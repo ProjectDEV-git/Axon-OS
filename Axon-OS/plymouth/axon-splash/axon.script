@@ -1,0 +1,75 @@
+// Axon OS Plymouth Boot Splash
+// Dark background: #0d0d10
+
+Window.SetBackgroundTopColor(0.05, 0.05, 0.06);
+Window.SetBackgroundBottomColor(0.05, 0.05, 0.06);
+
+// --- Logo ---
+logo_image = Image("logo.png");
+logo_sprite = Sprite(logo_image);
+logo_sprite.SetX(Window.GetWidth()  / 2 - logo_image.GetWidth()  / 2);
+logo_sprite.SetY(Window.GetHeight() / 2 - logo_image.GetHeight() / 2);
+logo_sprite.SetOpacity(0);
+
+// --- Progress bar ---
+bar_height    = 4;
+bar_y         = Window.GetHeight() - 48;
+bar_width_max = Window.GetWidth() * 0.5;
+bar_x         = (Window.GetWidth() - bar_width_max) / 2;
+
+// Background track
+bar_bg_image = Image.CreateFilledRectangle(bar_width_max, bar_height, 0x1e, 0x1e, 0x23, 0xff);
+bar_bg_sprite = Sprite(bar_bg_image);
+bar_bg_sprite.SetX(bar_x);
+bar_bg_sprite.SetY(bar_y);
+bar_bg_sprite.SetOpacity(0);
+
+// Fill (violet #a78bfa -> 0.65, 0.54, 0.98)
+bar_fill_image = Image.CreateFilledRectangle(1, bar_height, 0xa7, 0x8b, 0xfa, 0xff);
+bar_fill_sprite = Sprite(bar_fill_image);
+bar_fill_sprite.SetX(bar_x);
+bar_fill_sprite.SetY(bar_y);
+bar_fill_sprite.SetOpacity(0);
+
+// --- State ---
+progress      = 0.0;
+fade_opacity  = 0.0;
+fade_done     = 0;
+
+// --- Callbacks ---
+fun refresh_callback() {
+    // Fade-in: increase opacity by 0.05 per tick until fully visible
+    if (fade_done == 0) {
+        fade_opacity = fade_opacity + 0.05;
+        if (fade_opacity >= 1.0) {
+            fade_opacity = 1.0;
+            fade_done = 1;
+        }
+        logo_sprite.SetOpacity(fade_opacity);
+        bar_bg_sprite.SetOpacity(fade_opacity);
+        bar_fill_sprite.SetOpacity(fade_opacity);
+    }
+
+    // Resize fill sprite according to current progress
+    fill_width = Math.Int(bar_width_max * progress);
+    if (fill_width < 1) {
+        fill_width = 1;
+    }
+    bar_fill_sprite.SetImage(
+        Image.CreateFilledRectangle(fill_width, bar_height, 0xa7, 0x8b, 0xfa, 0xff)
+    );
+}
+
+fun boot_progress_callback(duration, progress_value) {
+    progress = progress_value;
+}
+
+fun quit_callback() {
+    logo_sprite.SetOpacity(0);
+    bar_bg_sprite.SetOpacity(0);
+    bar_fill_sprite.SetOpacity(0);
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+Plymouth.SetBootProgressFunction(boot_progress_callback);
+Plymouth.SetQuitFunction(quit_callback);

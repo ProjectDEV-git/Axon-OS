@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Axon Settings
+GenericName=Settings Assistant
+Comment=AI settings assistant to configure system parameters via natural language
+Exec=python3 AXON_APPS_DIR/axon-settings/main.py
+Icon=org.gnome.Settings
+Terminal=false
+StartupNotify=true
+Categories=System;Settings;Core;
+Keywords=axon;settings;assistant;control;configuration;wifi;brightness;volume;theme;
+X-GNOME-Autostart-enabled=false

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Axon Intent Bar
+GenericName=AI Intent Bar
+Comment=AI-powered command bar for Axon OS — invoke with Super+Space
+Exec=python3 AXON_APPS_DIR/axon-intent-bar/main.py
+Icon=axon-intent-bar
+Terminal=false
+StartupNotify=true
+Categories=Utility;AI;Productivity;
+Keywords=axon;ai;intent;command;search;
+Hidden=true
+NoDisplay=false
+X-GNOME-Autostart-enabled=false

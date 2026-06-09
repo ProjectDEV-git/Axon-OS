@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Axon AI Panel
+GenericName=AI Side Panel
+Comment=Persistent AI assistant panel for Axon OS — invoke with Super+A
+Exec=python3 AXON_APPS_DIR/axon-ai-panel/main.py
+Icon=axon-ai-panel
+Terminal=false
+StartupNotify=true
+Categories=Utility;AI;Productivity;
+Keywords=axon;ai;panel;assistant;chat;
+NoDisplay=true
+X-GNOME-Autostart-enabled=false
