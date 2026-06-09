@@ -1,0 +1,61 @@
+# Calamares branding descriptor — Axon OS
+# https://github.com/calamares/calamares/blob/calamares/src/branding/default/branding.desc
+
+---
+
+componentName: axon
+
+# -----------------------------------------------------------------------
+# Strings displayed in the installer UI
+# -----------------------------------------------------------------------
+strings:
+    productName:         "Axon OS"
+    shortProductName:    "Axon"
+    version:             "0.1.0"
+    shortVersion:        "0.1"
+    versionedName:       "Axon OS 0.1.0"
+    shortVersionedName:  "Axon 0.1"
+    bootloaderEntryName: "Axon OS"
+    productUrl:          "https://github.com/axonos/axon-os"
+    supportUrl:          "https://github.com/axonos/axon-os/issues"
+    knownIssuesUrl:      "https://github.com/axonos/axon-os/issues"
+    releaseNotesUrl:     "https://github.com/axonos/axon-os/releases"
+
+# -----------------------------------------------------------------------
+# Images — paths are relative to this branding directory
+# -----------------------------------------------------------------------
+images:
+    productLogo:    "logo.png"
+    productIcon:    "icon.png"
+    productWelcome: "welcome.png"
+
+# -----------------------------------------------------------------------
+# Slideshow shown during installation
+# -----------------------------------------------------------------------
+slideshow: "AxonSlideshow.qml"
+
+# Slideshow API version (1 = simple, 2 = with signals).
+slideshowAPI: 2
+
+# -----------------------------------------------------------------------
+# Style / colors
+# -----------------------------------------------------------------------
+style:
+    # Sidebar background
+    sidebarBackground:  "#09090f"
+    # Sidebar text
+    sidebarText:        "#e2e8f0"
+    # Sidebar menu highlight background
+    sidebarTextSelect:  "#8b5cf6"
+    # Sidebar menu selected text
+    sidebarTextHighlight: "#ffffff"
+
+    # Main window background
+    windowBackground:   "#0f0f17"
+
+    # Accent / highlight color (violet)
+    highlightColor:     "#8b5cf6"
+
+    # Fonts
+    fontFamily:         "Inter"
+    bodyFontSize:       "10"

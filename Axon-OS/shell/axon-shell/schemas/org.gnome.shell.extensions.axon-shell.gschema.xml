@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.axon-shell"
+          path="/org/gnome/shell/extensions/axon-shell/">
+
+    <!-- Intent Bar toggle: Super+Space -->
+    <key name="toggle-intent-bar" type="as">
+      <default>["&lt;Super&gt;space"]</default>
+      <summary>Toggle Intent Bar</summary>
+      <description>Keybinding to show or hide the Axon Intent Bar.</description>
+    </key>
+
+    <!-- AI Panel toggle: Super+A -->
+    <key name="toggle-ai-panel" type="as">
+      <default>["&lt;Super&gt;a"]</default>
+      <summary>Toggle AI Panel</summary>
+      <description>Keybinding to show or hide the Axon AI Panel.</description>
+    </key>
+
+    <!-- Space 1: Super+1 -->
+    <key name="switch-to-space-1" type="as">
+      <default>["&lt;Super&gt;1"]</default>
+      <summary>Switch to Space 1 (Code)</summary>
+      <description>Keybinding to activate Space 1.</description>
+    </key>
+
+    <!-- Space 2: Super+2 -->
+    <key name="switch-to-space-2" type="as">
+      <default>["&lt;Super&gt;2"]</default>
+      <summary>Switch to Space 2 (Web)</summary>
+      <description>Keybinding to activate Space 2.</description>
+    </key>
+
+    <!-- Space 3: Super+3 -->
+    <key name="switch-to-space-3" type="as">
+      <default>["&lt;Super&gt;3"]</default>
+      <summary>Switch to Space 3 (Chat)</summary>
+      <description>Keybinding to activate Space 3.</description>
+    </key>
+
+    <!-- Space 4: Super+4 -->
+    <key name="switch-to-space-4" type="as">
+      <default>["&lt;Super&gt;4"]</default>
+      <summary>Switch to Space 4 (Files)</summary>
+      <description>Keybinding to activate Space 4.</description>
+    </key>
+
+    <!-- Space 5: Super+5 -->
+    <key name="switch-to-space-5" type="as">
+      <default>["&lt;Super&gt;5"]</default>
+      <summary>Switch to Space 5 (Media)</summary>
+      <description>Keybinding to activate Space 5.</description>
+    </key>
+
+    <!-- Space 6: Super+6 -->
+    <key name="switch-to-space-6" type="as">
+      <default>["&lt;Super&gt;6"]</default>
+      <summary>Switch to Space 6 (Work)</summary>
+      <description>Keybinding to activate Space 6.</description>
+    </key>
+
+    <!-- Space 7: Super+7 -->
+    <key name="switch-to-space-7" type="as">
+      <default>["&lt;Super&gt;7"]</default>
+      <summary>Switch to Space 7 (Personal)</summary>
+      <description>Keybinding to activate Space 7.</description>
+    </key>
+
+    <!-- Space 8: Super+8 -->
+    <key name="switch-to-space-8" type="as">
+      <default>["&lt;Super&gt;8"]</default>
+      <summary>Switch to Space 8 (Terminal)</summary>
+      <description>Keybinding to activate Space 8.</description>
+    </key>
+
+    <!-- Space 9: Super+9 -->
+    <key name="switch-to-space-9" type="as">
+      <default>["&lt;Super&gt;9"]</default>
+      <summary>Switch to Space 9 (Notes)</summary>
+      <description>Keybinding to activate Space 9.</description>
+    </key>
+
+  </schema>
+</schemalist>

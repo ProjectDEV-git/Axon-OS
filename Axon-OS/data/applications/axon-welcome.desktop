@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Welcome to Axon OS
+GenericName=Welcome
+Comment=Get started with Axon OS — tour features and configure your AI assistant
+Exec=python3 AXON_APPS_DIR/axon-welcome/main.py
+Icon=axon-welcome
+Terminal=false
+StartupNotify=true
+Categories=Utility;AI;Productivity;
+Keywords=axon;welcome;setup;onboarding;
+NoDisplay=false
+X-GNOME-Autostart-enabled=false

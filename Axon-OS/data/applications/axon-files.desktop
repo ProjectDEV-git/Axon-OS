@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Axon Files
+GenericName=File Manager
+Comment=AI-powered semantic file manager for Axon OS
+Exec=python3 AXON_APPS_DIR/axon-files/main.py
+Icon=system-file-manager
+Terminal=false
+StartupNotify=true
+Categories=System;Utility;Core;
+Keywords=axon;files;manager;semantic;search;ai;index;
+X-GNOME-Autostart-enabled=false

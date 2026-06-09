@@ -1,0 +1,9 @@
+{
+  "name": "Axon Shell",
+  "description": "AI-native shell for Axon OS: Intent Bar, AI Panel, named Spaces with OSD.",
+  "uuid": "axon-shell@axon-os",
+  "version": 2,
+  "shell-version": ["45", "46", "47", "48"],
+  "settings-schema": "org.gnome.shell.extensions.axon-shell",
+  "url": "https://github.com/kaorii-ako/Axon-OS"
+}

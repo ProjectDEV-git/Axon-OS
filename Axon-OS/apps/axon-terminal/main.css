@@ -1,0 +1,138 @@
+/*
+ * main.css — Styling for Axon Terminal.
+ *
+ * Dark terminal with Axon-branded colours.
+ * Background: #0f0f14  |  Text: #e4e4e8  |  Accent: #c4b5fd (purple)
+ */
+
+/* ---- Header bar ---- */
+.header-bar {
+    background: linear-gradient(180deg, #0a0a12 0%, #0f0f14 100%);
+    border-bottom: 1px solid #2a2a3e;
+    color: #e4e4e8;
+}
+
+/* ---- AI toggle button in header ---- */
+.ai-toggle-btn {
+    background: linear-gradient(135deg, rgba(196, 181, 253, 0.15) 0%, rgba(196, 181, 253, 0.08) 100%);
+    color: #c4b5fd;
+    border: 1px solid rgba(196, 181, 253, 0.25);
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-weight: 600;
+    font-size: 12px;
+}
+.ai-toggle-btn:hover {
+    background: linear-gradient(135deg, rgba(196, 181, 253, 0.25) 0%, rgba(196, 181, 253, 0.15) 100%);
+    border-color: #c4b5fd;
+}
+
+/* ---- Tab bar ---- */
+tabbar {
+    background-color: #0a0a12;
+    border-bottom: 1px solid #2a2a3e;
+}
+
+tabbar tab {
+    background-color: #12121c;
+    border-radius: 6px 6px 0 0;
+    color: #8888a0;
+    padding: 4px 12px;
+    margin: 2px 1px 0 1px;
+}
+
+tabbar tab:selected {
+    background-color: #0f0f14;
+    color: #e4e4e8;
+    border-bottom: 2px solid #c4b5fd;
+}
+
+tabbar tab:hover:not(:selected) {
+    background-color: #18182a;
+    color: #c4c4d4;
+}
+
+/* ---- AI Diagnosis overlay ---- */
+.diagnosis-box {
+    background: linear-gradient(180deg, #12121e 0%, #0d0d18 100%);
+    border-top: 2px solid #c4b5fd;
+    border-radius: 0;
+    padding: 12px 16px;
+}
+
+.diagnosis-title {
+    color: #c4b5fd;
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.diagnosis-text {
+    color: #d0d0dc;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.diagnosis-dismiss {
+    color: #5a5a78;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.diagnosis-dismiss:hover {
+    color: #f87171;
+    background-color: rgba(248, 113, 113, 0.1);
+}
+
+/* ---- Suggestion chips ---- */
+.suggestion-chip {
+    background-color: rgba(196, 181, 253, 0.08);
+    color: #c4b5fd;
+    border: 1px solid rgba(196, 181, 253, 0.2);
+    border-radius: 9999px;
+    padding: 3px 12px;
+    font-size: 11px;
+    font-family: monospace;
+}
+.suggestion-chip:hover {
+    background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
+    color: #0f0f14;
+    border-color: #c4b5fd;
+}
+
+/* ---- Natural language command bar ---- */
+.nl-bar {
+    background: linear-gradient(180deg, #12121e 0%, #0f0f18 100%);
+    border-top: 1px solid #2a2a3e;
+    padding: 8px 12px;
+}
+
+.nl-icon {
+    color: #c4b5fd;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.nl-bar entry {
+    background-color: #1a1a28;
+    color: #e4e4e8;
+    border: 1px solid #2a2a3e;
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+.nl-bar entry:focus {
+    border-color: #c4b5fd;
+    box-shadow: 0 0 0 2px rgba(196, 181, 253, 0.15);
+}
+
+.nl-preview {
+    color: #86efac;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 4px 12px;
+    margin-left: 28px;
+}
+
+/* ---- Global window background ---- */
+window {
+    background-color: #0f0f14;
+}

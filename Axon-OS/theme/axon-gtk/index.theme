@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Axon
+Comment=Axon OS flat dark theme
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=Axon
+MetacityTheme=Axon
+IconTheme=Axon-Icons
+CursorTheme=default
+ButtonLayout=close,minimize,maximize:

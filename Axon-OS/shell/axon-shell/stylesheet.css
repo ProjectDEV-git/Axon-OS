@@ -1,0 +1,342 @@
+/* =============================================================================
+   Axon OS — GNOME Shell Extension Stylesheet
+   Design System: Deep violet-accented dark UI
+   ============================================================================= */
+
+
+/* =============================================================================
+   INTENT BAR
+   ============================================================================= */
+
+.axon-intentbar {
+    background-color: #09090f;
+    border: 1px solid #3a3a58;
+    border-radius: 16px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.4);
+    min-width: 680px;
+    padding: 20px 24px 16px 24px;
+}
+
+/* Input field — target both the St.Entry wrapper and the inner ClutterText */
+.axon-intentbar-input,
+.axon-intentbar-input StEntry,
+.axon-intentbar-input > StEntry {
+    background-color: transparent;
+    background: transparent;
+    color: #e8e8f4;
+    font-size: 20px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    caret-color: #8b5cf6;
+    padding: 4px 0;
+    selection-background-color: rgba(139, 92, 246, 0.28);
+}
+
+/* Remove focus ring on the entry wrapper */
+.axon-intentbar-input:focus,
+.axon-intentbar-input StEntry:focus {
+    border: none;
+    box-shadow: none;
+    background-color: transparent;
+}
+
+/* ─── Response area ─────────────────────────────────────────────────────────── */
+
+.axon-response {
+    color: #9090b8;
+    font-size: 13px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    border-top: 1px solid #2a2a42;
+    margin-top: 12px;
+    padding-top: 12px;
+}
+
+/* ─── Suggestion chips ──────────────────────────────────────────────────────── */
+
+.axon-chips-row {
+    spacing: 8px;
+    margin-top: 12px;
+}
+
+.axon-chip {
+    border-radius: 9999px;
+    background-color: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    color: #8b5cf6;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+}
+
+.axon-chip:hover {
+    background-color: #8b5cf6;
+    color: #ffffff;
+    border-color: #8b5cf6;
+}
+
+/* ─── Hint bar ──────────────────────────────────────────────────────────────── */
+
+.axon-hint-bar {
+    spacing: 16px;
+    margin-top: 8px;
+}
+
+.axon-hint-label {
+    color: #50507a;
+    font-size: 11px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+}
+
+/* ─── Separator ─────────────────────────────────────────────────────────────── */
+
+.axon-separator {
+    background-color: #2a2a42;
+    height: 1px;
+    margin: 2px 0;
+}
+
+
+/* =============================================================================
+   SPACE INDICATOR — top panel
+   ============================================================================= */
+
+.axon-space-indicator {
+    spacing: 6px;
+    padding: 0 10px;
+}
+
+.axon-space-dot {
+    font-size: 8px;
+}
+
+.axon-space-label {
+    font-size: 13px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    color: #e8e8f4;
+}
+
+
+/* =============================================================================
+   AI BUTTON — top panel
+   ============================================================================= */
+
+.axon-ai-panel-btn {
+    color: #8b5cf6;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    padding: 0 10px;
+    border-radius: 6px;
+}
+
+.axon-ai-panel-btn:hover {
+    background-color: rgba(139, 92, 246, 0.15);
+}
+
+.axon-ai-status-online {
+    color: #10b981;
+}
+
+.axon-ai-status-offline {
+    color: #ef4444;
+}
+
+.axon-ai-status-busy {
+    color: #8b5cf6;
+}
+
+
+/* =============================================================================
+   DOCK — macOS-style floating bottom panel
+   ============================================================================= */
+
+/**
+ * Pill-shaped glass container.
+ * Glass effect: semi-transparent dark fill + blur hint via box-shadow layering.
+ * border-radius 36px gives a fully pill look at 72 px height.
+ */
+.axon-dock {
+    background-color: rgba(10, 10, 18, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 36px;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.70),
+        0 2px  8px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    padding: 8px 16px;
+    spacing: 0;
+}
+
+/**
+ * Individual icon button cell.
+ * 56 × 56 px touch target, rounded for comfortable click area.
+ * Hover lifts the icon slightly via a top-border trick (CSS only — no JS).
+ */
+.axon-dock-icon {
+    border-radius: 14px;
+    padding: 4px;
+    width: 56px;
+    height: 56px;
+    transition-duration: 120ms;
+    transition-timing-function: ease-out;
+    background-color: transparent;
+    border: 1px solid transparent;
+}
+
+.axon-dock-icon:hover {
+    background-color: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.28);
+}
+
+.axon-dock-icon:focus {
+    background-color: rgba(139, 92, 246, 0.18);
+    border-color: rgba(139, 92, 246, 0.50);
+}
+
+/**
+ * Running-app indicator dot — sits just below the icon inside the cell.
+ */
+.axon-dock-dot {
+    font-size: 6px;
+    color: #8b5cf6;
+    text-align: center;
+    height: 8px;
+    margin-top: -2px;
+}
+
+/**
+ * Vertical separator before the pinned launchers section.
+ */
+.axon-dock-separator {
+    width: 1px;
+    height: 36px;
+    background-color: rgba(255, 255, 255, 0.10);
+    margin: 0 10px;
+}
+
+/**
+ * Tooltip label that floats above icons on hover.
+ */
+.axon-dock-tooltip {
+    background-color: rgba(9, 9, 15, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.60);
+    color: #e8e8f4;
+    font-size: 12px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    font-weight: 500;
+    padding: 4px 10px;
+}
+
+
+/* =============================================================================
+   SPACE OSD OVERLAY — shown when switching spaces
+   ============================================================================= */
+
+.axon-space-osd {
+    background-color: rgba(9, 9, 15, 0.9);
+    border: 1px solid #3a3a58;
+    border-radius: 20px;
+    padding: 24px 48px;
+    min-width: 280px;
+}
+
+.axon-space-osd-name {
+    font-size: 28px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    color: #e8e8f4;
+    font-weight: bold;
+}
+
+.axon-space-osd-index {
+    font-size: 13px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    color: #9090b8;
+}
+
+.axon-space-osd-number {
+    font-size: 48px;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    color: #8b5cf6;
+    font-weight: bold;
+}
+
+
+/* =============================================================================
+   DOCK — additional macOS-premium classes
+   ============================================================================= */
+
+.axon-dock {
+    background-color: rgba(15, 15, 25, 0.85);
+    border: 1px solid rgba(58, 58, 88, 0.8);
+    border-radius: 20px;
+    padding: 8px 16px;
+    spacing: 6px;
+}
+.axon-dock-icon {
+    border-radius: 12px;
+    padding: 4px;
+    transition-duration: 200ms;
+}
+.axon-dock-icon:hover {
+    background-color: rgba(139, 92, 246, 0.18);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+}
+.axon-dock-running-dot {
+    color: #8b5cf6;
+    font-size: 6px;
+}
+.axon-dock-separator {
+    background-color: rgba(58, 58, 88, 0.6);
+    width: 1px;
+    margin: 4px 6px;
+}
+.axon-dock-tooltip {
+    background-color: #0d0d1a;
+    color: #e8e8f4;
+    border: 1px solid #2a2a42;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+/* =============================================================================
+   DOCK CONTEXT MENU (AI Predicted Actions)
+   ============================================================================= */
+
+.axon-dock-menu {
+    background-color: rgba(13, 13, 26, 0.95);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    spacing: 4px;
+}
+
+.axon-dock-menu-item {
+    padding: 8px 16px;
+    border-radius: 6px;
+    color: #e4e4e8;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    text-align: left;
+    background-color: transparent;
+}
+
+.axon-dock-menu-item:hover {
+    background-color: rgba(139, 92, 246, 0.22);
+    color: #ffffff;
+}
+
+.axon-dock-menu-title {
+    padding: 6px 16px;
+    color: #9090b8;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+}
