@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>Axon OS</vendor>
+  <vendor_url>https://github.com/kaorii-ako/Axon-OS</vendor_url>
+
+  <action id="org.axonos.install-engine">
+    <description>Run the Axon OS system installer</description>
+    <message>Authentication is required to install Axon OS</message>
+    <icon_name>system-software-install</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/axon-install-engine</annotate>
+  </action>
+</policyconfig>

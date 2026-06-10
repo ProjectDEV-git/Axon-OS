@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Install Axon OS
+GenericName=System Installer
+Comment=Install Axon OS to your hard disk — full wipe or dual boot, with AI setup
+Exec=python3 AXON_APPS_DIR/axon-installer/main.py
+Icon=system-software-install
+Terminal=false
+StartupNotify=true
+Categories=System;Settings;
+Keywords=installer;install;system;axon;setup;dual boot;
+NoDisplay=false
+X-GNOME-Autostart-enabled=false

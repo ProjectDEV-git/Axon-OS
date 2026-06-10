@@ -34,7 +34,7 @@ sudo bash build/build.sh
 The script will:
 1. Bootstrap a minimal Ubuntu 24.04 (noble) root filesystem with `debootstrap`.
 2. Install the kernel, `casper` (Ubuntu live-boot), GNOME, and all Axon OS components into the chroot (`build/config/chroot-setup.sh`).
-3. Apply Axon branding: GTK theme, gschema defaults, Plymouth splash, wallpaper, Calamares installer.
+3. Apply Axon branding: GTK theme, gschema defaults, Plymouth splash, wallpaper, and the native Axon Installer.
 4. Build a SquashFS image of the root filesystem.
 5. Wrap everything in a hybrid BIOS + UEFI bootable ISO with GRUB and `xorriso`.
 
@@ -111,69 +111,37 @@ docker run --rm \
 
 > Note: `--privileged` is required for `debootstrap` and loop-device operations inside the container. Rootless Docker is not supported for the build stage.
 
-## Graphical Installer (Calamares)
+## Graphical Installer (Axon Installer)
 
-Axon OS ships a fully configured [Calamares](https://calamares.io/) graphical installer so users can install the system from the live ISO without using a terminal.
-
-### Installer layout
-
-```
-installer/
-├── settings.conf                   # Calamares top-level config (module sequence, branding name)
-├── branding/
-│   └── axon/
-│       ├── branding.desc           # Product strings, image paths, accent color (#8b5cf6)
-│       ├── AxonSlideshow.qml       # QML slideshow shown during package install
-│       ├── logo.png                # Product logo (add your own 256×256 PNG)
-│       ├── icon.png                # Product icon  (add your own 64×64 PNG)
-│       └── welcome.png             # Welcome screen image (add your own)
-└── modules/
-    ├── welcome.conf                # Requirement checks (storage ≥ 20 GiB, RAM ≥ 2 GiB)
-    └── finished.conf               # Post-install restart command
-```
+Axon OS ships its own native GTK4/libadwaita welcome and installation wizard (`apps/axon-installer/`). It autostarts when the ISO boots into the live session (`boot=casper` on the kernel command line) and walks the user through the full install — including AI setup, because Axon is an AI-centered OS.
 
 ### Install sequence
 
-The installer walks the user through these steps in order:
+| Step | Page | Description |
+|------|------|-------------|
+| 1 | Welcome | Try the live session, or start the install |
+| 2 | Internet | Wired status + Wi-Fi picker (`nmcli`); offline installs are allowed |
+| 3 | About You | Full name, username (auto-suggested), password, computer name |
+| 4 | Disk Setup | **Erase disk** (full wipe) or **install alongside another OS** (dual boot, uses the largest unallocated region ≥ 16 GiB) |
+| 5 | AI Setup | Install Ollama + pick a default local model, and/or add cloud providers (Anthropic, OpenAI, Google Gemini, OpenRouter) with API keys |
+| 6 | Summary | Review everything — nothing is written until Install is pressed |
+| 7 | Installing | Live progress from the root engine, with AI feature tips |
+| 8 | Finished | Reboot into the installed system or keep exploring live |
 
-| Step | Module | Description |
-|------|--------|-------------|
-| 1 | `welcome` | Requirement checks + language select |
-| 2 | `locale` | Timezone and locale |
-| 3 | `keyboard` | Keyboard layout |
-| 4 | `partition` | Disk partitioning (auto or manual) |
-| 5 | `users` | Create user account and hostname |
-| 6 | `summary` | Review all choices before writing |
-| — | *(exec)* | Partition, unpack, bootloader, locale hooks |
-| 7 | `finished` | Done — reboot or stay in live session |
+### Architecture
 
-### Build copies Calamares config automatically
-
-`build/build.sh` places the Calamares files in the correct locations inside the chroot overlay:
-
-| Source | Destination in live system |
-|--------|---------------------------|
-| `installer/settings.conf` | `/etc/calamares/settings.conf` |
-| `installer/branding/axon/` | `/usr/share/calamares/branding/axon/` |
-| `installer/modules/` | `/etc/calamares/modules/` |
-
-The `calamares` package is included in `build/config/packages.list` so it is installed into the live image automatically.
+- **UI** — `apps/axon-installer/ui/wizard.py`, runs unprivileged in the live session.
+- **Engine** — `apps/axon-installer/install_engine.py`, pure-stdlib Python run as root (`sudo -n` on the live session, `pkexec` via `/usr/local/bin/axon-install-engine` otherwise). It partitions (GPT via `sgdisk`/`parted`, BIOS + UEFI), formats, rsyncs the running live root to the target, writes fstab/swapfile, creates the user, removes live-session artifacts (casper, autologin, live user), installs GRUB (with `os-prober` enabled for dual boot), and provisions AI choices.
+- **Progress protocol** — the engine prints `AXON-PROGRESS:<pct>:<msg>` / `AXON-ERROR:<msg>` / `AXON-DONE` lines that the UI renders live.
+- **AI provisioning** — provider API keys are written to the new user's `~/.axon/config.toml` (mode 600, never under `/etc`). Ollama install + model pull happens on the installed system's first online boot via `axon-ai-firstboot.service` (`build/config/ai-firstboot.sh`), so offline installs work too.
 
 ### Testing the installer in QEMU
 
-Boot the ISO and launch the installer from the welcome app or run:
+Boot the ISO with a blank virtual disk attached (see the QEMU section below) — the wizard appears automatically in the live session. To relaunch it manually:
 
 ```bash
-sudo calamares
+python3 /usr/lib/axon/apps/axon-installer/main.py
 ```
-
-Use the virtual-disk QEMU workflow described in the "Testing in QEMU" section below to perform a full end-to-end install test without touching real hardware.
-
-### Customizing branding
-
-1. Replace the placeholder image files (`logo.png`, `icon.png`, `welcome.png`) in `installer/branding/axon/` with your own artwork.
-2. Edit `installer/branding/axon/branding.desc` to change `productName`, `version`, or the accent `highlightColor`.
-3. Edit `installer/branding/axon/AxonSlideshow.qml` to add or change the slides shown during installation.
 
 ---
 

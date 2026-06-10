@@ -210,23 +210,52 @@ update-alternatives --set default.plymouth \
     /usr/share/plymouth/themes/axon/axon.plymouth
 
 # ---------------------------------------------------------------------------
-# 8. Custom Axon OS installer configuration
+# 8. Axon Installer (native welcome + install wizard)
 # ---------------------------------------------------------------------------
-log "Configuring custom Axon OS installer..."
-mkdir -p "${AXON_LIB}/installer"
-cp -r "${SRC}/installer/." "${AXON_LIB}/installer/"
-chmod +x "${AXON_LIB}/installer/axon-installer.py"
+log "Configuring the Axon Installer..."
 
-cat > /usr/share/applications/install-axon-os.desktop <<'EOF'
+# Root-engine wrapper, referenced by the polkit policy so pkexec can grant it
+cat > /usr/local/bin/axon-install-engine <<EOF
+#!/bin/sh
+exec /usr/bin/python3 ${APPS_DIR}/axon-installer/install_engine.py "\$@"
+EOF
+chmod 755 /usr/local/bin/axon-install-engine
+
+mkdir -p /usr/share/polkit-1/actions
+cp "${SRC}/data/polkit/org.axonos.install-engine.policy" /usr/share/polkit-1/actions/
+
+# AI first-boot provisioner: installs Ollama + pulls the chosen model on the
+# installed system's first online boot. The unit stays disabled in the image;
+# the install engine enables it on the target when the user opts in.
+install -Dm755 "${SRC}/build/config/ai-firstboot.sh" /usr/local/bin/axon-ai-firstboot
+cat > /usr/lib/systemd/system/axon-ai-firstboot.service <<'EOF'
+[Unit]
+Description=Axon OS AI first-boot setup (Ollama install + model pull)
+Wants=network-online.target
+After=network-online.target NetworkManager-wait-online.service
+ConditionPathExists=/etc/axon/ai-setup.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/axon-ai-firstboot
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Auto-launch the installer wizard in the live session only (boot=casper)
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/axon-installer-live.desktop <<EOF
 [Desktop Entry]
 Type=Application
-Name=Install Axon OS
-Comment=Install Axon OS to your hard disk
-Exec=sh -c "pkexec python3 /usr/lib/axon/installer/axon-installer.py || sudo -E python3 /usr/lib/axon/installer/axon-installer.py"
-Icon=system-software-install
+Name=Welcome to Axon OS
+Comment=Welcome and installation wizard for the live session
+Exec=sh -c "grep -q boot=casper /proc/cmdline && exec /usr/bin/python3 ${APPS_DIR}/axon-installer/main.py"
 Terminal=false
-Categories=System;
-Keywords=installer;axon;system;
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Phase=Applications
 EOF
 
 # ---------------------------------------------------------------------------

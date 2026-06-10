@@ -95,7 +95,7 @@ open-vm-tools-desktop
 spice-vdagent
 qemu-guest-agent
 
-# ── Installer Dependencies ────────────────────────────────────────────────────
+# ── Axon runtime extras ───────────────────────────────────────────────────────
 python3-watchdog
 distrobox
 podman
@@ -103,3 +103,12 @@ gstreamer1.0-plugins-base
 gstreamer1.0-plugins-good
 gstreamer1.0-tools
 
+# ── Installer (native Axon Installer engine dependencies) ────────────────────
+parted
+gdisk
+rsync
+dosfstools
+e2fsprogs
+efibootmgr
+grub-pc-bin
+policykit-1

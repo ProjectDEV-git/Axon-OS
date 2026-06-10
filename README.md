@@ -121,6 +121,7 @@ For the full architecture document, see [docs/architecture.md](docs/architecture
 Axon-OS/
 ├── apps/
 │   ├── axon-ai-panel/     # AI conversation side panel
+│   ├── axon-installer/    # Live-session welcome & install wizard (with AI setup)
 │   ├── axon-terminal/     # AI-powered terminal
 │   ├── axon-welcome/      # First-boot welcome & model setup wizard
 │   └── intent-bar/        # Natural language command palette
@@ -130,7 +131,7 @@ Axon-OS/
 ├── shell/
 │   └── axon-shell/        # GNOME Shell extension (dock, spaces, intent bar)
 ├── theme/                 # GTK4 dark theme
-├── installer/             # Calamares-based installer
+├── installer/             # Legacy Calamares branding assets (superseded by apps/axon-installer)
 ├── plymouth/              # Boot splash
 ├── build/                 # ISO build scripts
 ├── tests/                 # Integration and unit tests
