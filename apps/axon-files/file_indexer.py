@@ -15,6 +15,8 @@ try:
     dbus.mainloop.glib.threads_init()
 except Exception:
     pass
+from axon_logger import configure_app_logger
+logger = configure_app_logger(__name__)
 
 # Helper to format file size
 def format_size(size_in_bytes):
@@ -57,10 +59,10 @@ def fetch_embedding_dbus(prompt: str) -> list:
         if isinstance(embedding, list):
             return embedding
         elif isinstance(embedding, dict) and "error" in embedding:
-            print(f"D-Bus embedding error: {embedding['error']}")
+            logger.error("D-Bus embedding error: %s", embedding['error'])
             return []
     except Exception as e:
-        print(f"Error fetching embedding via D-Bus: {e}")
+        logger.exception("Error fetching embedding via D-Bus: %s", e)
     return []
 
 def get_all_files(roots):

@@ -9,6 +9,7 @@ import dbus
 import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
+from axon_logger import configure_app_logger
 
 AXON_DIR = Path.home() / ".axon"
 
@@ -17,10 +18,11 @@ class ContextService(dbus.service.Object):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
         
+        logger = configure_app_logger(__name__)
         try:
             self.bus_name = dbus.service.BusName('org.axonos.Context', bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
-            print("org.axonos.Context service is already running.")
+            logger.error("org.axonos.Context service is already running.")
             sys.exit(1)
             
         dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Context')
@@ -30,7 +32,7 @@ class ContextService(dbus.service.Object):
         self.active_window_app = "None"
         self.active_space = "Default"
         
-        print("Axon Context Engine Service registered successfully at /org/axonos/Context")
+        logger.info("Axon Context Engine Service registered successfully at /org/axonos/Context")
 
     # ------------------------------------------------------------------
     # D-Bus Mutation Methods (Called by Shell Extension / Hooks)
@@ -198,5 +200,6 @@ if __name__ == '__main__':
     try:
         loop.run()
     except KeyboardInterrupt:
-        print("Stopping Axon Context service...")
+        logger = configure_app_logger(__name__)
+        logger.info("Stopping Axon Context service...")
         loop.quit()

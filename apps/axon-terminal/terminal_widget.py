@@ -281,7 +281,9 @@ class TerminalWidget(Gtk.Box):
     ) -> None:
         """Callback after async shell spawn completes."""
         if error is not None:
-            print(f"[axon-terminal] Spawn error: {error.message}")
+            from axon_logger import configure_app_logger
+            logger = configure_app_logger(__name__)
+            logger.error("[axon-terminal] Spawn error: %s", error.message)
             return
         # Find and update the tab
         for tab in self._tabs:

@@ -16,7 +16,9 @@ class SettingsExecutor:
             brain_obj = self._bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
             self._brain = dbus.Interface(brain_obj, "org.axonos.Brain")
         except Exception as e:
-            print(f"[axon-settings] DBus connection error: {e}")
+            from axon_logger import configure_app_logger
+            logger = configure_app_logger(__name__)
+            logger.exception("[axon-settings] DBus connection error: %s", e)
             self._brain = None
 
     def execute_command(self, query: str) -> dict:

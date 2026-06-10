@@ -484,7 +484,9 @@ class FilesWindow(Adw.ApplicationWindow):
         try:
             subprocess.Popen(["xdg-open", file_path])
         except Exception as e:
-            print(f"Error opening file {file_path}: {e}")
+            from axon_logger import configure_app_logger
+            logger = configure_app_logger(__name__)
+            logger.exception("Error opening file %s: %s", file_path, e)
 
     # --- Sync Index background worker ---
     def on_sync_clicked(self, btn):
@@ -624,7 +626,9 @@ def list_directory_contents(dir_path, indexer):
                         'similarity': 0.0
                     })
     except Exception as e:
-        print(f"Error listing folder contents: {e}")
+        from axon_logger import configure_app_logger
+        logger = configure_app_logger(__name__)
+        logger.exception("Error listing folder contents: %s", e)
         
     dirs = [x for x in items if x['is_dir']]
     files = [x for x in items if not x['is_dir']]

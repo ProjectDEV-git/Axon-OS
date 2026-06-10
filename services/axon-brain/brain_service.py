@@ -6,6 +6,7 @@ import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
+from axon_logger import configure_app_logger
 
 import dbus
 import dbus.mainloop.glib
@@ -30,10 +31,11 @@ class BrainService(dbus.service.Object):
         self.session_bus = dbus.SessionBus()
         
         # Request name org.axonos.Brain
+        logger = configure_app_logger(__name__)
         try:
             self.bus_name = dbus.service.BusName('org.axonos.Brain', bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
-            print("org.axonos.Brain service is already running.")
+            logger.error("org.axonos.Brain service is already running.")
             sys.exit(1)
             
         dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Brain')
@@ -41,7 +43,7 @@ class BrainService(dbus.service.Object):
         # Initialize sub-components
         self.store = ConversationStore()
         self.load_config()
-        print("Axon Brain D-Bus Service registered successfully at /org/axonos/Brain")
+        logger.info("Axon Brain D-Bus Service registered successfully at /org/axonos/Brain")
 
     def save_config(self):
         """Saves current configuration to TOML format."""
@@ -53,7 +55,7 @@ class BrainService(dbus.service.Object):
                 content += f'{k} = "{escaped_v}"\n'
             CONFIG_FILE.write_text(content)
         except Exception as e:
-            print(f"Error saving config to {CONFIG_FILE}: {e}")
+            logger.exception("Error saving config to %s: %s", CONFIG_FILE, e)
 
     def load_config(self):
         """Loads model config, profiles hardware if not present."""
@@ -425,5 +427,6 @@ if __name__ == '__main__':
     try:
         loop.run()
     except KeyboardInterrupt:
-        print("Stopping Axon Brain service...")
+        logger = configure_app_logger(__name__)
+        logger.info("Stopping Axon Brain service...")
         loop.quit()

@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass, field
+from axon_logger import configure_app_logger
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -49,8 +50,9 @@ class Partitioner:
 
     def _run(self, cmd: list[str]) -> subprocess.CompletedProcess[str]:
         """Run *cmd*, or just print it when dry_run is True."""
+        logger = configure_app_logger(__name__)
         if self.dry_run:
-            print("DRY-RUN:", " ".join(cmd))
+            logger.info("DRY-RUN: %s", " ".join(cmd))
             return subprocess.CompletedProcess(cmd, returncode=0, stdout="", stderr="")
         return subprocess.run(cmd, capture_output=True, text=True, check=True)
 
@@ -153,11 +155,12 @@ class Partitioner:
         if mode != "erase":
             raise ValueError(f"Unsupported partitioning mode: {mode!r}")
 
+        logger = configure_app_logger(__name__)
         try:
             self.create_partitions(device)
             return True
         except subprocess.CalledProcessError as exc:
-            print(f"Partitioning failed: {exc.stderr}")
+            logger.error("Partitioning failed: %s", exc.stderr)
             return False
 
     def partition_alongside(self, device: str, partition_num: int, shrink_size_gb: int) -> int | None:
@@ -168,8 +171,9 @@ class Partitioner:
         try:
             pmap = self.get_partition_map(device)
             target = next((p for p in pmap if p["num"] == partition_num), None)
+            logger = configure_app_logger(__name__)
             if not target:
-                print(f"Partition {partition_num} not found on {device}")
+                logger.error("Partition %s not found on %s", partition_num, device)
                 return None
             
             # Calculate new size in MiB
@@ -177,7 +181,7 @@ class Partitioner:
             original_size_mib = target["size"]
             new_size_mib = original_size_mib - shrink_size_mib
             if new_size_mib < 10240: # Leave at least 10 GB
-                print(f"Cannot shrink partition {partition_num} below 10GB")
+                logger.warning("Cannot shrink partition %s below 10GB", partition_num)
                 return None
                 
             # Resolve partition device path (e.g. /dev/sda2 or /dev/nvme0n1p2)
@@ -191,7 +195,7 @@ class Partitioner:
             elif target["fstype"] in ("ntfs", "fuseblk"):
                 self._run(["ntfsresize", "-y", "--size", f"{int(new_size_mib)}M", part_path])
             else:
-                print(f"Unsupported filesystem type: {target['fstype']}")
+                logger.error("Unsupported filesystem type: %s", target['fstype'])
                 return None
                 
             # Step 2: Shrink the partition itself
@@ -208,7 +212,7 @@ class Partitioner:
             new_part = max(p["num"] for p in updated_map) if updated_map else partition_num + 1
             return new_part
         except Exception as e:
-            print(f"Partition alongside failed: {e}")
+            logger.exception("Partition alongside failed: %s", e)
             return None
 
     def create_partitions(self, device: str) -> None:
