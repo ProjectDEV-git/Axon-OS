@@ -73,6 +73,10 @@ if ! apt-get install -y "${PACKAGES[@]}"; then
     done
 fi
 
+log "Installing Python AI libraries inside chroot..."
+pip3 install faster-whisper sqlite-vec --break-system-packages || log "WARNING: Python AI libraries failed to install"
+
+
 # ---------------------------------------------------------------------------
 # 5. Axon OS components (system-wide)
 # ---------------------------------------------------------------------------
@@ -199,25 +203,23 @@ update-alternatives --set default.plymouth \
     /usr/share/plymouth/themes/axon/axon.plymouth
 
 # ---------------------------------------------------------------------------
-# 8. Calamares installer configuration
+# 8. Custom Axon OS installer configuration
 # ---------------------------------------------------------------------------
-log "Configuring Calamares..."
-mkdir -p /etc/calamares/modules /usr/share/calamares/branding/axon
-cp "${SRC}/installer/settings.conf" /etc/calamares/settings.conf
-cp "${SRC}/installer/modules/"*.conf /etc/calamares/modules/
-cp -r "${SRC}/installer/branding/axon/." /usr/share/calamares/branding/axon/
-rm -f /usr/share/calamares/branding/axon/generate_branding.py
+log "Configuring custom Axon OS installer..."
+mkdir -p "${AXON_LIB}/installer"
+cp -r "${SRC}/installer/." "${AXON_LIB}/installer/"
+chmod +x "${AXON_LIB}/installer/axon-installer.py"
 
 cat > /usr/share/applications/install-axon-os.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Install Axon OS
 Comment=Install Axon OS to your hard disk
-Exec=sh -c "pkexec calamares || sudo -E calamares"
-Icon=calamares
+Exec=sh -c "pkexec python3 /usr/lib/axon/installer/axon-installer.py || sudo -E python3 /usr/lib/axon/installer/axon-installer.py"
+Icon=system-software-install
 Terminal=false
 Categories=System;
-Keywords=installer;calamares;system;
+Keywords=installer;axon;system;
 EOF
 
 # ---------------------------------------------------------------------------

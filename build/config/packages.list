@@ -95,6 +95,11 @@ open-vm-tools-desktop
 spice-vdagent
 qemu-guest-agent
 
-# ── Installer ─────────────────────────────────────────────────────────────────
-calamares
-calamares-settings-ubuntu-common
+# ── Installer Dependencies ────────────────────────────────────────────────────
+python3-watchdog
+distrobox
+podman
+gstreamer1.0-plugins-base
+gstreamer1.0-plugins-good
+gstreamer1.0-tools
+
