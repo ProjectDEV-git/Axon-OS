@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Axon Terminal
+GenericName=Terminal Emulator
+Comment=AI-powered terminal emulator for Axon OS with smart error diagnosis
+Exec=python3 AXON_APPS_DIR/axon-terminal/main.py
+Icon=utilities-terminal
+Terminal=false
+StartupNotify=true
+Categories=System;TerminalEmulator;Utility;
+Keywords=axon;terminal;shell;console;command;ai;
+X-GNOME-Autostart-enabled=false

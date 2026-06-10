@@ -346,7 +346,7 @@ class AIPanelWindow(Adw.Window):
         self._ctx_reader = context_reader
         self._streaming = False
         self._stream_bubble: Optional[MessageBubble] = None
-        self._conversation: list[dict] = []
+        self._conv_id: str = ""
 
         # Apply CSS
         css_provider = Gtk.CssProvider()
@@ -483,6 +483,9 @@ class AIPanelWindow(Adw.Window):
         # Fetch real model list in background
         threading.Thread(target=self._fetch_models, daemon=True).start()
 
+        # Initialize D-Bus conversation session
+        self._init_conversation()
+
     # ------------------------------------------------------------------
     # Model management
     # ------------------------------------------------------------------
@@ -565,9 +568,30 @@ class AIPanelWindow(Adw.Window):
         dialog.connect("response", self._on_clear_confirmed)
         dialog.present()
 
+    def _init_conversation(self) -> None:
+        """Initialize the persistent conversation ID and load past messages."""
+        try:
+            convs = self._client.list_conversations()
+            if convs:
+                self._conv_id = convs[0]["id"]
+                messages = self._client.get_messages(self._conv_id)
+                for msg in messages:
+                    role = msg.get("role", "assistant")
+                    content = msg.get("content", "")
+                    bubble = self._add_bubble(role, content)
+                    bubble.set_final_text(content)
+            else:
+                self._conv_id = self._client.create_conversation(title="Active Chat")
+        except Exception:
+            self._conv_id = self._client.create_conversation(title="Active Chat")
+
     def _on_clear_confirmed(self, dialog: Adw.MessageDialog, response: str) -> None:
         if response == "clear":
-            self._conversation.clear()
+            try:
+                self._client.delete_conversation(self._conv_id)
+            except Exception:
+                pass
+            self._conv_id = self._client.create_conversation(title="Active Chat")
             child = self._messages_box.get_first_child()
             while child is not None:
                 next_child = child.get_next_sibling()
@@ -600,25 +624,19 @@ class AIPanelWindow(Adw.Window):
         self._entry.set_text("")
         self._add_bubble("user", text)
 
-        # Append user message to conversation history
-        self._conversation.append({"role": "user", "content": text})
-
         if not self._client.is_available():
-            err_text = "Ollama is not running. Start it with: ollama serve"
+            err_text = "Axon Brain service is offline or Ollama is not running."
             self._add_bubble("assistant", err_text)
-            self._conversation.append({"role": "assistant", "content": err_text})
             return
 
         ctx_string = self._ctx_reader.build_context_string()
         self._set_streaming(True)
         self._stream_bubble = self._add_bubble("assistant", "")
 
-        # Pass up to last 20 messages
-        recent_messages = self._conversation[-20:]
-
+        model = self._client.model
         thread = threading.Thread(
             target=self._stream_response,
-            args=(recent_messages, ctx_string),
+            args=(text, ctx_string, model),
             daemon=True,
         )
         thread.start()
@@ -631,16 +649,10 @@ class AIPanelWindow(Adw.Window):
         else:
             self._spinner.stop()
 
-    def _stream_response(self, messages: list[dict], ctx: str) -> None:
-        system_prompt = (
-            "You are Axon AI, a helpful desktop assistant integrated into Axon OS. "
-            "Be concise and practical. You can use **bold** and *italic* markdown. "
-            "Here is the user's current desktop context:\n\n" + ctx
-        )
-
+    def _stream_response(self, text: str, ctx: str, model: str) -> None:
         accumulated = ""
         try:
-            for chunk in self._client.chat_stream(messages, system=system_prompt):
+            for chunk in self._client.send_message_stream(self._conv_id, text, model=model):
                 accumulated += chunk
                 GLib.idle_add(self._on_chunk, chunk)
         except Exception as exc:
@@ -661,8 +673,6 @@ class AIPanelWindow(Adw.Window):
         if self._stream_bubble is not None:
             self._stream_bubble.set_final_text(full_text)
             self._stream_bubble = None
-        # Append assistant response to conversation history
-        self._conversation.append({"role": "assistant", "content": full_text})
         return False
 
     # ------------------------------------------------------------------

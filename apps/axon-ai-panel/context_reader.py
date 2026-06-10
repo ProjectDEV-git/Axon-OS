@@ -1,229 +1,101 @@
 """
 context_reader.py — ContextReader for Axon AI Panel.
 
-Gathers ambient context from the running desktop session so that the AI
-assistant has useful information without the user having to copy/paste.
+Retrieves consolidated session context on-demand from the org.axonos.Context 
+D-Bus service instead of scanning /proc and system log files directly.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import re
-import subprocess
-from pathlib import Path
-from typing import Optional
+import dbus
+from typing import Optional, Any
 
 
 class ContextReader:
-    """Collects desktop-level context for the AI panel system prompt."""
+    """Retrieves session context from the central Context Engine D-Bus service."""
 
-    # ------------------------------------------------------------------ #
-    #  Active window
-    # ------------------------------------------------------------------ #
+    def __init__(self) -> None:
+        self.bus = dbus.SessionBus()
+        self.context_obj: Any = None
+        self._connect()
+
+    def _connect(self) -> None:
+        if self.context_obj is None:
+            try:
+                self.context_obj = self.bus.get_object('org.axonos.Context', '/org/axonos/Context')
+            except Exception:
+                self.context_obj = None
+
+    def _get_context(self) -> Any:
+        self._connect()
+        return self.context_obj
 
     def get_active_window_title(self) -> Optional[str]:
-        """Return the title of the currently focused X11 window, or None."""
-        try:
-            result = subprocess.run(
-                ["xdotool", "getactivewindow", "getwindowname"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-            )
-            title = result.stdout.strip()
-            return title if title else None
-        except Exception:
-            return None
-
-    # ------------------------------------------------------------------ #
-    #  Open files in text editors
-    # ------------------------------------------------------------------ #
-
-    def get_open_files_in_editors(self) -> list[str]:
-        """
-        Scan /proc for known editor processes and return up to 10 unique
-        file paths that those processes have open.
-        """
-        editor_names: set[str] = {"gedit", "code", "vim", "nvim", "nano"}
-        found_pids: list[int] = []
-
-        try:
-            proc_path = Path("/proc")
-            for entry in proc_path.iterdir():
-                if not entry.name.isdigit():
-                    continue
-                comm_file = entry / "comm"
-                try:
-                    comm = comm_file.read_text().strip()
-                except OSError:
-                    continue
-                if comm in editor_names:
-                    found_pids.append(int(entry.name))
-        except Exception:
-            return []
-
-        unique_paths: list[str] = []
-        seen: set[str] = set()
-
-        for pid in found_pids:
-            fd_dir = Path(f"/proc/{pid}/fd")
+        """Return the title of the currently focused window, or None."""
+        ctx = self._get_context()
+        if ctx is not None:
             try:
-                for fd_entry in fd_dir.iterdir():
-                    try:
-                        target = os.readlink(str(fd_entry))
-                    except OSError:
-                        continue
-                    if not target.startswith("/"):
-                        continue
-                    p = Path(target)
-                    # Only include regular files (no sockets, pipes, etc.)
-                    try:
-                        if not p.is_file():
-                            continue
-                    except OSError:
-                        continue
-                    if target not in seen:
-                        seen.add(target)
-                        unique_paths.append(target)
-                    if len(unique_paths) >= 10:
-                        break
-            except (PermissionError, OSError):
-                continue
-            if len(unique_paths) >= 10:
-                break
-
-        return unique_paths
-
-    # ------------------------------------------------------------------ #
-    #  Recent terminal commands
-    # ------------------------------------------------------------------ #
-
-    def get_recent_terminal_commands(self, n: int = 10) -> list[str]:
-        """
-        Return the last *n* shell commands from bash or fish history.
-        Fish history entries use the format ``- cmd: <command>``.
-        """
-        # Try bash history first
-        bash_history = Path.home() / ".bash_history"
-        if bash_history.exists():
-            try:
-                lines = bash_history.read_text(errors="replace").splitlines()
-                commands = [l.strip() for l in lines if l.strip() and not l.startswith("#")]
-                return commands[-n:]
+                context_data = json.loads(ctx.GetActiveContext())
+                title = context_data.get("active_window", {}).get("title")
+                return str(title) if title and title != "None" else None
             except Exception:
                 pass
-
-        # Fall back to fish history
-        fish_history = Path.home() / ".local" / "share" / "fish" / "fish_history"
-        if fish_history.exists():
-            try:
-                text = fish_history.read_text(errors="replace")
-                commands = re.findall(r"^- cmd: (.+)$", text, re.MULTILINE)
-                return commands[-n:]
-            except Exception:
-                pass
-
-        return []
-
-    # ------------------------------------------------------------------ #
-    #  Last terminal stderr
-    # ------------------------------------------------------------------ #
-
-    def get_last_terminal_stderr(self) -> Optional[str]:
-        """
-        Return the contents of ``~/.axon/last_stderr`` if it exists,
-        otherwise None.
-        """
-        stderr_file = Path.home() / ".axon" / "last_stderr"
-        try:
-            if stderr_file.exists():
-                content = stderr_file.read_text(errors="replace").strip()
-                return content if content else None
-        except Exception:
-            pass
         return None
 
-    # ------------------------------------------------------------------ #
-    #  Space context
-    # ------------------------------------------------------------------ #
+    def get_open_files_in_editors(self) -> list[str]:
+        """Scan known editor processes open file descriptors."""
+        ctx = self._get_context()
+        if ctx is not None:
+            try:
+                context_data = json.loads(ctx.GetActiveContext())
+                return list(context_data.get("open_files", []))
+            except Exception:
+                pass
+        return []
+
+    def get_recent_terminal_commands(self, n: int = 10) -> list[str]:
+        """Return the last shell commands from history."""
+        ctx = self._get_context()
+        if ctx is not None:
+            try:
+                context_data = json.loads(ctx.GetActiveContext())
+                commands = context_data.get("terminal_commands", [])
+                return list(commands[-n:])
+            except Exception:
+                pass
+        return []
+
+    def get_last_terminal_stderr(self) -> Optional[str]:
+        """Return the contents of last terminal error output."""
+        ctx = self._get_context()
+        if ctx is not None:
+            try:
+                context_data = json.loads(ctx.GetActiveContext())
+                err = context_data.get("last_stderr")
+                return str(err) if err else None
+            except Exception:
+                pass
+        return None
 
     def get_space_context(self) -> dict[str, Optional[str]]:
-        """
-        Read ``~/.axon/spaces.json`` and ``~/.axon/current_space`` to
-        return ``{"space_name": ..., "space_color": ...}``.
-        """
-        axon_dir = Path.home() / ".axon"
+        """Read and return name and color properties of the current space."""
+        ctx = self._get_context()
         result: dict[str, Optional[str]] = {"space_name": None, "space_color": None}
-
-        current_space_file = axon_dir / "current_space"
-        spaces_file = axon_dir / "spaces.json"
-
-        try:
-            space_name = current_space_file.read_text().strip()
-            result["space_name"] = space_name or None
-        except Exception:
-            return result
-
-        try:
-            spaces_data = json.loads(spaces_file.read_text())
-            if isinstance(spaces_data, dict):
-                space_info = spaces_data.get(result["space_name"], {})
-                result["space_color"] = space_info.get("color")
-            elif isinstance(spaces_data, list):
-                for item in spaces_data:
-                    if isinstance(item, dict) and item.get("name") == result["space_name"]:
-                        result["space_color"] = item.get("color")
-                        break
-        except Exception:
-            pass
-
+        if ctx is not None:
+            try:
+                context_data = json.loads(ctx.GetActiveContext())
+                result["space_name"] = context_data.get("active_space", "Default")
+            except Exception:
+                pass
         return result
 
-    # ------------------------------------------------------------------ #
-    #  Assembled context string
-    # ------------------------------------------------------------------ #
-
     def build_context_string(self) -> str:
-        """
-        Assemble all available context into a human-readable string
-        suitable for injection into an LLM system prompt.
-        """
-        parts: list[str] = []
-
-        # Active window
-        title = self.get_active_window_title()
-        if title:
-            parts.append(f"Active window: {title}")
-
-        # Space
-        space = self.get_space_context()
-        if space["space_name"]:
-            space_line = f"Current space: {space['space_name']}"
-            if space["space_color"]:
-                space_line += f" (color: {space['space_color']})"
-            parts.append(space_line)
-
-        # Open files
-        open_files = self.get_open_files_in_editors()
-        if open_files:
-            parts.append("Open files in editors:")
-            for f in open_files:
-                parts.append(f"  - {f}")
-
-        # Recent commands
-        cmds = self.get_recent_terminal_commands()
-        if cmds:
-            parts.append("Recent terminal commands:")
-            for cmd in cmds:
-                parts.append(f"  $ {cmd}")
-
-        # Last stderr
-        stderr = self.get_last_terminal_stderr()
-        if stderr:
-            parts.append(f"Last terminal error:\n{stderr}")
-
-        if not parts:
-            return "No desktop context available."
-
-        return "\n".join(parts)
+        """Fetch the fully formatted prompt-ready context string from D-Bus."""
+        ctx = self._get_context()
+        if ctx is not None:
+            try:
+                return str(ctx.GetContextString())
+            except Exception as e:
+                return f"Error retrieving context: {e}"
+        return "No desktop context available."

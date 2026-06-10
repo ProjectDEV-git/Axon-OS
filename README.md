@@ -3,7 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Build & Lint](https://github.com/kaorii-ako/Axon-OS/actions/workflows/build.yml/badge.svg)](https://github.com/kaorii-ako/Axon-OS/actions/workflows/build.yml)
 
-Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 24.04 LTS. Every AI capability runs entirely on-device through Ollama — no cloud accounts, no API keys, no data leaving your machine. It ships a purpose-built GNOME Shell environment with named workspaces, an intent-driven command bar, and a persistent AI side panel, giving you a cohesive experience where the operating system understands natural language without ever phoning home.
+Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 24.04 LTS. Every AI capability runs entirely on-device through Ollama — no cloud accounts, no API keys, no data leaving your machine.
+
+The operating system is built around two centralized D-Bus services — **Axon Brain** (AI inference, model management, conversation history) and **Axon Context** (ambient desktop awareness) — that power a purpose-built GNOME Shell environment with named workspaces, an intent-driven command bar, a persistent AI side panel, and AI-native applications.
 
 ## Screenshots
 
@@ -11,12 +13,15 @@ Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 24.04 LTS
 
 ## Features
 
-- **Spaces (Super+1-9)** — Named workspaces let you organise open windows by project or context. Each space can be labelled (e.g. "Code", "Research", "Chat") and instantly switched with a single keyboard shortcut.
-- **Intent Bar (Super+Space)** — A floating command bar that accepts natural-language input and maps it to system actions, app launches, and shell commands, powered by the local Ollama model.
-- **AI Panel (Super+A)** — A slide-in side panel that exposes a persistent conversation with the local AI assistant. Use it for summarisation, drafting, code help, or any freeform query — all offline.
-- **Local Ollama AI** — All inference runs locally via Ollama. The default model is `llama3.2:3b`, chosen for low VRAM requirements, but any Ollama-compatible model can be substituted in settings.
-- **GTK4 + libadwaita theming** — Native GNOME components with a custom Axon theme built on libadwaita for crisp HiDPI rendering and smooth dark/light mode transitions.
-- **Zero cloud dependency** — No telemetry, no mandatory accounts, no remote inference endpoints.
+- **Axon Brain (`org.axonos.Brain`)** — A centralized D-Bus AI gateway that handles Ollama communication, model lifecycle, task-to-model routing (Speed / General / Deep tiers), conversation persistence in SQLite, and streaming token generation — accessible to every app on the system.
+- **Axon Context (`org.axonos.Context`)** — An ambient context engine that tracks the active window, workspace, clipboard, open files, and terminal history, then feeds this context into AI queries for situationally-aware responses.
+- **Hardware Profiler** — Automatically scans your system RAM, GPU vendor (NVIDIA / AMD / Intel), and VRAM to recommend three local models: a **Speed** tier for instant responses, a **General** tier for daily use, and a **Deep** tier for complex reasoning and coding.
+- **Spaces (Super+1-9)** — Named workspaces with AI-powered window auto-routing. Open a terminal and it routes to the "Terminal" space; open VS Code and it goes to "Code". Each space carries its own context.
+- **Intent Bar (Super+Space)** — A floating command bar that accepts natural-language input and maps it to system actions, app launches, and shell commands through the Brain service.
+- **AI Panel (Super+A)** — A slide-in side panel with persistent, context-aware AI conversations. The panel automatically includes your desktop context (active window, open files, recent commands) in every query.
+- **Axon Terminal** — An AI-powered terminal with automatic error diagnosis, natural-language-to-command conversion, and smart suggestions when commands fail.
+- **GTK4 + libadwaita theming** — Native GNOME components with a custom Axon dark theme built on libadwaita for crisp HiDPI rendering.
+- **Zero cloud dependency** — No telemetry, no mandatory accounts, no remote inference endpoints. All data stays on your machine in `~/.axon/`.
 
 ## Installation
 
@@ -36,29 +41,101 @@ Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 24.04 LTS
 git clone https://github.com/kaorii-ako/Axon-OS.git
 cd Axon-OS
 
-# Install Python runtime dependency
-pip install httpx
+# Install system dependencies
+sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
+    gir1.2-adw-1 python3-dbus python3-vte-2.91
 
-# Run the shell extensions in-place (requires GNOME session)
-python3 -m shell.axon-shell
+# Install Ollama (if not already installed)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Run the full installer (sets up D-Bus services, shell extension, apps)
+./install.sh
 ```
 
-> Note: running from source requires an existing Ubuntu 24.04 GNOME session and Ollama installed separately (`curl -fsSL https://ollama.com/install.sh | sh`).
+> **Note**: Running from source requires an existing Ubuntu 24.04 GNOME session.
 
 ## Building
 
 Full build instructions — including how to produce a bootable ISO with the custom installer and Plymouth splash — are documented in [docs/building.md](docs/building.md).
+
+## Architecture
+
+Axon OS uses a layered D-Bus architecture where all AI capabilities flow through two centralized services:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                         User                            │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+            ┌─────────────▼──────────────┐
+            │        GNOME Shell         │
+            │  ┌──────────┐  ┌────────┐  │
+            │  │Intent Bar│  │AI Panel│  │
+            │  └────┬─────┘  └───┬────┘  │
+            │       │  Spaces    │       │
+            │  ┌────▼────────────▼────┐  │
+            │  │   Space Manager     │  │
+            │  └──────────┬──────────┘  │
+            └─────────────┼─────────────┘
+                          │ D-Bus (session bus)
+         ┌────────────────┼────────────────┐
+         │                │                │
+┌────────▼─────────┐ ┌───▼─────────┐ ┌────▼──────────┐
+│  org.axonos.Brain │ │org.axonos.  │ │ Axon Terminal │
+│  ├─ Model Routing│ │  Context    │ │ Axon Files    │
+│  ├─ Conversations│ │  ├─ Window  │ │ Axon Settings │
+│  ├─ HW Profiling │ │  ├─ Clipboard│ └───────────────┘
+│  └─ Streaming    │ │  └─ Files   │
+└────────┬─────────┘ └─────────────┘
+         │ HTTP (localhost)
+┌────────▼─────────┐
+│  Ollama Daemon   │
+│  (localhost:11434)│
+└────────┬─────────┘
+         │ llama.cpp / CUDA / ROCm
+┌────────▼─────────┐
+│       GPU        │
+└──────────────────┘
+```
+
+For the full architecture document, see [docs/architecture.md](docs/architecture.md).
 
 ## Tech Stack
 
 | Component | Version / Detail |
 |-----------|-----------------|
 | Base OS | Ubuntu 24.04 LTS |
-| Desktop | GNOME Shell |
+| Desktop | GNOME Shell 45+ |
 | UI Toolkit | GTK4 + libadwaita |
-| Shell extensions | Python 3.11+ |
-| AI runtime | Ollama |
-| Default model | llama3.2:3b |
+| IPC Layer | D-Bus (session bus) |
+| AI Services | `org.axonos.Brain`, `org.axonos.Context` |
+| AI Runtime | Ollama (localhost) |
+| Model Strategy | 3-tier: Speed / General / Deep (auto-profiled) |
+| Conversation DB | SQLite (`~/.axon/conversations.db`) |
+| Shell Extension | GJS (GNOME JavaScript) |
+| Apps | Python 3.11+ with GTK4 |
+
+## Project Structure
+
+```
+Axon-OS/
+├── apps/
+│   ├── axon-ai-panel/     # AI conversation side panel
+│   ├── axon-terminal/     # AI-powered terminal
+│   ├── axon-welcome/      # First-boot welcome & model setup wizard
+│   └── intent-bar/        # Natural language command palette
+├── services/
+│   ├── axon-brain/        # Central AI D-Bus service
+│   └── axon-context/      # Ambient desktop context engine
+├── shell/
+│   └── axon-shell/        # GNOME Shell extension (dock, spaces, intent bar)
+├── theme/                 # GTK4 dark theme
+├── installer/             # Calamares-based installer
+├── plymouth/              # Boot splash
+├── build/                 # ISO build scripts
+├── tests/                 # Integration and unit tests
+└── docs/                  # Architecture and build documentation
+```
 
 ## Contributing
 

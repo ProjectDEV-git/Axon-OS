@@ -1,16 +1,27 @@
 """Axon OS Welcome App — WelcomeWindow (4-page onboarding wizard)."""
 
 import os
+import sys
 import shutil
 import subprocess
 import threading
+import json
+from pathlib import Path
 
 import gi
-
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-
 from gi.repository import Adw, GLib, Gtk
+
+import dbus
+from dbus.mainloop.glib import DBusGMainLoop
+
+# Insert axon-brain path so we can run hardware profiler
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "services" / "axon-brain"))
+try:
+    import hardware_profiler
+except ImportError:
+    hardware_profiler = None
 
 # ---------------------------------------------------------------------------
 # Embedded CSS
@@ -42,23 +53,14 @@ _CSS = b"""
     font-weight: bold;
     border: 1px solid rgba(139, 92, 246, 0.35);
 }
-.feature-card {
-    background-color: #111119;
-    border-radius: 16px;
-    border: 1px solid #2a2a42;
-    padding: 20px;
-}
-.feature-icon {
-    font-size: 32px;
-}
-.feature-title {
-    font-size: 14px;
-    font-weight: bold;
-    color: #e8e8f4;
-}
-.feature-desc {
+.hardware-badge {
+    background-color: rgba(34, 211, 238, 0.1);
+    color: #22d3ee;
+    border-radius: 8px;
+    padding: 8px 12px;
     font-size: 12px;
-    color: #9090b8;
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    margin-bottom: 12px;
 }
 .model-row {
     background-color: #111119;
@@ -123,21 +125,12 @@ _CSS = b"""
 }
 """
 
-# ---------------------------------------------------------------------------
-# Helper: apply CSS class safely
-# ---------------------------------------------------------------------------
-
 def _add_class(widget: Gtk.Widget, css_class: str) -> None:
     widget.get_style_context().add_class(css_class)
-
 
 def _remove_class(widget: Gtk.Widget, css_class: str) -> None:
     widget.get_style_context().remove_class(css_class)
 
-
-# ---------------------------------------------------------------------------
-# WelcomeWindow
-# ---------------------------------------------------------------------------
 
 class WelcomeWindow(Adw.Window):
     _PAGE_NAMES = ["welcome", "setup", "features", "ready"]
@@ -145,12 +138,26 @@ class WelcomeWindow(Adw.Window):
     def __init__(self, app: Adw.Application):
         super().__init__(application=app)
 
-        # --- Window properties ---
+        # Initialize DBus GLib loop integration early
+        DBusGMainLoop(set_as_default=True)
+        self.bus = dbus.SessionBus()
+        self.brain = None
+        self._connect_brain()
+
+        # Track model downloading state
+        self._downloading_model = None
+
+        # Run hardware profiling
+        self._profile = {}
+        self._models = []
+        self._run_profiling()
+
+        # Window properties
         self.set_title("Welcome to Axon OS")
-        self.set_default_size(640, 560)
+        self.set_default_size(640, 600)
         self.set_decorated(True)
 
-        # --- Load CSS ---
+        # Load CSS
         provider = Gtk.CssProvider()
         provider.load_from_data(_CSS)
         Gtk.StyleContext.add_provider_for_display(
@@ -159,7 +166,7 @@ class WelcomeWindow(Adw.Window):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
 
-        # --- Root layout ---
+        # Root layout
         root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         _add_class(root_box, "welcome-window")
 
@@ -167,7 +174,6 @@ class WelcomeWindow(Adw.Window):
         clamp.set_maximum_size(560)
         clamp.set_vexpand(True)
 
-        # Main stack
         self._stack = Gtk.Stack()
         self._stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
         self._stack.set_vexpand(True)
@@ -194,9 +200,43 @@ class WelcomeWindow(Adw.Window):
         self._current_page = 0
         self._update_indicator()
 
-        # Start Ollama check in background
-        t = threading.Thread(target=self._check_ollama, daemon=True)
-        t.start()
+        # Register D-Bus signal listener for model pulls
+        self.bus.add_signal_receiver(
+            self._on_pull_progress,
+            signal_name="PullProgress",
+            dbus_interface="org.axonos.Brain"
+        )
+
+    def _connect_brain(self) -> None:
+        try:
+            self.brain = self.bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
+        except Exception:
+            self.brain = None
+
+    def _run_profiling(self) -> None:
+        if hardware_profiler:
+            try:
+                self._profile = hardware_profiler.profile_hardware()
+                hw = self._profile.get("hardware", {})
+                recs = self._profile.get("recommendations", {})
+                self._hw_info_str = f"Hardware profile: {hw.get('ram_gb')}GB RAM | GPU: {hw.get('gpu_vendor')} ({hw.get('gpu_model')})"
+                
+                self._models = [
+                    ("Speed Model", recs.get("speed", {}).get("model"), recs.get("speed", {}).get("description")),
+                    ("General Model", recs.get("general", {}).get("model"), recs.get("general", {}).get("description")),
+                    ("Deep Task Model", recs.get("deep", {}).get("model"), recs.get("deep", {}).get("description"))
+                ]
+                return
+            except Exception:
+                pass
+        
+        # Fallbacks if module is missing or fails
+        self._hw_info_str = "Hardware profile: Generic System CPU"
+        self._models = [
+            ("Speed Model", "llama3.2:1b", "Llama 3.2 1B — fast command processing."),
+            ("General Model", "llama3.2:3b", "Llama 3.2 3B — balanced conversation."),
+            ("Deep Task Model", "llama3:8b", "Llama 3 8B — high reasoning, running on CPU RAM.")
+        ]
 
     # ------------------------------------------------------------------
     # Page indicator
@@ -226,10 +266,6 @@ class WelcomeWindow(Adw.Window):
                 dot.set_opacity(0.3)
                 dot.set_markup('<span color="#50507a">●</span>')
 
-    # ------------------------------------------------------------------
-    # Navigation helpers
-    # ------------------------------------------------------------------
-
     def _go_to(self, page_name: str) -> None:
         idx = self._PAGE_NAMES.index(page_name)
         current_idx = self._current_page
@@ -256,20 +292,18 @@ class WelcomeWindow(Adw.Window):
         page.set_margin_start(40)
         page.set_margin_end(40)
 
-        # Hero logo glyph
+        # Hero logo
         logo = Gtk.Label(label="⬡")
         _add_class(logo, "hero-logo")
         logo.set_margin_bottom(8)
         page.append(logo)
 
-        # Title
         title = Gtk.Label(label="Welcome to Axon OS")
         _add_class(title, "hero-title")
         title.set_wrap(True)
         title.set_justify(Gtk.Justification.CENTER)
         page.append(title)
 
-        # Subtitle
         subtitle = Gtk.Label(label="Your AI-native desktop. Fully private. Entirely local.")
         _add_class(subtitle, "hero-subtitle")
         subtitle.set_wrap(True)
@@ -301,12 +335,12 @@ class WelcomeWindow(Adw.Window):
         return page
 
     # ------------------------------------------------------------------
-    # PAGE 2 — Setup
+    # PAGE 2 — Setup (AI Model Downloader)
     # ------------------------------------------------------------------
 
     def _build_page_setup(self) -> Gtk.Box:
-        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        page.set_margin_top(32)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        page.set_margin_top(24)
         page.set_margin_bottom(24)
         page.set_margin_start(32)
         page.set_margin_end(32)
@@ -317,72 +351,52 @@ class WelcomeWindow(Adw.Window):
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
-        subtitle = Gtk.Label(label="Axon runs AI models locally on your hardware.")
+        subtitle = Gtk.Label(label="Axon recommends local models customized for your hardware.")
         _add_class(subtitle, "page-subtitle")
         subtitle.set_halign(Gtk.Align.START)
         subtitle.set_wrap(True)
         page.append(subtitle)
 
-        # Ollama status row
-        ollama_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        ollama_row.set_margin_top(8)
-        ollama_lbl = Gtk.Label(label="Ollama")
-        _add_class(ollama_lbl, "model-name")
-        ollama_row.append(ollama_lbl)
+        # Hardware Info Badge
+        hw_lbl = Gtk.Label(label=self._hw_info_str)
+        _add_class(hw_lbl, "hardware-badge")
+        hw_lbl.set_halign(Gtk.Align.START)
+        page.append(hw_lbl)
 
-        status_spacer = Gtk.Box()
-        status_spacer.set_hexpand(True)
-        ollama_row.append(status_spacer)
-
-        self._ollama_status_label = Gtk.Label(label="Checking…")
-        self._ollama_status_label.set_halign(Gtk.Align.END)
-        ollama_row.append(self._ollama_status_label)
-        page.append(ollama_row)
-
-        # Model rows — radio group
-        models = [
-            ("llama3.2:3b", "Fast — great for everyday tasks", "~2 GB"),
-            ("mistral:7b", "Balanced — excellent for coding", "~4 GB"),
-            ("qwen2.5:7b", "Multilingual — best quality", "~4 GB"),
-            ("deepseek-r1:8b", "Reasoning specialist", "~5 GB"),
-        ]
-
-        self._model_checks: list[Gtk.CheckButton] = []
-        self._selected_model = models[0][0]
+        # Model checkboxes group
+        self._model_checks = []
+        self._selected_model = self._models[1][1] # Default to General Model
         first_check = None
 
-        for model_id, model_desc, model_size in models:
+        for tier, model_id, model_desc in self._models:
             outer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
             _add_class(outer, "model-row")
 
             check = Gtk.CheckButton()
             if first_check is None:
                 first_check = check
-                check.set_active(True)
             else:
                 check.set_group(first_check)
 
-            # Label box inside the checkbutton area
+            if model_id == self._selected_model:
+                check.set_active(True)
+
             inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             inner.set_hexpand(True)
 
-            name_lbl = Gtk.Label(label=model_id)
-            _add_class(name_lbl, "model-name")
-            name_lbl.set_halign(Gtk.Align.START)
-            inner.append(name_lbl)
+            tier_lbl = Gtk.Label()
+            tier_lbl.set_markup(f"<b>{tier}</b>: <span color='#8b5cf6'>{model_id}</span>")
+            _add_class(tier_lbl, "model-name")
+            tier_lbl.set_halign(Gtk.Align.START)
+            inner.append(tier_lbl)
 
             desc_lbl = Gtk.Label(label=model_desc)
             _add_class(desc_lbl, "model-desc")
             desc_lbl.set_halign(Gtk.Align.START)
+            desc_lbl.set_wrap(True)
             inner.append(desc_lbl)
 
-            size_lbl = Gtk.Label(label=model_size)
-            _add_class(size_lbl, "model-size")
-            size_lbl.set_halign(Gtk.Align.START)
-            inner.append(size_lbl)
-
             check.set_child(inner)
-
             captured_id = model_id
 
             def _on_toggled(btn, mid=captured_id):
@@ -394,25 +408,33 @@ class WelcomeWindow(Adw.Window):
             outer.append(check)
             page.append(outer)
 
-        # Pull button + progress bar
-        self._pull_btn = Gtk.Button(label="Pull Selected Model")
+        # Pull button + progress area
+        self._pull_btn = Gtk.Button(label="Download Recommended Model")
         _add_class(self._pull_btn, "nav-btn-next")
         self._pull_btn.set_halign(Gtk.Align.CENTER)
         self._pull_btn.set_margin_top(8)
         self._pull_btn.connect("clicked", self._on_pull_clicked)
         page.append(self._pull_btn)
 
+        self._progress_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self._progress_box.set_visible(False)
+        self._progress_box.set_margin_top(6)
+
         self._pull_progress = Gtk.ProgressBar()
-        self._pull_progress.set_visible(False)
-        self._pull_progress.set_margin_top(4)
-        page.append(self._pull_progress)
+        self._progress_lbl = Gtk.Label(label="Downloading: 0%")
+        _add_class(self._progress_lbl, "model-desc")
+        self._progress_lbl.set_halign(Gtk.Align.CENTER)
+
+        self._progress_box.append(self._pull_progress)
+        self._progress_box.append(self._progress_lbl)
+        page.append(self._progress_box)
 
         # Spacer
         spacer = Gtk.Box()
         spacer.set_vexpand(True)
         page.append(spacer)
 
-        # Nav row
+        # Navigation row
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         nav.set_halign(Gtk.Align.CENTER)
 
@@ -436,6 +458,81 @@ class WelcomeWindow(Adw.Window):
         return page
 
     # ------------------------------------------------------------------
+    # D-Bus Signal Handler
+    # ------------------------------------------------------------------
+
+    def _on_pull_progress(self, model_name, completed_bytes, total_bytes, status):
+        # Filter signals for our download
+        if not self._downloading_model or model_name != self._downloading_model:
+            return
+
+        GLib.idle_add(self._update_pull_progress, completed_bytes, total_bytes, status)
+
+    def _update_pull_progress(self, completed, total, status):
+        if total > 0:
+            fraction = float(completed) / float(total)
+            self._pull_progress.set_fraction(fraction)
+            percentage = int(fraction * 100)
+            completed_gb = completed / (1024 * 1024 * 1024)
+            total_gb = total / (1024 * 1024 * 1024)
+            self._progress_lbl.set_text(f"Downloading: {percentage}% ({completed_gb:.2f} / {total_gb:.2f} GB)")
+        else:
+            self._pull_progress.pulse()
+            self._progress_lbl.set_text(f"Status: {status}")
+            
+        if status == "success" or "verify" in status.lower():
+            self._progress_box.set_visible(False)
+            self._pull_btn.set_sensitive(True)
+            self._pull_btn.set_label("✓ Model Ready")
+            self._downloading_model = None
+        elif "error" in status.lower():
+            self._progress_box.set_visible(False)
+            self._pull_btn.set_sensitive(True)
+            self._pull_btn.set_label("Download Failed — Retry")
+            self._downloading_model = None
+
+    # ------------------------------------------------------------------
+    # Pull model action
+    # ------------------------------------------------------------------
+
+    def _on_pull_clicked(self, _btn: Gtk.Button) -> None:
+        model = self._selected_model
+        self._downloading_model = model
+        self._pull_btn.set_sensitive(False)
+        self._progress_box.set_visible(True)
+        self._pull_progress.set_fraction(0.0)
+        self._progress_lbl.set_text("Connecting to Axon Brain...")
+
+        # Fire D-Bus pull request
+        def _trigger_dbus_pull():
+            if self.brain is None:
+                try:
+                    self._connect_brain()
+                except Exception:
+                    pass
+                    
+            if self.brain is not None:
+                try:
+                    self.brain.PullModel(model)
+                except Exception as e:
+                    GLib.idle_add(self._update_pull_progress, 0, 0, f"Error: {e}")
+            else:
+                # Local command fallback if service is missing
+                GLib.idle_add(self._update_pull_progress, 0, 0, "Brain service not available. Retrying via CLI...")
+                try:
+                    subprocess.run(
+                        ["ollama", "pull", model],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=True
+                    )
+                    GLib.idle_add(self._update_pull_progress, 1, 1, "success")
+                except Exception:
+                    GLib.idle_add(self._update_pull_progress, 0, 0, "error")
+
+        threading.Thread(target=_trigger_dbus_pull, daemon=True).start()
+
+    # ------------------------------------------------------------------
     # PAGE 3 — Features
     # ------------------------------------------------------------------
 
@@ -451,7 +548,6 @@ class WelcomeWindow(Adw.Window):
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
-        # Feature grid 2x2
         grid = Gtk.Grid()
         grid.set_column_spacing(12)
         grid.set_row_spacing(12)
@@ -472,12 +568,10 @@ class WelcomeWindow(Adw.Window):
 
         page.append(grid)
 
-        # Spacer
         spacer = Gtk.Box()
         spacer.set_vexpand(True)
         page.append(spacer)
 
-        # Nav row
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         nav.set_halign(Gtk.Align.CENTER)
 
@@ -564,12 +658,10 @@ class WelcomeWindow(Adw.Window):
 
         page.append(toggle_row)
 
-        # Spacer
         spacer = Gtk.Box()
         spacer.set_vexpand(True)
         page.append(spacer)
 
-        # Nav row
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         nav.set_halign(Gtk.Align.CENTER)
 
@@ -588,68 +680,6 @@ class WelcomeWindow(Adw.Window):
         return page
 
     # ------------------------------------------------------------------
-    # Ollama background check
-    # ------------------------------------------------------------------
-
-    def _check_ollama(self) -> None:
-        found = shutil.which("ollama") is not None
-        GLib.idle_add(self._on_ollama_checked, found)
-
-    def _on_ollama_checked(self, found: bool) -> bool:
-        if found:
-            self._ollama_status_label.set_text("● Installed")
-            _remove_class(self._ollama_status_label, "status-offline")
-            _add_class(self._ollama_status_label, "status-online")
-        else:
-            self._ollama_status_label.set_text("● Not Found")
-            _remove_class(self._ollama_status_label, "status-online")
-            _add_class(self._ollama_status_label, "status-offline")
-        return GLib.SOURCE_REMOVE
-
-    # ------------------------------------------------------------------
-    # Pull model
-    # ------------------------------------------------------------------
-
-    def _on_pull_clicked(self, _btn: Gtk.Button) -> None:
-        model = self._selected_model
-        self._pull_btn.set_sensitive(False)
-        self._pull_progress.set_visible(True)
-        self._pull_progress.pulse()
-
-        def _do_pull():
-            try:
-                subprocess.run(
-                    ["ollama", "pull", model],
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                GLib.idle_add(self._on_pull_done, True)
-            except Exception:
-                GLib.idle_add(self._on_pull_done, False)
-
-        # Pulse the progress bar while pulling
-        def _pulse_tick():
-            if self._pull_progress.get_visible():
-                self._pull_progress.pulse()
-                return GLib.SOURCE_CONTINUE
-            return GLib.SOURCE_REMOVE
-
-        GLib.timeout_add(300, _pulse_tick)
-
-        t = threading.Thread(target=_do_pull, daemon=True)
-        t.start()
-
-    def _on_pull_done(self, success: bool) -> bool:
-        self._pull_progress.set_visible(False)
-        self._pull_btn.set_sensitive(True)
-        if success:
-            self._pull_btn.set_label("✓ Model Ready")
-        else:
-            self._pull_btn.set_label("Pull Failed — Retry")
-        return GLib.SOURCE_REMOVE
-
-    # ------------------------------------------------------------------
     # Startup toggle
     # ------------------------------------------------------------------
 
@@ -657,14 +687,12 @@ class WelcomeWindow(Adw.Window):
         config_dir = os.path.expanduser("~/.config/axon-os")
         marker = os.path.join(config_dir, ".firstboot-done")
         if state:
-            # Show on startup → remove the "done" marker so it shows again
             if os.path.exists(marker):
                 try:
                     os.remove(marker)
                 except OSError:
                     pass
         else:
-            # Do not show on startup → create the marker
             os.makedirs(config_dir, exist_ok=True)
             try:
                 with open(marker, "w") as f:

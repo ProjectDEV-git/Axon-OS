@@ -13,6 +13,24 @@ BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORK_DIR="/tmp/axon-build"
 CHROOT_OVERLAY="${WORK_DIR}/config/includes.chroot"
 
+# Default options
+COMPRESSION="gzip"
+PURGE_CACHE=false
+
+# Parse arguments
+for arg in "$@"; do
+    case "${arg}" in
+        --release)
+            COMPRESSION="xz"
+            ;;
+        --purge)
+            PURGE_CACHE=true
+            ;;
+        *)
+            ;;
+    esac
+done
+
 # ---------------------------------------------------------------------------
 # check_deps
 # Verifies that all required build tools are available on the host.
@@ -20,7 +38,7 @@ CHROOT_OVERLAY="${WORK_DIR}/config/includes.chroot"
 check_deps() {
     echo "[axon-build] Checking build dependencies..."
 
-    local deps=(live-build debootstrap xorriso squashfs-tools wget rsync)
+    local deps=(live-build debootstrap xorriso mksquashfs wget rsync)
     local missing=()
 
     for dep in "${deps[@]}"; do
@@ -46,7 +64,17 @@ check_deps() {
 setup_workdir() {
     echo "[axon-build] Setting up work directory at ${WORK_DIR}..."
 
-    rm -rf "${WORK_DIR}"
+    if [[ -d "${WORK_DIR}" ]]; then
+        if [[ "${PURGE_CACHE}" == "true" ]]; then
+            echo "[axon-build] Purging work directory and cache..."
+            (cd "${WORK_DIR}" && sudo lb clean --purge || true)
+            sudo rm -rf "${WORK_DIR}"
+        else
+            echo "[axon-build] Found existing work directory. Cleaning build artifacts while preserving package cache..."
+            (cd "${WORK_DIR}" && sudo lb clean)
+        fi
+    fi
+
     mkdir -p "${WORK_DIR}"
     cd "${WORK_DIR}"
 
@@ -61,6 +89,7 @@ configure_chroot() {
     echo "[axon-build] Configuring live-build (Ubuntu Noble / amd64)..."
 
     lb config \
+        --mode ubuntu \
         --distribution noble \
         --architecture amd64 \
         --archive-areas "main restricted universe multiverse" \
@@ -70,13 +99,13 @@ configure_chroot() {
         --mirror-binary "http://archive.ubuntu.com/ubuntu/" \
         --mirror-binary-security "http://security.ubuntu.com/ubuntu/" \
         --apt-options "--yes --no-install-recommends" \
-        --debian-installer none \
+        --debian-installer false \
         --bootappend-live "boot=live components quiet splash" \
         --iso-application "Axon OS" \
         --iso-publisher "Axon OS Project" \
         --iso-volume "AXON_OS_${VERSION}" \
         --checksums sha256 \
-        --compression xz
+        --compression "${COMPRESSION}"
 
     # Copy package list into live-build config
     mkdir -p "${WORK_DIR}/config/package-lists"
@@ -131,6 +160,27 @@ copy_files() {
     _rsync_if_exists \
         "${BASE_DIR}/apps" \
         "${CHROOT_OVERLAY}/usr/lib/axon/apps"
+
+    # D-Bus Services -> /usr/lib/axon/services
+    _rsync_if_exists \
+        "${BASE_DIR}/services" \
+        "${CHROOT_OVERLAY}/usr/lib/axon/services"
+
+    # D-Bus session policies -> /usr/share/dbus-1/session.d
+    mkdir -p "${CHROOT_OVERLAY}/usr/share/dbus-1/session.d"
+    if [[ -f "${BASE_DIR}/services/axon-brain/org.axonos.Brain.conf" ]]; then
+        cp "${BASE_DIR}/services/axon-brain/org.axonos.Brain.conf" \
+           "${CHROOT_OVERLAY}/usr/share/dbus-1/session.d/org.axonos.Brain.conf"
+    fi
+    if [[ -f "${BASE_DIR}/services/axon-context/org.axonos.Context.conf" ]]; then
+        cp "${BASE_DIR}/services/axon-context/org.axonos.Context.conf" \
+           "${CHROOT_OVERLAY}/usr/share/dbus-1/session.d/org.axonos.Context.conf"
+    fi
+
+    # Application launch templates -> /usr/lib/axon/data/applications
+    _rsync_if_exists \
+        "${BASE_DIR}/data/applications" \
+        "${CHROOT_OVERLAY}/usr/lib/axon/data/applications"
 
     # Plymouth theme -> /usr/share/plymouth/themes/axon
     _rsync_if_exists \
@@ -196,6 +246,14 @@ build_iso() {
     # Generate checksum
     sha256sum "${output_path}" > "${output_path}.sha256"
     echo "[axon-build] SHA-256 checksum: ${output_path}.sha256"
+
+    # Also copy to the user's requested ISO files directory if it exists
+    local iso_dir="/home/gamingrf/Documents/Axons-OS/ISO files"
+    if [[ -d "${iso_dir}" ]]; then
+        cp "${generated_iso}" "${iso_dir}/${ISO_NAME}"
+        sha256sum "${iso_dir}/${ISO_NAME}" > "${iso_dir}/${ISO_NAME}.sha256"
+        echo "[axon-build] ISO copied to: ${iso_dir}/${ISO_NAME}"
+    fi
 }
 
 # ---------------------------------------------------------------------------

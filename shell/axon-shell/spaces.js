@@ -83,6 +83,39 @@ class SpaceIndicator extends PanelMenu.Button {
     }
 });
 
+const ContextInterface = `
+<node>
+  <interface name="org.axonos.Context">
+    <method name="SetActiveSpace">
+      <arg type="s" name="space_name" direction="in"/>
+      <arg type="b" name="success" direction="out"/>
+    </method>
+  </interface>
+</node>
+`;
+
+const BrainInterface = `
+<node>
+  <interface name="org.axonos.Brain">
+    <method name="ClassifyWindow">
+      <arg type="s" name="title" direction="in"/>
+      <arg type="s" name="wm_class" direction="in"/>
+      <arg type="s" name="space_name" direction="out"/>
+    </method>
+    <method name="Generate">
+      <arg type="s" name="prompt" direction="in"/>
+      <arg type="s" name="context" direction="in"/>
+      <arg type="s" name="model" direction="in"/>
+      <arg type="b" name="stream" direction="in"/>
+      <arg type="s" name="response" direction="out"/>
+    </method>
+  </interface>
+</node>
+`;
+
+const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
+const BrainProxy = Gio.DBusProxy.makeProxyWrapper(BrainInterface);
+
 // ─── SpacesManager ────────────────────────────────────────────────────────────
 
 export default class SpacesManager {
@@ -92,6 +125,9 @@ export default class SpacesManager {
         this._currentIndex = 0;
         this._indicator = null;
         this._workspaceChangedId = null;
+        this._contextProxy = null;
+        this._brainProxy = null;
+        this._windowCreatedId = null;
         this._stateDir = GLib.build_filenamev([GLib.get_home_dir(), '.axon']);
         this._stateFile = GLib.build_filenamev([this._stateDir, 'spaces.json']);
     }
@@ -99,6 +135,26 @@ export default class SpacesManager {
     enable() {
         this._ensureStateDir();
         this._loadState();
+
+        try {
+            this._contextProxy = new ContextProxy(
+                Gio.DBus.session,
+                'org.axonos.Context',
+                '/org/axonos/Context'
+            );
+        } catch (e) {
+            console.warn('AxonShell: could not create ContextProxy in spaces.js:', e.message);
+        }
+
+        try {
+            this._brainProxy = new BrainProxy(
+                Gio.DBus.session,
+                'org.axonos.Brain',
+                '/org/axonos/Brain'
+            );
+        } catch (e) {
+            console.warn('AxonShell: could not create BrainProxy in spaces.js:', e.message);
+        }
 
         this._indicator = new SpaceIndicator(this._extension);
         Main.panel.addToStatusArea('axon-space-indicator', this._indicator, 0, 'left');
@@ -108,6 +164,24 @@ export default class SpacesManager {
             'active-workspace-changed',
             this._onWorkspaceChanged.bind(this)
         );
+
+        // Listen for new windows to auto-classify and route
+        this._windowCreatedId = global.display.connect('window-created', (display, window) => {
+            try {
+                if (window && this._brainProxy) {
+                    let title = window.get_title() || "None";
+                    let wmClass = window.get_wm_class() || "None";
+                    this._brainProxy.ClassifyWindowRemote(title, wmClass, (result, error) => {
+                        if (!error && result) {
+                            let [spaceName] = result;
+                            this._routeWindowToSpace(window, spaceName);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('AxonShell: window-created hook error:', e.message);
+            }
+        });
     }
 
     disable() {
@@ -116,11 +190,18 @@ export default class SpacesManager {
             this._workspaceChangedId = null;
         }
 
+        if (this._windowCreatedId) {
+            global.display.disconnect(this._windowCreatedId);
+            this._windowCreatedId = null;
+        }
+
         if (this._indicator) {
             this._indicator.destroy();
             this._indicator = null;
         }
 
+        this._contextProxy = null;
+        this._brainProxy = null;
         this._saveState();
     }
 
@@ -266,13 +347,51 @@ export default class SpacesManager {
                 ].join(' '),
             });
 
+            const summaryLabel = new St.Label({
+                style_class: 'axon-space-osd-summary',
+                text: 'Analyzing workspace…',
+                x_align: Clutter.ActorAlign.CENTER,
+                style: [
+                    'color: #a78bfa;',
+                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
+                    'font-size: 13px;',
+                    'font-weight: 500;',
+                    'margin-top: 8px;',
+                ].join(' '),
+            });
+
             osd.add_child(numberLabel);
             osd.add_child(nameLabel);
             osd.add_child(indexLabel);
+            osd.add_child(summaryLabel);
+
+            // Fetch workspace windows and generate summary via Brain service
+            let workspace = global.workspace_manager.get_workspace_by_index(idx);
+            let windows = workspace ? workspace.list_windows() : [];
+            if (windows.length === 0) {
+                summaryLabel.set_text('Empty workspace');
+            } else if (this._brainProxy) {
+                let windowList = windows.map(w => {
+                    let title = w.get_title() || 'Unknown';
+                    let wmClass = w.get_wm_class() || 'Unknown';
+                    return `- Title: "${title}" (Class: "${wmClass}")`;
+                }).join('\n');
+                let prompt = `Summarize what the user is doing on this desktop workspace in a single short phrase (under 10 words, e.g., "3 terminals running, 2 browser tabs open"). Do not include markdown, quotes, formatting, or prefixes. Open windows:\n${windowList}`;
+                this._brainProxy.GenerateRemote(prompt, "", "", false, (result, error) => {
+                    if (!error && result) {
+                        let [response] = result;
+                        summaryLabel.set_text(response.trim().replace(/^"|"$/g, ''));
+                    } else {
+                        summaryLabel.set_text('Workspace active');
+                    }
+                });
+            } else {
+                summaryLabel.set_text('Workspace active');
+            }
 
             // Measure after adding children; use a sensible fallback size
-            const osdWidth = 200;
-            const osdHeight = 140;
+            const osdWidth = 320;
+            const osdHeight = 180;
 
             osd.set_position(
                 monitor.x + Math.floor((monitor.width - osdWidth) / 2),
@@ -289,8 +408,8 @@ export default class SpacesManager {
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
 
-            // After 1500 ms, fade out and destroy
-            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
+            // After 3500 ms, fade out and destroy
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 3500, () => {
                 osd.ease({
                     opacity: 0,
                     duration: 300,
@@ -371,8 +490,38 @@ export default class SpacesManager {
     }
 
     _updateIndicator() {
+        const currentSpace = this.getCurrentSpace();
         if (this._indicator) {
-            this._indicator.update(this.getCurrentSpace());
+            this._indicator.update(currentSpace);
+        }
+        if (this._contextProxy && currentSpace) {
+            this._contextProxy.SetActiveSpaceRemote(currentSpace.name, (result, error) => {
+                if (error) {
+                    // Silently ignore if context daemon is not running
+                }
+            });
+        }
+    }
+
+    _routeWindowToSpace(window, spaceName) {
+        let targetIdx = -1;
+        for (let i = 0; i < this._spaces.length; i++) {
+            if (this._spaces[i].name.toLowerCase() === spaceName.toLowerCase()) {
+                targetIdx = i;
+                break;
+            }
+        }
+        
+        if (targetIdx !== -1) {
+            const workspaceManager = global.workspace_manager;
+            while (workspaceManager.get_n_workspaces() <= targetIdx) {
+                workspaceManager.append_new_workspace(false, global.get_current_time());
+            }
+            let workspace = workspaceManager.get_workspace_by_index(targetIdx);
+            if (workspace) {
+                window.change_workspace(workspace);
+                console.log(`AxonShell: Auto-routed window "${window.get_title()}" to Space ${spaceName} (Workspace ${targetIdx})`);
+            }
         }
     }
 }

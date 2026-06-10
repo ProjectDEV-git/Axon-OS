@@ -5,7 +5,6 @@ import Shell from 'gi://Shell';
 import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
-import Soup from 'gi://Soup?version=3.0';
 
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -17,6 +16,18 @@ import DockManager from './dock.js';
 
 // ─── AxonAIIndicator ──────────────────────────────────────────────────────────
 
+const BrainInterface = `
+<node>
+  <interface name="org.axonos.Brain">
+    <method name="GetStatus">
+      <arg type="s" name="status_json" direction="out"/>
+    </method>
+  </interface>
+</node>
+`;
+
+const BrainProxy = Gio.DBusProxy.makeProxyWrapper(BrainInterface);
+
 const AxonAIIndicator = GObject.registerClass(
 class AxonAIIndicator extends PanelMenu.Button {
     _init(extension) {
@@ -24,7 +35,7 @@ class AxonAIIndicator extends PanelMenu.Button {
 
         this._extension = extension;
         this._pollTimerId = null;
-        this._soupSession = null;
+        this._proxy = null;
 
         // Build UI: "⬡ AI" label + status dot
         const box = new St.BoxLayout({
@@ -58,53 +69,45 @@ class AxonAIIndicator extends PanelMenu.Button {
         box.add_child(this._statusDot);
         this.add_child(box);
 
-        // Initialise Soup session and do a first health check
         try {
-            this._soupSession = new Soup.Session();
+            this._proxy = new BrainProxy(
+                Gio.DBus.session,
+                'org.axonos.Brain',
+                '/org/axonos/Brain'
+            );
         } catch (e) {
-            console.warn('AxonShell: could not create Soup.Session:', e.message);
+            console.warn('AxonShell: could not create BrainProxy:', e.message);
         }
 
-        this._checkOllamaHealth();
+        this._checkBrainStatus();
 
         // Poll every 30 seconds
         this._pollTimerId = GLib.timeout_add_seconds(
             GLib.PRIORITY_DEFAULT,
             30,
-            this._checkOllamaHealth.bind(this)
+            this._checkBrainStatus.bind(this)
         );
     }
 
-    _checkOllamaHealth() {
-        if (!this._soupSession) return GLib.SOURCE_CONTINUE;
-
-        try {
-            const message = Soup.Message.new('GET', 'http://localhost:11434/api/tags');
-            if (!message) {
-                this._setDotColor(false);
-                return GLib.SOURCE_CONTINUE;
-            }
-
-            this._soupSession.send_and_read_async(
-                message,
-                GLib.PRIORITY_DEFAULT,
-                null,
-                (session, result) => {
-                    try {
-                        session.send_and_read_finish(result);
-                        const status = message.get_status();
-                        this._setDotColor(
-                            status === Soup.Status.OK || status === 200
-                        );
-                    } catch (e) {
-                        this._setDotColor(false);
-                    }
-                }
-            );
-        } catch (e) {
-            console.warn('AxonShell: Ollama health check failed:', e.message);
+    _checkBrainStatus() {
+        if (!this._proxy) {
             this._setDotColor(false);
+            return GLib.SOURCE_CONTINUE;
         }
+
+        this._proxy.GetStatusRemote((result, error) => {
+            if (error) {
+                this._setDotColor(false);
+            } else {
+                try {
+                    let [statusJson] = result;
+                    let status = JSON.parse(statusJson);
+                    this._setDotColor(status.ollama_online);
+                } catch (e) {
+                    this._setDotColor(false);
+                }
+            }
+        });
 
         return GLib.SOURCE_CONTINUE;
     }
@@ -119,15 +122,26 @@ class AxonAIIndicator extends PanelMenu.Button {
             GLib.source_remove(this._pollTimerId);
             this._pollTimerId = null;
         }
-        if (this._soupSession) {
-            this._soupSession.abort();
-            this._soupSession = null;
-        }
+        this._proxy = null;
         super.destroy();
     }
 });
 
 // ─── AxonShellExtension ───────────────────────────────────────────────────────
+
+const ContextInterface = `
+<node>
+  <interface name="org.axonos.Context">
+    <method name="SetActiveWindow">
+      <arg type="s" name="title" direction="in"/>
+      <arg type="s" name="app_id" direction="in"/>
+      <arg type="b" name="success" direction="out"/>
+    </method>
+  </interface>
+</node>
+`;
+
+const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
 
 export default class AxonShellExtension extends Extension {
     constructor(metadata) {
@@ -137,9 +151,21 @@ export default class AxonShellExtension extends Extension {
         this._aiIndicator   = null;
         this._dockManager   = null;
         this._keybindingIds = [];
+        this._contextProxy  = null;
+        this._focusWindowId = null;
     }
 
     enable() {
+        try {
+            this._contextProxy = new ContextProxy(
+                Gio.DBus.session,
+                'org.axonos.Context',
+                '/org/axonos/Context'
+            );
+        } catch (e) {
+            console.warn('AxonShell: could not create ContextProxy in extension.js:', e.message);
+        }
+
         this._spacesManager = new SpacesManager(this);
         this._spacesManager.enable();
 
@@ -154,6 +180,20 @@ export default class AxonShellExtension extends Extension {
         Main.panel.addToStatusArea('axon-ai-indicator', this._aiIndicator, 0, 'right');
 
         this._registerKeybindings();
+
+        // Listen for focused window changes
+        this._focusWindowId = global.display.connect('notify::focus-window', () => {
+            try {
+                let win = global.display.focus_window;
+                if (win && this._contextProxy) {
+                    let title = win.get_title() || "None";
+                    let wmClass = win.get_wm_class() || "None";
+                    this._contextProxy.SetActiveWindowRemote(title, wmClass, (result, error) => {});
+                }
+            } catch (e) {
+                console.warn('AxonShell: focus window track error:', e.message);
+            }
+        });
     }
 
     _registerKeybindings() {
@@ -245,6 +285,11 @@ export default class AxonShellExtension extends Extension {
         }
         this._keybindingIds = [];
 
+        if (this._focusWindowId) {
+            global.display.disconnect(this._focusWindowId);
+            this._focusWindowId = null;
+        }
+
         if (this._aiIndicator) {
             this._aiIndicator.destroy();
             this._aiIndicator = null;
@@ -265,5 +310,7 @@ export default class AxonShellExtension extends Extension {
             this._spacesManager.disable();
             this._spacesManager = null;
         }
+
+        this._contextProxy = null;
     }
 }

@@ -80,7 +80,7 @@ SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 # ---------------------------------------------------------------------------
 # STEP 1: Install Python / GTK dependencies
 # ---------------------------------------------------------------------------
-step "Step 1/8 — Installing Python/GTK dependencies"
+step "Step 1/9 — Installing Python/GTK dependencies"
 sudo apt-get install -y \
     python3-gi \
     python3-gi-cairo \
@@ -92,7 +92,7 @@ success "Python/GTK dependencies installed"
 # ---------------------------------------------------------------------------
 # STEP 2: Install Ollama
 # ---------------------------------------------------------------------------
-step "Step 2/8 — Installing Ollama"
+step "Step 2/9 — Installing Ollama"
 if command -v ollama &>/dev/null; then
     info "Ollama already installed at $(command -v ollama) — skipping"
 else
@@ -102,41 +102,69 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# STEP 3: Interactive model selection
+# STEP 3: Hardware-profiled model selection
 # ---------------------------------------------------------------------------
-step "Step 3/8 — Select an AI model to download"
-printf "\n"
-printf "  ${BOLD}1)${RESET} llama3.2:3b   ${GREEN}(Recommended)${RESET} — fast, lightweight\n"
-printf "  ${BOLD}2)${RESET} mistral:7b    — strong reasoning\n"
-printf "  ${BOLD}3)${RESET} qwen2.5:7b    — multilingual, balanced\n"
-printf "  ${BOLD}s)${RESET} Skip          — do not pull a model now\n"
-printf "\n"
-read -rp "  Choose [1/2/3/s]: " MODEL_CHOICE
+step "Step 3/9 — Profiling hardware and recommending AI models"
+
+PROFILER="${SCRIPT_DIR}/services/axon-brain/hardware_profiler.py"
+HW_JSON="$(python3 "${PROFILER}" 2>/dev/null)" || HW_JSON=""
+
+if [[ -n "${HW_JSON}" ]]; then
+    SYS_RAM="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['system']['ram_gb']:.1f}\")" 2>/dev/null || echo "?")"
+    GPU_TYPE="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['system']['gpu_type'])" 2>/dev/null || echo "Unknown")"
+    SPEED_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['speed']['model'])" 2>/dev/null || echo "llama3.2:1b")"
+    GENERAL_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['general']['model'])" 2>/dev/null || echo "llama3.2:3b")"
+    DEEP_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['deep']['model'])" 2>/dev/null || echo "llama3:8b")"
+
+    printf "\n"
+    info "Detected: ${BOLD}${SYS_RAM} GB RAM${RESET}, GPU: ${BOLD}${GPU_TYPE}${RESET}"
+    printf "\n"
+    printf "  ${BOLD}Recommended models for your hardware:${RESET}\n"
+    printf "  ${CYAN}⚡ Speed${RESET}  (instant responses):  ${GREEN}${SPEED_MODEL}${RESET}\n"
+    printf "  ${CYAN}🔧 General${RESET} (everyday queries):   ${GREEN}${GENERAL_MODEL}${RESET}\n"
+    printf "  ${CYAN}🧠 Deep${RESET}   (complex reasoning):  ${GREEN}${DEEP_MODEL}${RESET}\n"
+    printf "\n"
+    printf "  ${BOLD}d)${RESET} Download all recommended models ${GREEN}(Recommended)${RESET}\n"
+    printf "  ${BOLD}g)${RESET} Download General model only (fastest install)\n"
+    printf "  ${BOLD}s)${RESET} Skip — do not download models now\n"
+    printf "\n"
+    read -rp "  Choose [d/g/s]: " MODEL_CHOICE
+else
+    warn "Hardware profiler unavailable — falling back to defaults"
+    SPEED_MODEL="llama3.2:1b"
+    GENERAL_MODEL="llama3.2:3b"
+    DEEP_MODEL="llama3:8b"
+    MODEL_CHOICE="g"
+fi
 
 case "${MODEL_CHOICE}" in
-    1) OLLAMA_MODEL="llama3.2:3b" ;;
-    2) OLLAMA_MODEL="mistral:7b" ;;
-    3) OLLAMA_MODEL="qwen2.5:7b" ;;
+    d|D)
+        for m in "${SPEED_MODEL}" "${GENERAL_MODEL}" "${DEEP_MODEL}"; do
+            info "Pulling model: ${m}"
+            ollama pull "${m}" || warn "Failed to pull ${m} — you can retry later with: ollama pull ${m}"
+            success "Model ${m} ready"
+        done
+        ;;
+    g|G)
+        info "Pulling model: ${GENERAL_MODEL}"
+        ollama pull "${GENERAL_MODEL}" || warn "Failed to pull ${GENERAL_MODEL}"
+        success "Model ${GENERAL_MODEL} ready"
+        ;;
     s|S)
-        info "Skipping model download"
-        OLLAMA_MODEL=""
+        info "Skipping model download — you can pull models later via the Welcome app or: ollama pull <model>"
         ;;
     *)
-        warn "Unrecognised choice '${MODEL_CHOICE}', defaulting to llama3.2:3b"
-        OLLAMA_MODEL="llama3.2:3b"
+        warn "Unrecognised choice '${MODEL_CHOICE}', downloading General model"
+        info "Pulling model: ${GENERAL_MODEL}"
+        ollama pull "${GENERAL_MODEL}" || warn "Failed to pull ${GENERAL_MODEL}"
+        success "Model ${GENERAL_MODEL} ready"
         ;;
 esac
-
-if [[ -n "${OLLAMA_MODEL}" ]]; then
-    info "Pulling model: ${OLLAMA_MODEL}"
-    ollama pull "${OLLAMA_MODEL}"
-    success "Model ${OLLAMA_MODEL} ready"
-fi
 
 # ---------------------------------------------------------------------------
 # STEP 4: Install GNOME extension
 # ---------------------------------------------------------------------------
-step "Step 4/8 — Installing GNOME Shell extension"
+step "Step 4/9 — Installing GNOME Shell extension"
 DEST="${HOME}/.local/share/gnome-shell/extensions/axon-shell@axon-os"
 mkdir -p "${DEST}"
 cp -r "${SCRIPT_DIR}/shell/axon-shell/." "${DEST}/"
@@ -152,7 +180,7 @@ success "GNOME extension installed to ${DEST}"
 # ---------------------------------------------------------------------------
 # STEP 5: Install GTK theme
 # ---------------------------------------------------------------------------
-step "Step 5/8 — Installing Axon GTK theme"
+step "Step 5/9 — Installing Axon GTK theme"
 mkdir -p "${HOME}/.themes/axon-gtk/gtk-4.0"
 cp "${SCRIPT_DIR}/theme/axon-gtk/gtk-dark.css" \
    "${HOME}/.themes/axon-gtk/gtk-4.0/gtk.css"
@@ -166,7 +194,7 @@ success "Axon GTK theme installed and applied"
 # ---------------------------------------------------------------------------
 # STEP 6: Install apps and .desktop files
 # ---------------------------------------------------------------------------
-step "Step 6/8 — Installing Axon OS applications"
+step "Step 6/9 — Installing Axon OS applications"
 APPS_DIR="${HOME}/.local/share/axon-os"
 mkdir -p "${APPS_DIR}"
 cp -r "${SCRIPT_DIR}/apps/"* "${APPS_DIR}/"
@@ -180,18 +208,62 @@ done
 success "Applications installed to ${APPS_DIR}"
 
 # ---------------------------------------------------------------------------
-# STEP 7: Configure GNOME workspaces
+# STEP 7: Install D-Bus services and configure Systemd
 # ---------------------------------------------------------------------------
-step "Step 7/8 — Configuring GNOME workspaces"
+step "Step 7/9 — Installing Axon OS D-Bus services"
+SERVICES_DIR="${HOME}/.local/share/axon-os/services"
+mkdir -p "${SERVICES_DIR}"
+cp -r "${SCRIPT_DIR}/services/"* "${SERVICES_DIR}/"
+
+# Register D-Bus session services
+DBUS_DIR="${HOME}/.local/share/dbus-1/services"
+mkdir -p "${DBUS_DIR}"
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${SERVICES_DIR}/axon-brain/org.axonos.Brain.service" > "${DBUS_DIR}/org.axonos.Brain.service"
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${SERVICES_DIR}/axon-context/org.axonos.Context.service" > "${DBUS_DIR}/org.axonos.Context.service"
+info "D-Bus session service configs installed."
+
+# Register D-Bus session policies
+DBUS_POLICY_DIR="/usr/share/dbus-1/session.d"
+if [[ -d "${DBUS_POLICY_DIR}" ]]; then
+    if [[ -w "${DBUS_POLICY_DIR}" ]]; then
+        cp "${SERVICES_DIR}/axon-brain/org.axonos.Brain.conf" "${DBUS_POLICY_DIR}/"
+        cp "${SERVICES_DIR}/axon-context/org.axonos.Context.conf" "${DBUS_POLICY_DIR}/"
+        info "D-Bus session policies installed directly."
+    elif command -v sudo &>/dev/null; then
+        sudo cp "${SERVICES_DIR}/axon-brain/org.axonos.Brain.conf" "${DBUS_POLICY_DIR}/"
+        sudo cp "${SERVICES_DIR}/axon-context/org.axonos.Context.conf" "${DBUS_POLICY_DIR}/"
+        info "D-Bus session policies installed via sudo."
+    else
+        warn "Could not install D-Bus policies: write permission denied and sudo unavailable."
+    fi
+fi
+
+# Register Systemd user units
+SYSTEMD_DIR="${HOME}/.config/systemd/user"
+mkdir -p "${SYSTEMD_DIR}"
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${SERVICES_DIR}/axon-brain/axon-brain.service" > "${SYSTEMD_DIR}/axon-brain.service"
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${SERVICES_DIR}/axon-context/axon-context.service" > "${SYSTEMD_DIR}/axon-context.service"
+info "Systemd user service units installed."
+
+# Reload and enable user units
+systemctl --user daemon-reload
+systemctl --user enable axon-brain.service axon-context.service
+systemctl --user restart axon-brain.service axon-context.service 2>/dev/null || true
+success "Services installed and registered."
+
+# ---------------------------------------------------------------------------
+# STEP 8: Configure GNOME workspaces
+# ---------------------------------------------------------------------------
+step "Step 8/9 — Configuring GNOME workspaces"
 gsettings set org.gnome.desktop.wm.preferences num-workspaces 9
 gsettings set org.gnome.mutter dynamic-workspaces false
 gsettings set org.gnome.desktop.interface enable-animations true
 success "GNOME workspace configuration applied"
 
 # ---------------------------------------------------------------------------
-# STEP 8: Set up autostart for firstboot.sh
+# STEP 9: Set up autostart for firstboot.sh
 # ---------------------------------------------------------------------------
-step "Step 8/8 — Configuring first-boot autostart"
+step "Step 9/9 — Configuring first-boot autostart"
 mkdir -p "${HOME}/.config/autostart"
 
 FIRSTBOOT_SCRIPT="${SCRIPT_DIR}/build/config/firstboot.sh"

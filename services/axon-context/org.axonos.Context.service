@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.axonos.Context
+Exec=python3 AXON_SERVICES_DIR/axon-context/context_service.py

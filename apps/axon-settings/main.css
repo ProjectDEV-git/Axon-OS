@@ -1,0 +1,121 @@
+/* Axon Assistant Stylings sheet */
+
+window {
+    background-color: #0f0f14;
+    color: #e4e4e8;
+}
+
+.settings-header {
+    background-color: #0c0c10;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.ai-badge-icon {
+    font-size: 28px;
+    color: #8b5cf6;
+    font-weight: 700;
+}
+
+.app-title-label {
+    font-family: "Inter", "Outfit", "Ubuntu", sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #e4e4e8;
+}
+
+/* Feedback card styles */
+.feedback-card {
+    background-color: rgba(20, 20, 30, 0.6);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    transition: all 250ms ease;
+}
+
+.feedback-card.loading {
+    border-color: #8b5cf6;
+    background-color: rgba(139, 92, 246, 0.1);
+}
+
+.feedback-card.success {
+    border-color: #10b981;
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.feedback-card.error {
+    border-color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.feedback-text {
+    font-family: "Inter", "Ubuntu", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #b4b4c6;
+    text-align: center;
+}
+
+/* Quick Action buttons */
+.quick-action-btn {
+    background-color: rgba(30, 30, 46, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #e4e4e8;
+    font-family: "Inter", "Ubuntu", sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 10px 16px;
+    min-width: 140px;
+    transition: all 150ms ease;
+}
+
+.quick-action-btn:hover {
+    background-color: rgba(139, 92, 246, 0.18);
+    border-color: rgba(139, 92, 246, 0.45);
+    color: #ffffff;
+}
+
+.quick-action-btn:active {
+    background-color: rgba(139, 92, 246, 0.3);
+    transform: scale(0.97);
+}
+
+/* Input Entry & Apply Button */
+.settings-input-entry {
+    background-color: rgba(15, 15, 25, 0.9);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 8px;
+    color: #e4e4e8;
+    font-family: "Inter", "Ubuntu", sans-serif;
+    font-size: 13px;
+    padding: 8px 12px;
+    caret-color: #8b5cf6;
+    transition: all 200ms ease;
+}
+
+.settings-input-entry:focus {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.settings-apply-btn {
+    background-color: #8b5cf6;
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    font-family: "Inter", "Ubuntu", sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    transition: all 150ms ease;
+}
+
+.settings-apply-btn:hover {
+    background-color: #7c3aed;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+}
+
+.settings-apply-btn:active {
+    background-color: #6d28d9;
+    transform: scale(0.96);
+}

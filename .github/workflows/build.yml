@@ -11,25 +11,25 @@ on:
 jobs:
   lint-python:
     name: Lint Python (ruff)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install ruff
         run: pip install ruff
 
-      - name: Run ruff
-        run: ruff check apps/ --select E,F,I
+      - name: Run ruff on all Python code
+        run: ruff check apps/ services/ tests/ installer/ --select E,F,I
 
   lint-shell:
     name: Lint Shell (shellcheck)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,15 +37,63 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
-      - name: Run shellcheck on build scripts
-        run: find build -name "*.sh" -exec shellcheck {} \;
+      - name: Run shellcheck on all shell scripts
+        run: |
+          shellcheck install.sh
+          find build -name "*.sh" -exec shellcheck {} \;
 
   validate-json:
     name: Validate JSON (metadata)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Validate shell/axon-shell/metadata.json
         run: python3 -c "import json; json.load(open('shell/axon-shell/metadata.json'))"
+
+  syntax-check:
+    name: Python Syntax Check
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile-check all Python files
+        run: |
+          find apps/ services/ tests/ installer/ -name '*.py' \
+            -exec python3 -m py_compile {} +
+
+  test:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-24.04
+    needs: [lint-python, syntax-check]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-gi python3-gi-cairo \
+            gir1.2-gtk-4.0 gir1.2-adw-1 \
+            python3-dbus dbus-x11
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run tests under D-Bus session
+        run: |
+          eval $(dbus-launch --sh-syntax)
+          python3 -m pytest tests/ -v --tb=short

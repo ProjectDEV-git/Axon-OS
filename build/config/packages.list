@@ -35,6 +35,10 @@ fonts-liberation
 plymouth
 plymouth-themes
 grub-efi-amd64
+linux-image-generic
+live-boot
+live-config
+live-config-systemd
 
 # ── Network ───────────────────────────────────────────────────────────────────
 network-manager
@@ -65,4 +69,4 @@ qemu-guest-agent
 
 # ── Installer ─────────────────────────────────────────────────────────────────
 calamares
-calamares-settings-ubuntu
+calamares-settings-ubuntu-common
