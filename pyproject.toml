@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "axon-os"
-version = "0.2.0"
+version = "0.2.1"
 description = "Axon OS - A futuristic, AI-powered Linux desktop environment"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
