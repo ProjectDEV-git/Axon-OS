@@ -112,3 +112,100 @@ e2fsprogs
 efibootmgr
 grub-pc-bin
 policykit-1
+os-prober
+
+# ── Hardware & Driver Coverage ────────────────────────────────────────────────
+# GPU Drivers
+xserver-xorg-video-all
+xserver-xorg-video-amdgpu
+xserver-xorg-video-radeon
+xserver-xorg-video-intel
+xserver-xorg-video-nouveau
+xserver-xorg-video-fbdev
+xserver-xorg-video-vesa
+mesa-vulkan-drivers
+mesa-va-drivers
+mesa-vdpau-drivers
+libgl1-mesa-dri
+va-driver-all
+intel-media-va-driver
+
+# WiFi & Wireless
+wireless-tools
+iw
+rfkill
+wpasupplicant
+bcmwl-kernel-source
+
+# Bluetooth
+bluez
+bluez-tools
+gnome-bluetooth-3-common
+libspa-0.2-bluetooth
+
+# Audio Extras
+alsa-base
+alsa-utils
+firmware-sof-signed
+gstreamer1.0-pipewire
+
+# Printing & Scanning
+cups
+cups-browsed
+cups-filters
+system-config-printer
+printer-driver-gutenprint
+printer-driver-hpcups
+printer-driver-escpr
+foomatic-db-compressed-ppds
+ipp-usb
+sane-utils
+libsane
+simple-scan
+
+# Input Devices
+xserver-xorg-input-all
+xserver-xorg-input-libinput
+xserver-xorg-input-wacom
+libinput-tools
+
+# Peripherals & USB
+usb-modeswitch
+usb-modeswitch-data
+v4l-utils
+fprintd
+libpam-fprintd
+
+# Storage & Dual-Boot Filesystems
+ntfs-3g
+exfatprogs
+btrfs-progs
+xfsprogs
+lvm2
+cryptsetup
+udisks2
+gvfs-backends
+
+# Network & VPN
+network-manager-openvpn
+network-manager-openvpn-gnome
+ethtool
+nfs-common
+cifs-utils
+
+# Media Codecs
+gstreamer1.0-plugins-bad
+gstreamer1.0-plugins-ugly
+gstreamer1.0-libav
+gstreamer1.0-vaapi
+ffmpeg
+libavcodec-extra
+
+# Power Management
+power-profiles-daemon
+thermald
+tlp
+acpi
+acpid
+upower
+

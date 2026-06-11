@@ -120,12 +120,19 @@ class UserSetupPage(Gtk.Box):
         self.password2_entry = _entry("Confirm password", secret=True)
         self.hostname_entry  = _entry("Computer name (hostname)")
         self.hostname_entry.set_text("axon")
+        
+        self.timezone_entry  = _entry("Timezone (e.g. America/New_York)")
+        self.timezone_entry.set_text("UTC")
+        self.keymap_entry    = _entry("Keyboard layout (e.g. us)")
+        self.keymap_entry.set_text("us")
 
         for widget in (
             self.username_entry,
             self.password_entry,
             self.password2_entry,
             self.hostname_entry,
+            self.timezone_entry,
+            self.keymap_entry,
         ):
             form.append(widget)
 
@@ -138,6 +145,8 @@ class UserSetupPage(Gtk.Box):
             "password":  self.password_entry.get_text(),
             "password2": self.password2_entry.get_text(),
             "hostname":  self.hostname_entry.get_text(),
+            "timezone":  self.timezone_entry.get_text(),
+            "keymap":    self.keymap_entry.get_text(),
         }
 
     def validate(self) -> str | None:
@@ -465,6 +474,7 @@ class InstallerApp(Adw.ApplicationWindow):
 
         # Validate disk selection before installing
         if current_page == PAGE_DISK:
+            disk_settings = self._disk_page.get_installation_settings()
             if self._disk_page.get_selected_disk() is None:
                 dialog = Adw.MessageDialog(
                     transient_for=self,
@@ -472,6 +482,25 @@ class InstallerApp(Adw.ApplicationWindow):
                     body="Please select a disk to install Axon OS.",
                 )
                 dialog.add_response("ok", "OK")
+                dialog.present()
+                return
+
+            if disk_settings["mode"] == "erase":
+                def on_confirm_response(dialog, response):
+                    if response == "install":
+                        self._current_index += 1
+                        self._update_nav()
+                        self._start_install()
+                
+                dialog = Adw.MessageDialog(
+                    transient_for=self,
+                    heading="Erase Disk Confirmation",
+                    body="All data on the selected disk will be permanently destroyed. Are you sure you want to continue?",
+                )
+                dialog.add_response("cancel", "Cancel")
+                dialog.add_response("install", "Erase and Install")
+                dialog.set_response_appearance("install", Adw.ResponseAppearance.DESTRUCTIVE)
+                dialog.connect("response", on_confirm_response)
                 dialog.present()
                 return
 
@@ -528,6 +557,9 @@ class InstallerApp(Adw.ApplicationWindow):
             device = disk.device if disk else "/dev/sda"
             mount  = "/mnt/axon"
             mode   = disk_settings["mode"]
+            
+            import os
+            os.makedirs(mount, exist_ok=True)
 
             if mode == "erase":
                 self._set_progress(0.05, "Partitioning disk…")
@@ -622,14 +654,51 @@ class InstallerApp(Adw.ApplicationWindow):
                 with open(os.path.join(mount, "etc", "hosts"), "w") as f:
                     f.write(hosts_content)
 
-                # Create user with password
+                # Clean up live user if present
+                subprocess.run(["chroot", mount, "userdel", "-r", "axon"], check=False)
+
+                # Write timezone
+                tz = user_info.get("timezone", "UTC")
+                if tz:
+                    subprocess.run(["chroot", mount, "ln", "-sf", f"/usr/share/zoneinfo/{tz}", "/etc/localtime"], check=False)
+
+                # Write keyboard
+                keymap = user_info.get("keymap", "us")
+                kbd_content = f'XKBMODEL="pc105"\\nXKBLAYOUT="{keymap}"\\nXKBVARIANT=""\\nXKBOPTIONS=""\\nBACKSPACE="guess"\\n'
+                os.makedirs(os.path.join(mount, "etc", "default"), exist_ok=True)
+                with open(os.path.join(mount, "etc", "default", "keyboard"), "w") as f:
+                    f.write(kbd_content)
+
+                # Enable OS Prober for GRUB dual-boot detection
+                with open(os.path.join(mount, "etc", "default", "grub"), "a") as f:
+                    f.write("\\nGRUB_DISABLE_OS_PROBER=false\\n")
+
+                # Create user with password via chpasswd
                 username = user_info["username"]
                 password = user_info["password"]
-                hashed_password = crypt.crypt(password, crypt.METHOD_SHA512)
 
-                subprocess.run(["chroot", mount, "useradd", "-m", "-s", "/bin/bash", "-p", hashed_password, username], check=True)
+                subprocess.run(["chroot", mount, "useradd", "-m", "-s", "/bin/bash", username], check=True)
+                
+                proc = subprocess.Popen(["chroot", mount, "chpasswd"], stdin=subprocess.PIPE, text=True)
+                proc.communicate(f"{username}:{password}\\n")
+                if proc.returncode != 0:
+                    raise RuntimeError("Failed to set user password.")
+
                 subprocess.run(["chroot", mount, "usermod", "-aG", "sudo,adm,cdrom,dip,plugdev", username], check=True)
                 subprocess.run(["chroot", mount, "chown", "-R", f"{username}:{username}", f"/home/{username}"], check=True)
+                
+                # Remove installer shortcut from new user desktop
+                installer_desktop = os.path.join(mount, "home", username, "Desktop", "install-axon-os.desktop")
+                if os.path.exists(installer_desktop):
+                    os.remove(installer_desktop)
+                    
+            self._set_progress(0.85, "Creating swapfile…")
+            if not part.dry_run:
+                subprocess.run(["chroot", mount, "fallocate", "-l", "2G", "/swapfile"], check=False)
+                subprocess.run(["chroot", mount, "chmod", "600", "/swapfile"], check=False)
+                subprocess.run(["chroot", mount, "mkswap", "/swapfile"], check=False)
+                with open(os.path.join(mount, "etc", "fstab"), "a") as f:
+                    f.write("/swapfile none swap sw 0 0\\n")
 
             self._set_progress(0.90, "Installing bootloader (configuring dual boot GRUB)…")
             if not part.dry_run:

@@ -20,7 +20,6 @@ import Shell from 'gi://Shell';
 import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
-import AppDisplay from 'gi://AppDisplay';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import StartMenuPopup from './startmenu.js';
@@ -439,7 +438,7 @@ export default class DockManager {
         rightBox.add_child(clock);
 
         // Migrate native Quick Settings (network/volume/power aggregate)
-        const nativeQS = Main.panel.statusArea['aggregateMenu'];
+        const nativeQS = Main.panel.statusArea['quickSettings'];
         if (nativeQS) {
             const parent = nativeQS.get_parent();
             if (parent) parent.remove_child(nativeQS);
@@ -717,21 +716,59 @@ export default class DockManager {
                     let [response] = result;
                     let action = JSON.parse(response);
                     if (action && action.action === 'run_command' && action.command) {
-                        console.log(`AxonDock: Running AI shortcut command: ${action.command}`);
-                        Gio.Subprocess.new(
-                            ['bash', '-c', action.command],
-                            Gio.SubprocessFlags.NONE
-                        );
+                        const cmdText = action.command.trim();
+                        console.log(`AxonDock: Prompting user for AI shortcut command: ${cmdText}`);
+
+                        const confirmProc = new Gio.Subprocess({
+                            argv: [
+                                'zenity',
+                                '--question',
+                                '--title=AI Action Confirmation',
+                                '--text',
+                                `Do you want to run this AI generated command?\n\n${cmdText}`,
+                                '--no-wrap',
+                            ],
+                            flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+                        });
+                        confirmProc.init(null);
+                        confirmProc.wait_check_async(null, (proc, res) => {
+                            try {
+                                proc.wait_check_finish(res);
+                                if (!proc.get_successful()) return;
+
+                                const [ok, argv] = GLib.shell_parse_argv(cmdText);
+                                if (!ok || !argv || argv.length === 0) {
+                                    console.error('AxonDock: AI command cannot be safely parsed for execution:', cmdText);
+                                    return;
+                                }
+
+                                const runProc = new Gio.Subprocess({
+                                    argv: argv,
+                                    flags: Gio.SubprocessFlags.NONE,
+                                });
+                                runProc.init(null);
+                                runProc.wait_check_async(null, () => {});
+                            } catch (e) {
+                                console.error('AxonDock: failed to execute AI command:', e.message);
+                            }
+                        });
                     } else if (action && action.action === 'open_app' && action.app) {
                         console.log(`AxonDock: Launching app: ${action.app}`);
                         let app = this._appSystem.lookup_app(action.app);
                         if (app) {
                             app.activate();
                         } else {
-                            Gio.Subprocess.new(
-                                ['bash', '-c', action.app],
-                                Gio.SubprocessFlags.NONE
-                            );
+                            const [ok, argv] = GLib.shell_parse_argv(action.app);
+                            if (!ok || !argv || argv.length === 0) {
+                                console.error('AxonDock: App command cannot be safely parsed:', action.app);
+                                return;
+                            }
+                            const launchProc = new Gio.Subprocess({
+                                argv: argv,
+                                flags: Gio.SubprocessFlags.NONE,
+                            });
+                            launchProc.init(null);
+                            launchProc.wait_check_async(null, () => {});
                         }
                     } else {
                         if (icon._app) {

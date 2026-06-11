@@ -80,19 +80,39 @@ class BrainService(dbus.service.Object):
         self.save_config()
 
     def _http_post(self, url, payload, stream=False, timeout=60.0):
-        """Helper to execute urllib POST requests."""
+        """Helper to execute urllib POST requests with retry logic."""
         data = json.dumps(payload).encode()
         req = urllib.request.Request(
             url,
             data=data,
             headers={"Content-Type": "application/json"}
         )
-        return urllib.request.urlopen(req, timeout=timeout)
+        import time
+        max_retries = 5
+        max_backoff = 30.0
+        for attempt in range(max_retries):
+            try:
+                return urllib.request.urlopen(req, timeout=timeout)
+            except (urllib.error.URLError, OSError) as exc:
+                if attempt == max_retries - 1:
+                    raise
+                backoff = min(2.0 ** attempt, max_backoff)
+                time.sleep(backoff)
 
     def _http_get(self, url, timeout=5.0):
-        """Helper to execute urllib GET requests."""
+        """Helper to execute urllib GET requests with retry logic."""
         req = urllib.request.Request(url)
-        return urllib.request.urlopen(req, timeout=timeout)
+        import time
+        max_retries = 5
+        max_backoff = 30.0
+        for attempt in range(max_retries):
+            try:
+                return urllib.request.urlopen(req, timeout=timeout)
+            except (urllib.error.URLError, OSError) as exc:
+                if attempt == max_retries - 1:
+                    raise
+                backoff = min(2.0 ** attempt, max_backoff)
+                time.sleep(backoff)
 
     # ------------------------------------------------------------------
     # D-Bus Methods
@@ -262,6 +282,23 @@ class BrainService(dbus.service.Object):
                 if resp.status == 200:
                     result_data = json.loads(resp.read().decode())
                     result = result_data.get("response", "").strip()
+                    
+                    if result.startswith('{'):
+                        try:
+                            parsed = json.loads(result)
+                            if isinstance(parsed, dict) and parsed.get('action') == 'run_command' and isinstance(parsed.get('command'), str):
+                                return json.dumps({
+                                    'action': 'run_command',
+                                    'command': parsed['command'],
+                                })
+                            if isinstance(parsed, dict) and parsed.get('action') == 'open_app' and isinstance(parsed.get('app'), str):
+                                return json.dumps({
+                                    'action': 'open_app',
+                                    'app': parsed['app'],
+                                })
+                        except json.JSONDecodeError:
+                            pass
+                        return text
                     return result
         except Exception as e:
             return f"[Error: {e}]"

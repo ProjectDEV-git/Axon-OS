@@ -10,7 +10,7 @@ export LC_ALL=C
 export HOME=/root
 
 SRC="/opt/axon-src"
-VERSION="${AXON_VERSION:-0.2.0}"
+VERSION="${AXON_VERSION:-0.2.1}"
 CODENAME="Pulse"
 
 log() { echo "[chroot-setup] $*"; }
@@ -246,7 +246,7 @@ tap-to-click=true
 
 [org.gnome.shell]
 enabled-extensions=['axon-shell@axon-os', '${USER_THEME_EXT}']
-favorite-apps=['axon-welcome.desktop', 'install-axon-os.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Epiphany.desktop', 'axon-terminal.desktop', 'axon-files.desktop', 'axon-ai-panel.desktop', 'axon-settings.desktop']
+favorite-apps=['axon-welcome.desktop', 'install-axon-os.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Epiphany.desktop', 'axon-terminal.desktop', 'axon-ai-panel.desktop', 'axon-settings.desktop']
 EOF
 
 if [[ -n "${SHELL_THEME_NAME}" && -f /usr/share/glib-2.0/schemas/org.gnome.shell.extensions.user-theme.gschema.xml ]]; then

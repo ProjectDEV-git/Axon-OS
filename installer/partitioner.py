@@ -81,13 +81,11 @@ class Partitioner:
 
             partitions: list[PartitionInfo] = []
             for i, child in enumerate(device.get("children", [])):
-                # Deduce partition number from name (e.g. sda1 -> 1, nvme0n1p2 -> 2)
+                # Deduce partition number from name (e.g. sda1 -> 1, nvme0n1p12 -> 12)
                 p_name = child.get("name", "")
-                p_num = i + 1
-                for char in reversed(p_name):
-                    if char.isdigit():
-                        p_num = int(char)
-                        break
+                import re
+                m = re.search(r'(\\d+)$', p_name)
+                p_num = int(m.group(1)) if m else (i + 1)
                 
                 partitions.append(
                     PartitionInfo(

@@ -13,7 +13,7 @@
 #   AXON_BUILD_DIR   Work directory (default: /tmp/axon-build)
 set -euo pipefail
 
-VERSION="0.2.0"
+VERSION="0.2.1"
 ARCH="amd64"
 DIST="noble"
 MIRROR="http://archive.ubuntu.com/ubuntu/"

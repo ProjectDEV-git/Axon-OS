@@ -49,6 +49,14 @@ class StartMenuPopup extends St.BoxLayout {
                 this.hide();
                 return Clutter.EVENT_STOP;
             }
+            if (key === Clutter.KEY_Down) {
+                let firstRow = this._appsGrid.get_first_child();
+                if (firstRow) {
+                    let firstBtn = firstRow.get_first_child();
+                    if (firstBtn) firstBtn.grab_key_focus();
+                }
+                return Clutter.EVENT_STOP;
+            }
             return Clutter.EVENT_PROPAGATE;
         });
 
@@ -194,10 +202,25 @@ class StartMenuPopup extends St.BoxLayout {
         });
 
         this._searchEntry.grab_key_focus();
+
+        if (!this._clickDismissId) {
+            this._clickDismissId = global.stage.connect('button-press-event', (actor, event) => {
+                if (!this.contains(event.get_source())) {
+                    this.hide();
+                }
+                return Clutter.EVENT_PROPAGATE;
+            });
+        }
     }
 
     hide() {
         if (!this.visible) return;
+        
+        if (this._clickDismissId) {
+            global.stage.disconnect(this._clickDismissId);
+            this._clickDismissId = null;
+        }
+
         this.ease({
             opacity: 0,
             duration: 100,
@@ -259,6 +282,7 @@ class StartMenuPopup extends St.BoxLayout {
             const btn = new St.Button({
                 style_class: 'axon-startmenu-app-item',
                 reactive: true,
+                can_focus: true,
                 x_expand: true,
             });
 
@@ -279,6 +303,31 @@ class StartMenuPopup extends St.BoxLayout {
                 app.activate();
             });
 
+            btn.connect('key-press-event', (actor, event) => {
+                const key = event.get_key_symbol();
+                const buttons = this._getAppButtons();
+                const idx = buttons.indexOf(actor);
+                if (idx < 0) return Clutter.EVENT_PROPAGATE;
+
+                if (key === Clutter.KEY_Return || key === Clutter.KEY_KP_Enter) {
+                    actor.activate();
+                    return Clutter.EVENT_STOP;
+                }
+
+                let nextIndex = null;
+                if (key === Clutter.KEY_Right || key === Clutter.KEY_Down) {
+                    nextIndex = (idx + 1) % buttons.length;
+                } else if (key === Clutter.KEY_Left || key === Clutter.KEY_Up) {
+                    nextIndex = (idx - 1 + buttons.length) % buttons.length;
+                }
+
+                if (nextIndex !== null) {
+                    buttons[nextIndex].grab_key_focus();
+                    return Clutter.EVENT_STOP;
+                }
+                return Clutter.EVENT_PROPAGATE;
+            });
+
             row.add_child(btn);
             count++;
         });
@@ -294,73 +343,68 @@ class StartMenuPopup extends St.BoxLayout {
                 return;
             }
 
-            // Query SQLite via sqlite3 tool
+            // Query SQLite via sqlite3 tool asynchronously
             const query = 'SELECT file_name, file_path FROM files ORDER BY last_modified DESC LIMIT 5;';
             const argv = ['sqlite3', dbPath, query];
-            let [success, stdout, stderr] = GLib.spawn_sync(
-                null,
-                argv,
-                null,
-                GLib.SpawnFlags.SEARCH_PATH,
-                null
-            );
+            
+            const proc = Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                try {
+                    let [, stdout, stderr] = p.communicate_utf8_finish(res);
+                    if (p.get_successful() && stdout && stdout.length > 0) {
+                        const lines = stdout.split('\\n');
+                        let count = 0;
+                        lines.forEach(line => {
+                            if (!line.trim()) return;
+                            const parts = line.split('|');
+                            if (parts.length < 2) return;
+                            const name = parts[0];
+                            const path = parts[1];
 
-            if (success && stdout && stdout.length > 0) {
-                // Safely convert output bytes to string
-                let outStr = '';
-                if (typeof Uint8Array !== 'undefined' && stdout instanceof Uint8Array) {
-                    outStr = new TextDecoder('utf-8').decode(stdout);
-                } else {
-                    outStr = String.fromCharCode.apply(null, stdout);
-                }
-                
-                const lines = outStr.split('\n');
-                let count = 0;
-                lines.forEach(line => {
-                    if (!line.trim()) return;
-                    const parts = line.split('|');
-                    if (parts.length < 2) return;
-                    const name = parts[0];
-                    const path = parts[1];
+                            const btn = new St.Button({
+                                style_class: 'axon-startmenu-file-item',
+                                reactive: true,
+                                x_expand: true,
+                            });
+                            const box = new St.BoxLayout({ vertical: false, spacing: 8 });
+                            const icon = new St.Icon({
+                                icon_name: 'document-open-symbolic',
+                                icon_size: 16,
+                                style_class: 'axon-startmenu-file-icon',
+                            });
+                            const label = new St.Label({
+                                text: name,
+                                y_align: Clutter.ActorAlign.CENTER,
+                                style_class: 'axon-startmenu-file-label',
+                            });
 
-                    const btn = new St.Button({
-                        style_class: 'axon-startmenu-file-item',
-                        reactive: true,
-                        x_expand: true,
-                    });
-                    const box = new St.BoxLayout({ vertical: false, spacing: 8 });
-                    const icon = new St.Icon({
-                        icon_name: 'document-open-symbolic',
-                        icon_size: 16,
-                        style_class: 'axon-startmenu-file-icon',
-                    });
-                    const label = new St.Label({
-                        text: name,
-                        y_align: Clutter.ActorAlign.CENTER,
-                        style_class: 'axon-startmenu-file-label',
-                    });
+                            box.add_child(icon);
+                            box.add_child(label);
+                            btn.set_child(box);
 
-                    box.add_child(icon);
-                    box.add_child(label);
-                    btn.set_child(box);
+                            btn.connect('clicked', () => {
+                                this.hide();
+                                Gio.Subprocess.new(['xdg-open', path], Gio.SubprocessFlags.NONE);
+                            });
 
-                    btn.connect('clicked', () => {
-                        this.hide();
-                        Gio.Subprocess.new(['xdg-open', path], Gio.SubprocessFlags.NONE);
-                    });
+                            this._filesList.add_child(btn);
+                            count++;
+                        });
 
-                    this._filesList.add_child(btn);
-                    count++;
-                });
-
-                if (count === 0) {
+                        if (count === 0) {
+                            this._showNoRecentFiles();
+                        }
+                    } else {
+                        this._showNoRecentFiles();
+                    }
+                } catch (err) {
+                    console.error('AxonStartMenu: recent files async query error:', err.message);
                     this._showNoRecentFiles();
                 }
-            } else {
-                this._showNoRecentFiles();
-            }
+            });
+
         } catch (e) {
-            console.error('AxonStartMenu: recent files query error:', e.message);
+            console.error('AxonStartMenu: recent files setup error:', e.message);
             this._showNoRecentFiles();
         }
     }
@@ -399,6 +443,7 @@ class StartMenuPopup extends St.BoxLayout {
                 const btn = new St.Button({
                     style_class: 'axon-startmenu-app-item',
                     reactive: true,
+                    can_focus: true,
                     x_expand: true,
                 });
 
@@ -419,10 +464,47 @@ class StartMenuPopup extends St.BoxLayout {
                     app.activate();
                 });
 
+                btn.connect('key-press-event', (actor, event) => {
+                    const key = event.get_key_symbol();
+                    const buttons = this._getAppButtons();
+                    const idx = buttons.indexOf(actor);
+                    if (idx < 0) return Clutter.EVENT_PROPAGATE;
+
+                    if (key === Clutter.KEY_Return || key === Clutter.KEY_KP_Enter) {
+                        actor.activate();
+                        return Clutter.EVENT_STOP;
+                    }
+
+                    let nextIndex = null;
+                    if (key === Clutter.KEY_Right || key === Clutter.KEY_Down) {
+                        nextIndex = (idx + 1) % buttons.length;
+                    } else if (key === Clutter.KEY_Left || key === Clutter.KEY_Up) {
+                        nextIndex = (idx - 1 + buttons.length) % buttons.length;
+                    }
+
+                    if (nextIndex !== null) {
+                        buttons[nextIndex].grab_key_focus();
+                        return Clutter.EVENT_STOP;
+                    }
+                    return Clutter.EVENT_PROPAGATE;
+                });
+
                 row.add_child(btn);
                 count++;
             }
         });
+    }
+
+    _getAppButtons() {
+        const buttons = [];
+        for (const row of this._appsGrid.get_children()) {
+            for (const child of row.get_children()) {
+                if (child instanceof St.Button) {
+                    buttons.push(child);
+                }
+            }
+        }
+        return buttons;
     }
 
     _onSubmitSearch() {

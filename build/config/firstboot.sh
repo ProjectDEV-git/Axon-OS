@@ -127,5 +127,11 @@ fi
 
 # Mark first-boot complete
 touch "${DONE}"
+
+# Clean up installer shortcut from Desktop if it still exists
+if [[ -f "${HOME}/Desktop/install-axon-os.desktop" ]]; then
+    rm -f "${HOME}/Desktop/install-axon-os.desktop"
+fi
+
 echo "[axon-firstboot] Axon OS post-installation configuration finished."
 exit 0
