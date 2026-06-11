@@ -19,7 +19,21 @@ from typing import Callable, Optional
 import dbus
 from gi.repository import GLib
 
-from axon_logger import configure_app_logger
+try:
+    from axon_logger import configure_app_logger
+except ImportError:  # running standalone — repo root / installed shim not on sys.path
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
+    try:
+        from axon_logger import configure_app_logger
+    except ImportError:
+        import logging as _logging
+
+        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+            _logging.basicConfig(level=level)
+            return _logging.getLogger(name)
 
 logger = configure_app_logger(__name__)
 

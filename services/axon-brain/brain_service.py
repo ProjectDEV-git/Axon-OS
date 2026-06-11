@@ -13,7 +13,18 @@ import dbus.service
 import tomllib
 from gi.repository import GLib
 
-from axon_logger import configure_app_logger
+try:
+    from axon_logger import configure_app_logger
+except ImportError:  # running standalone — repo root / installed shim not on sys.path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    try:
+        from axon_logger import configure_app_logger
+    except ImportError:
+        import logging as _logging
+
+        def configure_app_logger(name, level=_logging.INFO, log_file=None):
+            _logging.basicConfig(level=level)
+            return _logging.getLogger(name)
 
 # Ensure we can import hardware_profiler and conversation_store
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -80,7 +91,7 @@ class BrainService(dbus.service.Object):
         }
         self.save_config()
 
-    def _http_post(self, url, payload, stream=False, timeout=60.0):
+    def _http_post(self, url, payload, stream=False, timeout=60.0, max_retries=5):
         """Helper to execute urllib POST requests with retry logic."""
         data = json.dumps(payload).encode()
         req = urllib.request.Request(
@@ -89,7 +100,6 @@ class BrainService(dbus.service.Object):
             headers={"Content-Type": "application/json"}
         )
         import time
-        max_retries = 5
         max_backoff = 30.0
         for attempt in range(max_retries):
             try:
@@ -315,7 +325,9 @@ class BrainService(dbus.service.Object):
             # Try newer /api/embed endpoint first
             payload = {"model": model, "input": prompt}
             try:
-                with self._http_post(f"{OLLAMA_BASE_URL}/api/embed", payload, timeout=15.0) as resp:
+                # Keep retries low: a blocking D-Bus call times out after ~25s,
+                # and the /api/embeddings fallback below still needs to run.
+                with self._http_post(f"{OLLAMA_BASE_URL}/api/embed", payload, timeout=15.0, max_retries=2) as resp:
                     if resp.status == 200:
                         data = json.loads(resp.read().decode())
                         embeddings = data.get("embeddings", [])
@@ -326,7 +338,7 @@ class BrainService(dbus.service.Object):
 
             # Fallback to /api/embeddings
             payload = {"model": model, "prompt": prompt}
-            with self._http_post(f"{OLLAMA_BASE_URL}/api/embeddings", payload, timeout=15.0) as resp:
+            with self._http_post(f"{OLLAMA_BASE_URL}/api/embeddings", payload, timeout=15.0, max_retries=2) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode())
                     return json.dumps(data.get("embedding", []))
