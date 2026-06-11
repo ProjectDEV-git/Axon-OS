@@ -2,18 +2,30 @@
 # Install with: pip install -r requirements-dev.txt
 
 # Testing
-pytest>=7.4.0
-pytest-cov>=4.1.0
+pytest==8.0.0
+pytest-cov==4.1.0
+pytest-timeout==2.2.0
+pytest-xdist==3.5.0
 
-# Linting
-ruff>=0.1.0
+# Linting & Code Quality
+ruff==0.2.0
+ruff-lsp==0.0.53
 
 # Type checking
-mypy>=1.5.0
-types-PyGObject>=1.2.0
+mypy==1.7.1
+types-PyGObject==1.2.0
 
 # Code formatting
-black>=23.9.0
+black==24.1.0
+isort==5.13.2
 
-# Pre-commit hooks (optional)
-pre-commit>=3.3.0
+# Pre-commit hooks
+pre-commit==3.6.0
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+
+# Security & Performance
+bandit==1.7.5
+memory-profiler==0.61.0

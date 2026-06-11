@@ -103,6 +103,53 @@ class ContextService(dbus.service.Object):
             
         return "\n".join(parts)
 
+    @dbus.service.method('org.axonos.Context', in_signature='s', out_signature='s')
+    def SemanticSearch(self, query_text):
+        """Performs vector search in the indexed documents using sqlite-vec."""
+        try:
+            import sqlite3
+            import sqlite_vec
+            from array import array
+            
+            # 1. Fetch embedding of query_text via Brain service
+            brain_obj = self.session_bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
+            brain_interface = dbus.Interface(brain_obj, 'org.axonos.Brain')
+            emb_json = brain_interface.GetEmbeddings(query_text, "")
+            emb = json.loads(emb_json)
+            if not emb or len(emb) != 768:
+                return "[]"
+                
+            db_path = os.path.expanduser("~/.axon/semantic_search.db")
+            if not os.path.exists(db_path):
+                return "[]"
+                
+            conn = sqlite3.connect(db_path)
+            conn.enable_load_extension(True)
+            sqlite_vec.load(conn)
+            
+            cursor = conn.cursor()
+            emb_bytes = array('f', emb).tobytes()
+            
+            cursor.execute("""
+                SELECT f.path, f.content, vec.distance 
+                FROM vec_items vec
+                JOIN files f ON f.id = vec.rowid
+                WHERE vec_embedding MATCH ?
+                ORDER BY distance
+                LIMIT 5
+            """, (emb_bytes,))
+            
+            results = []
+            for row in cursor.fetchall():
+                results.append({
+                    "path": row[0],
+                    "content": row[1],
+                    "distance": row[2]
+                })
+            return json.dumps(results)
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
     # ------------------------------------------------------------------
     # D-Bus Signals
     # ------------------------------------------------------------------

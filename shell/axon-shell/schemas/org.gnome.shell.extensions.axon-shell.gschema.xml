@@ -80,5 +80,12 @@
       <description>Keybinding to activate Space 9.</description>
     </key>
 
+    <!-- Voice toggle: Super+V -->
+    <key name="toggle-voice" type="as">
+      <default>["&lt;Super&gt;v"]</default>
+      <summary>Toggle Voice Recording</summary>
+      <description>Keybinding to trigger local voice commands.</description>
+    </key>
+
   </schema>
 </schemalist>

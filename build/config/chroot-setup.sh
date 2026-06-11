@@ -114,8 +114,21 @@ sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
 sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
     "${SERVICES_DIR}/axon-context/org.axonos.Context.service" \
     > /usr/share/dbus-1/services/org.axonos.Context.service
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
+    "${SERVICES_DIR}/axon-voice/org.axonos.Voice.service" \
+    > /usr/share/dbus-1/services/org.axonos.Voice.service
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
+    "${SERVICES_DIR}/axon-sandbox/org.axonos.Sandbox.service" \
+    > /usr/share/dbus-1/services/org.axonos.Sandbox.service
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
+    "${SERVICES_DIR}/axon-gui-agent/org.axonos.GuiAgent.service" \
+    > /usr/share/dbus-1/services/org.axonos.GuiAgent.service
+
 cp "${SERVICES_DIR}/axon-brain/org.axonos.Brain.conf" /usr/share/dbus-1/session.d/
 cp "${SERVICES_DIR}/axon-context/org.axonos.Context.conf" /usr/share/dbus-1/session.d/
+cp "${SERVICES_DIR}/axon-voice/org.axonos.Voice.conf" /usr/share/dbus-1/session.d/
+cp "${SERVICES_DIR}/axon-sandbox/org.axonos.Sandbox.conf" /usr/share/dbus-1/session.d/
+cp "${SERVICES_DIR}/axon-gui-agent/org.axonos.GuiAgent.conf" /usr/share/dbus-1/session.d/
 
 # systemd user units, enabled globally for every user
 mkdir -p /usr/lib/systemd/user
@@ -125,7 +138,20 @@ sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
 sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
     "${SERVICES_DIR}/axon-context/axon-context.service" \
     > /usr/lib/systemd/user/axon-context.service
-systemctl --global enable axon-brain.service axon-context.service
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
+    "${SERVICES_DIR}/axon-context/axon-file-indexer.service" \
+    > /usr/lib/systemd/user/axon-file-indexer.service
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
+    "${SERVICES_DIR}/axon-voice/axon-voice.service" \
+    > /usr/lib/systemd/user/axon-voice.service
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
+    "${SERVICES_DIR}/axon-sandbox/axon-sandbox.service" \
+    > /usr/lib/systemd/user/axon-sandbox.service
+sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" \
+    "${SERVICES_DIR}/axon-gui-agent/axon-gui-agent.service" \
+    > /usr/lib/systemd/user/axon-gui-agent.service
+
+systemctl --global enable axon-brain.service axon-context.service axon-file-indexer.service axon-voice.service axon-sandbox.service axon-gui-agent.service
 
 # GNOME Shell extension, system-wide
 EXT_DIR="/usr/share/gnome-shell/extensions/axon-shell@axon-os"
@@ -148,6 +174,46 @@ fi
 install -Dm755 "${SRC}/build/config/firstboot.sh" /usr/local/bin/axon-firstboot
 install -Dm755 "${SRC}/build/config/ollama-setup.sh" /usr/local/bin/axon-ollama-setup
 install -Dm755 "${SRC}/system/axon-updater.py" /usr/local/bin/axon-update
+
+# Install Axon Voice overlay & Sandbox / Watchdog helpers
+mkdir -p /usr/lib/axon/apps/axon-voice-overlay
+install -Dm755 "${SRC}/apps/axon-voice-overlay/main.py" /usr/lib/axon/apps/axon-voice-overlay/main.py
+install -Dm755 "${SRC}/services/axon-sandbox/axon-run" /usr/local/bin/axon-run
+install -Dm755 "${SRC}/system/boot_watchdog.py" /usr/local/bin/axon-boot-watchdog
+install -Dm644 "${SRC}/system/axon-boot-watchdog.service" /lib/systemd/system/axon-boot-watchdog.service
+systemctl enable axon-boot-watchdog.service
+
+# Shell environment interceptor for interactive shells
+install -Dm644 "${SRC}/services/axon-sandbox/axon-sandbox-env.sh" /etc/profile.d/axon-sandbox.sh
+
+# Python global logger path helper (copying to python standard dist-packages)
+cp "${SRC}/axon_logger.py" /usr/lib/python3/dist-packages/ || true
+
+# Append GRUB self-healing boot attempts watchdog logic to 00_header
+if [[ -f /etc/grub.d/00_header ]]; then
+    log "Injecting GRUB boot-attempts rollback watchdog logic..."
+    cat << 'EOF' >> /etc/grub.d/00_header
+
+# Axon OS Self-Healing Watchdog
+if [ -s \$prefix/grubenv ]; then
+  load_env boot_attempts
+fi
+if [ "\${boot_attempts}" -gt 2 ]; then
+  # Fallback to recovery, live session, or previous entry
+  set default="1"
+  echo "⬡ Axon Rogue Shield: Boot loop detected. Rolling back to fallback..."
+else
+  if [ -z "\${boot_attempts}" ]; then
+    set boot_attempts=1
+  elif [ "\${boot_attempts}" = "1" ]; then
+    set boot_attempts=2
+  elif [ "\${boot_attempts}" = "2" ]; then
+    set boot_attempts=3
+  fi
+  save_env boot_attempts
+fi
+EOF
+fi
 
 mkdir -p /etc/skel/.config/autostart
 cat > /etc/skel/.config/autostart/axon-firstboot.desktop <<'EOF'

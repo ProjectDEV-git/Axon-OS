@@ -1,0 +1,56 @@
+{
+  "name": "Axon OS Development",
+  "image": "mcr.microsoft.com/devcontainers/python:3.10-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-python.black-formatter",
+        "ms-python.mypy-type-checker",
+        "ms-vscode.makefile-tools",
+        "eamodio.gitlens",
+        "ms-python.debugpy"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.ruffEnabled": true,
+        "python.linting.ruffPath": "/usr/local/bin/ruff",
+        "python.formatting.provider": "black",
+        "python.formatting.blackArgs": ["--line-length=100"],
+        "[python]": {
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
+            "source.fixAll": "explicit"
+          }
+        },
+        "mypy-type-checker.args": [
+          "--ignore-missing-imports",
+          "--check-untyped-defs"
+        ]
+      }
+    }
+  },
+  "remoteUser": "vscode",
+  "postCreateCommand": "bash scripts/dev-setup.sh",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,readonly"
+  ],
+  "forwardPorts": [11434],
+  "portsAttributes": {
+    "11434": {
+      "label": "Ollama",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/workspace/.venv/bin"
+  }
+}

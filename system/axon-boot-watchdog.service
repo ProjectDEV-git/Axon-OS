@@ -1,0 +1,11 @@
+[Unit]
+Description=Axon OS Boot Counter Watchdog Reset
+After=graphical.target gdm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/bin/axon-boot-watchdog
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

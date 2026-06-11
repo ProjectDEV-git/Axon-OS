@@ -56,11 +56,14 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "UP", "B", "C4", "RUF"]
-ignore = ["E501", "E402"]
+select = ["E", "W", "F", "I", "UP", "B", "C4", "RUF", "D", "N", "PT", "SIM", "LOG"]
+ignore = ["E501", "E402", "D100", "D104"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["apps", "services", "installer"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.black]
 line-length = 100
@@ -78,6 +81,21 @@ exclude = '''
 
 [tool.mypy]
 python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+plugins = [
+    "mypy_dbus_python_plugin",
+]
+
+[[tool.mypy.overrides]]
+module = ["gi.*", "dbus.*"]
+ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true

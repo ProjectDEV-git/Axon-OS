@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Axon OS Rogue Software Shield - Bubblewrap Wrapper
+#
+# Runs commands in a secure sandbox with read-only system paths and $HOME.
+
+if [ $# -lt 1 ]; then
+    echo "Usage: axon-run <command>"
+    exit 1
+fi
+
+# Find bwrap
+if ! command -v bwrap &>/dev/null; then
+    echo "Error: bubblewrap (bwrap) is not installed." >&2
+    exit 1
+fi
+
+# Resolve paths
+CUR_DIR="$(pwd)"
+USER_HOME="${HOME:-/home/axon}"
+
+# Run command inside bubblewrap container
+# System paths are mounted read-only, user home is read-only, /tmp is isolated.
+bwrap \
+  --ro-bind /usr /usr \
+  --ro-bind /etc /etc \
+  --symlink usr/lib /lib \
+  --symlink usr/lib64 /lib64 \
+  --symlink usr/bin /bin \
+  --symlink usr/sbin /sbin \
+  --dir /tmp \
+  --dir /var \
+  --proc /proc \
+  --dev /dev \
+  --unshare-all \
+  --share-net \
+  --ro-bind "${USER_HOME}" "${USER_HOME}" \
+  --chdir "${CUR_DIR}" \
+  /bin/bash -c "$*"

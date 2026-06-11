@@ -267,6 +267,177 @@ export default class AxonShellExtension extends Extension {
         } catch (e) {
             console.warn('AxonShell: could not bind toggle-ai-panel:', e.message);
         }
+
+        // Super+V → toggle voice recording
+        try {
+            Main.wm.addKeybinding(
+                'toggle-voice',
+                settings,
+                Meta.KeyBindingFlags.NONE,
+                Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+                () => {
+                    this._toggleVoiceRecording();
+                }
+            );
+            this._keybindingIds.push('toggle-voice');
+        } catch (e) {
+            console.warn('AxonShell: could not bind toggle-voice:', e.message);
+        }
+    }
+
+    _toggleVoiceRecording() {
+        if (!this._voiceProxy) {
+            try {
+                const VoiceInterface = `
+                <node>
+                  <interface name="org.axonos.Voice">
+                    <method name="StartRecording">
+                      <arg type="b" name="success" direction="out"/>
+                    </method>
+                    <method name="StopRecording">
+                      <arg type="b" name="success" direction="out"/>
+                    </method>
+                    <method name="IsRecording">
+                      <arg type="b" name="recording" direction="out"/>
+                    </method>
+                    <signal name="TranscriptionCompleted">
+                      <arg type="s" name="transcription"/>
+                      <arg type="s" name="intent_json"/>
+                    </signal>
+                  </interface>
+                </node>
+                `;
+                const VoiceProxy = Gio.DBusProxy.makeProxyWrapper(VoiceInterface);
+                this._voiceProxy = new VoiceProxy(
+                    Gio.DBus.session,
+                    'org.axonos.Voice',
+                    '/org/axonos/Voice'
+                );
+                this._voiceProxy.connectSignal('TranscriptionCompleted', (proxy, sender, [transcription, intentJson]) => {
+                    this._onTranscriptionCompleted(transcription, intentJson);
+                });
+            } catch (e) {
+                console.warn('AxonShell: could not create VoiceProxy:', e.message);
+                return;
+            }
+        }
+
+        this._voiceProxy.IsRecordingRemote((res, err) => {
+            let recording = false;
+            if (!err && res) {
+                [recording] = res;
+            }
+            if (recording) {
+                this._voiceProxy.StopRecordingRemote((r, e) => {
+                    this._showVoiceOverlay(false);
+                });
+            } else {
+                this._voiceProxy.StartRecordingRemote((r, e) => {
+                    this._showVoiceOverlay(true);
+                });
+            }
+        });
+    }
+
+    _showVoiceOverlay(show) {
+        if (show) {
+            try {
+                const overlayScript = GLib.build_filenamev([
+                    GLib.get_home_dir(),
+                    '.local', 'share', 'axon-os', 'axon-voice-overlay', 'main.py',
+                ]);
+                let finalScript = overlayScript;
+                if (!GLib.file_test(overlayScript, GLib.FileTest.EXISTS)) {
+                    finalScript = '/usr/lib/axon/apps/axon-voice-overlay/main.py';
+                }
+                this._voiceOverlayProc = Gio.Subprocess.new(
+                    ['python3', finalScript],
+                    Gio.SubprocessFlags.NONE
+                );
+            } catch (e) {
+                console.warn('AxonShell: could not launch voice overlay:', e.message);
+            }
+        } else {
+            if (this._voiceOverlayProc) {
+                this._voiceOverlayProc.force_exit();
+                this._voiceOverlayProc = null;
+            }
+        }
+    }
+
+    _onTranscriptionCompleted(transcription, intentJson) {
+        console.log(`AxonShell Voice: Transcription: "${transcription}"`);
+        if (!transcription) return;
+        try {
+            let action = JSON.parse(intentJson);
+            if (action && action.action === 'run_command' && action.command) {
+                const cmdText = action.command.strip ? action.command.strip() : action.command.trim();
+                
+                const confirmProc = new Gio.Subprocess({
+                    argv: [
+                        'zenity',
+                        '--question',
+                        '--title=Voice Action Confirmation',
+                        '--text',
+                        `Do you want to run this voice command?\n\n"${transcription}"\n\nCommand: ${cmdText}`,
+                        '--no-wrap',
+                    ],
+                    flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+                });
+                confirmProc.init(null);
+                confirmProc.wait_check_async(null, (proc, res) => {
+                    try {
+                        proc.wait_check_finish(res);
+                        if (!proc.get_successful()) return;
+
+                        const [ok, argv] = GLib.shell_parse_argv(cmdText);
+                        if (!ok || !argv || argv.length === 0) return;
+
+                        const runProc = new Gio.Subprocess({
+                            argv: argv,
+                            flags: Gio.SubprocessFlags.NONE,
+                        });
+                        runProc.init(null);
+                        runProc.wait_check_async(null, () => {});
+                    } catch (e) {
+                        console.error('AxonShell Voice: command execute failed:', e.message);
+                    }
+                });
+            } else if (action && action.action === 'open_app' && action.app) {
+                let appSystem = Shell.AppSystem.get_default();
+                let app = appSystem.lookup_app(action.app) || appSystem.lookup_app(action.app + '.desktop');
+                if (app) {
+                    app.activate();
+                } else {
+                    const [ok, argv] = GLib.shell_parse_argv(action.app);
+                    if (ok && argv && argv.length > 0) {
+                        const launchProc = new Gio.Subprocess({
+                            argv: argv,
+                            flags: Gio.SubprocessFlags.NONE,
+                        });
+                        launchProc.init(null);
+                        launchProc.wait_check_async(null, () => {});
+                    }
+                }
+            } else {
+                // If it is just a plain text reply, display it
+                const infoProc = new Gio.Subprocess({
+                    argv: [
+                        'zenity',
+                        '--info',
+                        '--title=Axon Assistant',
+                        '--text',
+                        `You said: "${transcription}"\n\nReply: ${intentJson}`,
+                        '--no-wrap',
+                    ],
+                    flags: Gio.SubprocessFlags.NONE,
+                });
+                infoProc.init(null);
+                infoProc.wait_check_async(null, () => {});
+            }
+        } catch (e) {
+            console.error('AxonShell Voice: failed to parse/execute intent:', e.message);
+        }
     }
 
     _toggleAIPanel() {
@@ -292,6 +463,11 @@ export default class AxonShellExtension extends Extension {
     }
 
     disable() {
+        if (this._voiceOverlayProc) {
+            this._voiceOverlayProc.force_exit();
+            this._voiceOverlayProc = null;
+        }
+        this._voiceProxy = null;
         // Remove Super key overlay listener
         if (this._overlayKeyId) {
             global.display.disconnect(this._overlayKeyId);

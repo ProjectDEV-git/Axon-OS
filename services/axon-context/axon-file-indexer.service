@@ -1,0 +1,12 @@
+[Unit]
+Description=Axon OS Semantic File Indexer
+After=dbus.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 AXON_SERVICES_DIR/axon-context/file_indexer.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

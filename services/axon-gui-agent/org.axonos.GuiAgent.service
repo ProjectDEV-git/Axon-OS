@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.axonos.GuiAgent
+Exec=/usr/bin/python3 AXON_SERVICES_DIR/axon-gui-agent/gui_agent_service.py

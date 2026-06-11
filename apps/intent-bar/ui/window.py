@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import threading
 from typing import Any
@@ -136,11 +137,11 @@ Keep responses concise and helpful.
 
 # Quick-action chip definitions: (label, prefix inserted into entry)
 _CHIPS: list[tuple[str, str]] = [
+    ("Find File", "find "),
     ("Open App", "open "),
     ("Run Command", "run "),
     ("Search Web", "search "),
     ("Summarize", "summarize "),
-    ("Write Code", "write code for "),
 ]
 
 _MAX_HISTORY = 20
@@ -390,14 +391,20 @@ class IntentBarWindow(Adw.Window):
         if not query:
             return
 
+        # Push to history and reset index
+        self._push_history(query)
+        self._history_idx = -1
+
+        # Direct route for semantic file search
+        if query.startswith("find "):
+            search_query = query[5:].strip()
+            self._do_local_semantic_search(search_query)
+            return
+
         if not self._ollama.is_available():
             self._show_error("[error] Ollama is not running. Click 'Start Ollama'.")
             self._start_ollama_btn.set_visible(True)
             return
-
-        # Push to history and reset index
-        self._push_history(query)
-        self._history_idx = -1
 
         # Prepare UI for streaming
         self._spinner.start()
@@ -504,3 +511,81 @@ class IntentBarWindow(Adw.Window):
         )
         self._start_ollama_btn.set_sensitive(False)
         self._show_error("Starting Ollama... please wait a moment and try again.")
+
+    # ------------------------------------------------------------------
+    # Semantic File Search Helpers
+    # ------------------------------------------------------------------
+
+    def _do_local_semantic_search(self, search_query: str) -> None:
+        """Initialize semantic search loading state and spawn query thread."""
+        self._spinner.start()
+        self._response_label.set_text("Searching files...")
+        self._response_label.set_visible(True)
+        self._entry.set_sensitive(False)
+        
+        thread = threading.Thread(
+            target=self._query_semantic_db,
+            args=(search_query,),
+            daemon=True
+        )
+        thread.start()
+
+    def _query_semantic_db(self, query: str) -> None:
+        """Query org.axonos.Context.SemanticSearch via D-Bus in background thread."""
+        try:
+            import dbus
+            bus = dbus.SessionBus()
+            context_obj = bus.get_object('org.axonos.Context', '/org/axonos/Context')
+            context_interface = dbus.Interface(context_obj, 'org.axonos.Context')
+            results_json = context_interface.SemanticSearch(query)
+            GLib.idle_add(self._display_semantic_results, results_json)
+        except Exception as e:
+            GLib.idle_add(self._display_semantic_error, str(e))
+
+    def _display_semantic_error(self, err_msg: str) -> bool:
+        """Display D-Bus connection or execution errors."""
+        self._spinner.stop()
+        self._entry.set_sensitive(True)
+        self._entry.grab_focus()
+        self._show_error(f"[error] Semantic search service unavailable: {err_msg}")
+        return False
+
+    def _display_semantic_results(self, results_json: str) -> bool:
+        """Parse and display matches with interactive markup links in GTK main thread."""
+        self._spinner.stop()
+        self._entry.set_sensitive(True)
+        self._entry.grab_focus()
+        
+        try:
+            results = json.loads(results_json)
+            if not results or (isinstance(results, dict) and "error" in results) or len(results) == 0:
+                self._response_label.set_text("No matching files found.")
+                self._response_label.set_use_markup(False)
+                return False
+                
+            markup = "<b>📂 Semantic Search Matches:</b>\n\n"
+            for item in results:
+                path = item.get("path", "")
+                filename = os.path.basename(path)
+                snippet = item.get("content", "").replace("<", "&lt;").replace(">", "&gt;")
+                if len(snippet) > 150:
+                    snippet = snippet[:150] + "..."
+                # Build GtkLabel compatible anchor link
+                markup += f"• <a href=\"file://{path}\">{filename}</a>\n"
+                markup += f"  <span color=\"#9090b8\">{snippet}</span>\n\n"
+                
+            self._response_label.set_markup(markup)
+            self._response_label.set_use_markup(True)
+            self._response_label.connect("activate-link", self._on_link_activated)
+        except Exception as e:
+            self._show_error(f"Error parsing search results: {e}")
+            
+        return False
+        
+    def _on_link_activated(self, label: Gtk.Label, uri: str) -> bool:
+        """Handle link activation by opening the file target via xdg-open."""
+        try:
+            subprocess.Popen(["xdg-open", uri])
+            return True
+        except Exception:
+            return False

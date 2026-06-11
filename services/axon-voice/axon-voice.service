@@ -1,0 +1,12 @@
+[Unit]
+Description=Axon OS AI Voice Service
+After=dbus.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 AXON_SERVICES_DIR/axon-voice/voice_service.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
+"""Axon Brain D-Bus Service - Centralized AI inference and model management."""
+
 import json
+import logging
+import re
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
-from axon_logger import configure_app_logger
+from typing import Any, Dict, Optional
 
 import dbus
 import dbus.mainloop.glib
 import dbus.service
 import tomllib
+from axon_logger import configure_app_logger
 from gi.repository import GLib
 
 # Ensure we can import hardware_profiler and conversation_store
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import hardware_profiler
 from conversation_store import ConversationStore
 
