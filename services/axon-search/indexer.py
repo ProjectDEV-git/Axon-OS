@@ -10,19 +10,67 @@ from pathlib import Path
 
 # File types worth embedding: prose, notes, code, configs.
 INDEX_EXTENSIONS = {
-    ".md", ".txt", ".rst", ".org",
-    ".py", ".sh", ".bash", ".js", ".ts", ".jsx", ".tsx",
-    ".c", ".h", ".cpp", ".hpp", ".rs", ".go", ".java", ".rb", ".lua",
-    ".toml", ".yaml", ".yml", ".json", ".ini", ".cfg", ".conf",
-    ".css", ".html", ".sql", ".tex", ".csv",
+    ".md",
+    ".txt",
+    ".rst",
+    ".org",
+    ".py",
+    ".sh",
+    ".bash",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".rs",
+    ".go",
+    ".java",
+    ".rb",
+    ".lua",
+    ".toml",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".css",
+    ".html",
+    ".sql",
+    ".tex",
+    ".csv",
 }
 
 # Directory names never descended into.
 EXCLUDE_DIRS = {
-    ".git", ".svn", ".hg", "node_modules", "__pycache__", ".venv", "venv",
-    ".cache", ".cargo", ".rustup", ".npm", ".local", ".config", ".mozilla",
-    ".thunderbird", "snap", ".steam", ".var", ".axon", "dist", "build",
-    ".mypy_cache", ".pytest_cache", ".tox", "target",
+    ".git",
+    ".svn",
+    ".hg",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".cache",
+    ".cargo",
+    ".rustup",
+    ".npm",
+    ".local",
+    ".config",
+    ".mozilla",
+    ".thunderbird",
+    "snap",
+    ".steam",
+    ".var",
+    ".axon",
+    "dist",
+    "build",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".tox",
+    "target",
 }
 
 # Files larger than this are skipped (embedding huge blobs is wasteful).
@@ -96,10 +144,7 @@ def iter_candidate_files(home: str | Path, roots: tuple[str, ...] = DEFAULT_ROOT
         if not base.is_dir():
             continue
         for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
-            dirnames[:] = [
-                d for d in dirnames
-                if d not in EXCLUDE_DIRS and not d.startswith(".")
-            ]
+            dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
             for fname in filenames:
                 full = os.path.join(dirpath, fname)
                 if full in seen:
