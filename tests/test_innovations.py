@@ -11,20 +11,25 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-for sub in ("services/axon-search", "services/axon-voice",
-            "services/axon-sandbox", "services/axon-gui-agent",
-            "apps/axon-installer"):
+for sub in (
+    "services/axon-search",
+    "services/axon-voice",
+    "services/axon-sandbox",
+    "services/axon-gui-agent",
+    "apps/axon-installer",
+):
     sys.path.insert(0, str(ROOT / sub))
 
-import audit  # noqa: E402  (axon-sandbox)
-import indexer  # noqa: E402  (axon-search)
-import plan  # noqa: E402  (axon-gui-agent)
-from install_engine import fstab_lines  # noqa: E402
-from intent_router import clean_transcript, parse_intent_response  # noqa: E402
+import audit
+import indexer
+import plan
+from install_engine import fstab_lines
+from intent_router import clean_transcript, parse_intent_response
 
 # ---------------------------------------------------------------------------
 # axon-search / indexer
 # ---------------------------------------------------------------------------
+
 
 class TestChunkText:
     def test_empty(self):
@@ -83,6 +88,7 @@ def test_read_text_rejects_binary(tmp_path):
 # axon-voice / intent_router
 # ---------------------------------------------------------------------------
 
+
 class TestIntentRouter:
     def test_noise_discarded(self):
         assert clean_transcript("  Thank you.  ") == ""
@@ -92,13 +98,11 @@ class TestIntentRouter:
         assert clean_transcript("open  the   terminal") == "open the terminal"
 
     def test_open_app(self):
-        kind, payload = parse_intent_response(
-            '{"action": "open_app", "app": "nautilus"}')
+        kind, payload = parse_intent_response('{"action": "open_app", "app": "nautilus"}')
         assert (kind, payload) == ("open_app", "nautilus")
 
     def test_run_command(self):
-        kind, payload = parse_intent_response(
-            '{"action": "run_command", "command": "ls -la"}')
+        kind, payload = parse_intent_response('{"action": "run_command", "command": "ls -la"}')
         assert (kind, payload) == ("run_command", "ls -la")
 
     def test_plain_text_and_bad_json(self):
@@ -110,6 +114,7 @@ class TestIntentRouter:
 # ---------------------------------------------------------------------------
 # axon-sandbox / audit
 # ---------------------------------------------------------------------------
+
 
 class TestAudit:
     def test_clean_script(self):
@@ -149,29 +154,30 @@ class TestAudit:
 # axon-gui-agent / plan
 # ---------------------------------------------------------------------------
 
+
 class TestPlanValidation:
     def test_allowed_ops_pass(self):
         ops, errs = plan.validate_plan(
             '[{"type": "gsettings_set", "schema": "org.gnome.desktop.interface",'
             ' "key": "font-name", "value": "Inter 12"},'
             ' {"type": "launch_app", "app": "nautilus"},'
-            ' {"type": "notify", "message": "done"}]')
+            ' {"type": "notify", "message": "done"}]'
+        )
         assert len(ops) == 3 and errs == []
 
     def test_disallowed_schema_rejected(self):
         ops, errs = plan.validate_plan(
             '[{"type": "gsettings_set", "schema": "org.gnome.login-screen",'
-            ' "key": "banner", "value": "x"}]')
+            ' "key": "banner", "value": "x"}]'
+        )
         assert ops == [] and "not allowed" in errs[0]
 
     def test_shell_metacharacters_rejected(self):
-        ops, errs = plan.validate_plan(
-            '[{"type": "launch_app", "app": "nautilus; rm -rf /"}]')
+        ops, errs = plan.validate_plan('[{"type": "launch_app", "app": "nautilus; rm -rf /"}]')
         assert ops == [] and errs
 
     def test_markdown_fence_tolerated(self):
-        ops, _ = plan.validate_plan(
-            '```json\n[{"type": "notify", "message": "hi"}]\n```')
+        ops, _ = plan.validate_plan('```json\n[{"type": "notify", "message": "hi"}]\n```')
         assert len(ops) == 1
 
     def test_garbage_rejected(self):
@@ -179,8 +185,7 @@ class TestPlanValidation:
         assert ops == [] and errs
 
     def test_op_cap(self):
-        many = "[" + ",".join(
-            '{"type": "notify", "message": "x"}' for _ in range(20)) + "]"
+        many = "[" + ",".join('{"type": "notify", "message": "x"}' for _ in range(20)) + "]"
         ops, errs = plan.validate_plan(many)
         assert len(ops) == plan.MAX_OPS
         assert any("truncated" in e for e in errs)
@@ -195,6 +200,7 @@ class TestPlanValidation:
 # ---------------------------------------------------------------------------
 # install_engine / fstab (BTRFS migration for the boot watchdog)
 # ---------------------------------------------------------------------------
+
 
 class TestFstab:
     def test_btrfs_layout(self):
@@ -211,5 +217,54 @@ class TestFstab:
         assert "boot/efi" not in joined
 
     def test_no_swap(self):
-        assert not any(
-            "swap" in line for line in fstab_lines("RU", "", "btrfs", False))
+        assert not any("swap" in line for line in fstab_lines("RU", "", "btrfs", False))
+
+
+# ---------------------------------------------------------------------------
+# axon-search / search_service (vec_table_ready)
+# ---------------------------------------------------------------------------
+
+import sqlite3
+from unittest.mock import MagicMock
+
+# Safely mock D-Bus/GLib before importing search_service
+sys.modules["dbus"] = MagicMock()
+sys.modules["dbus.mainloop"] = MagicMock()
+sys.modules["dbus.mainloop.glib"] = MagicMock()
+sys.modules["dbus.service"] = MagicMock()
+sys.modules["gi"] = MagicMock()
+sys.modules["gi.repository"] = MagicMock()
+
+import search_service
+
+
+class TestVecTableReady:
+    def setup_method(self):
+        self.db = sqlite3.connect(":memory:")
+        self.db.execute("CREATE TABLE meta(key TEXT UNIQUE, value TEXT)")
+
+    def teardown_method(self):
+        self.db.close()
+
+    def test_returns_true_if_meta_exists(self):
+        """Should return True immediately if vec_dim is found in the meta table."""
+        self.db.execute("INSERT INTO meta(key, value) VALUES ('vec_dim', '128')")
+        assert search_service.vec_table_ready(self.db) is True
+
+    def test_returns_false_if_no_dim(self):
+        """Should return False if table doesn't exist and no dim is provided."""
+        assert search_service.vec_table_ready(self.db, dim=None) is False
+
+    def test_handles_operational_error(self):
+        """Should catch OperationalError when vec0 module is missing and return False."""
+        # Standard sqlite3 lacks sqlite-vec, so CREATE VIRTUAL TABLE USING vec0 fails.
+        assert search_service.vec_table_ready(self.db, dim=128) is False
+
+    def test_creates_table_success(self):
+        """Should return True and commit if table creation succeeds."""
+        mock_db = MagicMock()
+        mock_db.execute.return_value.fetchone.return_value = None
+        assert search_service.vec_table_ready(mock_db, dim=128) is True
+        mock_db.commit.assert_called_once()
+        # Verify the two expected execute calls (CREATE TABLE and INSERT into meta)
+        assert mock_db.execute.call_count == 3
