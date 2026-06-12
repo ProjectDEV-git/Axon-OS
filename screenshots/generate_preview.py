@@ -4,8 +4,11 @@ Axon OS — Futuristic Desktop Preview Generator
 1920 × 1080 · aurora wallpaper · glassmorphic windows · neon dock
 """
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageEnhance
-import math, os, random
+import math
+import os
+import random
+
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 # ── Canvas ────────────────────────────────────────────────────────────────────
 W, H = 1920, 1080
@@ -216,7 +219,7 @@ def draw_menubar(img):
     img.paste(bar_layer, (0,0), bar_layer)
     draw = ImageDraw.Draw(img)
 
-    f12 = _font(12); f13b = _font(13, True); f11 = _font(11)
+    f12 = _font(12); f13b = _font(13, True)
 
     hexagon(draw, 16, 15, 7, P["violet"])
     draw.text((28, 7), "Axon OS", font=f13b, fill=P["text"])
