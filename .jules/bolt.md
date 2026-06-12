@@ -1,2 +1,1 @@
-## 2024-05-18
-- Performance optimization: eliminated N+1 query in `search_service.py` file indexing loop by pre-fetching `mtime` into a dictionary. This optimization yielded a 2.5x speed up.
+2024-06-12: Added a unit test for ConversationStore, confirming that `importlib.util` is effective to import python modules from directories containing dashes, such as `axon-brain`.
