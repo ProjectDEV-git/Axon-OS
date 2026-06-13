@@ -7,7 +7,7 @@ name = "axon-os"
 version = "0.3.0"
 description = "Axon OS - A futuristic, AI-powered Linux desktop environment"
 readme = "README.md"
-license = {text = "GPL-3.0-or-later"}
+license = {text = "MIT"}
 authors = [
     {name = "Axon Team", email = "team@axon-os.local"}
 ]
@@ -16,7 +16,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: X11 Applications :: GTK",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",

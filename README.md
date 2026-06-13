@@ -48,7 +48,7 @@ cd Axon-OS
 
 # Install system dependencies
 sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
-    gir1.2-adw-1 python3-dbus python3-vte-2.91
+    gir1.2-adw-1 python3-dbus gir1.2-vte-2.91
 
 # Install Ollama (if not already installed)
 curl -fsSL https://ollama.com/install.sh | sh
