@@ -281,7 +281,7 @@ class InstallerWindow(Adw.Window):
 
     def _update_sidebar(self) -> None:
         for i, (row, dot, lbl) in enumerate(
-            zip(self._step_rows, self._step_dots, self._step_labels)
+            zip(self._step_rows, self._step_dots, self._step_labels, strict=False)
         ):
             for widget, classes in ((row, ["step-row-current"]),
                                     (dot, ["step-dot-current", "step-dot-done"]),

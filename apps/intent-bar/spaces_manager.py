@@ -31,7 +31,7 @@ class Space:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Space":
+    def from_dict(cls, data: dict[str, Any]) -> Space:
         """Construct a Space from a plain dictionary."""
         return cls(
             id=data["id"],

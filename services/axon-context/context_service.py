@@ -29,21 +29,21 @@ class ContextService(dbus.service.Object):
     def __init__(self):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
-        
+
         logger = configure_app_logger(__name__)
         try:
             self.bus_name = dbus.service.BusName('org.axonos.Context', bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             logger.error("org.axonos.Context service is already running.")
             sys.exit(1)
-            
+
         dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Context')
-        
+
         # State tracking (updated dynamically by shell extension or helpers)
         self.active_window_title = "None"
         self.active_window_app = "None"
         self.active_space = "Default"
-        
+
         logger.info("Axon Context Engine Service registered successfully at /org/axonos/Context")
 
     # ------------------------------------------------------------------
@@ -88,31 +88,31 @@ class ContextService(dbus.service.Object):
     def GetContextString(self):
         """Formats context for injection into LLM system prompts."""
         parts = []
-        
+
         if self.active_window_title and self.active_window_title != "None":
             parts.append(f"Active window: {self.active_window_title} (App: {self.active_window_app})")
-            
+
         parts.append(f"Current space: {self.active_space}")
-        
+
         open_files = self._get_open_files()
         if open_files:
             parts.append("Open files in editors:")
             for f in open_files:
                 parts.append(f"  - {f}")
-                
+
         cmds = self._get_terminal_commands()
         if cmds:
             parts.append("Recent terminal commands:")
             for cmd in cmds:
                 parts.append(f"  $ {cmd}")
-                
+
         stderr = self._get_last_stderr()
         if stderr:
             parts.append(f"Last terminal error:\n{stderr}")
-            
+
         if not parts:
             return "No desktop context available."
-            
+
         return "\n".join(parts)
 
     @dbus.service.method('org.axonos.Context', in_signature='s', out_signature='s')
@@ -123,7 +123,7 @@ class ContextService(dbus.service.Object):
             from array import array
 
             import sqlite_vec
-            
+
             # 1. Fetch embedding of query_text via Brain service
             brain_obj = self.session_bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
             brain_interface = dbus.Interface(brain_obj, 'org.axonos.Brain')
@@ -131,27 +131,27 @@ class ContextService(dbus.service.Object):
             emb = json.loads(emb_json)
             if not emb or len(emb) != 768:
                 return "[]"
-                
+
             db_path = os.path.expanduser("~/.axon/semantic_search.db")
             if not os.path.exists(db_path):
                 return "[]"
-                
+
             conn = sqlite3.connect(db_path)
             conn.enable_load_extension(True)
             sqlite_vec.load(conn)
-            
+
             cursor = conn.cursor()
             emb_bytes = array('f', emb).tobytes()
-            
+
             cursor.execute("""
-                SELECT f.path, f.content, vec.distance 
+                SELECT f.path, f.content, vec.distance
                 FROM vec_items vec
                 JOIN files f ON f.id = vec.rowid
                 WHERE vec_embedding MATCH ?
                 ORDER BY distance
                 LIMIT 5
             """, (emb_bytes,))
-            
+
             results = []
             for row in cursor.fetchall():
                 results.append({
@@ -232,7 +232,7 @@ class ContextService(dbus.service.Object):
                 return commands[-n:]
             except Exception:
                 pass
-        
+
         # Fish history
         fish_history = Path.home() / ".local" / "share" / "fish" / "fish_history"
         if fish_history.exists():

@@ -8,7 +8,7 @@ class ConversationStore:
     def __init__(self, db_path=None):
         if db_path is None:
             db_path = os.path.expanduser("~/.axon/conversations.db")
-        
+
         # Ensure directory exists with restricted permissions
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
@@ -38,7 +38,7 @@ class ConversationStore:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            
+
             # Create messages table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
@@ -50,7 +50,7 @@ class ConversationStore:
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
                 )
             """)
-            
+
             # Create index for faster lookups
             conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)")
             conn.commit()
@@ -60,7 +60,7 @@ class ConversationStore:
             conv_id = str(uuid.uuid4())
         if not title:
             title = f"New Chat ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
-            
+
         with self._get_connection() as conn:
             conn.execute(
                 "INSERT INTO conversations (id, title, system_prompt) VALUES (?, ?, ?)",
@@ -75,7 +75,7 @@ class ConversationStore:
             cursor = conn.execute("SELECT 1 FROM conversations WHERE id = ?", (conversation_id,))
             if not cursor.fetchone():
                 self.create_conversation(conv_id=conversation_id)
-                
+
             conn.execute(
                 "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
                 (conversation_id, role, content)
@@ -118,7 +118,7 @@ class ConversationStore:
         with self._get_connection() as conn:
             # Search messages and return their conversation title + content snippet
             cursor = conn.execute("""
-                SELECT m.conversation_id, c.title as conversation_title, m.role, m.content, m.timestamp 
+                SELECT m.conversation_id, c.title as conversation_title, m.role, m.content, m.timestamp
                 FROM messages m
                 JOIN conversations c ON m.conversation_id = c.id
                 WHERE m.content LIKE ?

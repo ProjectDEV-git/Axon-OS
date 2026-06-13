@@ -12,22 +12,22 @@ def configure_app_logger(
     log_file: str | None = None,
 ) -> logging.Logger:
     """Configure a logger for an Axon app or service.
-    
+
     Args:
         name: Logger name (typically __name__ or app module name)
         level: Logging level (default: INFO)
         log_file: Optional path to log file; if provided, logs to both console and file
-    
+
     Returns:
         Configured logger instance
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
-    
+
     # Avoid adding duplicate handlers
     if logger.handlers:
         return logger
-    
+
     # Console handler with formatted output
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level)
@@ -37,7 +37,7 @@ def configure_app_logger(
     )
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-    
+
     # File handler if log_file is specified
     if log_file:
         log_path = Path(log_file)
@@ -50,5 +50,5 @@ def configure_app_logger(
         file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-    
+
     return logger

@@ -89,5 +89,6 @@ with open(out_path, "wb") as f:
     f.write(_make_png(pixels))
 
 from axon_logger import configure_app_logger
+
 logger = configure_app_logger(__name__)
 logger.info("Written: %s  (%sx%s px)", out_path, WIDTH, HEIGHT)

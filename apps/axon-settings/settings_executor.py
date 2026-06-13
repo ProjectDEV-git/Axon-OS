@@ -54,7 +54,7 @@ class SettingsExecutor:
             response_str = response_str.strip()
             if response_str.startswith("```"):
                 response_str = response_str.replace("```json", "").replace("```", "").strip()
-            
+
             data = json.loads(response_str)
             action = data.get("action")
             value = data.get("value")
@@ -131,7 +131,7 @@ class SettingsExecutor:
             vol = int(value)
             if not (0 <= vol <= 100):
                 raise ValueError("Brightness must be between 0 and 100")
-            
+
             # Try brightnessctl first
             try:
                 subprocess.run(["brightnessctl", "set", f"{vol}%"], check=True)

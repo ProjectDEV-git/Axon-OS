@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import threading
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import dbus
 from gi.repository import GLib
@@ -49,9 +49,9 @@ class AIHelper:
     CONTEXT_OBJ_PATH = "/org/axonos/Context"
 
     def __init__(self) -> None:
-        self._bus: Optional[dbus.SessionBus] = None
-        self._brain: Optional[dbus.Interface] = None
-        self._context: Optional[dbus.Interface] = None
+        self._bus: dbus.SessionBus | None = None
+        self._brain: dbus.Interface | None = None
+        self._context: dbus.Interface | None = None
         self._available: bool = False
         self._connect()
 

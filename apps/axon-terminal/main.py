@@ -18,12 +18,12 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gtk
 
 # Ensure sibling modules are importable when running as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from terminal_widget import TerminalWidget  # noqa: E402
+from terminal_widget import TerminalWidget
 
 
 class AxonTerminalWindow(Adw.ApplicationWindow):
@@ -120,7 +120,7 @@ class AxonTerminalApp(Adw.Application):
 
     def __init__(self) -> None:
         super().__init__(application_id="io.github.axon_os.Terminal")
-        self._window: Optional[AxonTerminalWindow] = None  # noqa: F821
+        self._window: AxonTerminalWindow | None = None
 
     def do_activate(self) -> None:  # type: ignore[override]
         """Create and present the main window."""
@@ -131,7 +131,6 @@ class AxonTerminalApp(Adw.Application):
 
 
 # Optional type hint import at module scope
-from typing import Optional  # noqa: E402
 
 
 def main() -> int:

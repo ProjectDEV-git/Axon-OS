@@ -1,14 +1,14 @@
 """
 context_reader.py — ContextReader for Axon AI Panel.
 
-Retrieves consolidated session context on-demand from the org.axonos.Context 
+Retrieves consolidated session context on-demand from the org.axonos.Context
 D-Bus service instead of scanning /proc and system log files directly.
 """
 
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 import dbus
 
@@ -32,7 +32,7 @@ class ContextReader:
         self._connect()
         return self.context_obj
 
-    def get_active_window_title(self) -> Optional[str]:
+    def get_active_window_title(self) -> str | None:
         """Return the title of the currently focused window, or None."""
         ctx = self._get_context()
         if ctx is not None:
@@ -67,7 +67,7 @@ class ContextReader:
                 pass
         return []
 
-    def get_last_terminal_stderr(self) -> Optional[str]:
+    def get_last_terminal_stderr(self) -> str | None:
         """Return the contents of last terminal error output."""
         ctx = self._get_context()
         if ctx is not None:
@@ -79,10 +79,10 @@ class ContextReader:
                 pass
         return None
 
-    def get_space_context(self) -> dict[str, Optional[str]]:
+    def get_space_context(self) -> dict[str, str | None]:
         """Read and return name and color properties of the current space."""
         ctx = self._get_context()
-        result: dict[str, Optional[str]] = {"space_name": None, "space_color": None}
+        result: dict[str, str | None] = {"space_name": None, "space_color": None}
         if ctx is not None:
             try:
                 context_data = json.loads(ctx.GetActiveContext())

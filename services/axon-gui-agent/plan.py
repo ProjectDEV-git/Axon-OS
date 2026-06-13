@@ -117,4 +117,4 @@ def to_gvariant(value) -> str:
         return str(value)
     if isinstance(value, list):
         return json.dumps(value).replace('"', "'")
-    return f"'{str(value)}'" if not str(value).startswith("'") else str(value)
+    return f"'{value!s}'" if not str(value).startswith("'") else str(value)

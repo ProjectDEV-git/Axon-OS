@@ -1,6 +1,5 @@
-import time
-import os
 import sqlite3
+import time
 
 db = sqlite3.connect(":memory:")
 db.execute("CREATE TABLE chunks (path TEXT, mtime REAL)")

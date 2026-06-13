@@ -28,11 +28,11 @@ class OllamaClient:
             self.brain = self.bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
         except Exception:
             self.brain = None
-            
+
         self.model = model
         self.q: queue.Queue[str | None] = queue.Queue()
         self.current_tx: str | None = None
-        
+
         # Register signal listeners
         self.bus.add_signal_receiver(
             self._on_token_generated,
@@ -106,10 +106,10 @@ class OllamaClient:
             # Reset queue
             while not self.q.empty():
                 self.q.get_nowait()
-                
+
             # Call Generate to start stream and get transaction ID
             self.current_tx = str(brain.Generate(prompt, system, self.model, True))
-            
+
             # Consume tokens from queue
             while True:
                 token = self.q.get()
@@ -205,7 +205,7 @@ class OllamaClient:
         """Close wrapper."""
         pass
 
-    def __enter__(self) -> "OllamaClient":
+    def __enter__(self) -> OllamaClient:
         return self
 
     def __exit__(self, *_: object) -> None:

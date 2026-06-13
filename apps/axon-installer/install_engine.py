@@ -84,7 +84,7 @@ def run(cmd, check=True, input_text=None, capture=False):
 
 
 def run_chroot(cmd, check=True, input_text=None):
-    return run(["chroot", TARGET] + cmd, check=check, input_text=input_text)
+    return run(["chroot", TARGET, *cmd], check=check, input_text=input_text)
 
 
 # ---------------------------------------------------------------------------

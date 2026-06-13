@@ -127,7 +127,7 @@ def sandbox_command(target_cmd: list, no_net: bool) -> list:
             cmd += ["--tmpfs", str(p)]
     if no_net:
         cmd += ["--unshare-net"]
-    return cmd + ["--"] + target_cmd
+    return [*cmd, "--", *target_cmd]
 
 
 def main(argv: list) -> int:
@@ -163,7 +163,7 @@ def main(argv: list) -> int:
     interpreter: list = []
     if text is not None and not os.access(target_path, os.X_OK):
         interpreter = ["bash"]
-    target_cmd = interpreter + [target_path] + target_args
+    target_cmd = [*interpreter, target_path, *target_args]
 
     if risk == "none" and not force_sandbox:
         return subprocess.call(target_cmd)

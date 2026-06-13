@@ -1,8 +1,5 @@
-import time
-import os
-import sqlite3
-from pathlib import Path
 import sys
+import time
 
 sys.path.insert(0, 'services/axon-search')
 import search_service

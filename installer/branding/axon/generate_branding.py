@@ -33,22 +33,22 @@ def _hexagon(center, radius, rotation=math.pi / 6):
 def draw_mark(size, transparent=True):
     """Axon hexagon mark with a soft blue glow."""
     img = Image.new(
-        "RGBA", (size, size), (0, 0, 0, 0) if transparent else BG_DARK + (255,)
+        "RGBA", (size, size), (0, 0, 0, 0) if transparent else (*BG_DARK, 255)
     )
 
     glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.polygon(_hexagon((size / 2, size / 2), size * 0.36), fill=BLUE + (180,))
+    gd.polygon(_hexagon((size / 2, size / 2), size * 0.36), fill=(*BLUE, 180))
     glow = glow.filter(ImageFilter.GaussianBlur(size * 0.09))
     img.alpha_composite(glow)
 
     d = ImageDraw.Draw(img)
     d.polygon(
         _hexagon((size / 2, size / 2), size * 0.34),
-        outline=BLUE_LIGHT + (255,),
+        outline=(*BLUE_LIGHT, 255),
         width=max(2, size // 28),
     )
-    d.polygon(_hexagon((size / 2, size / 2), size * 0.20), fill=BLUE + (255,))
+    d.polygon(_hexagon((size / 2, size / 2), size * 0.20), fill=(*BLUE, 255))
     r = size * 0.055
     d.ellipse(
         (size / 2 - r, size / 2 - r, size / 2 + r, size / 2 + r),

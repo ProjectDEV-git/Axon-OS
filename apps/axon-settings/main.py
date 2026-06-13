@@ -164,7 +164,7 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
     def _run_command(self, query: str) -> None:
         self._feedback_text.set_text("Applying settings change...")
         self._feedback_card.add_css_class("loading")
-        
+
         # Async execution helper
         def worker():
             res = self._executor.execute_command(query)

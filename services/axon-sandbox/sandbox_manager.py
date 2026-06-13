@@ -31,7 +31,7 @@ class SandboxPromptDialog(Gtk.Window):
         self.set_default_size(520, 360)
         self.set_decorated(True)
         self.set_keep_above(True)
-        
+
         # UI Styling
         self.add_css_class("sandbox-dialog")
         css_provider = Gtk.CssProvider()
@@ -168,13 +168,13 @@ class SandboxManager(dbus.service.Object):
     def __init__(self):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
-        
+
         try:
             self.bus_name = dbus.service.BusName('org.axonos.Sandbox', bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             logger.error("org.axonos.Sandbox service is already running.")
             sys.exit(1)
-            
+
         dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Sandbox')
         logger.info("Axon Sandbox Manager D-Bus Service registered successfully at /org/axonos/Sandbox")
 
@@ -207,7 +207,7 @@ class SandboxManager(dbus.service.Object):
             try:
                 brain_obj = self.session_bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
                 brain_interface = dbus.Interface(brain_obj, 'org.axonos.Brain')
-                
+
                 prompt = (
                     f"Read this script path: {script_path}\n"
                     f"Script content:\n{content}\n\n"
@@ -216,7 +216,7 @@ class SandboxManager(dbus.service.Object):
                     "the security warning flags (e.g. ['Attempts to write to /etc', 'Accesses private ssh keys']). "
                     "If the script is entirely safe, respond with an empty list []. Do not include markdown codeblocks or other text."
                 )
-                
+
                 resp_json = brain_interface.Generate(prompt, "", "", False)
                 clean_json = resp_json.strip()
                 if clean_json.startswith("```"):
@@ -255,7 +255,7 @@ if __name__ == '__main__':
     # Initialize GTK Application context if not already created
     loop = GLib.MainLoop()
     service = SandboxManager()
-    
+
     # We run in a standard GLib loop, GTK bindings require standard thread initialization
     Gtk.init()
     try:

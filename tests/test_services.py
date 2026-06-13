@@ -128,7 +128,7 @@ class TestAxonServices(unittest.TestCase):
         # Setup window/space for test context
         self.context.SetActiveWindow("Visual Studio Code", "code", dbus_interface="org.axonos.Context")
         self.context.SetActiveSpace("Code Space", dbus_interface="org.axonos.Context")
-        
+
         ctx_str = self.context.GetContextString(dbus_interface="org.axonos.Context")
         self.assertIn("Code Space", ctx_str)
         self.assertIn("Visual Studio Code", ctx_str)

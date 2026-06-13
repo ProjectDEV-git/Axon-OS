@@ -13,7 +13,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import GLib, Gtk
 
 _BAR_COUNT = 24
 _ACCENT = (0.545, 0.361, 0.965)  # #8b5cf6 — Axon violet

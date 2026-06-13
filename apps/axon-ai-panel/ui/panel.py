@@ -12,14 +12,15 @@ import json
 import re
 import sys
 import threading
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator, Optional
+from typing import Any
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, GLib, Gtk, Pango  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
 # ---------------------------------------------------------------------------
 # Import OllamaClient from the intent-bar app, falling back to a built-in
@@ -342,7 +343,7 @@ class AIPanelWindow(Adw.Window):
         self._client = ollama_client
         self._ctx_reader = context_reader
         self._streaming = False
-        self._stream_bubble: Optional[MessageBubble] = None
+        self._stream_bubble: MessageBubble | None = None
         self._conv_id: str = ""
 
         # Apply CSS

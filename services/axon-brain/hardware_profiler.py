@@ -8,7 +8,7 @@ import subprocess
 def get_system_ram():
     """Returns total system RAM in GB."""
     try:
-        with open('/proc/meminfo', 'r') as f:
+        with open('/proc/meminfo') as f:
             meminfo = f.read()
         matched = re.search(r'MemTotal:\s+(\d+)\s+kB', meminfo)
         if matched:
@@ -28,8 +28,7 @@ def get_gpu_info():
             # Query GPU name and total memory in MB
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 check=True
             )
@@ -54,8 +53,7 @@ def get_gpu_info():
             # ROCm-smi output formats vary, we search for card info or usage
             result = subprocess.run(
                 ["rocm-smi", "--showmeminfo", "vram"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 check=True
             )
@@ -95,12 +93,12 @@ def get_gpu_info():
 def profile_hardware():
     ram = get_system_ram()
     gpu = get_gpu_info()
-    
+
     # Model recommendations database
     # speed: fast model
     # general: balanced model
     # deep: high reasoning model
-    
+
     rec = {
         "hardware": {
             "ram_gb": round(ram, 2),
@@ -124,7 +122,7 @@ def profile_hardware():
             }
         }
     }
-    
+
     vram = gpu["vram"]
     # Adjust recommendations based on capabilities
     if gpu["vendor"] == "NVIDIA" or gpu["vendor"] == "AMD":
@@ -170,7 +168,7 @@ def profile_hardware():
                 "model": "qwen2.5:1.5b",
                 "description": "Qwen 2.5 1.5B — fast response on standard system RAM."
             }
-            
+
     return rec
 
 if __name__ == "__main__":

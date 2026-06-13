@@ -219,7 +219,7 @@ class WelcomeWindow(Adw.Window):
                 hw = self._profile.get("hardware", {})
                 recs = self._profile.get("recommendations", {})
                 self._hw_info_str = f"Hardware profile: {hw.get('ram_gb')}GB RAM | GPU: {hw.get('gpu_vendor')} ({hw.get('gpu_model')})"
-                
+
                 self._models = [
                     ("Speed Model", recs.get("speed", {}).get("model"), recs.get("speed", {}).get("description")),
                     ("General Model", recs.get("general", {}).get("model"), recs.get("general", {}).get("description")),
@@ -228,7 +228,7 @@ class WelcomeWindow(Adw.Window):
                 return
             except Exception:
                 pass
-        
+
         # Fallbacks if module is missing or fails
         self._hw_info_str = "Hardware profile: Generic System CPU"
         self._models = [
@@ -478,7 +478,7 @@ class WelcomeWindow(Adw.Window):
         else:
             self._pull_progress.pulse()
             self._progress_lbl.set_text(f"Status: {status}")
-            
+
         if status == "success" or "verify" in status.lower():
             self._progress_box.set_visible(False)
             self._pull_btn.set_sensitive(True)
@@ -579,7 +579,7 @@ class WelcomeWindow(Adw.Window):
 
         positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
 
-        for (icon, feat_title, feat_desc), (col, row) in zip(feature_data, positions):
+        for (icon, feat_title, feat_desc), (col, row) in zip(feature_data, positions, strict=False):
             card = self._build_feature_card(icon, feat_title, feat_desc)
             grid.attach(card, col, row, 1, 1)
 

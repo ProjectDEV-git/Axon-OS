@@ -2,6 +2,7 @@
 import subprocess
 import sys
 
+
 def reset_boot_counter():
     try:
         # Reset the boot counter environment variable in GRUB

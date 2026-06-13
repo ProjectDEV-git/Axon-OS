@@ -12,15 +12,14 @@ Provides:
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Vte", "2.91")
-from ai_helper import AIHelper  # noqa: E402
-from gi.repository import Adw, Gdk, GLib, Gtk, Pango, Vte  # noqa: E402
+from ai_helper import AIHelper
+from gi.repository import Adw, Gdk, GLib, Gtk, Pango, Vte
 
 # ---------------------------------------------------------------------------
 # Colour palette
@@ -56,8 +55,15 @@ for _hex in _PALETTE_HEX:
 class _TerminalTab:
     """Data associated with a single terminal tab."""
 
-    __slots__ = ("terminal", "label", "pid", "last_command", "last_exit_code",
-                 "stderr_capture", "page")
+    __slots__ = (
+        "label",
+        "last_command",
+        "last_exit_code",
+        "page",
+        "pid",
+        "stderr_capture",
+        "terminal",
+    )
 
     def __init__(self, terminal: Vte.Terminal, label: str, pid: int) -> None:
         self.terminal = terminal
@@ -66,7 +72,7 @@ class _TerminalTab:
         self.last_command: str = ""
         self.last_exit_code: int = 0
         self.stderr_capture: str = ""
-        self.page: Optional[Adw.TabPage] = None
+        self.page: Adw.TabPage | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +282,7 @@ class TerminalWidget(Gtk.Box):
         self,
         terminal: Vte.Terminal,
         pid: GLib.Pid,
-        error: Optional[GLib.Error],
+        error: GLib.Error | None,
         user_data: object = None,
     ) -> None:
         """Callback after async shell spawn completes."""
@@ -303,7 +309,7 @@ class TerminalWidget(Gtk.Box):
             self.new_tab()
         return True
 
-    def _get_active_tab(self) -> Optional[_TerminalTab]:
+    def _get_active_tab(self) -> _TerminalTab | None:
         """Return the currently selected terminal tab."""
         page = self._tab_view.get_selected_page()
         if page is None:
@@ -516,7 +522,7 @@ class TerminalWidget(Gtk.Box):
             tab.last_command = command
             self._command_history.append(command)
 
-    def get_active_terminal(self) -> Optional[Vte.Terminal]:
+    def get_active_terminal(self) -> Vte.Terminal | None:
         """Return the active VTE terminal widget, or None."""
         tab = self._get_active_tab()
         return tab.terminal if tab is not None else None

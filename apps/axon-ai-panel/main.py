@@ -11,13 +11,13 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gio  # noqa: E402
+from gi.repository import Adw, Gio
 
 # Make the ui sub-package importable when running as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from context_reader import ContextReader  # noqa: E402
-from ui.panel import AIPanelWindow, OllamaClient  # noqa: E402
+from context_reader import ContextReader
+from ui.panel import AIPanelWindow, OllamaClient
 
 
 class AIPanelApp(Adw.Application):

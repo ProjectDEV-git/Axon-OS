@@ -13,13 +13,13 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
 
-from ..ollama_client import OllamaClient  # noqa: E402
-from ..spaces_manager import SpacesManager  # noqa: E402
+from ..ollama_client import OllamaClient
+from ..spaces_manager import SpacesManager
 
 try:
-    import dbus  # noqa: E402
+    import dbus
 except ImportError:  # pragma: no cover - dbus ships on Axon images
     dbus = None
 
@@ -640,7 +640,7 @@ class IntentBarWindow(Adw.Window):
         self._response_label.set_text("Searching files...")
         self._response_label.set_visible(True)
         self._entry.set_sensitive(False)
-        
+
         thread = threading.Thread(
             target=self._query_semantic_db,
             args=(search_query,),
@@ -673,14 +673,14 @@ class IntentBarWindow(Adw.Window):
         self._spinner.stop()
         self._entry.set_sensitive(True)
         self._entry.grab_focus()
-        
+
         try:
             results = json.loads(results_json)
             if not results or (isinstance(results, dict) and "error" in results) or len(results) == 0:
                 self._response_label.set_text("No matching files found.")
                 self._response_label.set_use_markup(False)
                 return False
-                
+
             markup = "<b>📂 Semantic Search Matches:</b>\n\n"
             for item in results:
                 path = item.get("path", "")
@@ -691,15 +691,15 @@ class IntentBarWindow(Adw.Window):
                 # Build GtkLabel compatible anchor link
                 markup += f"• <a href=\"file://{path}\">{filename}</a>\n"
                 markup += f"  <span color=\"#9090b8\">{snippet}</span>\n\n"
-                
+
             self._response_label.set_markup(markup)
             self._response_label.set_use_markup(True)
             self._response_label.connect("activate-link", self._on_link_activated)
         except Exception as e:
             self._show_error(f"Error parsing search results: {e}")
-            
+
         return False
-        
+
     def _on_link_activated(self, label: Gtk.Label, uri: str) -> bool:
         """Handle link activation by opening the file target via xdg-open."""
         try:

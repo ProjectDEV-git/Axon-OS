@@ -12,7 +12,7 @@ class TestBrainService:
     def test_validate_model_name_valid(self) -> None:
         """Test model name validation with valid names."""
         from services.axon_brain.brain_service import BrainService
-        
+
         valid_names = [
             "mistral:latest",
             "neural-chat:7b",
@@ -26,7 +26,7 @@ class TestBrainService:
     def test_validate_model_name_invalid(self) -> None:
         """Test model name validation with invalid names."""
         from services.axon_brain.brain_service import BrainService
-        
+
         invalid_names = [
             "",  # Empty
             "a" * 300,  # Too long
@@ -42,7 +42,7 @@ class TestBrainService:
     def test_validate_prompt_valid(self) -> None:
         """Test prompt validation with valid prompts."""
         from services.axon_brain.brain_service import BrainService
-        
+
         valid_prompts = [
             "What is 2+2?",
             "Hello world" * 100,  # Within limit
@@ -55,7 +55,7 @@ class TestBrainService:
     def test_validate_prompt_invalid(self) -> None:
         """Test prompt validation with invalid prompts."""
         from services.axon_brain.brain_service import BrainService
-        
+
         invalid_prompts = [
             "",  # Empty
             "x" * 10001,  # Exceeds max length
@@ -68,7 +68,7 @@ class TestBrainService:
     @patch('services.axon_brain.brain_service.hardware_profiler')
     def test_load_config_fallback(self, mock_profiler: Mock) -> None:
         """Test config loading with hardware profiler fallback."""
-        
+
         mock_profiler.profile_hardware.return_value = {
             "recommendations": {
                 "speed": {"model": "mistral:latest"},
@@ -76,7 +76,7 @@ class TestBrainService:
                 "deep": {"model": "llama2:latest"}
             }
         }
-        
+
         # Service will call load_config during init
         # This tests that fallback config is set correctly
         assert True  # Would need full mocking of dbus
@@ -87,14 +87,14 @@ class TestContextService:
 
     def test_get_active_context_json(self) -> None:
         """Test that GetActiveContext returns valid JSON."""
-        
+
         # Would need to mock dbus session
         # This is a placeholder for full test
         assert True
 
     def test_set_active_window_validation(self) -> None:
         """Test SetActiveWindow with valid/invalid inputs."""
-        
+
         # Test validation of window title and app_id
         assert True  # Would need dbus mocking
 
@@ -105,7 +105,7 @@ class TestServiceUtils:
     def test_ttl_cache_get_valid(self) -> None:
         """Test TTL cache retrieval of valid entries."""
         from services.service_utils import TTLCache
-        
+
         cache = TTLCache(ttl_seconds=10)
         cache.set("test_key", "test_value")
         assert cache.get("test_key") == "test_value"
@@ -115,7 +115,7 @@ class TestServiceUtils:
         import time
 
         from services.service_utils import TTLCache
-        
+
         cache = TTLCache(ttl_seconds=1)
         cache.set("test_key", "test_value")
         time.sleep(1.1)
@@ -124,7 +124,7 @@ class TestServiceUtils:
     def test_ttl_cache_clear(self) -> None:
         """Test TTL cache clear operation."""
         from services.service_utils import TTLCache
-        
+
         cache = TTLCache(ttl_seconds=10)
         cache.set("key1", "value1")
         cache.set("key2", "value2")
@@ -135,14 +135,14 @@ class TestServiceUtils:
     def test_rate_limiter_allow(self) -> None:
         """Test rate limiter allows requests within limit."""
         from services.service_utils import RateLimiter
-        
+
         limiter = RateLimiter(rate=5, window_seconds=60)
         identifier = "test_client"
-        
+
         # Should allow 5 requests
         for _ in range(5):
             assert limiter.allow(identifier)
-        
+
         # Should block 6th request
         assert not limiter.allow(identifier)
 
@@ -151,13 +151,13 @@ class TestServiceUtils:
         import time
 
         from services.service_utils import RateLimiter
-        
+
         limiter = RateLimiter(rate=1, window_seconds=1)
         identifier = "test_client"
-        
+
         assert limiter.allow(identifier)
         assert not limiter.allow(identifier)
-        
+
         time.sleep(1.1)
         assert limiter.allow(identifier)  # Should be allowed after reset
 

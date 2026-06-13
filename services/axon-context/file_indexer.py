@@ -30,17 +30,17 @@ class FileIndexer:
         self.conn = sqlite3.connect(str(DB_PATH))
         self.conn.enable_load_extension(True)
         sqlite_vec.load(self.conn)
-        
+
         self.init_db()
         self.watch_dirs = [
             Path.home() / "Documents",
             Path.home() / "Notes",
             Path.home() / "Projects"
         ]
-        
+
         for d in self.watch_dirs:
             d.mkdir(parents=True, exist_ok=True)
-            
+
         logger.info(f"File Indexer initialized. Monitoring: {[str(d) for d in self.watch_dirs]}")
 
     def init_db(self):
@@ -80,37 +80,37 @@ class FileIndexer:
             p = Path(file_path)
             if not p.exists() or not p.is_file():
                 return
-                
+
             mtime = p.stat().st_mtime
-            
+
             # Check DB
             cursor = self.conn.cursor()
             cursor.execute("SELECT id, mtime FROM files WHERE path = ?", (str(p),))
             row = cursor.fetchone()
-            
+
             if row and row[1] >= mtime:
                 # No change
                 return
-                
+
             logger.info(f"Indexing file: {p}")
-            
+
             # Read first 1500 chars (reasonable context chunk)
             try:
                 content = p.read_text(encoding="utf-8", errors="ignore").strip()
             except Exception:
                 return
-                
+
             if not content:
                 return
-                
+
             chunk = content[:1500]
             emb = self.get_brain_embedding(chunk)
             if not emb:
                 logger.warning(f"Could not generate embedding for {p}")
                 return
-                
+
             emb_bytes = array('f', emb).tobytes()
-            
+
             if row:
                 doc_id = row[0]
                 cursor.execute("UPDATE files SET mtime = ?, content = ? WHERE id = ?", (mtime, chunk, doc_id))
@@ -119,7 +119,7 @@ class FileIndexer:
                 cursor.execute("INSERT INTO files (path, mtime, content) VALUES (?, ?, ?)", (str(p), mtime, chunk))
                 doc_id = cursor.lastrowid
                 cursor.execute("INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)", (doc_id, emb_bytes))
-                
+
             self.conn.commit()
             logger.info(f"Successfully indexed: {p}")
         except Exception:
@@ -142,7 +142,7 @@ class FileIndexer:
 
     def scan_and_index(self):
         self.remove_deleted_files()
-        
+
         valid_exts = {".txt", ".md", ".py", ".json", ".js", ".html", ".css", ".sh", ".c", ".cpp"}
         for watch_dir in self.watch_dirs:
             if not watch_dir.exists():

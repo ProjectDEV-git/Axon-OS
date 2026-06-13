@@ -49,16 +49,16 @@ class BrainService(dbus.service.Object):
         # Initialise GLib main loop integration with D-Bus
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
-        
+
         # Request name org.axonos.Brain
         try:
             self.bus_name = dbus.service.BusName('org.axonos.Brain', bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
             logger.error("org.axonos.Brain service is already running.")
             sys.exit(1)
-            
+
         dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Brain')
-        
+
         # Initialize sub-components
         self.store = ConversationStore()
         self.load_config()
@@ -88,7 +88,7 @@ class BrainService(dbus.service.Object):
                     return
             except Exception:
                 pass
-        
+
         # Profile hardware and save default config
         profile = hardware_profiler.profile_hardware()
         self.config = {
@@ -208,16 +208,16 @@ class BrainService(dbus.service.Object):
             return json.dumps({"error": f"invalid model name: {model!r}"})
         if not model:
             model = self.config["general_model"]
-            
+
         system_prompt = ""
         if context:
             system_prompt = f"Here is the user's desktop context:\n\n{context}"
-            
+
         if stream:
             tx_id = str(uuid.uuid4())
             threading.Thread(
-                target=self._do_generate_stream, 
-                args=(tx_id, prompt, system_prompt, model), 
+                target=self._do_generate_stream,
+                args=(tx_id, prompt, system_prompt, model),
                 daemon=True
             ).start()
             return tx_id
@@ -261,10 +261,10 @@ class BrainService(dbus.service.Object):
     def SendMessage(self, conversation_id, message, context, model, stream):
         """Persists user message and streams or blocks assistant reply with ambient context."""
         self.store.add_message(conversation_id, "user", message)
-        
+
         if not model:
             model = self.config["general_model"]
-            
+
         if stream:
             tx_id = str(uuid.uuid4())
             threading.Thread(
@@ -331,7 +331,7 @@ class BrainService(dbus.service.Object):
                 if resp.status == 200:
                     result_data = json.loads(resp.read().decode())
                     result = result_data.get("response", "").strip()
-                    
+
                     if result.startswith('{'):
                         try:
                             parsed = json.loads(result)
@@ -463,8 +463,8 @@ class BrainService(dbus.service.Object):
             system_prompt += f"\n\nHere is the user's current desktop context:\n{context}"
         try:
             payload = {
-                "model": model, 
-                "messages": api_msgs, 
+                "model": model,
+                "messages": api_msgs,
                 "stream": False,
                 "system": system_prompt
             }
@@ -483,12 +483,12 @@ class BrainService(dbus.service.Object):
         )
         if context:
             system_prompt += f"\n\nHere is the user's current desktop context:\n{context}"
-            
+
         accumulated = ""
         try:
             payload = {
-                "model": model, 
-                "messages": api_msgs, 
+                "model": model,
+                "messages": api_msgs,
                 "stream": True,
                 "system": system_prompt
             }

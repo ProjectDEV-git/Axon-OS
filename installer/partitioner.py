@@ -33,7 +33,7 @@ except ImportError:  # running standalone — repo root / installed shim not on 
 # ---------------------------------------------------------------------------
 
 @dataclass
-        
+
 class PartitionInfo:
     num:    int
     name:   str
@@ -104,7 +104,7 @@ class Partitioner:
                 import re
                 m = re.search(r'(\\d+)$', p_name)
                 p_num = int(m.group(1)) if m else (i + 1)
-                
+
                 partitions.append(
                     PartitionInfo(
                         num=p_num,
@@ -181,7 +181,7 @@ class Partitioner:
 
     def partition_alongside(self, device: str, partition_num: int, shrink_size_gb: int) -> int | None:
         """Shrinks partition_num by shrink_size_gb and creates a new root partition in the freed space.
-        
+
         Returns the partition number of the newly created root partition on success, or None on failure.
         """
         try:
@@ -191,7 +191,7 @@ class Partitioner:
             if not target:
                 logger.error("Partition %s not found on %s", partition_num, device)
                 return None
-            
+
             # Calculate new size in MiB
             shrink_size_mib = shrink_size_gb * 1024
             original_size_mib = target["size"]
@@ -199,11 +199,11 @@ class Partitioner:
             if new_size_mib < 10240: # Leave at least 10 GB
                 logger.warning("Cannot shrink partition %s below 10GB", partition_num)
                 return None
-                
+
             # Resolve partition device path (e.g. /dev/sda2 or /dev/nvme0n1p2)
             part_suffix = f"p{partition_num}" if device[-1].isdigit() else f"{partition_num}"
             part_path = f"{device}{part_suffix}"
-            
+
             # Step 1: Shrink filesystem first
             if target["fstype"] in ("ext4", "ext3"):
                 self._run(["e2fsck", "-f", "-y", part_path])
@@ -213,15 +213,15 @@ class Partitioner:
             else:
                 logger.error("Unsupported filesystem type: %s", target['fstype'])
                 return None
-                
+
             # Step 2: Shrink the partition itself
             new_end_mib = target["start"] + new_size_mib
             self._run(["parted", "-s", device, "resizepart", str(partition_num), f"{new_end_mib}MiB"])
-            
+
             # Step 3: Create new root partition in the freed space
             # Start from the new end of the shrunk partition, end at 100% of the disk
             self._run(["parted", "-s", device, "mkpart", "root", "btrfs", f"{new_end_mib}MiB", "100%"])
-            
+
             # Find new partition number (typically pmap count + 1)
             # Fetch the updated partition map to confirm number
             updated_map = self.get_partition_map(device)

@@ -4,7 +4,8 @@
 import functools
 import time
 from collections import defaultdict
-from typing import Any, Callable, Dict, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import dbus
 
@@ -19,9 +20,9 @@ class TTLCache:
             ttl_seconds: Time in seconds before cache entry expires.
         """
         self.ttl_seconds = ttl_seconds
-        self.cache: Dict[str, Tuple[Any, float]] = {}
+        self.cache: dict[str, tuple[Any, float]] = {}
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Retrieve value from cache if not expired.
 
         Args:
@@ -63,7 +64,7 @@ class RateLimiter:
         """
         self.rate = rate
         self.window_seconds = window_seconds
-        self.requests: Dict[str, list] = defaultdict(list)
+        self.requests: dict[str, list] = defaultdict(list)
 
     def allow(self, identifier: str) -> bool:
         """Check if request is allowed for identifier.

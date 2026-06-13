@@ -9,11 +9,11 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gio  # noqa: E402
+from gi.repository import Adw, Gio
 
-from .ollama_client import OllamaClient  # noqa: E402
-from .spaces_manager import SpacesManager  # noqa: E402
-from .ui.window import IntentBarWindow  # noqa: E402
+from .ollama_client import OllamaClient
+from .spaces_manager import SpacesManager
+from .ui.window import IntentBarWindow
 
 
 class IntentBarApp(Adw.Application):

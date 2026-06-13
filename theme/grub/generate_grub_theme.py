@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import os
 import math
+import os
+
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -17,11 +18,11 @@ def draw_rounded_rect(draw, x0, y0, x1, y1, r, fill, outline, width=1):
     draw.ellipse([x1 - 2*r, y0, x1, y0 + 2*r], fill=fill, outline=outline, width=width)
     draw.ellipse([x0, y1 - 2*r, x0 + 2*r, y1], fill=fill, outline=outline, width=width)
     draw.ellipse([x1 - 2*r, y1 - 2*r, x1, y1], fill=fill, outline=outline, width=width)
-    
+
     # fill inner areas
     draw.rectangle([x0 + r, y0, x1 - r, y1], fill=fill)
     draw.rectangle([x0, y0 + r, x1, y1 - r], fill=fill)
-    
+
     # draw border lines
     draw.line([x0 + r, y0, x1 - r, y0], fill=outline, width=width)
     draw.line([x0 + r, y1, x1 - r, y1], fill=outline, width=width)

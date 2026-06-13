@@ -20,7 +20,7 @@ import gi
 gi.require_version("Gtk",  "4.0")
 gi.require_version("Adw",  "1")
 
-from gi.repository import Adw, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, GLib, Gtk
 
 # Installer backend
 try:
@@ -120,7 +120,7 @@ class UserSetupPage(Gtk.Box):
         self.password2_entry = _entry("Confirm password", secret=True)
         self.hostname_entry  = _entry("Computer name (hostname)")
         self.hostname_entry.set_text("axon")
-        
+
         self.timezone_entry  = _entry("Timezone (e.g. America/New_York)")
         self.timezone_entry.set_text("UTC")
         self.keymap_entry    = _entry("Keyboard layout (e.g. us)")
@@ -164,7 +164,7 @@ class UserSetupPage(Gtk.Box):
 
 
 class DiskRow(Gtk.ListBoxRow):
-    def __init__(self, disk: "DiskInfo") -> None:
+    def __init__(self, disk: DiskInfo) -> None:
         super().__init__()
         self.disk = disk
 
@@ -218,7 +218,7 @@ class DiskPage(Gtk.Box):
 
         # Partitioning Options
         self.append(_label("<span weight='bold'>Partitioning Options</span>", use_markup=True))
-        
+
         self.erase_radio = Gtk.CheckButton(label="Erase entire disk and install Axon OS")
         self.erase_radio.set_active(True)
         self.erase_radio.connect("toggled", self._on_type_toggled)
@@ -286,14 +286,14 @@ class DiskPage(Gtk.Box):
         disk_info = self.get_selected_disk()
         if not disk_info:
             return
-            
+
         resizable_count = 0
         for p in disk_info.partitions:
             if p.fstype in ("ext4", "ext3", "ntfs", "fuseblk"):
                 label = f"Partition {p.num} ({p.fstype}) — {p.size}"
                 self.part_combo.append(str(p.num), label)
                 resizable_count += 1
-                
+
         if resizable_count > 0:
             self.part_combo.set_active(0)
             self.alongside_radio.set_sensitive(True)
@@ -301,7 +301,7 @@ class DiskPage(Gtk.Box):
             self.alongside_radio.set_sensitive(False)
             self.erase_radio.set_active(True)
 
-    def get_selected_disk(self) -> "DiskInfo | None":
+    def get_selected_disk(self) -> DiskInfo | None:
         row = self.listbox.get_selected_row()
         if isinstance(row, DiskRow):
             return row.disk
@@ -491,7 +491,7 @@ class InstallerApp(Adw.ApplicationWindow):
                         self._current_index += 1
                         self._update_nav()
                         self._start_install()
-                
+
                 dialog = Adw.MessageDialog(
                     transient_for=self,
                     heading="Erase Disk Confirmation",
@@ -533,7 +533,7 @@ class InstallerApp(Adw.ApplicationWindow):
 
     def _install_worker(
         self,
-        disk: "DiskInfo | None",
+        disk: DiskInfo | None,
         disk_settings: dict,
         user_info: dict[str, str],
     ) -> None:
@@ -557,7 +557,7 @@ class InstallerApp(Adw.ApplicationWindow):
             device = disk.device if disk else "/dev/sda"
             mount  = "/mnt/axon"
             mode   = disk_settings["mode"]
-            
+
             import os
             os.makedirs(mount, exist_ok=True)
 
@@ -570,13 +570,13 @@ class InstallerApp(Adw.ApplicationWindow):
 
                 self._set_progress(0.35, "Mounting filesystems…")
                 part.mount_partitions(device, mount)
-                
+
                 root_device = f"{device}p2" if device[-1].isdigit() else f"{device}2"
                 efi_device = f"{device}p1" if device[-1].isdigit() else f"{device}1"
             else:
                 part_num = disk_settings["partition_num"]
                 shrink_gb = disk_settings["shrink_size_gb"]
-                
+
                 self._set_progress(0.05, f"Shrinking partition {part_num} by {shrink_gb} GB…")
                 new_root_num = part.partition_alongside(device, part_num, shrink_gb)
                 if not new_root_num:
@@ -586,7 +586,7 @@ class InstallerApp(Adw.ApplicationWindow):
                 part.format_partitions_alongside(device, new_root_num)
 
                 self._set_progress(0.35, "Mounting partitions (reusing EFI)…")
-                
+
                 # Fetch EFI partition index (e.g. fat/vfat formatted partition on disk)
                 pmap = part.get_partition_map(device)
                 efi_num = 1
@@ -595,7 +595,7 @@ class InstallerApp(Adw.ApplicationWindow):
                         efi_num = p["num"]
                         break
                 part.mount_partitions_alongside(device, efi_num, new_root_num, mount)
-                
+
                 root_device = f"{device}p{new_root_num}" if device[-1].isdigit() else f"{device}{new_root_num}"
                 efi_device = f"{device}p{efi_num}" if device[-1].isdigit() else f"{device}{efi_num}"
 
@@ -679,7 +679,7 @@ class InstallerApp(Adw.ApplicationWindow):
                 password = user_info["password"]
 
                 subprocess.run(["chroot", mount, "useradd", "-m", "-s", "/bin/bash", username], check=True)
-                
+
                 proc = subprocess.Popen(["chroot", mount, "chpasswd"], stdin=subprocess.PIPE, text=True)
                 proc.communicate(f"{username}:{password}\n")
                 if proc.returncode != 0:
@@ -687,12 +687,12 @@ class InstallerApp(Adw.ApplicationWindow):
 
                 subprocess.run(["chroot", mount, "usermod", "-aG", "sudo,adm,cdrom,dip,plugdev", username], check=True)
                 subprocess.run(["chroot", mount, "chown", "-R", f"{username}:{username}", f"/home/{username}"], check=True)
-                
+
                 # Remove installer shortcut from new user desktop
                 installer_desktop = os.path.join(mount, "home", username, "Desktop", "install-axon-os.desktop")
                 if os.path.exists(installer_desktop):
                     os.remove(installer_desktop)
-                    
+
             self._set_progress(0.85, "Creating swapfile…")
             if not part.dry_run:
                 subprocess.run(["chroot", mount, "fallocate", "-l", "2G", "/swapfile"], check=False)
@@ -708,7 +708,7 @@ class InstallerApp(Adw.ApplicationWindow):
                 subprocess.run(["mount", "--bind", "/proc", os.path.join(mount, "proc")], check=True)
                 subprocess.run(["mount", "--bind", "/sys", os.path.join(mount, "sys")], check=True)
                 subprocess.run(["mount", "--bind", "/run", os.path.join(mount, "run")], check=True)
-                
+
                 efi_vars_src = "/sys/firmware/efi/efivars"
                 efi_vars_dest = os.path.join(mount, "sys/firmware/efi/efivars")
                 mount_efivars = os.path.exists(efi_vars_src)
@@ -722,7 +722,7 @@ class InstallerApp(Adw.ApplicationWindow):
                         "--target=x86_64-efi", "--efi-directory=/boot/efi",
                         "--bootloader-id=Axon OS", "--recheck"
                     ], check=True)
-                    
+
                     # Update grub
                     subprocess.run(["chroot", mount, "update-grub"], check=True)
                 finally:
