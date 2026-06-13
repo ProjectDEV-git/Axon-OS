@@ -191,6 +191,45 @@ fi
 EOF
 fi
 
+cat > /usr/share/applications/axon-update.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Axon OS Updater
+Comment=Check for and apply the latest Axon OS updates
+Exec=/usr/local/bin/axon-update
+Icon=software-update-available
+Terminal=false
+StartupNotify=true
+Categories=System;Settings;
+EOF
+
+cat > /usr/lib/systemd/system/axon-update-auto.service <<'EOF'
+[Unit]
+Description=Axon OS automatic update check and apply
+Wants=network-online.target
+After=network-online.target NetworkManager-wait-online.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/axon-update --auto
+EOF
+
+cat > /usr/lib/systemd/system/axon-update-auto.timer <<'EOF'
+[Unit]
+Description=Run Axon OS automatic updates daily
+
+[Timer]
+OnBootSec=30min
+OnUnitActiveSec=1d
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+
+systemctl enable axon-update-auto.timer || log "WARNING: could not enable axon-update-auto.timer"
+
 # Voice push-to-talk toggle (bound to Super+V via the gschema override)
 install -Dm755 "${SRC}/build/config/axon-voice-toggle" /usr/local/bin/axon-voice-toggle
 

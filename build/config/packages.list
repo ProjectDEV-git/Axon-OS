@@ -65,6 +65,10 @@ locales
 console-setup
 keyboard-configuration
 linux-firmware
+intel-microcode
+amd64-microcode
+fwupd
+ubuntu-drivers-common
 pciutils
 usbutils
 

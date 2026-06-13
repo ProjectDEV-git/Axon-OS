@@ -27,6 +27,7 @@ from gi.repository import GLib
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from intent_router import clean_transcript, parse_intent_response
+from vad_helper import is_speech_wav
 
 WHISPER_MODEL = os.environ.get("AXON_WHISPER_MODEL", "base.en")
 WHISPER_DIR = Path.home() / ".axon" / "models" / "whisper"
@@ -52,6 +53,11 @@ class VoiceService(dbus.service.Object):
         self._busy = False
         self._whisper = None  # lazily loaded WhisperModel
         self._overlay = None  # lazily built GTK overlay
+        # Ambient listening state
+        self._ambient_thread: threading.Thread | None = None
+        self._ambient_stop = threading.Event()
+        # TTS engine cached choice (env var overrides)
+        self._tts_engine = os.environ.get("AXON_TTS_ENGINE", "")
         print("Axon Voice D-Bus service registered at /org/axonos/Voice")
 
     # ------------------------------------------------------------------
@@ -72,6 +78,24 @@ class VoiceService(dbus.service.Object):
     @dbus.service.method("org.axonos.Voice", in_signature="", out_signature="b")
     def IsListening(self):
         return self._recorder is not None
+
+    @dbus.service.method("org.axonos.Voice", in_signature="", out_signature="b")
+    def StartAmbient(self):
+        """Begin ambient listening (VAD-based wake capture)."""
+        if self._ambient_thread and self._ambient_thread.is_alive():
+            return False
+        self._ambient_stop.clear()
+        self._ambient_thread = threading.Thread(target=self._ambient_loop, daemon=True)
+        self._ambient_thread.start()
+        return True
+
+    @dbus.service.method("org.axonos.Voice", in_signature="", out_signature="b")
+    def StopAmbient(self):
+        """Stop ambient listening."""
+        if not self._ambient_thread:
+            return False
+        self._ambient_stop.set()
+        return True
 
     @dbus.service.signal("org.axonos.Voice", signature="s")
     def StateChanged(self, state):
@@ -211,9 +235,49 @@ class VoiceService(dbus.service.Object):
     # ------------------------------------------------------------------
 
     def _speak(self, text):
-        if shutil.which("spd-say"):
-            subprocess.Popen(["spd-say", "--wait-mode", "no", text[:500]],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Prefer configured engine, then fallbacks. AXON_TTS_ENGINE may be set
+        # to one of: piper, espeak, pico2wave, spd-say
+        engine = self._tts_engine or os.environ.get("AXON_TTS_ENGINE", "")
+        candidates = []
+        if engine:
+            candidates.append(engine)
+        candidates += ["piper", "espeak", "pico2wave", "spd-say"]
+
+        for eng in candidates:
+            if eng == "piper" and shutil.which("piper"):
+                try:
+                    subprocess.Popen(["piper", "-t", text[:1000]],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return
+                except Exception:
+                    continue
+            if eng in ("espeak", "espeak-ng") and shutil.which(eng):
+                try:
+                    subprocess.Popen([eng, text[:1000]],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return
+                except Exception:
+                    continue
+            if eng == "pico2wave" and shutil.which("pico2wave") and shutil.which("aplay"):
+                try:
+                    fd, tmp = tempfile.mkstemp(prefix="axon-tts-", suffix=".wav")
+                    os.close(fd)
+                    subprocess.check_call(["pico2wave", "-w", tmp, text[:1000]])
+                    subprocess.Popen(["aplay", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return
+                except Exception:
+                    try:
+                        os.unlink(tmp)
+                    except Exception:
+                        pass
+                    continue
+            if eng == "spd-say" and shutil.which("spd-say"):
+                try:
+                    subprocess.Popen(["spd-say", "--wait-mode", "no", text[:500]],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return
+                except Exception:
+                    continue
 
     def _notify(self, title, body):
         if shutil.which("notify-send"):
@@ -258,6 +322,50 @@ class VoiceService(dbus.service.Object):
     def _hide_overlay(self):
         if self._overlay is not None:
             self._overlay.hide()
+
+    # ------------------------------------------------------------------
+    # Ambient loop (simple implementation)
+    # ------------------------------------------------------------------
+
+    def _ambient_loop(self):
+        """Record short chunks and run VAD on them; on speech, transcribe.
+
+        This implementation records 1s chunks using `arecord` and runs the
+        VAD helper. When speech is detected the chunk is handed to the
+        transcription worker. It is intentionally conservative and exits if
+        `arecord` is not available.
+        """
+        if not shutil.which("arecord"):
+            print("[axon-voice] ambient disabled: 'arecord' not found")
+            return
+        while not self._ambient_stop.is_set():
+            fd, wav = tempfile.mkstemp(prefix="axon-amb-", suffix=".wav")
+            os.close(fd)
+            cmd = ["arecord", "-q", "-f", "S16_LE", "-r", "16000", "-c", "1", "-d", "1", wav]
+            try:
+                subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except subprocess.CalledProcessError:
+                try:
+                    os.unlink(wav)
+                except Exception:
+                    pass
+                break
+            try:
+                if is_speech_wav(wav):
+                    threading.Thread(target=self._transcribe_and_route, args=(wav,), daemon=True).start()
+                    # cooldown to avoid repeated immediate triggers
+                    self._ambient_stop.wait(1.2)
+                else:
+                    try:
+                        os.unlink(wav)
+                    except Exception:
+                        pass
+            except Exception:
+                try:
+                    os.unlink(wav)
+                except Exception:
+                    pass
+        print("[axon-voice] ambient stopped")
 
 
 if __name__ == "__main__":

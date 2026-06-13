@@ -27,6 +27,26 @@ success() { printf "${GREEN}  ✔  %s${RESET}\n" "$*"; }
 warn()    { printf "${YELLOW}  ⚠  %s${RESET}\n" "$*"; }
 error()   { printf "${RED}  ✖  %s${RESET}\n" "$*" >&2; }
 step()    { printf "\n${BOLD}${CYAN}══▶  %s${RESET}\n" "$*"; }
+prompt_yes_no() {
+    local prompt="$1"
+    local answer="${2:-Y}"
+    read -rp "${prompt} " reply || reply="${answer}"
+    reply="${reply:-${answer}}"
+    [[ "${reply}" =~ ^[Yy]([Ee][Ss])?$ ]]
+}
+
+apt_install_best_effort() {
+    local pkg
+    for pkg in "$@"; do
+        if ! sudo apt-get install -y "${pkg}"; then
+            warn "Package ${pkg} is unavailable on this system — skipping"
+        fi
+    done
+}
+
+internet_available() {
+    curl -fsI --max-time 8 https://ollama.com/install.sh >/dev/null 2>&1
+}
 
 # ---------------------------------------------------------------------------
 # ASCII banner
@@ -98,6 +118,17 @@ sudo apt-get install -y \
     gir1.2-gtk-4.0 \
     gir1.2-adw-1 \
     python3-httpx
+# Additional packages for voice, sandbox and search features
+apt_install_best_effort \
+    alsa-utils \
+    pulseaudio-utils \
+    sox \
+    python3-pip \
+    python3-venv \
+    bubblewrap \
+    ubuntu-drivers-common
+info "Installing Python packages (faster-whisper, webrtcvad, sqlite-vec) into user environment"
+pip3 install --user faster-whisper webrtcvad sqlite-vec || warn "pip install of AI extras failed — you can retry later"
 success "Python/GTK dependencies installed"
 
 # ---------------------------------------------------------------------------
@@ -107,9 +138,25 @@ step "Step 2/9 — Installing Ollama"
 if command -v ollama &>/dev/null; then
     info "Ollama already installed at $(command -v ollama) — skipping"
 else
-    info "Downloading and installing Ollama..."
-    curl -fsSL https://ollama.com/install.sh | sh
-    success "Ollama installed"
+    if internet_available; then
+        if prompt_yes_no "Use the internet now to install Ollama and download local AI models? [Y/n]"; then
+            info "Downloading and installing Ollama..."
+            curl -fsSL https://ollama.com/install.sh | sh
+            success "Ollama installed"
+        else
+            warn "Skipping Ollama setup — you can install it later from the Welcome app or first boot"
+        fi
+    else
+        warn "No internet connection detected — skipping Ollama install for now"
+    fi
+fi
+
+if prompt_yes_no "Install recommended hardware drivers now (GPU/Wi-Fi/Bluetooth support)? [Y/n]"; then
+    if command -v ubuntu-drivers &>/dev/null; then
+        sudo ubuntu-drivers autoinstall || warn "Driver autoinstall reported a problem; the ISO still includes broad open-source driver coverage"
+    else
+        warn "ubuntu-drivers is unavailable — driver auto-install skipped"
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -117,35 +164,43 @@ fi
 # ---------------------------------------------------------------------------
 step "Step 3/9 — Profiling hardware and recommending AI models"
 
-PROFILER="${SCRIPT_DIR}/services/axon-brain/hardware_profiler.py"
-HW_JSON="$(python3 "${PROFILER}" 2>/dev/null)" || HW_JSON=""
+if command -v ollama &>/dev/null; then
+    PROFILER="${SCRIPT_DIR}/services/axon-brain/hardware_profiler.py"
+    HW_JSON="$(python3 "${PROFILER}" 2>/dev/null)" || HW_JSON=""
 
-if [[ -n "${HW_JSON}" ]]; then
-    SYS_RAM="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['system']['ram_gb']:.1f}\")" 2>/dev/null || echo "?")"
-    GPU_TYPE="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['system']['gpu_type'])" 2>/dev/null || echo "Unknown")"
-    SPEED_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['speed']['model'])" 2>/dev/null || echo "llama3.2:1b")"
-    GENERAL_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['general']['model'])" 2>/dev/null || echo "llama3.2:3b")"
-    DEEP_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['deep']['model'])" 2>/dev/null || echo "llama3:8b")"
+    if [[ -n "${HW_JSON}" ]]; then
+        SYS_RAM="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['system']['ram_gb']:.1f}\")" 2>/dev/null || echo "?")"
+        GPU_TYPE="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['system']['gpu_type'])" 2>/dev/null || echo "Unknown")"
+        SPEED_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['speed']['model'])" 2>/dev/null || echo "llama3.2:1b")"
+        GENERAL_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['general']['model'])" 2>/dev/null || echo "llama3.2:3b")"
+        DEEP_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['deep']['model'])" 2>/dev/null || echo "llama3:8b")"
 
-    printf "\n"
-    info "Detected: ${BOLD}${SYS_RAM} GB RAM${RESET}, GPU: ${BOLD}${GPU_TYPE}${RESET}"
-    printf "\n"
-    printf "  ${BOLD}Recommended models for your hardware:${RESET}\n"
-    printf "  ${CYAN}⚡ Speed${RESET}  (instant responses):  ${GREEN}${SPEED_MODEL}${RESET}\n"
-    printf "  ${CYAN}🔧 General${RESET} (everyday queries):   ${GREEN}${GENERAL_MODEL}${RESET}\n"
-    printf "  ${CYAN}🧠 Deep${RESET}   (complex reasoning):  ${GREEN}${DEEP_MODEL}${RESET}\n"
-    printf "\n"
-    printf "  ${BOLD}d)${RESET} Download all recommended models ${GREEN}(Recommended)${RESET}\n"
-    printf "  ${BOLD}g)${RESET} Download General model only (fastest install)\n"
-    printf "  ${BOLD}s)${RESET} Skip — do not download models now\n"
-    printf "\n"
-    read -rp "  Choose [d/g/s]: " MODEL_CHOICE
+        printf "\n"
+        info "Detected: ${BOLD}${SYS_RAM} GB RAM${RESET}, GPU: ${BOLD}${GPU_TYPE}${RESET}"
+        printf "\n"
+        printf "  ${BOLD}Recommended models for your hardware:${RESET}\n"
+        printf "  ${CYAN}⚡ Speed${RESET}  (instant responses):  ${GREEN}${SPEED_MODEL}${RESET}\n"
+        printf "  ${CYAN}🔧 General${RESET} (everyday queries):   ${GREEN}${GENERAL_MODEL}${RESET}\n"
+        printf "  ${CYAN}🧠 Deep${RESET}   (complex reasoning):  ${GREEN}${DEEP_MODEL}${RESET}\n"
+        printf "\n"
+        printf "  ${BOLD}d)${RESET} Download all recommended models ${GREEN}(Recommended)${RESET}\n"
+        printf "  ${BOLD}g)${RESET} Download General model only (fastest install)\n"
+        printf "  ${BOLD}s)${RESET} Skip — do not download models now\n"
+        printf "\n"
+        read -rp "  Choose [d/g/s]: " MODEL_CHOICE
+    else
+        warn "Hardware profiler unavailable — falling back to defaults"
+        SPEED_MODEL="llama3.2:1b"
+        GENERAL_MODEL="llama3.2:3b"
+        DEEP_MODEL="llama3:8b"
+        MODEL_CHOICE="g"
+    fi
 else
-    warn "Hardware profiler unavailable — falling back to defaults"
+    warn "Ollama is not installed yet, so AI model downloads will be skipped for now"
     SPEED_MODEL="llama3.2:1b"
     GENERAL_MODEL="llama3.2:3b"
     DEEP_MODEL="llama3:8b"
-    MODEL_CHOICE="g"
+    MODEL_CHOICE="s"
 fi
 
 case "${MODEL_CHOICE}" in
@@ -226,40 +281,58 @@ SERVICES_DIR="${HOME}/.local/share/axon-os/services"
 mkdir -p "${SERVICES_DIR}"
 cp -r "${SCRIPT_DIR}/services/"* "${SERVICES_DIR}/"
 
-# Register D-Bus session services
+# Register D-Bus session services for all Axon services
 DBUS_DIR="${HOME}/.local/share/dbus-1/services"
 mkdir -p "${DBUS_DIR}"
-sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${SERVICES_DIR}/axon-brain/org.axonos.Brain.service" > "${DBUS_DIR}/org.axonos.Brain.service"
-sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${SERVICES_DIR}/axon-context/org.axonos.Context.service" > "${DBUS_DIR}/org.axonos.Context.service"
+for svc in "${SERVICES_DIR}"/*; do
+    if [[ -d "${svc}" ]]; then
+        for f in "${svc}"/*.service; do
+            [ -e "${f}" ] || continue
+            name=$(basename "${f}")
+            sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${f}" > "${DBUS_DIR}/${name}"
+        done
+    fi
+done
 info "D-Bus session service configs installed."
 
-# Register D-Bus session policies
+# Register D-Bus session policies (may require sudo)
 DBUS_POLICY_DIR="/usr/share/dbus-1/session.d"
 if [[ -d "${DBUS_POLICY_DIR}" ]]; then
-    if [[ -w "${DBUS_POLICY_DIR}" ]]; then
-        cp "${SERVICES_DIR}/axon-brain/org.axonos.Brain.conf" "${DBUS_POLICY_DIR}/"
-        cp "${SERVICES_DIR}/axon-context/org.axonos.Context.conf" "${DBUS_POLICY_DIR}/"
-        info "D-Bus session policies installed directly."
-    elif command -v sudo &>/dev/null; then
-        sudo cp "${SERVICES_DIR}/axon-brain/org.axonos.Brain.conf" "${DBUS_POLICY_DIR}/"
-        sudo cp "${SERVICES_DIR}/axon-context/org.axonos.Context.conf" "${DBUS_POLICY_DIR}/"
-        info "D-Bus session policies installed via sudo."
-    else
-        warn "Could not install D-Bus policies: write permission denied and sudo unavailable."
-    fi
+    for conf in "${SERVICES_DIR}"/*/*.conf; do
+        [ -e "${conf}" ] || continue
+        if [[ -w "${DBUS_POLICY_DIR}" ]]; then
+            cp "${conf}" "${DBUS_POLICY_DIR}/"
+        elif command -v sudo &>/dev/null; then
+            sudo cp "${conf}" "${DBUS_POLICY_DIR}/"
+        else
+            warn "Could not install ${conf} to ${DBUS_POLICY_DIR}: permission denied"
+        fi
+    done
+    info "D-Bus session policies installed (best-effort)."
 fi
 
-# Register Systemd user units
+# Register Systemd user units for available services
 SYSTEMD_DIR="${HOME}/.config/systemd/user"
 mkdir -p "${SYSTEMD_DIR}"
-sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${SERVICES_DIR}/axon-brain/axon-brain.service" > "${SYSTEMD_DIR}/axon-brain.service"
-sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${SERVICES_DIR}/axon-context/axon-context.service" > "${SYSTEMD_DIR}/axon-context.service"
+for svc in "${SERVICES_DIR}"/*; do
+    if [[ -d "${svc}" ]]; then
+        for u in "${svc}"/*.service; do
+            [ -e "${u}" ] || continue
+            name=$(basename "${u}")
+            sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${u}" > "${SYSTEMD_DIR}/${name}"
+        done
+    fi
+done
 info "Systemd user service units installed."
 
-# Reload and enable user units
+# Reload and enable user units (enable commonly useful ones)
 systemctl --user daemon-reload
-systemctl --user enable axon-brain.service axon-context.service
-systemctl --user restart axon-brain.service axon-context.service 2>/dev/null || true
+# Enable all axon-* services if present
+for unit in axon-*.service org.axonos.*.service axon-*.service; do
+    true
+done
+systemctl --user enable --now axon-brain.service axon-context.service 2>/dev/null || true
+systemctl --user enable --now axon-voice.service axon-search.service axon-sandbox.service axon-gui-agent.service 2>/dev/null || true
 success "Services installed and registered."
 
 # ---------------------------------------------------------------------------

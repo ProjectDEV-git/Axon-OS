@@ -18,8 +18,15 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Vte", "2.91")
-from ai_helper import AIHelper
-from gi.repository import Adw, Gdk, GLib, Gtk, Pango, Vte
+import sys
+import tempfile
+from pathlib import Path
+
+safety_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(safety_dir))
+from ai_helper import AIHelper  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, Gtk, Pango, Vte  # noqa: E402
+from safety import assess_command, format_findings  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Colour palette
@@ -496,12 +503,9 @@ class TerminalWidget(Gtk.Box):
     def _on_nl_confirm(self, button: Gtk.Button) -> None:
         """User confirmed the generated command — execute it."""
         if self._pending_nl_command:
-            tab = self._get_active_tab()
-            if tab is not None:
-                cmd = self._pending_nl_command
-                tab.terminal.feed_child((cmd + "\n").encode())
-                tab.last_command = cmd
-                self._command_history.append(cmd)
+            cmd = self._pending_nl_command
+            # Reuse the feed_command helper which includes safety checks
+            self.feed_command(cmd)
         self._reset_nl_bar()
         self._nl_bar_visible = False
         self._nl_revealer.set_reveal_child(False)
@@ -516,6 +520,51 @@ class TerminalWidget(Gtk.Box):
 
     def feed_command(self, command: str) -> None:
         """Send a command string to the active terminal."""
+        # Run a quick static audit and, if suspicious, prompt the user.
+        decision = assess_command(command)
+        findings = decision.findings
+
+        if decision.sandbox_recommended:
+            # Build a simple inline prompt in GTK4-friendly style.
+            transient = self.get_root() if hasattr(self.get_root(), "present") else None
+            dialog = Gtk.Dialog(title="Suspicious command detected", transient_for=transient, modal=True)
+            dialog.add_button("Block", Gtk.ResponseType.CANCEL)
+            dialog.add_button("Allow Once", Gtk.ResponseType.YES)
+            dialog.add_button("Run Sandboxed", Gtk.ResponseType.OK)
+            box = dialog.get_content_area()
+            label = Gtk.Label(label=format_findings(findings))
+            label.set_wrap(True)
+            label.set_margin_top(12)
+            label.set_margin_bottom(12)
+            label.set_margin_start(12)
+            label.set_margin_end(12)
+            box.append(label)
+
+            def _finish(resp: Gtk.ResponseType) -> None:
+                dialog.destroy()
+                if resp == Gtk.ResponseType.CANCEL:
+                    return
+                if resp == Gtk.ResponseType.OK:
+                    try:
+                        tmp = Path(tempfile.mktemp(prefix="axon-term-", suffix=".sh"))
+                        tmp.write_text(f"#!/bin/bash\n{command}\n")
+                        tmp.chmod(0o700)
+                        shield_script = Path(__file__).resolve().parents[2] / "services" / "axon-sandbox" / "shield.py"
+                        self.new_tab("Sandbox")
+                        self._tabs[-1].terminal.feed_child((f"python3 '{shield_script}' --yes-sandbox '{tmp}'\n").encode())
+                        return
+                    except Exception:
+                        pass
+                tab = self._get_active_tab()
+                if tab is not None:
+                    tab.terminal.feed_child((command + "\n").encode())
+                    tab.last_command = command
+                    self._command_history.append(command)
+
+            dialog.connect("response", lambda _dlg, resp: _finish(resp))
+            dialog.present()
+            return
+
         tab = self._get_active_tab()
         if tab is not None:
             tab.terminal.feed_child((command + "\n").encode())

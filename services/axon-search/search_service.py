@@ -110,6 +110,8 @@ class SearchService(dbus.service.Object):
         self._rescan_event = threading.Event()
         self._pull_attempted = False
         threading.Thread(target=self._index_loop, daemon=True).start()
+        # Start a lightweight watcher that triggers rescans when files change.
+        threading.Thread(target=self._watch_loop, daemon=True).start()
         print("Axon Search D-Bus service registered at /org/axonos/Search")
 
     # ------------------------------------------------------------------
@@ -157,6 +159,39 @@ class SearchService(dbus.service.Object):
                 print(f"[axon-search] scan error: {exc}")
             self._rescan_event.wait(RESCAN_INTERVAL)
             self._rescan_event.clear()
+
+    def _watch_loop(self):
+        """Lightweight polling watcher for environments without inotify.
+
+        Scans candidate files and triggers a rescan when mtimes change. Uses a
+        low-overhead polling interval so it is safe to run on low-end devices.
+        """
+        known = {}
+        while True:
+            try:
+                changed = False
+                for path in indexer.iter_candidate_files(Path.home()):
+                    try:
+                        mtime = Path(path).stat().st_mtime
+                    except OSError:
+                        mtime = None
+                    prev = known.get(path)
+                    if prev is None:
+                        known[path] = mtime
+                        changed = True
+                    else:
+                        if mtime is None:
+                            # disappeared
+                            known.pop(path, None)
+                            changed = True
+                        elif abs(mtime - prev) > 0.5:
+                            known[path] = mtime
+                            changed = True
+                if changed:
+                    self._rescan_event.set()
+            except Exception:
+                pass
+            time.sleep(10)
 
     def _scan_once(self):
         db = open_db()

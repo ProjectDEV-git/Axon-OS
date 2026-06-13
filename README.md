@@ -26,6 +26,7 @@ The operating system is built around two centralized D-Bus services — **Axon B
 - **Rogue Software Shield (`axon-shield`)** — Run untrusted scripts through a static + AI audit (SSH-key theft, `curl | sh`, reverse shells, persistence hooks...) and execute them inside a bubblewrap sandbox with a read-only home, masked secrets, and optional network blackout.
 - **GUI Agent (`org.axonos.GuiAgent`)** — Tell the OS to change its own settings: natural-language requests are compiled by the Brain into an allowlisted plan of `gsettings` operations ("enable night light and make text bigger") and applied in milliseconds — no synthetic clicking.
 - **Self-Healing Boot Watchdog** — Installs root on BTRFS `@`/`@home` subvolumes, snapshots a factory `@axon-fallback` after install, and counts boot attempts in a GRUB env file on the ESP. Two consecutive failed boots and GRUB automatically boots the rollback snapshot.
+- **Axon Updater (`axon-update`)** — A graphical + headless updater that checks GitHub releases, refreshes installed Axon assets, updates APT / Flatpak packages, and runs on a daily timer so new pushes propagate automatically.
 - **Zero cloud dependency** — No telemetry, no mandatory accounts, no remote inference endpoints. All data stays on your machine in `~/.axon/`.
 
 ## Installation
