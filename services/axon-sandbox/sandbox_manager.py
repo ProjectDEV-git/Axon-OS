@@ -192,14 +192,16 @@ class SandboxManager(dbus.service.Object):
         try:
             p = Path(script_path)
             if not p.exists() or not p.is_file():
-                dbus_ok("allow")
+                logger.warning("Sandbox audit: file not found or not a regular file: %s", script_path)
+                dbus_ok("deny")
                 return
 
             # Read script content
             try:
                 content = p.read_text(encoding="utf-8", errors="ignore")[:3000].strip()
-            except Exception:
-                dbus_ok("allow")
+            except Exception as e:
+                logger.warning("Sandbox audit: failed to read script %s: %s", script_path, e)
+                dbus_ok("deny")
                 return
 
             # Call Brain service to check warnings
@@ -208,9 +210,13 @@ class SandboxManager(dbus.service.Object):
                 brain_obj = self.session_bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
                 brain_interface = dbus.Interface(brain_obj, 'org.axonos.Brain')
 
+                safe_content = content.replace("{", "{{").replace("}", "}}")
                 prompt = (
                     f"Read this script path: {script_path}\n"
-                    f"Script content:\n{content}\n\n"
+                    "Script content:\n"
+                    "---BEGIN SCRIPT---\n"
+                    f"{safe_content}\n"
+                    "---END SCRIPT---\n\n"
                     "Does this script access SSH keys, steal cookies, wipe folders, edit system files, "
                     "or make suspicious cURL requests? Respond ONLY as a JSON list of strings detailing "
                     "the security warning flags (e.g. ['Attempts to write to /etc', 'Accesses private ssh keys']). "
@@ -249,7 +255,7 @@ class SandboxManager(dbus.service.Object):
 
         except Exception:
             logger.exception("Error in sandbox manager:")
-            dbus_ok("allow")
+            dbus_ok("deny")
 
 if __name__ == '__main__':
     # Initialize GTK Application context if not already created

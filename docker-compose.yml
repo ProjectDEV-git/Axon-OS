@@ -21,7 +21,7 @@ services:
       <<: *common-env
       AXON_SERVICE: brain
     volumes:
-      - axon-data:/data/axon
+      - brain-data:/data/axon
     extra_hosts:
       - host.docker.internal:host-gateway
     healthcheck:
@@ -40,7 +40,7 @@ services:
       <<: *common-env
       AXON_SERVICE: context
     volumes:
-      - axon-data:/data/axon
+      - context-data:/data/axon
     depends_on:
       axon-brain:
         condition: service_healthy
@@ -57,7 +57,7 @@ services:
       <<: *common-env
       AXON_SERVICE: search
     volumes:
-      - axon-data:/data/axon
+      - search-data:/data/axon
     depends_on:
       axon-brain:
         condition: service_healthy
@@ -74,11 +74,13 @@ services:
       <<: *common-env
       AXON_SERVICE: voice
     volumes:
-      - axon-data:/data/axon
       - /dev/snd:/dev/snd
     devices:
       - /dev/snd:/dev/snd
-    privileged: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_NICE
     depends_on:
       axon-brain:
         condition: service_healthy
@@ -94,8 +96,6 @@ services:
     environment:
       <<: *common-env
       AXON_SERVICE: gui-agent
-    volumes:
-      - axon-data:/data/axon
     depends_on:
       axon-brain:
         condition: service_healthy
@@ -112,7 +112,7 @@ services:
       <<: *common-env
       AXON_SERVICE: sandbox
     volumes:
-      - axon-data:/data/axon
+      - sandbox-data:/data/axon
     depends_on:
       axon-brain:
         condition: service_healthy
@@ -128,8 +128,6 @@ services:
     environment:
       <<: *common-env
       AXON_SERVICE: global-search
-    volumes:
-      - axon-data:/data/axon
     depends_on:
       axon-brain:
         condition: service_healthy
@@ -137,5 +135,11 @@ services:
       - host.docker.internal:host-gateway
 
 volumes:
-  axon-data:
+  brain-data:
+    driver: local
+  context-data:
+    driver: local
+  search-data:
+    driver: local
+  sandbox-data:
     driver: local

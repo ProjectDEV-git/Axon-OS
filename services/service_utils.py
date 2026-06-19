@@ -2,6 +2,9 @@
 """Caching and rate limiting utilities for D-Bus services."""
 
 import functools
+import logging
+import shlex
+import subprocess
 import threading
 import time
 from collections import defaultdict
@@ -9,6 +12,76 @@ from collections.abc import Callable
 from typing import Any
 
 import dbus
+
+logger = logging.getLogger(__name__)
+
+ALLOWED_COMMANDS: set[str] = {
+    "ls", "cat", "grep", "find", "echo", "date", "whoami", "hostname",
+    "uname", "df", "du", "free", "uptime", "ps", "top", "htop",
+    "pwd", "wc", "head", "tail", "sort", "uniq", "diff", "file",
+    "stat", "readlink", "realpath", "basename", "dirname",
+    "python", "python3", "node", "bash", "sh",
+    "apt", "apt-get", "dpkg", "snap", "flatpak",
+    "git", "make", "gcc", "g++", "cargo", "rustc",
+    "systemctl", "journalctl",
+    "nmcli", "bluetoothctl", "pactl", "paplay",
+    "xdg-open", "gtk-launch", "gio",
+    "notify-send", "zenity",
+}
+
+_SHELL_META_CHARS = frozenset("|;&$`\\(){}[]<>*?~!#")
+
+
+def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
+    """Execute a command safely with whitelist validation.
+
+    Parses the command with shlex.split() and checks the binary against
+    ALLOWED_COMMANDS before executing. Refuses to run commands containing
+    shell metacharacters that could enable injection.
+
+    Args:
+        command: Command string to execute.
+        **kwargs: Additional arguments passed to subprocess.Popen.
+
+    Returns:
+        Popen object if command was allowed and started, None otherwise.
+    """
+    if any(c in command for c in _SHELL_META_CHARS):
+        logger.warning("safe_exec: blocked command containing shell metacharacters: %s", command[:100])
+        return None
+
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        logger.warning("safe_exec: failed to parse command: %s", command)
+        return None
+
+    if not parts:
+        logger.warning("safe_exec: empty command")
+        return None
+
+    binary = parts[0]
+    if binary not in ALLOWED_COMMANDS:
+        logger.warning("safe_exec: blocked unwhitelisted command: %s", binary)
+        return None
+
+    defaults = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    defaults.update(kwargs)
+    return subprocess.Popen(parts, **defaults)
+
+
+def error_response(message: str, code: str = "UNKNOWN") -> str:
+    """Create a standardized JSON error response for D-Bus methods.
+
+    Args:
+        message: Human-readable error description.
+        code: Machine-readable error code.
+
+    Returns:
+        JSON string with error and code fields.
+    """
+    import json
+    return json.dumps({"error": message, "code": code})
 
 
 class TTLCache:

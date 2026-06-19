@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-AXON_DIR: Path = Path.home() / ".axon"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "services"))
+from constants import AXON_DIR
+
 SPACES_FILE: Path = AXON_DIR / "spaces.json"
 _CURRENT_SPACE_FILE: Path = AXON_DIR / "current_space"
 

@@ -5,10 +5,14 @@ import json
 import math
 import os
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import dbus
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "services"))
+from constants import AXON_DIR
 
 try:
     import dbus.mainloop.glib
@@ -108,7 +112,7 @@ def get_all_files(roots):
 class FileIndexer:
     def __init__(self, db_path=None):
         if db_path is None:
-            self.db_path = Path.home() / ".axon" / "files_index.db"
+            self.db_path = AXON_DIR / "files_index.db"
         else:
             self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

@@ -23,11 +23,9 @@ COPY services/ ./services/
 COPY apps/ ./apps/
 COPY axon_logger.py ./
 COPY pyproject.toml ./
+COPY requirements-docker.txt ./
 
-RUN pip install --no-cache-dir \
-    dbus-python \
-    PyGObject \
-    tomli
+RUN pip install --no-cache-dir -r requirements-docker.txt
 
 ENV AXON_SERVICE=brain
 

@@ -28,6 +28,7 @@ from gi.repository import GLib
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from constants import MAX_RECORD_SECONDS, WHISPER_DIR
+from service_utils import safe_exec
 
 from axon_logger import configure_app_logger
 
@@ -220,8 +221,7 @@ class VoiceService(dbus.service.Object):
                              stderr=subprocess.DEVNULL)
             GLib.idle_add(self._finish, f"Opening {payload}", "")
         elif kind == "run_command":
-            subprocess.Popen(payload, shell=True,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            safe_exec(payload)
             GLib.idle_add(self._finish, f"Running: {payload}", "")
         else:
             spoken = payload if payload else "I don't have an answer for that."
@@ -255,14 +255,16 @@ class VoiceService(dbus.service.Object):
                     subprocess.Popen(["piper", "-t", text[:1000]],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     return
-                except Exception:
+                except Exception as e:
+                    log.debug("piper TTS failed: %s", e)
                     continue
             if eng in ("espeak", "espeak-ng") and shutil.which(eng):
                 try:
                     subprocess.Popen([eng, text[:1000]],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     return
-                except Exception:
+                except Exception as e:
+                    log.debug("%s TTS failed: %s", eng, e)
                     continue
             if eng == "pico2wave" and shutil.which("pico2wave") and shutil.which("aplay"):
                 try:
@@ -271,10 +273,11 @@ class VoiceService(dbus.service.Object):
                     subprocess.check_call(["pico2wave", "-w", tmp, text[:1000]])
                     subprocess.Popen(["aplay", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     return
-                except Exception:
+                except Exception as e:
+                    log.debug("pico2wave TTS failed: %s", e)
                     try:
                         os.unlink(tmp)
-                    except Exception:
+                    except OSError:
                         pass
                     continue
             if eng == "spd-say" and shutil.which("spd-say"):
@@ -282,7 +285,8 @@ class VoiceService(dbus.service.Object):
                     subprocess.Popen(["spd-say", "--wait-mode", "no", text[:500]],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     return
-                except Exception:
+                except Exception as e:
+                    log.debug("spd-say TTS failed: %s", e)
                     continue
 
     def _notify(self, title, body):
@@ -353,7 +357,7 @@ class VoiceService(dbus.service.Object):
             except subprocess.CalledProcessError:
                 try:
                     os.unlink(wav)
-                except Exception:
+                except OSError:
                     pass
                 break
             try:
@@ -364,12 +368,13 @@ class VoiceService(dbus.service.Object):
                 else:
                     try:
                         os.unlink(wav)
-                    except Exception:
+                    except OSError:
                         pass
-            except Exception:
+            except Exception as e:
+                log.debug("Ambient speech detection error: %s", e)
                 try:
                     os.unlink(wav)
-                except Exception:
+                except OSError:
                     pass
         log.info("ambient stopped")
 

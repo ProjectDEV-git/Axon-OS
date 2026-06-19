@@ -21,6 +21,8 @@ if search --no-floppy --label --set=axon_esp AXONESP; then
             set boot_attempts=2
         elif [ "${boot_attempts}" = "2" ]; then
             set boot_attempts=3
+        elif [ "${boot_attempts}" = "3" ]; then
+            set boot_attempts=3
         else
             set boot_attempts=1
         fi

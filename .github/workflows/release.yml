@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -34,8 +34,11 @@ jobs:
           git commit -m "chore(release): bump version to ${{ github.event.inputs.version }}" || echo "No changes to commit"
 
       - name: Create tag and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git tag -a v${{ github.event.inputs.version }} -m "Release ${{ github.event.inputs.version }}"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
           git push origin HEAD:main
           git push origin --tags
 

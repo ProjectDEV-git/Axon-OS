@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 import json
+import logging
 import re
 import shutil
 import subprocess
+
+logger = logging.getLogger(__name__)
 
 
 def get_system_ram():
@@ -13,8 +16,8 @@ def get_system_ram():
         matched = re.search(r'MemTotal:\s+(\d+)\s+kB', meminfo)
         if matched:
             return int(matched.group(1)) / (1024 * 1024)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to read /proc/meminfo: %s — defaulting to 8 GB", e)
     return 8.0  # Default fallback
 
 def get_gpu_info():
@@ -43,10 +46,8 @@ def get_gpu_info():
                     "vram": vram_mb / 1024.0,
                     "status": "detected"
                 }
-        except Exception:
-            pass
-
-    # 2. Try AMD ROCm
+        except Exception as e:
+            logger.debug("nvidia-smi detection failed: %s", e)
     if shutil.which("rocm-smi"):
         try:
             # Try to get VRAM from rocm-smi
@@ -67,8 +68,8 @@ def get_gpu_info():
                     "vram": vram_gb,
                     "status": "detected"
                 }
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("rocm-smi detection failed: %s", e)
 
     # 3. Inspect /sys/class/drm or lspci as fallback for general GPUs
     try:
@@ -80,8 +81,8 @@ def get_gpu_info():
             return {"vendor": "AMD", "model": "AMD Radeon GPU (unconfigured)", "vram": 4.0, "status": "unsupported_driver"}
         elif "Intel" in lspci_out:
             return {"vendor": "Intel", "model": "Intel Integrated Graphics", "vram": 2.0, "status": "cpu_shared"}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("lspci detection failed: %s", e)
 
     return {
         "vendor": "CPU",

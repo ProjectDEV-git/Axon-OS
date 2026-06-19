@@ -185,6 +185,8 @@ else
     set boot_attempts=2
   elif [ "\${boot_attempts}" = "2" ]; then
     set boot_attempts=3
+  else
+    set boot_attempts=1
   fi
   save_env boot_attempts
 fi
@@ -314,14 +316,19 @@ apt-get install -y sassc libglib2.0-dev-bin || log "WARNING: theme build deps fa
 GTK_THEME_NAME='axon-gtk'
 ICON_THEME_NAME='Papirus-Dark'
 SHELL_THEME_NAME=''
-if git clone --depth=1 https://github.com/vinceliuice/WhiteSur-gtk-theme.git /tmp/wsg \
+# Pinned commit hashes for reproducible builds — update these when bumping themes.
+WHITESUR_GTK_COMMIT="${WHITESUR_GTK_COMMIT:-master}"
+WHITESUR_ICON_COMMIT="${WHITESUR_ICON_COMMIT:-master}"
+if git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git /tmp/wsg \
+   && git -C /tmp/wsg checkout "${WHITESUR_GTK_COMMIT}" \
    && /tmp/wsg/install.sh -d /usr/share/themes -c Dark -N glassy; then
     GTK_THEME_NAME='WhiteSur-Dark'
     SHELL_THEME_NAME='WhiteSur-Dark'
 else
     log "WARNING: WhiteSur GTK theme install failed — keeping axon-gtk"
 fi
-if git clone --depth=1 https://github.com/vinceliuice/WhiteSur-icon-theme.git /tmp/wsi \
+if git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git /tmp/wsi \
+   && git -C /tmp/wsi checkout "${WHITESUR_ICON_COMMIT}" \
    && /tmp/wsi/install.sh -d /usr/share/icons; then
     ICON_THEME_NAME='WhiteSur-dark'
 else
@@ -473,6 +480,17 @@ export USERFULLNAME="Axon Live"
 export HOST="axon-os"
 export BUILD_SYSTEM="Ubuntu"
 export FLAVOUR="Axon"
+EOF
+
+# GDM autologin for the live session — casper's built-in autologin can fail on
+# Ubuntu 24.04, leaving the user on a black screen after Plymouth quits.
+log "Configuring GDM autologin for live session..."
+mkdir -p /etc/gdm3
+cat > /etc/gdm3/custom.conf <<'EOF'
+[daemon]
+AutomaticLoginEnable=true
+AutomaticLogin=axon
+WaylandEnable=false
 EOF
 
 # /etc/os-release is a symlink to /usr/lib/os-release on Ubuntu; replace the

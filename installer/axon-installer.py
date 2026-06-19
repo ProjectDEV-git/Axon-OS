@@ -671,8 +671,11 @@ class InstallerApp(Adw.ApplicationWindow):
                     f.write(kbd_content)
 
                 # Enable OS Prober for GRUB dual-boot detection
+                # Add rootflags=subvol=@ so the kernel mounts the correct BTRFS subvolume
                 with open(os.path.join(mount, "etc", "default", "grub"), "a") as f:
                     f.write("\nGRUB_DISABLE_OS_PROBER=false\n")
+                    f.write('GRUB_CMDLINE_LINUX_DEFAULT="quiet splash rootflags=subvol=@ console=tty0"\n')
+                    f.write('GRUB_CMDLINE_LINUX=""\n')
 
                 # Create user with password via chpasswd
                 username = user_info["username"]
