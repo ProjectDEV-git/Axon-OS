@@ -13,6 +13,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+gi.require_version("Gdk", "4.0")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
 
@@ -446,6 +447,8 @@ class IntentBarWindow(Adw.Window):
         self._response_label.set_text("")
         self._response_label.set_visible(False)
         entry.set_sensitive(False)
+        self._push_history(query)
+        self._history_idx = -1
 
         thread = threading.Thread(
             target=self._do_query,

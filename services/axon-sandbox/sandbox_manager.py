@@ -11,6 +11,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+gi.require_version("Gdk", "4.0")
 from gi.repository import Gdk, GLib, Gtk
 
 # Ensure we can load axon_logger
@@ -210,12 +211,11 @@ class SandboxManager(dbus.service.Object):
                 brain_obj = self.session_bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
                 brain_interface = dbus.Interface(brain_obj, 'org.axonos.Brain')
 
-                safe_content = content.replace("{", "{{").replace("}", "}}")
                 prompt = (
                     f"Read this script path: {script_path}\n"
                     "Script content:\n"
                     "---BEGIN SCRIPT---\n"
-                    f"{safe_content}\n"
+                    f"{content}\n"
                     "---END SCRIPT---\n\n"
                     "Does this script access SSH keys, steal cookies, wipe folders, edit system files, "
                     "or make suspicious cURL requests? Respond ONLY as a JSON list of strings detailing "

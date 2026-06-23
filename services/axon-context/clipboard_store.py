@@ -33,7 +33,8 @@ class ClipboardStore:
         return conn
 
     def _init_db(self):
-        with self._get_connection() as conn:
+        conn = self._get_connection()
+        try:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS clipboard_entries (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,6 +49,8 @@ class ClipboardStore:
                 ON clipboard_entries(timestamp DESC)
             """)
             conn.commit()
+        finally:
+            conn.close()
 
     def add(self, content, content_type="text"):
         """Add a clipboard entry. Returns True if added (not duplicate)."""
@@ -57,7 +60,8 @@ class ClipboardStore:
         content = content[:self.max_entry_len].strip()
 
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 # Check for duplicate (most recent entry)
                 row = conn.execute(
                     "SELECT content FROM clipboard_entries ORDER BY id DESC LIMIT 1"
@@ -81,72 +85,95 @@ class ClipboardStore:
 
                 conn.commit()
                 return True
+            finally:
+                conn.close()
 
     def get_recent(self, limit=10):
         """Get most recent clipboard entries."""
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 rows = conn.execute(
                     "SELECT id, content, content_type, timestamp, pinned "
                     "FROM clipboard_entries ORDER BY id DESC LIMIT ?",
                     (limit,)
                 ).fetchall()
                 return [dict(row) for row in rows]
+            finally:
+                conn.close()
 
     def search(self, query, limit=20):
         """Search clipboard history by content."""
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 rows = conn.execute(
                     "SELECT id, content, content_type, timestamp, pinned "
                     "FROM clipboard_entries WHERE content LIKE ? ORDER BY id DESC LIMIT ?",
                     (f"%{query}%", limit)
                 ).fetchall()
                 return [dict(row) for row in rows]
+            finally:
+                conn.close()
 
     def pin(self, entry_id):
         """Pin a clipboard entry to prevent pruning."""
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 conn.execute(
                     "UPDATE clipboard_entries SET pinned = 1 WHERE id = ?",
                     (entry_id,)
                 )
                 conn.commit()
+            finally:
+                conn.close()
 
     def unpin(self, entry_id):
         """Unpin a clipboard entry."""
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 conn.execute(
                     "UPDATE clipboard_entries SET pinned = 0 WHERE id = ?",
                     (entry_id,)
                 )
                 conn.commit()
+            finally:
+                conn.close()
 
     def delete(self, entry_id):
         """Delete a specific clipboard entry."""
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 conn.execute(
                     "DELETE FROM clipboard_entries WHERE id = ?",
                     (entry_id,)
                 )
                 conn.commit()
+            finally:
+                conn.close()
 
     def clear(self):
         """Clear all non-pinned clipboard entries."""
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 conn.execute("DELETE FROM clipboard_entries WHERE pinned = 0")
                 conn.commit()
+            finally:
+                conn.close()
 
     def get_count(self):
         """Get total number of clipboard entries."""
         with self._lock:
-            with self._get_connection() as conn:
+            conn = self._get_connection()
+            try:
                 row = conn.execute("SELECT COUNT(*) as cnt FROM clipboard_entries").fetchone()
                 return row["cnt"]
+            finally:
+                conn.close()
 
     def to_deque(self, maxlen=None):
         """Export recent entries as a deque (for backward compatibility)."""

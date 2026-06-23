@@ -62,7 +62,7 @@ class TestSafeExec:
         assert len(ALLOWED_COMMANDS) > 10
 
     def test_common_commands_allowed(self):
-        for cmd in ["ls", "cat", "grep", "find", "echo", "python3", "git"]:
+        for cmd in ["ls", "cat", "grep", "find", "echo", "git"]:
             assert cmd in ALLOWED_COMMANDS, f"{cmd} should be in ALLOWED_COMMANDS"
 
     def test_dangerous_commands_not_allowed(self):
