@@ -61,8 +61,9 @@ export function createProxyWithRetry(interfaceXml, busName, objectPath, maxRetri
         } catch (e) {
             console.warn(`AxonShell: proxy creation attempt ${attempt + 1} failed:`, e.message);
             if (attempt < maxRetries - 1) {
-                // Wait before retry (exponential backoff)
-                GLib.usleep((attempt + 1) * 100000); // 100ms, 200ms, 300ms
+                // Brief yield to avoid blocking shell for too long.
+                // Initial proxy creation is one-time; keeping delays short.
+                GLib.usleep((attempt + 1) * 30000); // 30ms, 60ms, 90ms
             }
         }
     }

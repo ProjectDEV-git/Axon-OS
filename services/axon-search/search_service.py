@@ -175,6 +175,7 @@ class SearchService(dbus.service.Object):
                 def __init__(self, service):
                     self.service = service
                     self.debounce_timer = None
+                    self._timer_lock = threading.Lock()
 
                 def on_any_event(self, event):
                     if event.is_directory:
@@ -198,10 +199,11 @@ class SearchService(dbus.service.Object):
                         self.trigger_rescan()
 
                 def trigger_rescan(self):
-                    if self.debounce_timer:
-                        self.debounce_timer.cancel()
-                    self.debounce_timer = threading.Timer(2.0, self._set_event)
-                    self.debounce_timer.start()
+                    with self._timer_lock:
+                        if self.debounce_timer:
+                            self.debounce_timer.cancel()
+                        self.debounce_timer = threading.Timer(2.0, self._set_event)
+                        self.debounce_timer.start()
 
                 def _set_event(self):
                     self.service._rescan_event.set()

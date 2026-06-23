@@ -82,43 +82,46 @@ class BrainService(dbus.service.Object):
         dbus.service.Object.__init__(self, self.session_bus, '/org/axonos/Brain')
 
         # Initialize sub-components
+        self._config_lock = threading.Lock()
         self.store = ConversationStore()
         self.load_config()
         logger.info("Axon Brain D-Bus Service registered successfully at /org/axonos/Brain")
 
     def save_config(self):
         """Saves current configuration to TOML format."""
-        try:
-            content = "# Axon OS AI Configuration\n\n"
-            for k, v in self.config.items():
-                # Escape any backslashes or quotes
-                escaped_v = str(v).replace("\\", "\\\\").replace('"', '\\"')
-                content += f'{k} = "{escaped_v}"\n'
-            CONFIG_FILE.write_text(content)
-        except Exception as e:
-            logger.exception("Error saving config to %s: %s", CONFIG_FILE, e)
+        with self._config_lock:
+            try:
+                content = "# Axon OS AI Configuration\n\n"
+                for k, v in self.config.items():
+                    # Escape any backslashes or quotes
+                    escaped_v = str(v).replace("\\", "\\\\").replace('"', '\\"')
+                    content += f'{k} = "{escaped_v}"\n'
+                CONFIG_FILE.write_text(content)
+            except Exception as e:
+                logger.exception("Error saving config to %s: %s", CONFIG_FILE, e)
 
     def load_config(self):
         """Loads model config, profiles hardware if not present."""
         AXON_DIR.mkdir(parents=True, exist_ok=True)
-        if CONFIG_FILE.exists():
-            try:
-                with open(CONFIG_FILE, "rb") as f:
-                    self.config = tomllib.load(f)
-                # Verify required keys exist
-                if all(k in self.config for k in ("speed_model", "general_model", "deep_model")):
-                    return
-            except Exception as e:
-                logger.debug("Config file not loaded, using defaults: %s", e)
+        with self._config_lock:
+            if CONFIG_FILE.exists():
+                try:
+                    with open(CONFIG_FILE, "rb") as f:
+                        self.config = tomllib.load(f)
+                    # Verify required keys exist
+                    if all(k in self.config for k in ("speed_model", "general_model", "deep_model")):
+                        return
+                except Exception as e:
+                    logger.debug("Config file not loaded, using defaults: %s", e)
 
-        # Profile hardware and save default config
-        profile = hardware_profiler.profile_hardware()
-        self.config = {
-            "speed_model": profile["recommendations"]["speed"]["model"],
-            "general_model": profile["recommendations"]["general"]["model"],
-            "deep_model": profile["recommendations"]["deep"]["model"]
-        }
-        self.save_config()
+            # Profile hardware and save default config
+            profile = hardware_profiler.profile_hardware()
+            self.config = {
+                "speed_model": profile["recommendations"]["speed"]["model"],
+                "general_model": profile["recommendations"]["general"]["model"],
+                "deep_model": profile["recommendations"]["deep"]["model"]
+            }
+            self.save_config()
 
     def _http_post(self, url, payload, stream=False, timeout=60.0, max_retries=5):
         """Helper to execute urllib POST requests with retry logic."""

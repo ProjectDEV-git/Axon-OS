@@ -86,6 +86,7 @@ class GlobalSearchService(dbus.service.Object):
             return json.dumps([])
 
         results = []
+        results_lock = threading.Lock()
         threads = []
 
         def _search_files():
@@ -95,13 +96,14 @@ class GlobalSearchService(dbus.service.Object):
                     raw = svc.Search(query)
                     items = json.loads(raw) if raw else []
                     for item in items:
-                        results.append({
-                            "type": "file",
-                            "title": item.get("path", "").split("/")[-1],
-                            "subtitle": item.get("path", ""),
-                            "score": item.get("score", 0),
-                            "source": "search",
-                        })
+                        with results_lock:
+                            results.append({
+                                "type": "file",
+                                "title": item.get("path", "").split("/")[-1],
+                                "subtitle": item.get("path", ""),
+                                "score": item.get("score", 0),
+                                "source": "search",
+                            })
                 except Exception:
                     pass
 
@@ -119,13 +121,14 @@ class GlobalSearchService(dbus.service.Object):
                                 name = line.split("=", 1)[1].strip()
                                 break
                         if query.lower() in name.lower() or query.lower() in desktop.stem.lower():
-                            results.append({
-                                "type": "app",
-                                "title": name or desktop.stem,
-                                "subtitle": "Application",
-                                "score": 0.8,
-                                "source": "desktop",
-                            })
+                            with results_lock:
+                                results.append({
+                                    "type": "app",
+                                    "title": name or desktop.stem,
+                                    "subtitle": "Application",
+                                    "score": 0.8,
+                                    "source": "desktop",
+                                })
             except Exception:
                 pass
 
@@ -137,13 +140,14 @@ class GlobalSearchService(dbus.service.Object):
                 )
                 for schema in schemas.stdout.strip().splitlines():
                     if query.lower() in schema.lower():
-                        results.append({
-                            "type": "setting",
-                            "title": schema,
-                            "subtitle": "GNOME Setting",
-                            "score": 0.5,
-                            "source": "gsettings",
-                        })
+                        with results_lock:
+                            results.append({
+                                "type": "setting",
+                                "title": schema,
+                                "subtitle": "GNOME Setting",
+                                "score": 0.5,
+                                "source": "gsettings",
+                            })
             except Exception:
                 pass
 
