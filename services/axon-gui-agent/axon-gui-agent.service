@@ -1,9 +1,11 @@
 [Unit]
 Description=Axon OS GUI Agent (desktop automation) Service
 After=dbus.socket
+Requires=dbus.socket
 
 [Service]
-Type=simple
+Type=dbus
+BusName=org.axonos.GuiAgent
 ExecStart=/usr/bin/python3 AXON_SERVICES_DIR/axon-gui-agent/gui_agent_service.py
 Restart=on-failure
 RestartSec=3

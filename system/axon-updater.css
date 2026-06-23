@@ -1,0 +1,117 @@
+/* Axon OS Updater — Stylesheet */
+
+window {
+    background-color: #0f0f14;
+    color: #e4e4e8;
+}
+
+.updater-header {
+    background-color: #0c0c10;
+    border-bottom: 1px solid rgba(124, 58, 237, 0.15);
+}
+
+/* Status page */
+.updater-status-page {
+    margin-top: 8px;
+}
+
+/* Phase label */
+.phase-label {
+    font-family: "Inter", "Outfit", "Ubuntu", sans-serif;
+    font-size: 13px;
+    color: #b4b4c6;
+}
+
+/* Progress bar */
+.updater-progress-bar trough {
+    background-color: rgba(30, 30, 50, 0.8);
+    border: 1px solid rgba(124, 58, 237, 0.15);
+    border-radius: 6px;
+    min-height: 14px;
+}
+
+.updater-progress-bar progress {
+    background: linear-gradient(90deg, #7C3AED, #8B5CF6, #06B6D4);
+    border-radius: 6px;
+    min-height: 14px;
+}
+
+.updater-progress-bar.complete progress {
+    background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.updater-progress-bar.error progress {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+/* Progress percentage text */
+.progress-percent {
+    font-family: "Inter", "Ubuntu", sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8B5CF6;
+}
+
+.progress-percent.complete {
+    color: #10b981;
+}
+
+/* Start / Close button */
+.updater-start-btn {
+    background-color: #7C3AED;
+    border: none;
+    border-radius: 10px;
+    color: #ffffff;
+    font-family: "Inter", "Ubuntu", sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 32px;
+    min-width: 180px;
+    transition: all 150ms ease;
+}
+
+.updater-start-btn:hover {
+    background-color: #8B5CF6;
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.45);
+}
+
+.updater-start-btn:active {
+    background-color: #6d28d9;
+    transform: scale(0.97);
+}
+
+.updater-start-btn:disabled {
+    background-color: rgba(124, 58, 237, 0.35);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.updater-close-btn {
+    background-color: #06B6D4;
+    border: none;
+    border-radius: 10px;
+    color: #ffffff;
+    font-family: "Inter", "Ubuntu", sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 32px;
+    min-width: 180px;
+    transition: all 150ms ease;
+}
+
+.updater-close-btn:hover {
+    background-color: #22d3ee;
+    box-shadow: 0 4px 16px rgba(6, 182, 212, 0.45);
+}
+
+/* Detail card for log output */
+.detail-card {
+    background-color: rgba(20, 20, 30, 0.6);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    border-radius: 10px;
+}
+
+.detail-text {
+    font-family: "JetBrains Mono", "Ubuntu Mono", monospace;
+    font-size: 11px;
+    color: #8B8BA0;
+}

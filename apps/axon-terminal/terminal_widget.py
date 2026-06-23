@@ -24,9 +24,9 @@ from pathlib import Path
 
 safety_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(safety_dir))
-from ai_helper import AIHelper  # noqa: E402
-from gi.repository import Adw, Gdk, GLib, Gtk, Pango, Vte  # noqa: E402
-from safety import assess_command, format_findings  # noqa: E402
+from ai_helper import AIHelper
+from gi.repository import Adw, Gdk, GLib, Gtk, Pango, Vte
+from safety import assess_command, format_findings
 
 # ---------------------------------------------------------------------------
 # Colour palette
@@ -255,7 +255,16 @@ class TerminalWidget(Gtk.Box):
         term.set_colors(_FG, _BG, _PALETTE)
 
         # Spawn user shell
-        shell = os.environ.get("SHELL", "/bin/bash")
+        shell = "/bin/bash"
+        config_path = Path.home() / ".config" / "axon-os" / "shell.conf"
+        if config_path.exists():
+            try:
+                shell = config_path.read_text().strip()
+            except Exception:
+                pass
+        if not shell or not Path(shell).exists():
+            shell = os.environ.get("SHELL", "/bin/bash")
+
         term.spawn_async(
             Vte.PtyFlags.DEFAULT,
             os.environ.get("HOME", "/"),

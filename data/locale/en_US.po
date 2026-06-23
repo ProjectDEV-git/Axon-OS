@@ -1,0 +1,123 @@
+# English (US) translation for Axon OS
+# Copyright (C) 2024 Axon OS Contributors
+# This file is distributed under the MIT license.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Axon OS 0.3.0\n"
+"Report-Msgid-Bugs-To: https://github.com/kaorii-ako/Axon-OS/issues\n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: 2024-01-01 00:00+0000\n"
+"Last-Translator: Axon OS Team <team@axon-os.local>\n"
+"Language-Team: English (US)\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Shell extension - Intent Bar
+msgid "What do you want to do?"
+msgstr "What do you want to do?"
+
+msgid "Thinking…"
+msgstr "Thinking…"
+
+msgid "AI service unavailable. Is Axon Brain running?"
+msgstr "AI service unavailable. Is Axon Brain running?"
+
+# Shell extension - Dock
+msgid "Start Menu"
+msgstr "Start Menu"
+
+msgid "Intent Bar (Search / AI)"
+msgstr "Intent Bar (Search / AI)"
+
+msgid "Clock"
+msgstr "Clock"
+
+# Shell extension - Spaces
+msgid "Code"
+msgstr "Code"
+
+msgid "Web"
+msgstr "Web"
+
+msgid "Chat"
+msgstr "Chat"
+
+msgid "Files"
+msgstr "Files"
+
+msgid "Media"
+msgstr "Media"
+
+msgid "Work"
+msgstr "Work"
+
+msgid "Personal"
+msgstr "Personal"
+
+msgid "Terminal"
+msgstr "Terminal"
+
+msgid "Notes"
+msgstr "Notes"
+
+msgid "Empty workspace"
+msgstr "Empty workspace"
+
+msgid "Workspace active"
+msgstr "Workspace active"
+
+# Shell extension - Start Menu
+msgid "Search applications…"
+msgstr "Search applications…"
+
+msgid "Lock"
+msgstr "Lock"
+
+msgid "Restart"
+msgstr "Restart"
+
+msgid "Shut Down"
+msgstr "Shut Down"
+
+# Common
+msgid "Error"
+msgstr "Error"
+
+msgid "Warning"
+msgstr "Warning"
+
+msgid "Info"
+msgstr "Info"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Cancel"
+msgstr "Cancel"
+
+msgid "Yes"
+msgstr "Yes"
+
+msgid "No"
+msgstr "No"
+
+msgid "Close"
+msgstr "Close"
+
+msgid "Save"
+msgstr "Save"
+
+msgid "Delete"
+msgstr "Delete"
+
+msgid "Back"
+msgstr "Back"
+
+msgid "Next"
+msgstr "Next"
+
+msgid "Finish"
+msgstr "Finish"

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Axon Files — Window and layout components."""
 
+import shutil
+import stat
 import subprocess
 import threading
 from pathlib import Path
@@ -10,7 +12,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from file_indexer import FileIndexer, format_size, format_timestamp
-from gi.repository import Adw, Gdk, GLib, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 
 def load_css():
@@ -135,6 +137,8 @@ class FilesWindow(Adw.ApplicationWindow):
         self.current_dir = None
         self.search_query = ""
         self.use_semantic = False
+        self.clipboard_file = None
+        self.clipboard_action = None
 
         # Background worker sync state
         self.sync_thread = None
@@ -232,6 +236,17 @@ class FilesWindow(Adw.ApplicationWindow):
         self.file_list.get_style_context().add_class("file-list")
         self.file_list.connect("row-selected", self.on_file_selected)
         self.file_list.connect("row-activated", self.on_file_activated)
+
+        # Right-click gesture
+        list_gesture = Gtk.GestureClick.new()
+        list_gesture.set_button(3)
+        list_gesture.connect("pressed", self.on_list_right_clicked)
+        self.file_list.add_controller(list_gesture)
+
+        # Keyboard shortcuts controller
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self.on_key_pressed)
+        self.add_controller(key_controller)
 
         scroll.set_child(self.file_list)
         main_box.append(scroll)
@@ -352,35 +367,73 @@ class FilesWindow(Adw.ApplicationWindow):
         while child := self.path_bar_box.get_first_child():
             self.path_bar_box.remove(child)
 
+        # Container for breadcrumbs trail
+        breadcrumbs_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        breadcrumbs_box.set_hexpand(True)
+        self.path_bar_box.append(breadcrumbs_box)
+
         if self.current_dir is None:
             lbl = Gtk.Label(label="Global Search (All Directories)")
             lbl.get_style_context().add_class("file-name-label")
-            self.path_bar_box.append(lbl)
-            return
+            breadcrumbs_box.append(lbl)
+        else:
+            path_obj = Path(self.current_dir).expanduser().resolve()
+            parts = []
+            curr = path_obj
+            while curr != curr.parent:
+                parts.append(curr)
+                curr = curr.parent
+            parts.append(curr) # Root folder
+            parts.reverse()
 
-        path_obj = Path(self.current_dir).expanduser().resolve()
-        parts = []
-        curr = path_obj
-        while curr != curr.parent:
-            parts.append(curr)
-            curr = curr.parent
-        parts.append(curr) # Root folder
-        parts.reverse()
+            first = True
+            for p in parts:
+                if not first:
+                    sep = Gtk.Label(label=" › ")
+                    sep.get_style_context().add_class("file-meta-label")
+                    breadcrumbs_box.append(sep)
+                first = False
 
-        first = True
-        for p in parts:
-            if not first:
-                sep = Gtk.Label(label=" › ")
-                sep.get_style_context().add_class("file-meta-label")
-                self.path_bar_box.append(sep)
-            first = False
+                name = "Home" if p == Path.home() else (p.name if p.name else "/")
+                btn = Gtk.Button(label=name)
+                btn.get_style_context().add_class("path-btn")
+                btn.set_has_frame(False)
+                btn.connect("clicked", lambda b, target=p: self.navigate_to(target))
+                breadcrumbs_box.append(btn)
 
-            name = "Home" if p == Path.home() else (p.name if p.name else "/")
-            btn = Gtk.Button(label=name)
-            btn.get_style_context().add_class("path-btn")
-            btn.set_has_frame(False)
-            btn.connect("clicked", lambda b, target=p: self.navigate_to(target))
-            self.path_bar_box.append(btn)
+        # Action buttons on the right if viewing folder
+        if self.current_dir is not None:
+            actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+            # New Folder Button
+            new_dir_btn = Gtk.Button()
+            new_dir_btn.set_icon_name("folder-new-symbolic")
+            new_dir_btn.set_tooltip_text("New Folder")
+            new_dir_btn.get_style_context().add_class("path-btn")
+            new_dir_btn.set_has_frame(False)
+            new_dir_btn.connect("clicked", lambda b: self.create_new_folder_dialog())
+            actions_box.append(new_dir_btn)
+
+            # New File Button
+            new_file_btn = Gtk.Button()
+            new_file_btn.set_icon_name("document-new-symbolic")
+            new_file_btn.set_tooltip_text("New File")
+            new_file_btn.get_style_context().add_class("path-btn")
+            new_file_btn.set_has_frame(False)
+            new_file_btn.connect("clicked", lambda b: self.create_new_file_dialog())
+            actions_box.append(new_file_btn)
+
+            # Paste Button
+            paste_btn = Gtk.Button()
+            paste_btn.set_icon_name("edit-paste-symbolic")
+            paste_btn.set_tooltip_text("Paste")
+            paste_btn.get_style_context().add_class("path-btn")
+            paste_btn.set_has_frame(False)
+            paste_btn.set_sensitive(self.clipboard_file is not None)
+            paste_btn.connect("clicked", lambda b: self.paste_file())
+            actions_box.append(paste_btn)
+
+            self.path_bar_box.append(actions_box)
 
     def refresh_list(self):
         """Updates the list of files in the center view."""
@@ -557,6 +610,344 @@ class FilesWindow(Adw.ApplicationWindow):
             self.refresh_list()
         else:
             self.status_lbl.set_text(f"Indexing failed: {err_msg}")
+
+    # --- File Operations handlers & helper functions ---
+
+    def on_key_pressed(self, controller, keyval, keycode, state):
+        keyname = Gdk.keyval_name(keyval)
+        is_ctrl = (state & Gdk.ModifierType.CONTROL_MASK) != 0
+        row = self.file_list.get_selected_row()
+
+        if is_ctrl:
+            if keyname == "c":
+                if row and hasattr(row, 'file_info'):
+                    self.copy_file(row.file_info['file_path'])
+                    return True
+            elif keyname == "x":
+                if row and hasattr(row, 'file_info'):
+                    self.cut_file(row.file_info['file_path'])
+                    return True
+            elif keyname == "v":
+                self.paste_file()
+                return True
+            elif keyname == "n":
+                self.create_new_folder_dialog()
+                return True
+        else:
+            if keyname == "Delete":
+                if row and hasattr(row, 'file_info'):
+                    self.trash_file(row.file_info['file_path'])
+                    return True
+            elif keyname == "F2":
+                if row and hasattr(row, 'file_info'):
+                    self.rename_file(row.file_info['file_path'])
+                    return True
+        return False
+
+    def on_list_right_clicked(self, gesture, n_press, x, y):
+        row = self.file_list.get_row_at_y(int(y))
+        if row:
+            # Point to click coordinates (already relative to ListBox)
+            self.show_context_menu(row, int(x), int(y))
+        else:
+            self.show_empty_context_menu(int(x), int(y))
+
+    def show_context_menu(self, row, x, y):
+        popover = Gtk.Popover()
+        popover.set_parent(self.file_list)
+        popover.set_has_arrow(True)
+        rect = Gdk.Rectangle()
+        rect.x = x
+        rect.y = y
+        rect.width = 1
+        rect.height = 1
+        popover.set_pointing_to(rect)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.get_style_context().add_class("sidebar-list") # reusable CSS padding
+
+        actions = [
+            ("Open", "document-open-symbolic", lambda: self.on_file_activated(None, row)),
+            ("Copy", "edit-copy-symbolic", lambda: self.copy_file(row.file_info['file_path'])),
+            ("Cut", "edit-cut-symbolic", lambda: self.cut_file(row.file_info['file_path'])),
+            ("Rename...", "document-properties-symbolic", lambda: self.rename_file(row.file_info['file_path'])),
+            ("Move to Trash", "user-trash-symbolic", lambda: self.trash_file(row.file_info['file_path'])),
+            ("Properties...", "dialog-information-symbolic", lambda: self.show_properties(row.file_info))
+        ]
+
+        for label, icon_name, callback in actions:
+            btn = Gtk.Button()
+            btn.set_has_frame(False)
+            btn.get_style_context().add_class("path-btn")
+
+            btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            icon = Gtk.Image.new_from_icon_name(icon_name)
+            icon.set_pixel_size(16)
+            btn_box.append(icon)
+
+            lbl = Gtk.Label(label=label)
+            lbl.set_halign(Gtk.Align.START)
+            btn_box.append(lbl)
+
+            btn.set_child(btn_box)
+
+            def make_click(cb):
+                return lambda b: (popover.popdown(), cb())
+
+            btn.connect("clicked", make_click(callback))
+            box.append(btn)
+
+        popover.set_child(box)
+        popover.popup()
+
+    def show_empty_context_menu(self, x, y):
+        popover = Gtk.Popover()
+        popover.set_parent(self.file_list)
+        popover.set_has_arrow(True)
+        rect = Gdk.Rectangle()
+        rect.x = x
+        rect.y = y
+        rect.width = 1
+        rect.height = 1
+        popover.set_pointing_to(rect)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.get_style_context().add_class("sidebar-list")
+
+        actions = [
+            ("New Folder...", "folder-new-symbolic", lambda: self.create_new_folder_dialog()),
+            ("New File...", "document-new-symbolic", lambda: self.create_new_file_dialog()),
+            ("Paste", "edit-paste-symbolic", lambda: self.paste_file()),
+            ("Refresh List", "view-refresh-symbolic", lambda: self.refresh_list())
+        ]
+
+        for label, icon_name, callback in actions:
+            btn = Gtk.Button()
+            btn.set_has_frame(False)
+            btn.get_style_context().add_class("path-btn")
+
+            btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            icon = Gtk.Image.new_from_icon_name(icon_name)
+            icon.set_pixel_size(16)
+            btn_box.append(icon)
+
+            lbl = Gtk.Label(label=label)
+            lbl.set_halign(Gtk.Align.START)
+            btn_box.append(lbl)
+
+            btn.set_child(btn_box)
+
+            if label == "Paste":
+                btn.set_sensitive(self.clipboard_file is not None)
+
+            def make_click(cb):
+                return lambda b: (popover.popdown(), cb())
+
+            btn.connect("clicked", make_click(callback))
+            box.append(btn)
+
+        popover.set_child(box)
+        popover.popup()
+
+    def prompt_text_dialog(self, title, label_text, default_text, callback):
+        transient = self.get_root() if hasattr(self, "get_root") and hasattr(self.get_root(), "present") else None
+        dialog = Gtk.Dialog(title=title, transient_for=transient, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("OK", Gtk.ResponseType.OK)
+
+        box = dialog.get_content_area()
+        box.set_spacing(10)
+        box.set_margin_top(12)
+        box.set_margin_bottom(12)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+
+        lbl = Gtk.Label(label=label_text)
+        lbl.set_halign(Gtk.Align.START)
+        box.append(lbl)
+
+        entry = Gtk.Entry()
+        entry.set_text(default_text)
+        entry.set_activates_default(True)
+        box.append(entry)
+
+        dialog.set_default_response(Gtk.ResponseType.OK)
+
+        def on_response(dlg, response_id):
+            text = entry.get_text().strip()
+            dialog.destroy()
+            if response_id == Gtk.ResponseType.OK:
+                callback(text)
+
+        dialog.connect("response", on_response)
+        dialog.present()
+        entry.grab_focus()
+
+    def copy_file(self, path):
+        self.clipboard_file = path
+        self.clipboard_action = 'copy'
+        self.status_lbl.set_text(f"Copied: {Path(path).name}")
+        self.update_path_bar()
+
+    def cut_file(self, path):
+        self.clipboard_file = path
+        self.clipboard_action = 'cut'
+        self.status_lbl.set_text(f"Cut: {Path(path).name}")
+        self.update_path_bar()
+
+    def paste_file(self):
+        if not self.clipboard_file:
+            return
+
+        dest_dir = self.current_dir or str(Path.home())
+        src_path = Path(self.clipboard_file)
+        dest_path = Path(dest_dir) / src_path.name
+
+        if not src_path.exists():
+            self.status_lbl.set_text("Paste failed: Source file no longer exists.")
+            return
+
+        if dest_path.exists():
+            dest_path = Path(dest_dir) / f"{src_path.stem}_copy{src_path.suffix}"
+
+        try:
+            if self.clipboard_action == 'copy':
+                if src_path.is_dir():
+                    shutil.copytree(src_path, dest_path)
+                else:
+                    shutil.copy2(src_path, dest_path)
+                self.status_lbl.set_text(f"Pasted: {src_path.name}")
+            elif self.clipboard_action == 'cut':
+                shutil.move(str(src_path), str(dest_path))
+                self.status_lbl.set_text(f"Moved: {src_path.name}")
+                self.clipboard_file = None
+                self.clipboard_action = None
+            self.refresh_list()
+            self.update_path_bar()
+        except Exception as e:
+            self.status_lbl.set_text(f"Paste failed: {e}")
+
+    def rename_file(self, path):
+        src = Path(path)
+        def do_rename(new_name):
+            if not new_name:
+                return
+            dest = src.parent / new_name
+            try:
+                src.rename(dest)
+                self.status_lbl.set_text(f"Renamed to: {new_name}")
+                self.refresh_list()
+            except Exception as e:
+                self.status_lbl.set_text(f"Rename failed: {e}")
+        self.prompt_text_dialog("Rename", f"Enter new name for '{src.name}':", src.name, do_rename)
+
+    def trash_file(self, path):
+        transient = self.get_root() if hasattr(self, "get_root") and hasattr(self.get_root(), "present") else None
+        dialog = Gtk.Dialog(title="Move to Trash", transient_for=transient, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Move to Trash", Gtk.ResponseType.OK)
+
+        box = dialog.get_content_area()
+        box.set_spacing(10)
+        box.set_margin_top(12)
+        box.set_margin_bottom(12)
+        box.set_margin_start(12)
+        box.set_margin_end(12)
+
+        lbl = Gtk.Label(label=f"Move '{Path(path).name}' to Trash?")
+        lbl.set_wrap(True)
+        box.append(lbl)
+
+        def on_response(dlg, response_id):
+            dialog.destroy()
+            if response_id == Gtk.ResponseType.OK:
+                try:
+                    f = Gio.File.new_for_path(path)
+                    f.trash(None)
+                    self.status_lbl.set_text(f"Moved to Trash: {Path(path).name}")
+                    self.refresh_list()
+                except Exception as e:
+                    self.status_lbl.set_text(f"Failed to move to Trash: {e}")
+        dialog.connect("response", on_response)
+        dialog.present()
+
+    def create_new_folder_dialog(self):
+        dest_dir = self.current_dir or str(Path.home())
+        def do_create(name):
+            if not name:
+                return
+            p = Path(dest_dir) / name
+            try:
+                p.mkdir(parents=True, exist_ok=False)
+                self.status_lbl.set_text(f"Created folder: {name}")
+                self.refresh_list()
+            except Exception as e:
+                self.status_lbl.set_text(f"Failed to create folder: {e}")
+        self.prompt_text_dialog("New Folder", "Enter folder name:", "Untitled Folder", do_create)
+
+    def create_new_file_dialog(self):
+        dest_dir = self.current_dir or str(Path.home())
+        def do_create(name):
+            if not name:
+                return
+            p = Path(dest_dir) / name
+            try:
+                p.touch(exist_ok=False)
+                self.status_lbl.set_text(f"Created file: {name}")
+                self.refresh_list()
+            except Exception as e:
+                self.status_lbl.set_text(f"Failed to create file: {e}")
+        self.prompt_text_dialog("New File", "Enter file name:", "untitled.txt", do_create)
+
+    def show_properties(self, file_info):
+        transient = self.get_root() if hasattr(self, "get_root") and hasattr(self.get_root(), "present") else None
+        dialog = Gtk.Dialog(title="Properties", transient_for=transient, modal=True)
+        dialog.add_button("Close", Gtk.ResponseType.CLOSE)
+
+        box = dialog.get_content_area()
+        box.set_spacing(10)
+        box.set_margin_top(16)
+        box.set_margin_bottom(16)
+        box.set_margin_start(16)
+        box.set_margin_end(16)
+
+        grid = Gtk.Grid()
+        grid.set_column_spacing(12)
+        grid.set_row_spacing(10)
+
+        rows = [
+            ("Name:", file_info['file_name']),
+            ("Type:", file_info.get('file_type', 'Folder' if file_info.get('is_dir') else 'Unknown')),
+            ("Location:", file_info['file_path']),
+            ("Size:", format_size(file_info['file_size']) if file_info['file_size'] is not None else "Folder"),
+            ("Modified:", format_timestamp(file_info['last_modified']))
+        ]
+
+        try:
+            p = Path(file_info['file_path'])
+            mode = p.stat().st_mode
+            perms = stat.filemode(mode)
+            rows.append(("Permissions:", perms))
+        except Exception:
+            pass
+
+        for i, (label, val) in enumerate(rows):
+            lbl_title = Gtk.Label(label=label)
+            lbl_title.set_halign(Gtk.Align.START)
+            lbl_title.get_style_context().add_class("file-name-label")
+
+            lbl_val = Gtk.Label(label=val)
+            lbl_val.set_halign(Gtk.Align.START)
+            lbl_val.set_selectable(True)
+            lbl_val.set_wrap(True)
+            lbl_val.set_max_width_chars(40)
+
+            grid.attach(lbl_title, 0, i, 1, 1)
+            grid.attach(lbl_val, 1, i, 1, 1)
+
+        box.append(grid)
+        dialog.connect("response", lambda dlg, resp: dialog.destroy())
+        dialog.present()
 
 def list_directory_contents(dir_path, indexer):
     """Utility function to list both folders and database files inside a directory."""

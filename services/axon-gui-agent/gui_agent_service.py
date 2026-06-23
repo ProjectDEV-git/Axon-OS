@@ -9,6 +9,7 @@ milliseconds — no screenshot pipelines, no synthetic clicks.
 """
 
 import json
+import logging
 import shutil
 import subprocess
 import sys
@@ -20,8 +21,13 @@ import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from axon_logger import configure_app_logger
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import plan as plan_mod
+
+log = configure_app_logger("axon-gui-agent", level=logging.INFO)
 
 PLANNER_PROMPT = """\
 You are the desktop automation planner for Axon OS (GNOME). Convert the
@@ -53,12 +59,12 @@ class GuiAgentService(dbus.service.Object):
                 "org.axonos.GuiAgent", bus=self.session_bus
             )
         except dbus.exceptions.NameExistsException:
-            print("org.axonos.GuiAgent service is already running.")
+            log.error("org.axonos.GuiAgent service is already running.")
             sys.exit(1)
         dbus.service.Object.__init__(
             self, self.session_bus, "/org/axonos/GuiAgent"
         )
-        print("Axon GUI Agent registered at /org/axonos/GuiAgent")
+        log.info("Axon GUI Agent registered at /org/axonos/GuiAgent")
 
     # ------------------------------------------------------------------
     # D-Bus API

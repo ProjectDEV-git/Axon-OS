@@ -20,7 +20,8 @@ except ImportError:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("axon-file-indexer")
 
-AXON_DIR = Path.home() / ".axon"
+from constants import AXON_DIR
+
 DB_PATH = AXON_DIR / "semantic_search.db"
 
 class FileIndexer:

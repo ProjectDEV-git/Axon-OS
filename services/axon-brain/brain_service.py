@@ -37,12 +37,34 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import hardware_profiler
+from constants import (
+    AXON_DIR,
+    MAX_MODEL_NAME_LEN,
+    MAX_PROMPT_LEN,
+    OLLAMA_BASE_URL,
+)
 from conversation_store import ConversationStore
+from prompts import CHAT_SYSTEM_PROMPT
 
-# Path configurations
-AXON_DIR = Path.home() / ".axon"
 CONFIG_FILE = AXON_DIR / "config.toml"
-OLLAMA_BASE_URL = "http://localhost:11434"
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+_MAX_CONTEXT_LEN = 2000
+
+
+def _sanitize_output(text: str) -> str:
+    """Strip ANSI escape sequences and null bytes from AI output."""
+    text = _ANSI_RE.sub("", text)
+    text = text.replace("\x00", "")
+    return text
+
+
+def _sanitize_context(context: str) -> str:
+    """Truncate and clean context before embedding in system prompt."""
+    safe = context.replace("\x00", "")
+    if len(safe) > _MAX_CONTEXT_LEN:
+        safe = safe[:_MAX_CONTEXT_LEN]
+    return safe
 
 class BrainService(dbus.service.Object):
     def __init__(self):
@@ -86,8 +108,8 @@ class BrainService(dbus.service.Object):
                 # Verify required keys exist
                 if all(k in self.config for k in ("speed_model", "general_model", "deep_model")):
                     return
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Config file not loaded, using defaults: %s", e)
 
         # Profile hardware and save default config
         profile = hardware_profiler.profile_hardware()
@@ -137,8 +159,8 @@ class BrainService(dbus.service.Object):
     # Ollama tags: alnum start, then alnum plus . _ : / - (namespaced models
     # like "library/llama3" are allowed; ".." path traversal is not).
     _MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
-    _MAX_MODEL_NAME_LEN = 256
-    _MAX_PROMPT_LEN = 10000
+    _MAX_MODEL_NAME_LEN = MAX_MODEL_NAME_LEN
+    _MAX_PROMPT_LEN = MAX_PROMPT_LEN
 
     @staticmethod
     def _validate_model_name(name):
@@ -174,8 +196,8 @@ class BrainService(dbus.service.Object):
                     status["ollama_online"] = True
                     data = json.loads(resp.read().decode())
                     status["active_models"] = [m["name"] for m in data.get("models", [])]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not query Ollama status: %s", e)
         return json.dumps(status)
 
     @dbus.service.method('org.axonos.Brain', in_signature='', out_signature='s')
@@ -211,7 +233,7 @@ class BrainService(dbus.service.Object):
 
         system_prompt = ""
         if context:
-            system_prompt = f"Here is the user's desktop context:\n\n{context}"
+            system_prompt = f"Here is the user's desktop context:\n\n{_sanitize_context(str(context))}"
 
         if stream:
             tx_id = str(uuid.uuid4())
@@ -304,8 +326,8 @@ class BrainService(dbus.service.Object):
                     for s in valid_spaces:
                         if s.lower() in result.lower():
                             return s
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Window classification failed: %s", e)
         return "Default"
 
     @dbus.service.method('org.axonos.Brain', in_signature='s', out_signature='s')
@@ -371,8 +393,8 @@ class BrainService(dbus.service.Object):
                         embeddings = data.get("embeddings", [])
                         if embeddings:
                             return json.dumps(embeddings[0])
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Embeddings endpoint failed, trying fallback: %s", e)
 
             # Fallback to /api/embeddings
             payload = {"model": model, "prompt": prompt}
@@ -430,7 +452,7 @@ class BrainService(dbus.service.Object):
                 payload["system"] = system
             with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload) as resp:
                 data = json.loads(resp.read().decode())
-                return data.get("response", "")
+                return _sanitize_output(data.get("response", ""))
         except Exception as e:
             return f"[Error: {e}]"
 
@@ -447,7 +469,7 @@ class BrainService(dbus.service.Object):
                     chunk = json.loads(line)
                     token = chunk.get("response", "")
                     if token:
-                        self.TokenGenerated(tx_id, token)
+                        self.TokenGenerated(tx_id, _sanitize_output(token))
             self.GenerationCompleted(tx_id, True, "")
         except Exception as e:
             self.GenerationCompleted(tx_id, False, str(e))
@@ -455,12 +477,9 @@ class BrainService(dbus.service.Object):
     def _do_chat_sync(self, conv_id, context, model):
         messages = self.store.get_messages(conv_id)
         api_msgs = [{"role": m["role"], "content": m["content"]} for m in messages]
-        system_prompt = (
-            "You are Axon AI, a helpful desktop assistant integrated into Axon OS. "
-            "Be concise and practical. You can use **bold** and *italic* markdown."
-        )
+        system_prompt = CHAT_SYSTEM_PROMPT
         if context:
-            system_prompt += f"\n\nHere is the user's current desktop context:\n{context}"
+            system_prompt += f"\n\nHere is the user's current desktop context:\n{_sanitize_context(str(context))}"
         try:
             payload = {
                 "model": model,
@@ -470,19 +489,16 @@ class BrainService(dbus.service.Object):
             }
             with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as resp:
                 data = json.loads(resp.read().decode())
-                return data.get("message", {}).get("content", "")
+                return _sanitize_output(data.get("message", {}).get("content", ""))
         except Exception as e:
             return f"[Error: {e}]"
 
     def _do_chat_stream(self, tx_id, conv_id, context, model):
         messages = self.store.get_messages(conv_id)
         api_msgs = [{"role": m["role"], "content": m["content"]} for m in messages]
-        system_prompt = (
-            "You are Axon AI, a helpful desktop assistant integrated into Axon OS. "
-            "Be concise and practical. You can use **bold** and *italic* markdown."
-        )
+        system_prompt = CHAT_SYSTEM_PROMPT
         if context:
-            system_prompt += f"\n\nHere is the user's current desktop context:\n{context}"
+            system_prompt += f"\n\nHere is the user's current desktop context:\n{_sanitize_context(str(context))}"
 
         accumulated = ""
         try:
@@ -500,6 +516,7 @@ class BrainService(dbus.service.Object):
                     chunk = json.loads(line)
                     token = chunk.get("message", {}).get("content", "")
                     if token:
+                        token = _sanitize_output(token)
                         accumulated += token
                         self.TokenGenerated(tx_id, token)
             # Save final response

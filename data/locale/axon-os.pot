@@ -1,0 +1,208 @@
+# Axon OS Translation Template
+# Copyright (C) 2024 Axon OS Contributors
+# This file is distributed under the MIT license.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Axon OS 0.3.0\n"
+"Report-Msgid-Bugs-To: https://github.com/kaorii-ako/Axon-OS/issues\n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Shell extension - Intent Bar
+msgid "What do you want to do?"
+msgstr ""
+
+msgid "Thinking…"
+msgstr ""
+
+msgid "AI service unavailable. Is Axon Brain running?"
+msgstr ""
+
+msgid "Opening {app}…"
+msgstr ""
+
+msgid "Running: {command}"
+msgstr ""
+
+# Shell extension - Dock
+msgid "Start Menu"
+msgstr ""
+
+msgid "Intent Bar (Search / AI)"
+msgstr ""
+
+msgid "Clock"
+msgstr ""
+
+# Shell extension - Spaces
+msgid "Code"
+msgstr ""
+
+msgid "Web"
+msgstr ""
+
+msgid "Chat"
+msgstr ""
+
+msgid "Files"
+msgstr ""
+
+msgid "Media"
+msgstr ""
+
+msgid "Work"
+msgstr ""
+
+msgid "Personal"
+msgstr ""
+
+msgid "Terminal"
+msgstr ""
+
+msgid "Notes"
+msgstr ""
+
+msgid "Empty workspace"
+msgstr ""
+
+msgid "Workspace active"
+msgstr ""
+
+msgid "Analyzing workspace…"
+msgstr ""
+
+# Shell extension - Start Menu
+msgid "Search applications…"
+msgstr ""
+
+msgid "Lock"
+msgstr ""
+
+msgid "Restart"
+msgstr ""
+
+msgid "Shut Down"
+msgstr ""
+
+# Services - Brain
+msgid "org.axonos.Brain service is already running."
+msgstr ""
+
+msgid "Axon Brain D-Bus service registered successfully"
+msgstr ""
+
+# Services - Context
+msgid "org.axonos.Context service is already running."
+msgstr ""
+
+msgid "Axon Context Engine Service registered successfully"
+msgstr ""
+
+# Services - Search
+msgid "org.axonos.Search service is already running."
+msgstr ""
+
+msgid "Axon Search D-Bus service registered at /org/axonos/Search"
+msgstr ""
+
+# Services - Voice
+msgid "org.axonos.Voice service is already running."
+msgstr ""
+
+msgid "Axon Voice D-Bus service registered at /org/axonos/Voice"
+msgstr ""
+
+# Services - GUI Agent
+msgid "org.axonos.GuiAgent service is already running."
+msgstr ""
+
+msgid "Axon GUI Agent registered at /org/axonos/GuiAgent"
+msgstr ""
+
+# Apps - Installer
+msgid "Installation complete"
+msgstr ""
+
+msgid "Installation failed"
+msgstr ""
+
+msgid "Welcome to Axon OS"
+msgstr ""
+
+msgid "Install Axon OS"
+msgstr ""
+
+# Apps - Terminal
+msgid "Command not found"
+msgstr ""
+
+msgid "AI suggestion"
+msgstr ""
+
+# Apps - Files
+msgid "Search files"
+msgstr ""
+
+msgid "No files found"
+msgstr ""
+
+# Apps - Settings
+msgid "Settings"
+msgstr ""
+
+msgid "AI Model"
+msgstr ""
+
+msgid "Privacy"
+msgstr ""
+
+msgid "Accessibility"
+msgstr ""
+
+# Common
+msgid "Error"
+msgstr ""
+
+msgid "Warning"
+msgstr ""
+
+msgid "Info"
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "Back"
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "Finish"
+msgstr ""

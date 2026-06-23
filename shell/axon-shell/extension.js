@@ -142,6 +142,25 @@ const ContextInterface = `
 
 const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
 
+const BrainGenerateInterface = `
+<node>
+  <interface name="org.axonos.Brain">
+    <method name="Generate">
+      <arg type="s" name="prompt" direction="in"/>
+      <arg type="s" name="model" direction="in"/>
+      <arg type="s" name="system" direction="in"/>
+      <arg type="b" name="stream" direction="in"/>
+      <arg type="s" name="response" direction="out"/>
+    </method>
+    <method name="GetStatus">
+      <arg type="s" name="status_json" direction="out"/>
+    </method>
+  </interface>
+</node>
+`;
+
+const BrainFullProxy = Gio.DBusProxy.makeProxyWrapper(BrainGenerateInterface);
+
 export default class AxonShellExtension extends Extension {
     constructor(metadata) {
         super(metadata);
@@ -164,6 +183,17 @@ export default class AxonShellExtension extends Extension {
             );
         } catch (e) {
             console.warn('AxonShell: could not create ContextProxy in extension.js:', e.message);
+        }
+
+        try {
+            this._brainProxy = new BrainFullProxy(
+                Gio.DBus.session,
+                'org.axonos.Brain',
+                '/org/axonos/Brain'
+            );
+        } catch (e) {
+            console.warn('AxonShell: could not create BrainProxy in extension.js:', e.message);
+            this._brainProxy = null;
         }
 
         // Hide default GNOME Top Panel for a Windows layout
@@ -514,5 +544,6 @@ export default class AxonShellExtension extends Extension {
         }
 
         this._contextProxy = null;
+        this._brainProxy = null;
     }
 }

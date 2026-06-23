@@ -1,9 +1,11 @@
 [Unit]
 Description=Axon OS AI Context Service
 After=dbus.socket
+Requires=dbus.socket
 
 [Service]
-Type=simple
+Type=dbus
+BusName=org.axonos.Context
 ExecStart=/usr/bin/python3 AXON_SERVICES_DIR/axon-context/context_service.py
 Restart=on-failure
 RestartSec=3

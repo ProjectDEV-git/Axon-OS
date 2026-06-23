@@ -86,7 +86,7 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         feedback_inner.set_margin_bottom(16)
 
         self._feedback_text = Gtk.Label(
-            label="Tell me what you'd like to adjust. Try: 'toggle dark mode', 'mute system volume', or 'turn off wifi'."
+            label="Tell me what you'd like to adjust. Try: 'toggle dark mode', 'enable night light', 'turn on bluetooth', or 'enable do not disturb'."
         )
         self._feedback_text.set_wrap(True)
         self._feedback_text.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
@@ -127,6 +127,30 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         bright_btn.add_css_class("quick-action-btn")
         bright_btn.connect("clicked", lambda _b: self._run_command("set brightness to 100%"))
         quick_grid.attach(bright_btn, 1, 1, 1, 1)
+
+        # Night Light button
+        night_btn = Gtk.Button(label="Toggle Night Light")
+        night_btn.add_css_class("quick-action-btn")
+        night_btn.connect("clicked", lambda _b: self._run_command("toggle night light"))
+        quick_grid.attach(night_btn, 0, 2, 1, 1)
+
+        # Bluetooth button
+        bt_btn = Gtk.Button(label="Toggle Bluetooth")
+        bt_btn.add_css_class("quick-action-btn")
+        bt_btn.connect("clicked", lambda _b: self._run_command("toggle bluetooth"))
+        quick_grid.attach(bt_btn, 1, 2, 1, 1)
+
+        # Do Not Disturb button
+        dnd_btn = Gtk.Button(label="Toggle DND")
+        dnd_btn.add_css_class("quick-action-btn")
+        dnd_btn.connect("clicked", lambda _b: self._run_command("toggle do not disturb"))
+        quick_grid.attach(dnd_btn, 0, 3, 1, 1)
+
+        # Natural Scroll button
+        scroll_btn = Gtk.Button(label="Toggle Natural Scroll")
+        scroll_btn.add_css_class("quick-action-btn")
+        scroll_btn.connect("clicked", lambda _b: self._run_command("toggle natural scrolling"))
+        quick_grid.attach(scroll_btn, 1, 3, 1, 1)
 
         content_box.append(quick_grid)
 

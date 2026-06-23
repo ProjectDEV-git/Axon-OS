@@ -10,10 +10,12 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -32,16 +34,64 @@ jobs:
           git commit -m "chore(release): bump version to ${{ github.event.inputs.version }}" || echo "No changes to commit"
 
       - name: Create tag and push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git tag -a v${{ github.event.inputs.version }} -m "Release ${{ github.event.inputs.version }}"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
           git push origin HEAD:main
           git push origin --tags
 
+      - name: Import GPG key
+        if: env.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
+          echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
+          gpgconf --launch gpg-agent
+
       - name: Create GitHub Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.event.inputs.version }}
-          release_name: v${{ github.event.inputs.version }}
-          body: "Automated release for version ${{ github.event.inputs.version }}"
+          name: v${{ github.event.inputs.version }}
+          body: |
+            ## Axon OS v${{ github.event.inputs.version }}
+
+            ### Installation
+            ```bash
+            # Verify the ISO signature (if GPG key is configured)
+            gpg --verify axon-os-${{ github.event.inputs.version }}-amd64.iso.sig
+
+            # Verify the SHA-256 checksum
+            sha256sum -c axon-os-${{ github.event.inputs.version }}-amd64.iso.sha256
+            ```
+
+            ### Changes
+            - Automated release for version ${{ github.event.inputs.version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SBOM
+        run: |
+          pip install cyclonedx-bom
+          cyclonedx-py -o sbom.json --from pyproject.toml
+          # Also generate system package SBOM if available
+          if command -v dpkg-query &> /dev/null; then
+            dpkg-query -W -f='${Package} ${Version}\n' | \
+              awk '{printf "{\"name\":\"%s\",\"version\":\"%s\"},\n", $1, $2}' | \
+              sed '$ s/,$//' > /tmp/system-packages.json
+          fi
+
+      - name: Upload SBOM
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          files: sbom.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

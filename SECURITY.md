@@ -27,8 +27,9 @@ If you discover a security vulnerability in Axon OS, please **do not** open a pu
 
 | Version | Status | Support Until |
 |---------|--------|----------------|
-| 0.2.x   | Current | Active |
-| 0.1.x   | Legacy | 2026-12-31 |
+| 0.3.x   | Current | Active |
+| 0.2.x   | Legacy | 2027-06-30 |
+| 0.1.x   | Unsupported | 2026-12-31 |
 | < 0.1   | Unsupported | — |
 
 ## Dependency Security

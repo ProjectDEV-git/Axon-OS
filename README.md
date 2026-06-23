@@ -29,6 +29,17 @@ The operating system is built around two centralized D-Bus services — **Axon B
 - **Axon Updater (`axon-update`)** — A graphical + headless updater that checks GitHub releases, refreshes installed Axon assets, updates APT / Flatpak packages, and runs on a daily timer so new pushes propagate automatically.
 - **Zero cloud dependency** — No telemetry, no mandatory accounts, no remote inference endpoints. All data stays on your machine in `~/.axon/`.
 
+### v1.0.0 — New Features
+
+- **Plugin System** — Write new D-Bus services with a TOML manifest. `ServiceBase` base class handles all boilerplate. Install with `python3 services/plugin_deploy.py --install <dir>`.
+- **AI Model Marketplace** — Browse, download, and manage local AI models. 10-model curated catalog with disk usage monitoring and smart recommendations.
+- **Context-Aware AI Routing** — Automatically selects the optimal model (Speed/General/Deep) based on task classification. Code tasks go to Deep, quick answers to Speed.
+- **Advanced Voice Pipeline** — Multi-engine STT (whisper, vosk), wake word detection ("Hey Axon"), streaming partial transcripts, language selection, TTS.
+- **System-Wide AI Search** — Unified search across files, desktop apps, and GNOME settings with AI-powered answers.
+- **Containerized Deployment** — Run all services in Docker with `docker compose up -d`.
+- **Telemetry & Crash Reporting** — Opt-in, local-only event tracking and crash dumps. No data leaves your machine.
+- **QA Pipeline** — `scripts/qa.sh` runs all checks locally. CI enforces 40% coverage threshold.
+
 ## Installation
 
 ### From ISO (recommended)
@@ -127,16 +138,25 @@ For the full architecture document, see [docs/architecture.md](docs/architecture
 Axon-OS/
 ├── apps/
 │   ├── axon-ai-panel/     # AI conversation side panel
+│   ├── axon-files/        # AI-powered file manager with semantic search
 │   ├── axon-installer/    # Live-session welcome & install wizard (with AI setup)
+│   ├── axon-settings/     # NL system settings assistant
+│   ├── axon-shortcuts/    # Keyboard shortcut overlay (Super+/)
 │   ├── axon-terminal/     # AI-powered terminal
+│   ├── axon-voice-overlay/ # Voice input wave animation
 │   ├── axon-welcome/      # First-boot welcome & model setup wizard
 │   └── intent-bar/        # Natural language command palette
 ├── services/
 │   ├── axon-brain/        # Central AI D-Bus service
-│   └── axon-context/      # Ambient desktop context engine
+│   ├── axon-context/      # Ambient desktop context engine (clipboard, shell history)
+│   ├── axon-gui-agent/    # NL desktop automation agent
+│   ├── axon-sandbox/      # Rogue Software Shield (bubblewrap sandbox)
+│   ├── axon-search/       # Semantic file search with sqlite-vec
+│   └── axon-voice/        # Voice-to-intent daemon (faster-whisper)
 ├── shell/
 │   └── axon-shell/        # GNOME Shell extension (dock, spaces, intent bar)
-├── theme/                 # GTK4 dark theme
+├── system/                # System updater & boot watchdog
+├── theme/                 # GTK4 dark theme & GRUB theme
 ├── installer/             # Legacy Calamares branding assets (superseded by apps/axon-installer)
 ├── plymouth/              # Boot splash
 ├── build/                 # ISO build scripts

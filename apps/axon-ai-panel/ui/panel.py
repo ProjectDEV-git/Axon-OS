@@ -319,7 +319,7 @@ class AIPanelWindow(Adw.Window):
     }
     """
 
-    _QUICK_CHIPS: list[str] = [
+    _QUICK_CHIPS: list[str] = [  # noqa: RUF012
         "Explain Error",
         "Summarize",
         "Write Code",
@@ -327,7 +327,7 @@ class AIPanelWindow(Adw.Window):
         "Translate",
     ]
 
-    _DEFAULT_MODELS: list[str] = [
+    _DEFAULT_MODELS: list[str] = [  # noqa: RUF012
         "llama3.2:3b",
         "mistral:7b",
         "qwen2.5:7b",

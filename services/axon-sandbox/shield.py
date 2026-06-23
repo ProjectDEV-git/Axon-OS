@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import audit
+import audit_v2 as audit
 
 AI_AUDIT_TIMEOUT = 25  # seconds; the shield never hard-blocks on the AI
 
@@ -66,7 +66,7 @@ def ai_audit(script_text: str) -> str:
 def ask_user(target: str, findings: list, ai_verdict: str) -> str:
     """Returns one of: sandbox | allow | block."""
     body = (f"Suspicious behavior detected in:\n{target}\n\n"
-            + audit.format_findings(findings))
+            + audit.format_findings_compat(findings))
     if ai_verdict:
         body += f"\n\nAI audit: {ai_verdict[:300]}"
 
@@ -87,8 +87,8 @@ def ask_user(target: str, findings: list, ai_verdict: str) -> str:
             return "sandbox" if proc.returncode == 0 else "block"
 
     # Terminal fallback
-    print("\n⚠  Axon Rogue Shield — suspicious script behavior detected")
-    print(body)
+    print("\n⚠  Axon Rogue Shield — suspicious script behavior detected")  # noqa: T201
+    print(body)  # noqa: T201
     try:
         choice = input("\n[S]andbox / [a]llow once / [b]lock (default S): ")
     except EOFError:
@@ -139,13 +139,13 @@ def main(argv: list) -> int:
         no_net = no_net or flag == "--no-net"
         force_sandbox = force_sandbox or flag == "--yes-sandbox"
     if not args:
-        print(__doc__)
+        print(__doc__)  # noqa: T201
         return 126
 
     target, target_args = args[0], args[1:]
     target_path = shutil.which(target) or target
     if not Path(target_path).exists():
-        print(f"axon-shield: no such file: {target}")
+        print(f"axon-shield: no such file: {target}")  # noqa: T201
         return 126
 
     text = read_target(target_path)
@@ -156,10 +156,10 @@ def main(argv: list) -> int:
                      "snippet": Path(target_path).name}]
         ai_verdict = ""
     else:
-        findings = audit.analyze_script(text)
+        findings = audit.analyze_script_compat(text)
         ai_verdict = ai_audit(text) if findings else ""
 
-    risk = audit.risk_level(findings)
+    risk = audit.risk_level_compat(findings)
     interpreter: list = []
     if text is not None and not os.access(target_path, os.X_OK):
         interpreter = ["bash"]
@@ -171,15 +171,15 @@ def main(argv: list) -> int:
     decision = "sandbox" if force_sandbox else ask_user(
         target_path, findings, ai_verdict)
     if decision == "block":
-        print("axon-shield: execution blocked.")
+        print("axon-shield: execution blocked.")  # noqa: T201
         return 125
     if decision == "allow":
         return subprocess.call(target_cmd)
 
     if not shutil.which("bwrap"):
-        print("axon-shield: bubblewrap not installed; refusing unsandboxed run.")
+        print("axon-shield: bubblewrap not installed; refusing unsandboxed run.")  # noqa: T201
         return 126
-    print(json.dumps({"axon-shield": "sandboxed", "risk": risk,
+    print(json.dumps({"axon-shield": "sandboxed", "risk": risk,  # noqa: T201
                       "network": "blocked" if no_net else "allowed"}))
     return subprocess.call(sandbox_command(target_cmd, no_net))
 

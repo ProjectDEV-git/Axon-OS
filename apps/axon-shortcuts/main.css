@@ -1,0 +1,98 @@
+/* Axon Shortcuts Overlay — main.css */
+
+/* Window background */
+window {
+    background-color: #0f0f14;
+}
+
+/* Header */
+.shortcuts-header {
+    background-color: rgba(15, 15, 20, 0.95);
+    border-bottom: 1px solid rgba(124, 58, 237, 0.3);
+}
+
+/* Title area */
+.title-icon {
+    font-size: 28px;
+}
+
+.overlay-title {
+    font-family: "Inter", "Cantarell", sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #e2e8f0;
+    letter-spacing: 0.5px;
+}
+
+.overlay-subtitle {
+    font-family: "Inter", "Cantarell", sans-serif;
+    font-size: 12px;
+    color: rgba(148, 163, 184, 0.7);
+    font-style: italic;
+}
+
+/* Shortcut group cards */
+.shortcut-card {
+    background-color: rgba(30, 30, 45, 0.8);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    border-radius: 12px;
+    transition: border-color 200ms ease;
+}
+
+.shortcut-card:hover {
+    border-color: rgba(124, 58, 237, 0.5);
+}
+
+/* Group header */
+.group-icon {
+    font-size: 18px;
+}
+
+.group-title {
+    font-family: "Inter", "Cantarell", sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #8B5CF6;
+    letter-spacing: 0.3px;
+}
+
+.group-separator {
+    background-color: rgba(124, 58, 237, 0.15);
+    min-height: 1px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+/* Key badges */
+.key-badge {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e2e8f0;
+    background-color: rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    border-radius: 6px;
+    padding: 4px 10px;
+}
+
+/* Key descriptions */
+.key-desc {
+    font-family: "Inter", "Cantarell", sans-serif;
+    font-size: 13px;
+    color: rgba(203, 213, 225, 0.85);
+}
+
+/* Scrollbar styling */
+scrollbar slider {
+    background-color: rgba(124, 58, 237, 0.3);
+    border-radius: 4px;
+    min-width: 6px;
+}
+
+scrollbar slider:hover {
+    background-color: rgba(124, 58, 237, 0.5);
+}
+
+scrollbar trough {
+    background-color: transparent;
+}

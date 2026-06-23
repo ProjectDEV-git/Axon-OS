@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "services" / "axon-voice"))
 sys.path.insert(0, str(ROOT / "apps" / "axon-terminal"))
 
-import safety  # noqa: E402
-import vad_helper  # noqa: E402
+import safety
+import vad_helper
 
 
 class TestVADHelper:
@@ -20,7 +20,7 @@ class TestVADHelper:
     def test_rms_heuristic_detects_non_silent_pcm(self, tmp_path):
         # Create a small raw PCM-ish file with non-zero 16-bit samples.
         p = tmp_path / "pcm.raw"
-        p.write_bytes((b"\x10\x27" * 8000))
+        p.write_bytes(b"\x10\x27" * 8000)
         # The helper tolerates raw PCM and should treat it as speech-like.
         assert vad_helper.is_speech_wav(p) is True
 

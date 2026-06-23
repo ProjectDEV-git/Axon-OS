@@ -5,7 +5,7 @@ Window.SetBackgroundTopColor(0.05, 0.05, 0.06);
 Window.SetBackgroundBottomColor(0.05, 0.05, 0.06);
 
 // --- Logo ---
-logo_image = Image("logo.png");
+logo_image = Image("axon.png");
 logo_sprite = Sprite(logo_image);
 logo_sprite.SetX(Window.GetWidth()  / 2 - logo_image.GetWidth()  / 2);
 logo_sprite.SetY(Window.GetHeight() / 2 - logo_image.GetHeight() / 2);

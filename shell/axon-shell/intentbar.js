@@ -3,7 +3,7 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
-import Soup from 'gi://Soup?version=3.0';
+import Atk from 'gi://Atk';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
@@ -17,12 +17,12 @@ export default class IntentBar {
         this._entry = null;
         this._responseLabel = null;
         this._visible = false;
-        this._session = null;
         this._keyPressId = null;
+        this._brainProxy = null;
     }
 
     enable() {
-        this._session = new Soup.Session();
+        this._brainProxy = this._extension._brainProxy || null;
         this._buildUI();
     }
 
@@ -34,11 +34,7 @@ export default class IntentBar {
             this._actor = null;
         }
 
-        if (this._session) {
-            this._session.abort();
-            this._session = null;
-        }
-
+        this._brainProxy = null;
         this._entry = null;
         this._responseLabel = null;
     }
@@ -61,6 +57,8 @@ export default class IntentBar {
             hint_text: 'What do you want to do?',
             can_focus: true,
             x_expand: true,
+            accessible_name: 'Intent bar input',
+            accessible_role: Atk.Role.ENTRY,
         });
 
         this._entry.clutter_text.connect('key-press-event', (actor, event) => {
@@ -81,6 +79,8 @@ export default class IntentBar {
             style_class: 'axon-response',
             text: '',
             x_expand: true,
+            accessible_name: 'AI response',
+            accessible_role: Atk.Role.LABEL,
         });
         this._responseLabel.clutter_text.set_line_wrap(true);
         this._responseLabel.hide();
@@ -163,10 +163,10 @@ export default class IntentBar {
         if (!query) return;
 
         this._setResponse('Thinking…');
-        this._callOllama(query);
+        this._callBrain(query);
     }
 
-    _callOllama(prompt) {
+    _callBrain(prompt) {
         const currentSpace = this._spacesManager.getCurrentSpace();
         const spaceName = currentSpace ? currentSpace.name : 'Default';
 
@@ -177,49 +177,81 @@ export default class IntentBar {
             `{"action":"open_app","app":"<app-name>"} or {"action":"run_command","command":"<shell-command>"}. ` +
             `For general questions or requests that are not app/command actions, respond with plain text.`;
 
-        const body = JSON.stringify({
-            model: 'llama3',
-            prompt: prompt,
-            system: systemPrompt,
-            stream: false,
-        });
-
-        const message = Soup.Message.new('POST', 'http://localhost:11434/api/generate');
-        message.set_request_body_from_bytes(
-            'application/json',
-            new GLib.Bytes(new TextEncoder().encode(body))
-        );
-
-        this._session.send_and_read_async(
-            message,
-            GLib.PRIORITY_DEFAULT,
-            null,
-            (session, result) => {
-                try {
-                    const bytes = session.send_and_read_finish(result);
-                    const decoder = new TextDecoder('utf-8');
-                    const text = decoder.decode(bytes.get_data());
-                    const json = JSON.parse(text);
-                    const responseText = json.response || '';
-
-                    // Try to parse as action JSON
-                    try {
-                        const action = JSON.parse(responseText.trim());
-                        if (action && typeof action.action === 'string') {
-                            this._executeAction(action);
+        // Try Brain D-Bus proxy first
+        if (this._brainProxy) {
+            try {
+                this._brainProxy.Generate(
+                    prompt, '', systemPrompt, false,
+                    (result, error) => {
+                        if (error) {
+                            logError(error, 'AxonShell: Brain Generate failed');
+                            this._setResponse(`Error: ${error.message}`);
                             return;
                         }
-                    } catch (_) {
-                        // Not JSON — display as plain text
+                        this._handleResponse(result);
                     }
-
-                    this._setResponse(responseText.trim() || '(no response)');
-                } catch (e) {
-                    logError(e, 'AxonShell: Ollama call failed');
-                    this._setResponse(`Error: ${e.message}`);
-                }
+                );
+                return;
+            } catch (e) {
+                logError(e, 'AxonShell: Brain proxy call failed, falling back');
             }
-        );
+        }
+
+        // Fallback: try to create proxy on the fly
+        try {
+            const BrainInterface = `
+<node>
+  <interface name="org.axonos.Brain">
+    <method name="Generate">
+      <arg type="s" name="prompt" direction="in"/>
+      <arg type="s" name="model" direction="in"/>
+      <arg type="s" name="system" direction="in"/>
+      <arg type="b" name="stream" direction="in"/>
+      <arg type="s" name="response" direction="out"/>
+    </method>
+  </interface>
+</node>`;
+            const BrainProxy = Gio.DBusProxy.makeProxyWrapper(BrainInterface);
+            const proxy = new BrainProxy(
+                Gio.DBus.session,
+                'org.axonos.Brain',
+                '/org/axonos/Brain'
+            );
+            proxy.Generate(
+                prompt, '', systemPrompt, false,
+                (result, error) => {
+                    if (error) {
+                        logError(error, 'AxonShell: Brain Generate failed');
+                        this._setResponse(`Error: ${error.message}`);
+                        return;
+                    }
+                    this._handleResponse(result);
+                }
+            );
+        } catch (e) {
+            logError(e, 'AxonShell: could not reach Brain service');
+            this._setResponse('AI service unavailable. Is Axon Brain running?');
+        }
+    }
+
+    _handleResponse(responseText) {
+        if (!responseText) {
+            this._setResponse('(no response)');
+            return;
+        }
+
+        // Try to parse as action JSON
+        try {
+            const action = JSON.parse(responseText.trim());
+            if (action && typeof action.action === 'string') {
+                this._executeAction(action);
+                return;
+            }
+        } catch (_) {
+            // Not JSON — display as plain text
+        }
+
+        this._setResponse(responseText.trim());
     }
 
     _executeAction(action) {

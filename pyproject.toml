@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "axon-os"
-version = "0.3.0"
+version = "1.0.3"
 description = "Axon OS - A futuristic, AI-powered Linux desktop environment"
 readme = "README.md"
 license = {text = "MIT"}
@@ -102,9 +102,21 @@ pythonpath = ["."]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--verbose --strict-markers"
+addopts = "--verbose --strict-markers --timeout=30"
 markers = [
     "slow: marks tests as slow",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", "build", "dist", ".venv"]
+skips = ["B101"]  # allow assert in non-test code (used for D-Bus validation)
+
+[tool.coverage.run]
+source = ["apps", "services"]
+omit = ["tests/*", "build/*", "dist/*", ".venv/*"]
+
+[tool.coverage.report]
+fail_under = 40
+show_missing = true

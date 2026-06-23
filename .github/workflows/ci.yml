@@ -36,17 +36,17 @@ jobs:
     
     - name: Lint with ruff
       run: |
-        ruff check apps/ services/ tests/ installer/ --select E4,E7,E9,F,I --ignore E402 --statistics
+        ruff check apps/ services/ tests/ installer/
     
     - name: Type check with mypy
       run: |
-        mypy apps/ services/ --ignore-missing-imports --no-error-summary 2>&1 | head -50 || true
-      continue-on-error: true
+        mypy apps/ services/ --ignore-missing-imports
     
     - name: Run pytest
       run: |
-        pytest tests/ -v --tb=short --cov=apps --cov=services --cov-report=term-missing
-      continue-on-error: true
+        pytest tests/ -v --tb=short \
+          --cov=apps --cov=services --cov-report=term-missing --cov-report=xml \
+          --cov-fail-under=40
     
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
@@ -54,4 +54,30 @@ jobs:
         file: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
+      continue-on-error: true
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt -r requirements-dev.txt
+
+    - name: Security scan with bandit
+      run: |
+        bandit -r apps/ services/ -c pyproject.toml --severity-level medium
+
+    - name: Dependency vulnerability scan
+      run: |
+        pip install pip-audit
+        pip-audit --strict --progress-spinner off
       continue-on-error: true

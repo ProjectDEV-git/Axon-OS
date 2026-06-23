@@ -1,0 +1,43 @@
+# Dockerfile.service — Runs a single Axon OS D-Bus service in a container.
+# Build: docker build -t axon-service -f Dockerfile.service .
+# Run:   docker run -e AXON_SERVICE=brain axon-service
+
+FROM python:3.12-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-dbus \
+    python3-gi \
+    gir1.2-gtk-4.0 \
+    gir1.2-adw-1 \
+    gir1.2-vte-2.91 \
+    libglib2.0-0 \
+    libdbus-1-3 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY services/ ./services/
+COPY apps/ ./apps/
+COPY axon_logger.py ./
+COPY pyproject.toml ./
+COPY requirements-docker.txt ./
+
+RUN pip install --no-cache-dir -r requirements-docker.txt
+
+ENV AXON_SERVICE=brain
+
+CMD ["sh", "-c", "\
+  case \"$AXON_SERVICE\" in \
+    brain)        python3 services/axon-brain/brain_service.py ;; \
+    context)      python3 services/axon-context/context_service.py ;; \
+    search)       python3 services/axon-search/search_service.py ;; \
+    voice)        python3 services/axon-voice/voice_service.py ;; \
+    gui-agent)    python3 services/axon-gui-agent/gui_agent_service.py ;; \
+    sandbox)      python3 services/axon-sandbox/sandbox_manager.py ;; \
+    global-search) python3 services/axon-search/global_search_service.py ;; \
+    *)            echo \"Unknown service: $AXON_SERVICE\"; exit 1 ;; \
+  esac \
+"]

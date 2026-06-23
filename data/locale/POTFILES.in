@@ -1,0 +1,26 @@
+# List of source files containing translatable strings
+# Used by xgettext to generate the .pot template
+
+# Python services
+services/axon-brain/brain_service.py
+services/axon-context/context_service.py
+services/axon-search/search_service.py
+services/axon-voice/voice_service.py
+services/axon-gui-agent/gui_agent_service.py
+services/axon-sandbox/shield.py
+
+# Python apps
+apps/axon-terminal/terminal.py
+apps/axon-files/ui.py
+apps/axon-settings/settings.py
+apps/axon-ai-panel/ui/panel.py
+apps/axon-installer/install_engine.py
+apps/axon-welcome/welcome.py
+apps/intent-bar/intent_bar.py
+
+# JavaScript shell extension
+shell/axon-shell/extension.js
+shell/axon-shell/dock.js
+shell/axon-shell/startmenu.js
+shell/axon-shell/intentbar.js
+shell/axon-shell/spaces.js

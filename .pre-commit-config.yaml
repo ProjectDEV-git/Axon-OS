@@ -1,13 +1,13 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.0
+    rev: v0.8.6
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -16,9 +16,17 @@ repos:
         args: ['--maxkb=50000']
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.5.0
+    rev: v1.14.1
     hooks:
       - id: mypy
         args: [--ignore-missing-imports]
         additional_dependencies: [types-PyGObject]
+        exclude: ^(tests/|build/|dist/|\.venv/)
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+      - id: bandit
+        args: [-r, -c, pyproject.toml]
+        additional_dependencies: ["bandit[toml]"]
         exclude: ^(tests/|build/|dist/|\.venv/)

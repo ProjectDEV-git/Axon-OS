@@ -141,8 +141,19 @@ else
     if internet_available; then
         if prompt_yes_no "Use the internet now to install Ollama and download local AI models? [Y/n]"; then
             info "Downloading and installing Ollama..."
-            curl -fsSL https://ollama.com/install.sh | sh
-            success "Ollama installed"
+            ollama_installer="$(mktemp /tmp/ollama-install.XXXXXX.sh)"
+            trap 'rm -f "$ollama_installer"' EXIT
+            if curl -fsSL --retry 3 --retry-delay 5 -o "$ollama_installer" https://ollama.com/install.sh; then
+                if head -c 100 "$ollama_installer" | grep -q '#!/'; then
+                    sh "$ollama_installer"
+                    success "Ollama installed"
+                else
+                    error "Downloaded Ollama installer does not appear to be a valid script"
+                fi
+            else
+                error "Failed to download Ollama installer — check your internet connection"
+            fi
+            rm -f "$ollama_installer"
         else
             warn "Skipping Ollama setup — you can install it later from the Welcome app or first boot"
         fi

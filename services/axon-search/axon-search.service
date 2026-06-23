@@ -1,9 +1,11 @@
 [Unit]
 Description=Axon OS Semantic Search Service
-After=dbus.socket
+After=dbus.socket axon-brain.service
+Requires=dbus.socket
 
 [Service]
-Type=simple
+Type=dbus
+BusName=org.axonos.Search
 ExecStart=/usr/bin/python3 AXON_SERVICES_DIR/axon-search/search_service.py
 Restart=on-failure
 RestartSec=3

@@ -3,9 +3,11 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
+import Atk from 'gi://Atk';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import { safeCall, createProxyWithRetry, callWithRetry } from './dbus-helpers.js';
 
 // ─── Default space definitions ────────────────────────────────────────────────
 
@@ -171,12 +173,12 @@ export default class SpacesManager {
                 if (window && this._brainProxy) {
                     let title = window.get_title() || "None";
                     let wmClass = window.get_wm_class() || "None";
-                    this._brainProxy.ClassifyWindowRemote(title, wmClass, (result, error) => {
+                    callWithRetry(this._brainProxy, 'ClassifyWindow', [title, wmClass], (result, error) => {
                         if (!error && result) {
                             let [spaceName] = result;
                             this._routeWindowToSpace(window, spaceName);
                         }
-                    });
+                    }, 2);
                 }
             } catch (e) {
                 console.warn('AxonShell: window-created hook error:', e.message);
@@ -377,14 +379,14 @@ export default class SpacesManager {
                     return `- Title: "${title}" (Class: "${wmClass}")`;
                 }).join('\n');
                 let prompt = `Summarize what the user is doing on this desktop workspace in a single short phrase (under 10 words, e.g., "3 terminals running, 2 browser tabs open"). Do not include markdown, quotes, formatting, or prefixes. Open windows:\n${windowList}`;
-                this._brainProxy.GenerateRemote(prompt, "", "", false, (result, error) => {
+                callWithRetry(this._brainProxy, 'Generate', [prompt, "", "", false], (result, error) => {
                     if (!error && result) {
                         let [response] = result;
                         summaryLabel.set_text(response.trim().replace(/^"|"$/g, ''));
                     } else {
                         summaryLabel.set_text('Workspace active');
                     }
-                });
+                }, 2);
             } else {
                 summaryLabel.set_text('Workspace active');
             }
@@ -453,6 +455,16 @@ export default class SpacesManager {
         this._updateIndicator();
         this._saveState();
         this._showSpaceOSD(this._spaces[idx], idx);
+
+        // Announce workspace switch for screen readers
+        try {
+            const atkWindow = Atk.get_default_root();
+            if (atkWindow) {
+                atkWindow.emit_children_changed();
+            }
+        } catch (e) {
+            // Atk announcement not critical
+        }
     }
 
     createSpace(name, color = '#a78bfa') {

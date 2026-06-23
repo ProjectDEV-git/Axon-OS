@@ -59,8 +59,8 @@ class OllamaClient:
         if self.brain is None:
             try:
                 self.brain = self.bus.get_object('org.axonos.Brain', '/org/axonos/Brain')
-            except Exception:
-                raise RuntimeError("org.axonos.Brain service is offline or unreachable.")
+            except Exception as e:
+                raise RuntimeError("org.axonos.Brain service is offline or unreachable.") from e
         return self.brain
 
     # ------------------------------------------------------------------

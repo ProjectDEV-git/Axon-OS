@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -23,14 +24,20 @@ except ImportError:  # running standalone — repo root / installed shim not on 
             _logging.basicConfig(level=level)
             return _logging.getLogger(name)
 
-AXON_DIR = Path.home() / ".axon"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from clipboard_store import ClipboardStore
+
+logger = configure_app_logger(__name__)
+
 
 class ContextService(dbus.service.Object):
     def __init__(self):
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
         self.session_bus = dbus.SessionBus()
 
-        logger = configure_app_logger(__name__)
         try:
             self.bus_name = dbus.service.BusName('org.axonos.Context', bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
@@ -44,7 +51,32 @@ class ContextService(dbus.service.Object):
         self.active_window_app = "None"
         self.active_space = "Default"
 
+        self.track_clipboard = True
+        self.track_terminal_history = True
+        self.track_open_files = True
+
+        # Clipboard history with SQLite persistence
+        self._clipboard_store = ClipboardStore(
+            max_entries=MAX_CLIPBOARD_HISTORY,
+            max_entry_len=MAX_CLIPBOARD_ENTRY_LEN
+        )
+        self._clipboard_history = self._clipboard_store.to_deque()
+        self._clipboard_watcher = None
+        self._start_clipboard_watcher()
+
         logger.info("Axon Context Engine Service registered successfully at /org/axonos/Context")
+
+    def _load_config(self):
+        config_path = Path.home() / ".config" / "axon-os" / "context.json"
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    cfg = json.load(f)
+                    self.track_clipboard = cfg.get("track_clipboard", True)
+                    self.track_terminal_history = cfg.get("track_terminal_history", True)
+                    self.track_open_files = cfg.get("track_open_files", True)
+            except Exception as e:
+                logger.warning("Failed to load context config: %s", e)
 
     # ------------------------------------------------------------------
     # D-Bus Mutation Methods (Called by Shell Extension / Hooks)
@@ -80,7 +112,8 @@ class ContextService(dbus.service.Object):
             "active_space": self.active_space,
             "open_files": self._get_open_files(),
             "terminal_commands": self._get_terminal_commands(),
-            "last_stderr": self._get_last_stderr()
+            "last_stderr": self._get_last_stderr(),
+            "clipboard_history": list(self._clipboard_history)
         }
         return json.dumps(context)
 
@@ -109,6 +142,13 @@ class ContextService(dbus.service.Object):
         stderr = self._get_last_stderr()
         if stderr:
             parts.append(f"Last terminal error:\n{stderr}")
+
+        if self._clipboard_history:
+            parts.append("Recent clipboard entries:")
+            for i, entry in enumerate(reversed(list(self._clipboard_history)), 1):
+                # Truncate long entries for prompt injection
+                display = entry[:120] + "..." if len(entry) > 120 else entry
+                parts.append(f"  [{i}] {display}")
 
         if not parts:
             return "No desktop context available."
@@ -173,10 +213,90 @@ class ContextService(dbus.service.Object):
         pass
 
     # ------------------------------------------------------------------
+    # Clipboard Watcher
+    # ------------------------------------------------------------------
+
+    def _start_clipboard_watcher(self):
+        """Starts a background clipboard watcher using wl-paste (Wayland) or xclip (X11)."""
+        logger = configure_app_logger(__name__)
+        self._load_config()
+        if not self.track_clipboard:
+            logger.info("Clipboard tracking is disabled by privacy settings.")
+            return
+
+        # Try Wayland first (wl-paste --watch), fall back to polling xclip
+        try:
+            self._clipboard_watcher = subprocess.Popen(
+                ["wl-paste", "--watch", "cat"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            # Read clipboard changes in a GLib IO watch
+            GLib.io_add_watch(
+                self._clipboard_watcher.stdout.fileno(),
+                GLib.IO_IN | GLib.IO_HUP,
+                self._on_clipboard_data,
+            )
+            logger.info("Clipboard watcher started (Wayland/wl-paste)")
+            return
+        except FileNotFoundError:
+            logger.debug("wl-paste not found, trying X11 fallback")
+        except Exception as e:
+            logger.debug("wl-paste failed: %s", e)
+
+        # X11 fallback: poll xclip every 2 seconds
+        self._last_xclip_content = ""
+        GLib.timeout_add_seconds(2, self._poll_xclip)
+        logger.info("Clipboard watcher started (X11/xclip polling)")
+
+    def _on_clipboard_data(self, fd, condition):
+        """GLib IO callback for wl-paste --watch output."""
+        if condition & GLib.IO_HUP:
+            return False  # watcher died
+        self._load_config()
+        if not self.track_clipboard:
+            return True
+        try:
+            data = os.read(fd, 4096)
+            if data:
+                text = data.decode("utf-8", errors="replace").strip()
+                if text:
+                    added = self._clipboard_store.add(text)
+                    if added:
+                        self._clipboard_history = self._clipboard_store.to_deque()
+                        self.ContextChanged(self.GetActiveContext())
+        except Exception as e:
+            logger.debug("Clipboard data read error: %s", e)
+        return True  # keep watching
+
+    def _poll_xclip(self):
+        """Polls xclip for clipboard changes (X11 fallback)."""
+        self._load_config()
+        if not self.track_clipboard:
+            return True
+        try:
+            result = subprocess.run(
+                ["xclip", "-selection", "clipboard", "-o"],
+                capture_output=True, text=True, timeout=1,
+            )
+            text = result.stdout.strip()
+            if text:
+                added = self._clipboard_store.add(text)
+                if added:
+                    self._clipboard_history = self._clipboard_store.to_deque()
+                    self.ContextChanged(self.GetActiveContext())
+        except Exception as e:
+            logger.debug("xclip poll error: %s", e)
+        return True  # keep polling
+
+    # ------------------------------------------------------------------
     # Context Fetching Helpers
     # ------------------------------------------------------------------
 
     def _get_open_files(self):
+        self._load_config()
+        if not self.track_open_files:
+            return []
         editor_names = {"gedit", "code", "vim", "nvim", "nano"}
         found_pids = []
         try:
@@ -190,7 +310,8 @@ class ContextService(dbus.service.Object):
                     continue
                 if comm in editor_names:
                     found_pids.append(int(entry.name))
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to scan /proc for open files: %s", e)
             return []
 
         unique_paths = []
@@ -223,6 +344,9 @@ class ContextService(dbus.service.Object):
         return unique_paths
 
     def _get_terminal_commands(self, n=10):
+        self._load_config()
+        if not self.track_terminal_history:
+            return []
         # Try bash history
         bash_history = Path.home() / ".bash_history"
         if bash_history.exists():
@@ -230,8 +354,29 @@ class ContextService(dbus.service.Object):
                 lines = bash_history.read_text(errors="replace").splitlines()
                 commands = [line.strip() for line in lines if line.strip() and not line.startswith("#")]
                 return commands[-n:]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to read bash history: %s", e)
+
+        # Try zsh history (supports both extended and plain formats)
+        zsh_history = Path.home() / ".zsh_history"
+        if zsh_history.exists():
+            try:
+                lines = zsh_history.read_text(errors="replace").splitlines()
+                commands = []
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # Extended history format: `: <timestamp>:0;command`
+                    match = re.match(r"^:\s*\d+:\d+;(.+)$", line)
+                    if match:
+                        commands.append(match.group(1))
+                    else:
+                        # Plain history format (non-extended)
+                        commands.append(line)
+                return commands[-n:]
+            except Exception as e:
+                logger.debug("Failed to read zsh history: %s", e)
 
         # Fish history
         fish_history = Path.home() / ".local" / "share" / "fish" / "fish_history"
@@ -240,8 +385,8 @@ class ContextService(dbus.service.Object):
                 text = fish_history.read_text(errors="replace")
                 commands = re.findall(r"^- cmd: (.+)$", text, re.MULTILINE)
                 return commands[-n:]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to read fish history: %s", e)
         return []
 
     def _get_last_stderr(self):
@@ -250,8 +395,8 @@ class ContextService(dbus.service.Object):
             if stderr_file.exists():
                 content = stderr_file.read_text(errors="replace").strip()
                 return content if content else None
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to read last_stderr: %s", e)
         return None
 
 if __name__ == '__main__':

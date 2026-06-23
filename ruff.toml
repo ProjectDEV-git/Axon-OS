@@ -13,13 +13,14 @@ select = [
     "B",    # flake8-bugbear
     "C4",   # flake8-comprehensions
     "RUF",  # Ruff-specific rules
+    "T20",  # flake8-print (ban print() in services/apps)
 ]
 
 # Exclude rules:
 # E501: long lines tolerated in UI/string-heavy GTK code
 # E402: gi.require_version() must precede `from gi.repository import ...`,
 #       so module-level imports legitimately appear after code
-ignore = ["E501", "E402"]
+ignore = ["E501", "E402", "RUF001", "RUF002"]
 
 exclude = [
     ".git",

@@ -10,6 +10,7 @@ keyword search so the Intent Bar always gets an answer.
 """
 
 import json
+import logging
 import sqlite3
 import sys
 import threading
@@ -21,13 +22,17 @@ import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from constants import AXON_DIR, EMBED_MODEL, RESCAN_INTERVAL, SEMANTIC_INDEX_DB
+
+from axon_logger import configure_app_logger
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import indexer
 
-AXON_DIR = Path.home() / ".axon"
-DB_PATH = AXON_DIR / "semantic-index.db"
-EMBED_MODEL = "nomic-embed-text"
-RESCAN_INTERVAL = 15 * 60  # seconds between full rescans
+log = configure_app_logger("axon-search", level=logging.INFO)
+
+DB_PATH = SEMANTIC_INDEX_DB
 
 try:
     import sqlite_vec
@@ -40,7 +45,8 @@ except ImportError:
 def open_db():
     """Open (and migrate) the index database. One connection per thread."""
     AXON_DIR.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(DB_PATH)
+    db = sqlite3.connect(DB_PATH, check_same_thread=False)
+    db.execute("PRAGMA journal_mode=WAL")
     if HAVE_SQLITE_VEC:
         try:
             db.enable_load_extension(True)
@@ -95,7 +101,7 @@ class SearchService(dbus.service.Object):
         try:
             self.bus_name = dbus.service.BusName("org.axonos.Search", bus=self.session_bus)
         except dbus.exceptions.NameExistsException:
-            print("org.axonos.Search service is already running.")
+            log.error("org.axonos.Search service is already running.")
             sys.exit(1)
         dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Search")
 
@@ -110,9 +116,9 @@ class SearchService(dbus.service.Object):
         self._rescan_event = threading.Event()
         self._pull_attempted = False
         threading.Thread(target=self._index_loop, daemon=True).start()
-        # Start a lightweight watcher that triggers rescans when files change.
-        threading.Thread(target=self._watch_loop, daemon=True).start()
-        print("Axon Search D-Bus service registered at /org/axonos/Search")
+        # Start the watchdog watcher (falls back to polling watcher if watchdog is not available)
+        self._start_watchdog()
+        log.info("Axon Search D-Bus service registered at /org/axonos/Search")
 
     # ------------------------------------------------------------------
     # Brain helpers
@@ -156,9 +162,68 @@ class SearchService(dbus.service.Object):
             try:
                 self._scan_once()
             except Exception as exc:  # never kill the loop
-                print(f"[axon-search] scan error: {exc}")
+                log.error("scan error: %s", exc, exc_info=True)
             self._rescan_event.wait(RESCAN_INTERVAL)
             self._rescan_event.clear()
+
+    def _start_watchdog(self):
+        try:
+            from watchdog.events import FileSystemEventHandler
+            from watchdog.observers import Observer
+
+            class IndexHandler(FileSystemEventHandler):
+                def __init__(self, service):
+                    self.service = service
+                    self.debounce_timer = None
+
+                def on_any_event(self, event):
+                    if event.is_directory:
+                        return
+
+                    paths_to_check = []
+                    if hasattr(event, 'dest_path'):
+                        paths_to_check.append(event.dest_path)
+                    if event.src_path:
+                        paths_to_check.append(event.src_path)
+
+                    should_trigger = False
+                    for p in paths_to_check:
+                        p_path = Path(p)
+                        if p_path.suffix.lower() in indexer.INDEX_EXTENSIONS:
+                            if not any(part in indexer.EXCLUDE_DIRS or part.startswith(".") for part in p_path.parts[:-1]):
+                                should_trigger = True
+                                break
+
+                    if should_trigger:
+                        self.trigger_rescan()
+
+                def trigger_rescan(self):
+                    if self.debounce_timer:
+                        self.debounce_timer.cancel()
+                    self.debounce_timer = threading.Timer(2.0, self._set_event)
+                    self.debounce_timer.start()
+
+                def _set_event(self):
+                    self.service._rescan_event.set()
+
+            self.observer = Observer()
+            handler = IndexHandler(self)
+
+            watch_count = 0
+            for rel in indexer.DEFAULT_ROOTS:
+                path = Path.home() / rel
+                if path.is_dir():
+                    self.observer.schedule(handler, str(path), recursive=True)
+                    watch_count += 1
+
+            if watch_count > 0:
+                self.observer.start()
+                log.info("Started watchdog observer on %d directories.", watch_count)
+            else:
+                log.warning("No directories found to watch with watchdog.")
+        except Exception as e:
+            log.warning("Failed to initialize watchdog: %s. Falling back to polling watcher.", e)
+            threading.Thread(target=self._watch_loop, daemon=True).start()
 
     def _watch_loop(self):
         """Lightweight polling watcher for environments without inotify.

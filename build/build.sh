@@ -28,6 +28,17 @@ VOLID="AXON_OS"
 WORK_DIR="${AXON_BUILD_DIR:-/tmp/axon-build}"
 CHROOT="${WORK_DIR}/chroot"
 IMAGE="${WORK_DIR}/image"
+
+# Reproducible builds: set SOURCE_DATE_EPOCH for deterministic timestamps
+# If not set externally, use the last git commit timestamp
+if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
+    if command -v git &>/dev/null && git -C "${BASE_DIR}" rev-parse --git-dir &>/dev/null; then
+        SOURCE_DATE_EPOCH="$(git -C "${BASE_DIR}" log -1 --format=%ct)"
+    else
+        SOURCE_DATE_EPOCH="$(date +%s)"
+    fi
+fi
+export SOURCE_DATE_EPOCH
 STAGING="${WORK_DIR}/staging"
 DIST_DIR="${BASE_DIR}/dist"
 
@@ -220,17 +231,17 @@ if loadfont /boot/grub/themes/axon/unicode.pf2 ; then
 fi
 
 menuentry "Try or Install Axon OS ${VERSION}" --class axonos {
-    linux /casper/vmlinuz boot=casper quiet splash ---
+    linux /casper/vmlinuz boot=casper quiet splash nomodeset console=tty0 vga=791 ---
     initrd /casper/initrd
 }
 
 menuentry "Try or Install Axon OS ${VERSION} (safe graphics)" --class safe {
-    linux /casper/vmlinuz boot=casper quiet splash nomodeset ---
+    linux /casper/vmlinuz boot=casper nomodeset console=tty0 vga=normal ---
     initrd /casper/initrd
 }
 
 menuentry "Try or Install Axon OS ${VERSION} (modern NVIDIA drivers)" --class nvidia {
-    linux /casper/vmlinuz boot=casper quiet splash nouveau.modeset=0 nvidia-drm.modeset=1 ---
+    linux /casper/vmlinuz boot=casper quiet splash nouveau.modeset=0 nvidia-drm.modeset=1 console=tty0 ---
     initrd /casper/initrd
 }
 
@@ -304,6 +315,9 @@ EOF
 
     (cd "${DIST_DIR}" && sha256sum "${ISO_NAME}" > "${ISO_NAME}.sha256")
 
+    # Generate SBOM (Software Bill of Materials)
+    generate_sbom
+
     # Hand the artifacts back to the invoking (non-root) user where possible
     if [[ -n "${SUDO_UID:-}" ]]; then
         chown "${SUDO_UID}:${SUDO_GID:-${SUDO_UID}}" \
@@ -325,6 +339,70 @@ EOF
 
     log "ISO produced: ${DIST_DIR}/${ISO_NAME} ($(du -sh "${DIST_DIR}/${ISO_NAME}" | cut -f1))"
     log "SHA-256:      ${DIST_DIR}/${ISO_NAME}.sha256"
+}
+
+# ---------------------------------------------------------------------------
+# SBOM Generation
+# ---------------------------------------------------------------------------
+generate_sbom() {
+    log "Generating Software Bill of Materials (SBOM)..."
+
+    local sbom_file="${DIST_DIR}/sbom.spdx.json"
+
+    # Collect package information from the chroot
+    local packages=""
+    if [[ -f "${WORK_DIR}/rootfs/var/log/apt/history.log" ]]; then
+        packages=$(grep "Install:" "${WORK_DIR}/rootfs/var/log/apt/history.log" | \
+            sed 's/Install://' | tr ',' '\n' | \
+            sed 's/([^)]*)//g' | awk '{print $1}' | sort -u | tr '\n' ',')
+    fi
+
+    # Collect Python package versions
+    local python_packages=""
+    if [[ -d "${WORK_DIR}/rootfs/usr/lib/python3/dist-packages" ]]; then
+        python_packages=$(ls "${WORK_DIR}/rootfs/usr/lib/python3/dist-packages/"*.dist-info/ 2>/dev/null | \
+            grep -oP '[^/]+(?=-\d)' | sort -u | tr '\n' ',')
+    fi
+
+    # Generate minimal SPDX SBOM
+    cat > "${sbom_file}" << EOF
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "Axon-OS-${VERSION}",
+  "documentNamespace": "https://axon-os.github.io/sbom/${VERSION}",
+  "creationInfo": {
+    "created": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "creators": ["Tool: axon-build-${VERSION}"]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-RootPackage",
+      "name": "axon-os",
+      "versionInfo": "${VERSION}",
+      "downloadLocation": "https://github.com/kaorii-ako/Axon-OS",
+      "filesAnalyzed": false,
+      "primaryPackagePurpose": "OPERATING-SYSTEM"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-RootPackage"
+    }
+  ]
+}
+EOF
+
+    # Embed SBOM in the ISO's squashfs
+    if [[ -d "${STAGING}/live" ]]; then
+        mkdir -p "${STAGING}/live/sbom"
+        cp "${sbom_file}" "${STAGING}/live/sbom/"
+    fi
+
+    log "SBOM generated: ${sbom_file}"
 }
 
 # ---------------------------------------------------------------------------

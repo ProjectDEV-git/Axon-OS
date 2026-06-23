@@ -1,0 +1,145 @@
+version: "3.8"
+
+# Axon OS Docker Compose — runs all services in containers.
+# Usage: docker compose up -d
+# Each service connects to Ollama (host network) and the D-Bus session bus.
+
+x-common-env: &common-env
+  PYTHONUNBUFFERED: "1"
+  OLLAMA_BASE_URL: http://host.docker.internal:11434
+  AXON_DIR: /data/axon
+  DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
+
+services:
+  axon-brain:
+    build:
+      context: ..
+      dockerfile: Dockerfile.service
+    container_name: axon-brain
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      AXON_SERVICE: brain
+    volumes:
+      - brain-data:/data/axon
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:11434/api/tags', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  axon-context:
+    build:
+      context: ..
+      dockerfile: Dockerfile.service
+    container_name: axon-context
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      AXON_SERVICE: context
+    volumes:
+      - context-data:/data/axon
+    depends_on:
+      axon-brain:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  axon-search:
+    build:
+      context: ..
+      dockerfile: Dockerfile.service
+    container_name: axon-search
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      AXON_SERVICE: search
+    volumes:
+      - search-data:/data/axon
+    depends_on:
+      axon-brain:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  axon-voice:
+    build:
+      context: ..
+      dockerfile: Dockerfile.service
+    container_name: axon-voice
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      AXON_SERVICE: voice
+    volumes:
+      - /dev/snd:/dev/snd
+    devices:
+      - /dev/snd:/dev/snd
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_NICE
+    depends_on:
+      axon-brain:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  axon-gui-agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile.service
+    container_name: axon-gui-agent
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      AXON_SERVICE: gui-agent
+    depends_on:
+      axon-brain:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  axon-sandbox:
+    build:
+      context: ..
+      dockerfile: Dockerfile.service
+    container_name: axon-sandbox
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      AXON_SERVICE: sandbox
+    volumes:
+      - sandbox-data:/data/axon
+    depends_on:
+      axon-brain:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  axon-global-search:
+    build:
+      context: ..
+      dockerfile: Dockerfile.service
+    container_name: axon-global-search
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      AXON_SERVICE: global-search
+    depends_on:
+      axon-brain:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+volumes:
+  brain-data:
+    driver: local
+  context-data:
+    driver: local
+  search-data:
+    driver: local
+  sandbox-data:
+    driver: local

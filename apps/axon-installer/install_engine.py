@@ -59,11 +59,11 @@ PROVIDER_DEFAULTS = {
 # ---------------------------------------------------------------------------
 
 def emit(percent: int, message: str) -> None:
-    print(f"AXON-PROGRESS:{percent}:{message}", flush=True)
+    print(f"AXON-PROGRESS:{percent}:{message}", flush=True)  # noqa: T201
 
 
 def fail(message: str) -> None:
-    print(f"AXON-ERROR:{message}", flush=True)
+    print(f"AXON-ERROR:{message}", flush=True)  # noqa: T201
     sys.exit(1)
 
 
@@ -534,7 +534,7 @@ def setup_boot_watchdog(root: str, fs_type: str) -> None:
             run(["umount", toplevel], check=False)
     except (RuntimeError, OSError) as exc:
         # The watchdog is a safety net, not a prerequisite — never abort.
-        print(f"AXON-PROGRESS:96:Boot watchdog skipped ({exc})", flush=True)
+        print(f"AXON-PROGRESS:96:Boot watchdog skipped ({exc})", flush=True)  # noqa: T201
 
 
 def setup_ai(cfg: dict) -> None:
@@ -629,7 +629,7 @@ def install(cfg: dict) -> None:
     unmount_all()
 
     emit(100, "Installation complete")
-    print("AXON-DONE", flush=True)
+    print("AXON-DONE", flush=True)  # noqa: T201
 
 
 def main() -> int:

@@ -1,5 +1,6 @@
 """Axon OS Welcome App — WelcomeWindow (4-page onboarding wizard)."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -132,7 +133,7 @@ def _remove_class(widget: Gtk.Widget, css_class: str) -> None:
 
 
 class WelcomeWindow(Adw.Window):
-    _PAGE_NAMES = ["welcome", "setup", "features", "ready"]
+    _PAGE_NAMES = ["welcome", "setup", "preferences", "features", "ready"]  # noqa: RUF012
 
     def __init__(self, app: Adw.Application):
         super().__init__(application=app)
@@ -184,6 +185,7 @@ class WelcomeWindow(Adw.Window):
         # Build pages
         self._stack.add_named(self._build_page_welcome(), "welcome")
         self._stack.add_named(self._build_page_setup(), "setup")
+        self._stack.add_named(self._build_page_preferences(), "preferences")
         self._stack.add_named(self._build_page_features(), "features")
         self._stack.add_named(self._build_page_ready(), "ready")
 
@@ -444,12 +446,12 @@ class WelcomeWindow(Adw.Window):
 
         skip_btn = Gtk.Button(label="Skip")
         _add_class(skip_btn, "nav-btn-back")
-        skip_btn.connect("clicked", lambda _: self._go_to("features"))
+        skip_btn.connect("clicked", lambda _: self._go_to("preferences"))
         nav.append(skip_btn)
 
         continue_btn = Gtk.Button(label="Continue →")
         _add_class(continue_btn, "nav-btn-next")
-        continue_btn.connect("clicked", lambda _: self._go_to("features"))
+        continue_btn.connect("clicked", lambda _: self._go_to("preferences"))
         nav.append(continue_btn)
 
         page.append(nav)
@@ -550,6 +552,226 @@ class WelcomeWindow(Adw.Window):
         threading.Thread(target=_trigger_dbus_pull, daemon=True).start()
 
     # ------------------------------------------------------------------
+    # PAGE 2.5 — Preferences
+    # ------------------------------------------------------------------
+
+    def _build_page_preferences(self) -> Gtk.Box:
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        page.set_margin_top(24)
+        page.set_margin_bottom(24)
+        page.set_margin_start(32)
+        page.set_margin_end(32)
+
+        # Title
+        title = Gtk.Label(label="Preferences & Privacy")
+        _add_class(title, "page-title")
+        title.set_halign(Gtk.Align.START)
+        page.append(title)
+
+        subtitle = Gtk.Label(label="Customize your default shell and AI context signals.")
+        _add_class(subtitle, "page-subtitle")
+        subtitle.set_halign(Gtk.Align.START)
+        subtitle.set_wrap(True)
+        page.append(subtitle)
+
+        # Shell Selection Frame
+        shell_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        shell_lbl = Gtk.Label(label="Preferred Terminal Shell:")
+        shell_lbl.set_halign(Gtk.Align.START)
+        _add_class(shell_lbl, "model-name")
+        shell_box.append(shell_lbl)
+
+        # List shells
+        shells = [
+            ("Bash", "/bin/bash", True),
+            ("Zsh", "/usr/bin/zsh", shutil.which("zsh") is not None),
+            ("Fish", "/usr/bin/fish", shutil.which("fish") is not None)
+        ]
+
+        self.selected_shell = "/bin/bash"
+        config_path = Path.home() / ".config" / "axon-os" / "shell.conf"
+        if config_path.exists():
+            try:
+                self.selected_shell = config_path.read_text().strip()
+            except Exception:
+                pass
+
+        first_radio = None
+        for name, path, installed in shells:
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            _add_class(row, "model-row")
+            if not installed:
+                row.set_opacity(0.5)
+
+            radio = Gtk.CheckButton()
+            if first_radio is None:
+                first_radio = radio
+            else:
+                radio.set_group(first_radio)
+
+            radio.set_sensitive(installed)
+            if path == self.selected_shell and installed:
+                radio.set_active(True)
+            elif name == "Bash" and not first_radio.get_active():
+                radio.set_active(True)
+
+            lbl_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            name_lbl = Gtk.Label()
+            name_lbl.set_markup(f"<b>{name}</b> ({path})")
+            name_lbl.set_halign(Gtk.Align.START)
+            lbl_box.append(name_lbl)
+
+            if not installed:
+                status_lbl = Gtk.Label(label="Not installed — run 'sudo apt install " + name.lower() + "' to enable")
+                _add_class(status_lbl, "model-desc")
+                status_lbl.set_halign(Gtk.Align.START)
+                lbl_box.append(status_lbl)
+
+            radio.set_child(lbl_box)
+
+            def _on_shell_toggled(btn, p=path):
+                if btn.get_active():
+                    self.selected_shell = p
+                    self._save_preferences()
+
+            radio.connect("toggled", _on_shell_toggled)
+            row.append(radio)
+            shell_box.append(row)
+
+        page.append(shell_box)
+
+        # Context Privacy Options Frame
+        privacy_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        privacy_lbl = Gtk.Label(label="AI Context Settings:")
+        privacy_lbl.set_halign(Gtk.Align.START)
+        _add_class(privacy_lbl, "model-name")
+        privacy_box.append(privacy_lbl)
+
+        # Load current context config
+        self.context_config = {
+            "track_clipboard": True,
+            "track_terminal_history": True,
+            "track_open_files": True
+        }
+        ctx_config_path = Path.home() / ".config" / "axon-os" / "context.json"
+        if ctx_config_path.exists():
+            try:
+                with open(ctx_config_path) as f:
+                    self.context_config.update(json.load(f))
+            except Exception:
+                pass
+
+        # Clipboard switch
+        clip_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        _add_class(clip_row, "model-row")
+        clip_lbl_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        clip_lbl_box.set_hexpand(True)
+        clip_t = Gtk.Label(label="Clipboard Tracking")
+        clip_t.set_halign(Gtk.Align.START)
+        _add_class(clip_t, "model-name")
+        clip_d = Gtk.Label(label="Provide recent copy-paste text to the AI context.")
+        clip_d.set_halign(Gtk.Align.START)
+        _add_class(clip_d, "model-desc")
+        clip_lbl_box.append(clip_t)
+        clip_lbl_box.append(clip_d)
+        clip_row.append(clip_lbl_box)
+
+        self.clip_switch = Gtk.Switch()
+        self.clip_switch.set_active(self.context_config["track_clipboard"])
+        self.clip_switch.set_valign(Gtk.Align.CENTER)
+        self.clip_switch.connect("state-set", lambda sw, st: self._on_privacy_toggled("track_clipboard", st))
+        clip_row.append(self.clip_switch)
+        privacy_box.append(clip_row)
+
+        # Terminal History switch
+        term_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        _add_class(term_row, "model-row")
+        term_lbl_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        term_lbl_box.set_hexpand(True)
+        term_t = Gtk.Label(label="Terminal History Tracking")
+        term_t.set_halign(Gtk.Align.START)
+        _add_class(term_t, "model-name")
+        term_d = Gtk.Label(label="Provide recent bash/zsh/fish commands to the AI context.")
+        term_d.set_halign(Gtk.Align.START)
+        _add_class(term_d, "model-desc")
+        term_lbl_box.append(term_t)
+        term_lbl_box.append(term_d)
+        term_row.append(term_lbl_box)
+
+        self.term_switch = Gtk.Switch()
+        self.term_switch.set_active(self.context_config["track_terminal_history"])
+        self.term_switch.set_valign(Gtk.Align.CENTER)
+        self.term_switch.connect("state-set", lambda sw, st: self._on_privacy_toggled("track_terminal_history", st))
+        term_row.append(self.term_switch)
+        privacy_box.append(term_row)
+
+        # Open Files switch
+        files_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        _add_class(files_row, "model-row")
+        files_lbl_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        files_lbl_box.set_hexpand(True)
+        files_t = Gtk.Label(label="Editor Files Tracking")
+        files_t.set_halign(Gtk.Align.START)
+        _add_class(files_t, "model-name")
+        files_d = Gtk.Label(label="Provide open file names from editors (VSCode, Vim, nano) to the AI.")
+        files_d.set_halign(Gtk.Align.START)
+        _add_class(files_d, "model-desc")
+        files_lbl_box.append(files_t)
+        files_lbl_box.append(files_d)
+        files_row.append(files_lbl_box)
+
+        self.files_switch = Gtk.Switch()
+        self.files_switch.set_active(self.context_config["track_open_files"])
+        self.files_switch.set_valign(Gtk.Align.CENTER)
+        self.files_switch.connect("state-set", lambda sw, st: self._on_privacy_toggled("track_open_files", st))
+        files_row.append(self.files_switch)
+        privacy_box.append(files_row)
+
+        page.append(privacy_box)
+
+        # Spacer
+        spacer = Gtk.Box()
+        spacer.set_vexpand(True)
+        page.append(spacer)
+
+        # Navigation row
+        nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        nav.set_halign(Gtk.Align.CENTER)
+
+        back_btn = Gtk.Button(label="← Back")
+        _add_class(back_btn, "nav-btn-back")
+        back_btn.connect("clicked", lambda _: self._go_to("setup"))
+        nav.append(back_btn)
+
+        continue_btn = Gtk.Button(label="Continue →")
+        _add_class(continue_btn, "nav-btn-next")
+        continue_btn.connect("clicked", lambda _: self._go_to("features"))
+        nav.append(continue_btn)
+
+        page.append(nav)
+
+        return page
+
+    def _on_privacy_toggled(self, key, state):
+        self.context_config[key] = state
+        self._save_preferences()
+        return False
+
+    def _save_preferences(self):
+        config_dir = Path.home() / ".config" / "axon-os"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(config_dir / "shell.conf", "w") as f:
+                f.write(self.selected_shell)
+        except Exception:
+            pass
+        try:
+            with open(config_dir / "context.json", "w") as f:
+                json.dump(self.context_config, f, indent=2)
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
     # PAGE 3 — Features
     # ------------------------------------------------------------------
 
@@ -594,7 +816,7 @@ class WelcomeWindow(Adw.Window):
 
         back_btn = Gtk.Button(label="← Back")
         _add_class(back_btn, "nav-btn-back")
-        back_btn.connect("clicked", lambda _: self._go_to("setup"))
+        back_btn.connect("clicked", lambda _: self._go_to("preferences"))
         nav.append(back_btn)
 
         next_btn = Gtk.Button(label="Next →")
@@ -674,6 +896,21 @@ class WelcomeWindow(Adw.Window):
         toggle_row.append(switch)
 
         page.append(toggle_row)
+
+        # Documentation & Community links
+        links_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        links_row.set_halign(Gtk.Align.CENTER)
+        links_row.set_margin_top(12)
+
+        doc_btn = Gtk.LinkButton.new_with_label("https://github.com/axonos/axon-os", "Documentation")
+        _add_class(doc_btn, "page-subtitle")
+        links_row.append(doc_btn)
+
+        comm_btn = Gtk.LinkButton.new_with_label("https://github.com/axonos/axon-os/discussions", "Community")
+        _add_class(comm_btn, "page-subtitle")
+        links_row.append(comm_btn)
+
+        page.append(links_row)
 
         spacer = Gtk.Box()
         spacer.set_vexpand(True)

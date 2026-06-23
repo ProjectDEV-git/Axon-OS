@@ -2,6 +2,10 @@
 """Caching and rate limiting utilities for D-Bus services."""
 
 import functools
+import logging
+import shlex
+import subprocess
+import threading
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -9,9 +13,79 @@ from typing import Any
 
 import dbus
 
+logger = logging.getLogger(__name__)
+
+ALLOWED_COMMANDS: set[str] = {
+    "ls", "cat", "grep", "find", "echo", "date", "whoami", "hostname",
+    "uname", "df", "du", "free", "uptime", "ps", "top", "htop",
+    "pwd", "wc", "head", "tail", "sort", "uniq", "diff", "file",
+    "stat", "readlink", "realpath", "basename", "dirname",
+    "python", "python3", "node", "bash", "sh",
+    "apt", "apt-get", "dpkg", "snap", "flatpak",
+    "git", "make", "gcc", "g++", "cargo", "rustc",
+    "systemctl", "journalctl",
+    "nmcli", "bluetoothctl", "pactl", "paplay",
+    "xdg-open", "gtk-launch", "gio",
+    "notify-send", "zenity",
+}
+
+_SHELL_META_CHARS = frozenset("|;&$`\\(){}[]<>*?~!#")
+
+
+def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
+    """Execute a command safely with whitelist validation.
+
+    Parses the command with shlex.split() and checks the binary against
+    ALLOWED_COMMANDS before executing. Refuses to run commands containing
+    shell metacharacters that could enable injection.
+
+    Args:
+        command: Command string to execute.
+        **kwargs: Additional arguments passed to subprocess.Popen.
+
+    Returns:
+        Popen object if command was allowed and started, None otherwise.
+    """
+    if any(c in command for c in _SHELL_META_CHARS):
+        logger.warning("safe_exec: blocked command containing shell metacharacters: %s", command[:100])
+        return None
+
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        logger.warning("safe_exec: failed to parse command: %s", command)
+        return None
+
+    if not parts:
+        logger.warning("safe_exec: empty command")
+        return None
+
+    binary = parts[0]
+    if binary not in ALLOWED_COMMANDS:
+        logger.warning("safe_exec: blocked unwhitelisted command: %s", binary)
+        return None
+
+    defaults = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    defaults.update(kwargs)
+    return subprocess.Popen(parts, **defaults)
+
+
+def error_response(message: str, code: str = "UNKNOWN") -> str:
+    """Create a standardized JSON error response for D-Bus methods.
+
+    Args:
+        message: Human-readable error description.
+        code: Machine-readable error code.
+
+    Returns:
+        JSON string with error and code fields.
+    """
+    import json
+    return json.dumps({"error": message, "code": code})
+
 
 class TTLCache:
-    """Simple TTL (Time-To-Live) cache for frequently accessed data."""
+    """Thread-safe TTL (Time-To-Live) cache for frequently accessed data."""
 
     def __init__(self, ttl_seconds: int = 300) -> None:
         """Initialize cache with TTL.
@@ -21,6 +95,7 @@ class TTLCache:
         """
         self.ttl_seconds = ttl_seconds
         self.cache: dict[str, tuple[Any, float]] = {}
+        self._lock = threading.Lock()
 
     def get(self, key: str) -> Any | None:
         """Retrieve value from cache if not expired.
@@ -31,12 +106,13 @@ class TTLCache:
         Returns:
             Cached value or None if expired/not found.
         """
-        if key in self.cache:
-            value, timestamp = self.cache[key]
-            if time.time() - timestamp < self.ttl_seconds:
-                return value
-            del self.cache[key]
-        return None
+        with self._lock:
+            if key in self.cache:
+                value, timestamp = self.cache[key]
+                if time.time() - timestamp < self.ttl_seconds:
+                    return value
+                del self.cache[key]
+            return None
 
     def set(self, key: str, value: Any) -> None:
         """Store value in cache with current timestamp.
@@ -45,15 +121,17 @@ class TTLCache:
             key: Cache key to store.
             value: Value to cache.
         """
-        self.cache[key] = (value, time.time())
+        with self._lock:
+            self.cache[key] = (value, time.time())
 
     def clear(self) -> None:
         """Clear all cached entries."""
-        self.cache.clear()
+        with self._lock:
+            self.cache.clear()
 
 
 class RateLimiter:
-    """Rate limiter using token bucket algorithm."""
+    """Thread-safe rate limiter using sliding window algorithm."""
 
     def __init__(self, rate: int = 100, window_seconds: int = 60) -> None:
         """Initialize rate limiter.
@@ -65,6 +143,7 @@ class RateLimiter:
         self.rate = rate
         self.window_seconds = window_seconds
         self.requests: dict[str, list] = defaultdict(list)
+        self._lock = threading.Lock()
 
     def allow(self, identifier: str) -> bool:
         """Check if request is allowed for identifier.
@@ -78,17 +157,18 @@ class RateLimiter:
         now = time.time()
         cutoff = now - self.window_seconds
 
-        # Clean old requests
-        self.requests[identifier] = [
-            req_time for req_time in self.requests[identifier]
-            if req_time > cutoff
-        ]
+        with self._lock:
+            # Clean old requests
+            self.requests[identifier] = [
+                req_time for req_time in self.requests[identifier]
+                if req_time > cutoff
+            ]
 
-        # Check limit
-        if len(self.requests[identifier]) < self.rate:
-            self.requests[identifier].append(now)
-            return True
-        return False
+            # Check limit
+            if len(self.requests[identifier]) < self.rate:
+                self.requests[identifier].append(now)
+                return True
+            return False
 
 
 def cached(ttl_seconds: int = 300) -> Callable:

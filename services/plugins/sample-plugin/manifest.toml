@@ -1,0 +1,12 @@
+[service]
+name = "sample-plugin"
+description = "Example Axon OS service plugin"
+bus_name = "org.axonos.plugins.Sample"
+object_path = "/org/axonos/plugins/Sample"
+entry_point = "sample_service.py"
+dependencies = ["org.axonos.Brain"]
+
+[systemd]
+description = "Axon Sample Plugin Service"
+after = ["axon-brain.service"]
+restart_sec = 3

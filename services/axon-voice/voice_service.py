@@ -11,6 +11,7 @@ are spoken back through speech-dispatcher (spd-say) and shown as a
 desktop notification. Everything runs on-device.
 """
 
+import logging
 import os
 import shutil
 import signal
@@ -25,13 +26,19 @@ import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from constants import MAX_RECORD_SECONDS, WHISPER_DIR
+from service_utils import safe_exec
+
+from axon_logger import configure_app_logger
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from intent_router import clean_transcript, parse_intent_response
 from vad_helper import is_speech_wav
 
+log = configure_app_logger("axon-voice", level=logging.INFO)
+
 WHISPER_MODEL = os.environ.get("AXON_WHISPER_MODEL", "base.en")
-WHISPER_DIR = Path.home() / ".axon" / "models" / "whisper"
-MAX_RECORD_SECONDS = 30
 
 
 class VoiceService(dbus.service.Object):
@@ -43,7 +50,7 @@ class VoiceService(dbus.service.Object):
                 "org.axonos.Voice", bus=self.session_bus
             )
         except dbus.exceptions.NameExistsException:
-            print("org.axonos.Voice service is already running.")
+            log.error("org.axonos.Voice service is already running.")
             sys.exit(1)
         dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Voice")
 
@@ -58,7 +65,7 @@ class VoiceService(dbus.service.Object):
         self._ambient_stop = threading.Event()
         # TTS engine cached choice (env var overrides)
         self._tts_engine = os.environ.get("AXON_TTS_ENGINE", "")
-        print("Axon Voice D-Bus service registered at /org/axonos/Voice")
+        log.info("Axon Voice D-Bus service registered at /org/axonos/Voice")
 
     # ------------------------------------------------------------------
     # D-Bus API
@@ -214,8 +221,7 @@ class VoiceService(dbus.service.Object):
                              stderr=subprocess.DEVNULL)
             GLib.idle_add(self._finish, f"Opening {payload}", "")
         elif kind == "run_command":
-            subprocess.Popen(payload, shell=True,
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            safe_exec(payload)
             GLib.idle_add(self._finish, f"Running: {payload}", "")
         else:
             spoken = payload if payload else "I don't have an answer for that."
@@ -249,14 +255,16 @@ class VoiceService(dbus.service.Object):
                     subprocess.Popen(["piper", "-t", text[:1000]],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     return
-                except Exception:
+                except Exception as e:
+                    log.debug("piper TTS failed: %s", e)
                     continue
             if eng in ("espeak", "espeak-ng") and shutil.which(eng):
                 try:
                     subprocess.Popen([eng, text[:1000]],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     return
-                except Exception:
+                except Exception as e:
+                    log.debug("%s TTS failed: %s", eng, e)
                     continue
             if eng == "pico2wave" and shutil.which("pico2wave") and shutil.which("aplay"):
                 try:
@@ -265,10 +273,11 @@ class VoiceService(dbus.service.Object):
                     subprocess.check_call(["pico2wave", "-w", tmp, text[:1000]])
                     subprocess.Popen(["aplay", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     return
-                except Exception:
+                except Exception as e:
+                    log.debug("pico2wave TTS failed: %s", e)
                     try:
                         os.unlink(tmp)
-                    except Exception:
+                    except OSError:
                         pass
                     continue
             if eng == "spd-say" and shutil.which("spd-say"):
@@ -276,7 +285,8 @@ class VoiceService(dbus.service.Object):
                     subprocess.Popen(["spd-say", "--wait-mode", "no", text[:500]],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     return
-                except Exception:
+                except Exception as e:
+                    log.debug("spd-say TTS failed: %s", e)
                     continue
 
     def _notify(self, title, body):
@@ -311,7 +321,7 @@ class VoiceService(dbus.service.Object):
                 self._overlay = VoiceOverlay()
             self._overlay.show(status)
         except Exception as exc:
-            print(f"[axon-voice] overlay unavailable: {exc}")
+            log.warning("overlay unavailable: %s", exc)
             self._overlay = None
 
     def _set_overlay_status(self, status):
@@ -336,7 +346,7 @@ class VoiceService(dbus.service.Object):
         `arecord` is not available.
         """
         if not shutil.which("arecord"):
-            print("[axon-voice] ambient disabled: 'arecord' not found")
+            log.warning("ambient disabled: 'arecord' not found")
             return
         while not self._ambient_stop.is_set():
             fd, wav = tempfile.mkstemp(prefix="axon-amb-", suffix=".wav")
@@ -347,7 +357,7 @@ class VoiceService(dbus.service.Object):
             except subprocess.CalledProcessError:
                 try:
                     os.unlink(wav)
-                except Exception:
+                except OSError:
                     pass
                 break
             try:
@@ -358,14 +368,15 @@ class VoiceService(dbus.service.Object):
                 else:
                     try:
                         os.unlink(wav)
-                    except Exception:
+                    except OSError:
                         pass
-            except Exception:
+            except Exception as e:
+                log.debug("Ambient speech detection error: %s", e)
                 try:
                     os.unlink(wav)
-                except Exception:
+                except OSError:
                     pass
-        print("[axon-voice] ambient stopped")
+        log.info("ambient stopped")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,11 @@ FROM ubuntu:24.04
 # Avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Reproducible builds: set SOURCE_DATE_EPOCH
+# Override at build time with: docker build --build-arg SOURCE_DATE_EPOCH=<timestamp>
+ARG SOURCE_DATE_EPOCH=1704067200
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
+
 # Install live-build dependencies and utilities
 RUN apt-get update && apt-get install -y \
     live-build \

@@ -20,6 +20,7 @@ import Shell from 'gi://Shell';
 import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
+import Atk from 'gi://Atk';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import StartMenuPopup from './startmenu.js';
@@ -75,6 +76,8 @@ class TaskbarClock extends St.Label {
             style_class: 'axon-taskbar-clock',
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
+            accessible_name: 'Clock',
+            accessible_role: Atk.Role.LABEL,
         });
         this._updateTime();
         this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, () => {
