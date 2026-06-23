@@ -310,7 +310,7 @@ class SearchService(dbus.service.Object):
                 (cid, cid),
             )
             try:
-                db.executemany("DELETE FROM vec_chunks WHERE rowid=?", [(cid,) for cid in ids])
+                db.execute("DELETE FROM vec_chunks WHERE rowid=?", (cid,))
             except sqlite3.OperationalError:
                 pass
         db.execute("DELETE FROM chunks WHERE path=?", (path,))

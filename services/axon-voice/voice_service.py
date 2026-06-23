@@ -54,6 +54,7 @@ class VoiceService(dbus.service.Object):
             sys.exit(1)
         dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Voice")
 
+        self._lock = threading.Lock()
         self._recorder = None  # subprocess.Popen while recording
         self._wav_path = None
         self._record_timeout_id = 0
@@ -74,11 +75,12 @@ class VoiceService(dbus.service.Object):
     @dbus.service.method("org.axonos.Voice", in_signature="", out_signature="b")
     def Toggle(self):
         """Start listening, or stop + transcribe. Returns new listening state."""
-        if self._recorder is not None:
-            GLib.idle_add(self._stop_and_process)
-            return False
-        if self._busy:
-            return False
+        with self._lock:
+            if self._recorder is not None:
+                GLib.idle_add(self._stop_and_process)
+                return False
+            if self._busy:
+                return False
         GLib.idle_add(self._start_recording)
         return True
 
@@ -153,11 +155,12 @@ class VoiceService(dbus.service.Object):
         return False
 
     def _stop_and_process(self):
-        if self._record_timeout_id:
-            GLib.source_remove(self._record_timeout_id)
-            self._record_timeout_id = 0
-        rec, self._recorder = self._recorder, None
-        wav, self._wav_path = self._wav_path, None
+        with self._lock:
+            if self._record_timeout_id:
+                GLib.source_remove(self._record_timeout_id)
+                self._record_timeout_id = 0
+            rec, self._recorder = self._recorder, None
+            wav, self._wav_path = self._wav_path, None
         if rec is None:
             return False
         rec.send_signal(signal.SIGINT)
@@ -165,7 +168,8 @@ class VoiceService(dbus.service.Object):
             rec.wait(timeout=3)
         except subprocess.TimeoutExpired:
             rec.kill()
-        self._busy = True
+        with self._lock:
+            self._busy = True
         self._set_overlay_status("Transcribing on-device...")
         self.StateChanged("transcribing")
         threading.Thread(
@@ -296,7 +300,8 @@ class VoiceService(dbus.service.Object):
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def _finish(self, result, error):
-        self._busy = False
+        with self._lock:
+            self._busy = False
         if error:
             self._notify("Axon Voice", error)
         elif result:

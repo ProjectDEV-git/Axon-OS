@@ -20,7 +20,8 @@ ALLOWED_COMMANDS: set[str] = {
     "uname", "df", "du", "free", "uptime", "ps", "top", "htop",
     "pwd", "wc", "head", "tail", "sort", "uniq", "diff", "file",
     "stat", "readlink", "realpath", "basename", "dirname",
-    "python", "python3", "node", "bash", "sh",
+    # NOTE: python/node/bash/sh intentionally excluded — they can execute
+    # arbitrary code, defeating the purpose of the allowlist.
     "apt", "apt-get", "dpkg", "snap", "flatpak",
     "git", "make", "gcc", "g++", "cargo", "rustc",
     "systemctl", "journalctl",

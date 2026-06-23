@@ -321,18 +321,23 @@ export default class AxonShellExtension extends Extension {
                 const VoiceInterface = `
                 <node>
                   <interface name="org.axonos.Voice">
-                    <method name="StartRecording">
+                    <method name="Toggle">
+                      <arg type="b" name="listening" direction="out"/>
+                    </method>
+                    <method name="IsListening">
+                      <arg type="b" name="listening" direction="out"/>
+                    </method>
+                    <method name="StartAmbient">
                       <arg type="b" name="success" direction="out"/>
                     </method>
-                    <method name="StopRecording">
+                    <method name="StopAmbient">
                       <arg type="b" name="success" direction="out"/>
                     </method>
-                    <method name="IsRecording">
-                      <arg type="b" name="recording" direction="out"/>
-                    </method>
-                    <signal name="TranscriptionCompleted">
-                      <arg type="s" name="transcription"/>
-                      <arg type="s" name="intent_json"/>
+                    <signal name="StateChanged">
+                      <arg type="s" name="state"/>
+                    </signal>
+                    <signal name="TranscriptReady">
+                      <arg type="s" name="text"/>
                     </signal>
                   </interface>
                 </node>
@@ -343,8 +348,8 @@ export default class AxonShellExtension extends Extension {
                     'org.axonos.Voice',
                     '/org/axonos/Voice'
                 );
-                this._voiceProxy.connectSignal('TranscriptionCompleted', (proxy, sender, [transcription, intentJson]) => {
-                    this._onTranscriptionCompleted(transcription, intentJson);
+                this._voiceProxy.connectSignal('TranscriptReady', (proxy, sender, [text]) => {
+                    this._onTranscriptionCompleted(text, '');
                 });
             } catch (e) {
                 console.warn('AxonShell: could not create VoiceProxy:', e.message);
@@ -352,20 +357,16 @@ export default class AxonShellExtension extends Extension {
             }
         }
 
-        this._voiceProxy.IsRecordingRemote((res, err) => {
-            let recording = false;
-            if (!err && res) {
-                [recording] = res;
+        this._voiceProxy.ToggleRemote((res, err) => {
+            if (err) {
+                console.warn('AxonShell: Toggle voice failed:', err.message);
+                return;
             }
-            if (recording) {
-                this._voiceProxy.StopRecordingRemote((r, e) => {
-                    this._showVoiceOverlay(false);
-                });
-            } else {
-                this._voiceProxy.StartRecordingRemote((r, e) => {
-                    this._showVoiceOverlay(true);
-                });
+            let listening = false;
+            if (res) {
+                [listening] = res;
             }
+            this._showVoiceOverlay(listening);
         });
     }
 

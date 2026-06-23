@@ -350,15 +350,15 @@ class AdvancedVoiceService(dbus.service.Object):
                 return self._transcribe_whisper(file_path)
 
             model = Model(model_path)
-            wf = wave.open(file_path, "rb")
-            rec = KaldiRecognizer(model, wf.getframerate())
-            rec.SetWords(True)
+            with wave.open(file_path, "rb") as wf:
+                rec = KaldiRecognizer(model, wf.getframerate())
+                rec.SetWords(True)
 
-            while True:
-                data = wf.readframes(4000)
-                if len(data) == 0:
-                    break
-                rec.AcceptWaveform(data)
+                while True:
+                    data = wf.readframes(4000)
+                    if len(data) == 0:
+                        break
+                    rec.AcceptWaveform(data)
 
             result = json.loads(rec.FinalResult())
             return result.get("text", "")

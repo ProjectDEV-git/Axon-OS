@@ -62,21 +62,27 @@ class ContextService(dbus.service.Object):
         )
         self._clipboard_history = self._clipboard_store.to_deque()
         self._clipboard_watcher = None
+        self._config_mtime = 0.0
         self._start_clipboard_watcher()
 
         logger.info("Axon Context Engine Service registered successfully at /org/axonos/Context")
 
     def _load_config(self):
         config_path = Path.home() / ".config" / "axon-os" / "context.json"
-        if config_path.exists():
-            try:
-                with open(config_path) as f:
-                    cfg = json.load(f)
-                    self.track_clipboard = cfg.get("track_clipboard", True)
-                    self.track_terminal_history = cfg.get("track_terminal_history", True)
-                    self.track_open_files = cfg.get("track_open_files", True)
-            except Exception as e:
-                logger.warning("Failed to load context config: %s", e)
+        if not config_path.exists():
+            return
+        try:
+            mtime = config_path.stat().st_mtime
+            if mtime == self._config_mtime:
+                return
+            self._config_mtime = mtime
+            with open(config_path) as f:
+                cfg = json.load(f)
+                self.track_clipboard = cfg.get("track_clipboard", True)
+                self.track_terminal_history = cfg.get("track_terminal_history", True)
+                self.track_open_files = cfg.get("track_open_files", True)
+        except Exception as e:
+            logger.warning("Failed to load context config: %s", e)
 
     # ------------------------------------------------------------------
     # D-Bus Mutation Methods (Called by Shell Extension / Hooks)
@@ -158,6 +164,7 @@ class ContextService(dbus.service.Object):
     @dbus.service.method('org.axonos.Context', in_signature='s', out_signature='s')
     def SemanticSearch(self, query_text):
         """Performs vector search in the indexed documents using sqlite-vec."""
+        conn = None
         try:
             import sqlite3
             from array import array
@@ -202,6 +209,9 @@ class ContextService(dbus.service.Object):
             return json.dumps(results)
         except Exception as e:
             return json.dumps({"error": str(e)})
+        finally:
+            if conn is not None:
+                conn.close()
 
     # ------------------------------------------------------------------
     # D-Bus Signals

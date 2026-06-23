@@ -7,6 +7,14 @@ import Atk from 'gi://Atk';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+function logError(error, message) {
+    if (message) {
+        console.error(`${message}: ${error.message || error}`);
+    } else {
+        console.error(error.message || error);
+    }
+}
+
 // ─── IntentBar ────────────────────────────────────────────────────────────────
 
 export default class IntentBar {

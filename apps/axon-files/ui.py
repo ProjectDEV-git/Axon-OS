@@ -11,6 +11,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+gi.require_version("Gdk", "4.0")
 from file_indexer import FileIndexer, format_size, format_timestamp
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
