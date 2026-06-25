@@ -54,23 +54,29 @@ class GlobalSearchService(dbus.service.Object):
 
     def _get_brain(self):
         if self._brain is None:
-            self._brain = self._get_proxy(
-                "org.axonos.Brain", "/org/axonos/Brain", "org.axonos.Brain"
-            )
+            try:
+                obj = self.session_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+                self._brain = dbus.Interface(obj, "org.axonos.Brain")
+            except dbus.exceptions.DBusException:
+                return None
         return self._brain
 
     def _get_search(self):
         if self._search is None:
-            self._search = self._get_proxy(
-                "org.axonos.Search", "/org/axonos/Search", "org.axonos.Search"
-            )
+            try:
+                obj = self.session_bus.get_object("org.axonos.Search", "/org/axonos/Search")
+                self._search = dbus.Interface(obj, "org.axonos.Search")
+            except dbus.exceptions.DBusException:
+                return None
         return self._search
 
     def _get_context(self):
         if self._context is None:
-            self._context = self._get_proxy(
-                "org.axonos.Context", "/org/axonos/Context", "org.axonos.Context"
-            )
+            try:
+                obj = self.session_bus.get_object("org.axonos.Context", "/org/axonos/Context")
+                self._context = dbus.Interface(obj, "org.axonos.Context")
+            except dbus.exceptions.DBusException:
+                return None
         return self._context
 
     # ------------------------------------------------------------------

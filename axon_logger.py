@@ -2,6 +2,7 @@
 
 Provides `configure_app_logger` for simple, consistent logging across packages.
 """
+
 import json
 import logging
 import logging.handlers
@@ -62,7 +63,7 @@ def configure_app_logger(
 
     try:
         log_path = Path(log_file)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
         file_handler = logging.handlers.RotatingFileHandler(
             log_file,
             maxBytes=10 * 1024 * 1024,
@@ -71,7 +72,7 @@ def configure_app_logger(
         file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-    except OSError:
-        pass  # log directory not writable (e.g. /var/log in tests)
+    except OSError as e:
+        print(f"axon_logger: cannot create log file: {e}", file=sys.stderr)  # noqa: T201
 
     return logger

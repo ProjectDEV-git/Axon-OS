@@ -217,6 +217,9 @@ class Partitioner:
                 return None
 
             # Calculate new size in MiB
+            # NOTE: For ext4, resize2fs handles used-space validation automatically.
+            # For NTFS, ntfsresize also refuses to shrink below used space.
+            # No explicit used-space pre-check is needed here.
             shrink_size_mib = shrink_size_gb * 1024
             original_size_mib = target["size"]
             new_size_mib = original_size_mib - shrink_size_mib
@@ -230,7 +233,7 @@ class Partitioner:
 
             # Step 1: Shrink filesystem first
             if target["fstype"] in ("ext4", "ext3"):
-                self._run(["e2fsck", "-f", "-y", part_path])
+                self._run(["e2fsck", "-f", "-p", part_path])
                 self._run(["resize2fs", part_path, f"{int(new_size_mib)}M"])
             elif target["fstype"] in ("ntfs", "fuseblk"):
                 self._run(["ntfsresize", "-y", "--size", f"{int(new_size_mib)}M", part_path])

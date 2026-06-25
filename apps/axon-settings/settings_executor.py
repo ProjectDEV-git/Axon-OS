@@ -1,7 +1,10 @@
 import json
+import logging
 import subprocess
 
 import dbus
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsExecutor:
@@ -157,8 +160,8 @@ class SettingsExecutor:
                     ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{vol}%"], check=True
                 )
                 return {"success": True, "message": f"Volume adjusted to {vol}%."}
-        except Exception:
-            # Fallback to amixer if pactl fails
+        except (subprocess.SubprocessError, OSError, ValueError) as e:
+            logger.debug("pactl failed, trying amixer: %s", e)
             try:
                 if value == "mute":
                     subprocess.run(["amixer", "set", "Master", "mute"], check=True)

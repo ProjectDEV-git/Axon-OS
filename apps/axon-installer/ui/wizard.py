@@ -211,6 +211,7 @@ class InstallerWindow(Adw.Window):
         self._live = is_live_session()
         self._engine_proc = None
         self._install_failed = False
+        self._poll_running = False
 
         # Wizard state collected across pages
         self.state = {
@@ -477,6 +478,10 @@ class InstallerWindow(Adw.Window):
         return outer
 
     def _poll_connectivity(self) -> bool:
+        if self._poll_running:
+            return True
+        self._poll_running = True
+
         def check():
             try:
                 out = subprocess.run(
@@ -488,6 +493,7 @@ class InstallerWindow(Adw.Window):
             except Exception:
                 out = "unknown"
             GLib.idle_add(self._set_net_status, out)
+            self._poll_running = False
 
         threading.Thread(target=check, daemon=True).start()
         return True  # keep the timeout alive

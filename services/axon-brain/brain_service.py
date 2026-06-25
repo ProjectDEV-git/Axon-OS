@@ -262,6 +262,8 @@ class BrainService(dbus.service.Object):
 
     @dbus.service.method("org.axonos.Brain", in_signature="sss", out_signature="b")
     def AddMessage(self, conversation_id, role, content):
+        if role not in ("user", "assistant", "system"):
+            role = "user"
         self.store.add_message(conversation_id, role, content)
         return True
 
@@ -310,7 +312,7 @@ class BrainService(dbus.service.Object):
     def ClassifyWindow(self, title, wm_class):
         """Classifies a newly opened window title/class into one of the 9 spaces."""
         model = self.config["speed_model"]
-        prompt = f"App: {wm_class}\nWindow Title: {title}"
+        prompt = f"App: {_sanitize_context(wm_class)}\nWindow Title: {_sanitize_context(title)}"
         system_prompt = (
             "You are a workspace routing assistant for Axon OS. Classify this window into one of these 9 workspace spaces:\n"
             "Code, Web, Chat, Files, Media, Work, Personal, Terminal, Notes.\n"
@@ -476,7 +478,8 @@ class BrainService(dbus.service.Object):
                     total = data.get("total", 0)
                     self.PullProgress(model_name, completed, total, status)
         except Exception as e:
-            self.PullProgress(model_name, 0, 0, f"Error: {e}")
+            logger.debug("Pull failed for %s: %s", model_name, e)
+            self.PullProgress(model_name, 0, 0, "Pull failed")
 
     def _do_generate_sync(self, prompt, system, model):
         try:
@@ -506,7 +509,8 @@ class BrainService(dbus.service.Object):
                         self.TokenGenerated(tx_id, _sanitize_output(token))
             self.GenerationCompleted(tx_id, True, "")
         except Exception as e:
-            self.GenerationCompleted(tx_id, False, str(e))
+            logger.debug("Generate stream failed: %s", e)
+            self.GenerationCompleted(tx_id, False, "Generation failed")
 
     def _do_chat_sync(self, conv_id, context, model):
         messages = self.store.get_messages(conv_id)
@@ -558,7 +562,8 @@ class BrainService(dbus.service.Object):
             self.store.add_message(conv_id, "assistant", accumulated)
             self.GenerationCompleted(tx_id, True, "")
         except Exception as e:
-            self.GenerationCompleted(tx_id, False, str(e))
+            logger.debug("Chat stream failed: %s", e)
+            self.GenerationCompleted(tx_id, False, "Chat failed")
 
 
 if __name__ == "__main__":

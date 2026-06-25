@@ -178,7 +178,9 @@ class Telemetry:
                     "events": self._daily["events"],
                     "services": self._daily.get("services", []),
                 }
-                self._daily_file().write_text(json.dumps(save_data, indent=2))
+                tmp = self._daily_file().with_suffix(".tmp")
+                tmp.write_text(json.dumps(save_data, indent=2))
+                tmp.replace(self._daily_file())
             except Exception:
                 pass
 

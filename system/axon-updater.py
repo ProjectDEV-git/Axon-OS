@@ -191,7 +191,9 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
             self._set_status("Update Failed: apt-get update returned an error.", 0.0)
             self._set_phase("")
             self._progress_remove_add("error")
-            GLib.idle_add(self._show_error_dialog, "Failed to update package lists. Check terminal logs.")
+            GLib.idle_add(
+                self._show_error_dialog, "Failed to update package lists. Check terminal logs."
+            )
             GLib.idle_add(self._btn.set_sensitive, True)
             return
         self._set_progress(0.45)
@@ -204,7 +206,9 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
             self._set_status("Update Failed.", 0.0)
             self._set_phase("")
             self._progress_remove_add("error")
-            GLib.idle_add(self._show_error_dialog, "System package update failed. Check terminal logs.")
+            GLib.idle_add(
+                self._show_error_dialog, "System package update failed. Check terminal logs."
+            )
             GLib.idle_add(self._btn.set_sensitive, True)
             return
         self._set_progress(0.70)
@@ -259,10 +263,12 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
 
     def _progress_remove_add(self, css_class: str) -> None:
         """Remove all state classes then add *css_class*."""
+
         def _apply():
             for cls in ("complete", "error"):
                 self._progress.remove_css_class(cls)
             self._progress.add_css_class(css_class)
+
         GLib.idle_add(_apply)
 
 

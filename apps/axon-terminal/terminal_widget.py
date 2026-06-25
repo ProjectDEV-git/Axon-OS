@@ -274,7 +274,7 @@ class TerminalWidget(Gtk.Box):
                 shell = config_path.read_text().strip()
             except Exception:
                 pass
-        if not shell or not Path(shell).exists():
+        if not Path(shell).exists() or not os.access(shell, os.X_OK):
             shell = os.environ.get("SHELL", "/bin/bash")
 
         term.spawn_async(

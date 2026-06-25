@@ -426,8 +426,14 @@ class ContextService(dbus.service.Object):
         fish_history = Path.home() / ".local" / "share" / "fish" / "fish_history"
         if fish_history.exists():
             try:
-                text = fish_history.read_text(errors="replace")
-                commands = re.findall(r"^- cmd: (.+)$", text, re.MULTILINE)
+                commands = []
+                with open(fish_history, errors="replace") as f:
+                    for line in f:
+                        match = re.match(r"^- cmd: (.+)$", line.strip())
+                        if match:
+                            commands.append(match.group(1))
+                            if len(commands) > n * 2:
+                                commands = commands[-n:]
                 return commands[-n:]
             except Exception as e:
                 logger.debug("Failed to read fish history: %s", e)

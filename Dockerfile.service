@@ -34,13 +34,13 @@ USER axon
 
 CMD ["sh", "-c", "\
   case \"$AXON_SERVICE\" in \
-    brain)        python3 services/axon-brain/brain_service.py ;; \
-    context)      python3 services/axon-context/context_service.py ;; \
-    search)       python3 services/axon-search/search_service.py ;; \
-    voice)        python3 services/axon-voice/voice_service.py ;; \
-    gui-agent)    python3 services/axon-gui-agent/gui_agent_service.py ;; \
-    sandbox)      python3 services/axon-sandbox/sandbox_manager.py ;; \
-    global-search) python3 services/axon-search/global_search_service.py ;; \
+    brain)        exec python3 services/axon-brain/brain_service.py ;; \
+    context)      exec python3 services/axon-context/context_service.py ;; \
+    search)       exec python3 services/axon-search/search_service.py ;; \
+    voice)        exec python3 services/axon-voice/voice_service.py ;; \
+    gui-agent)    exec python3 services/axon-gui-agent/gui_agent_service.py ;; \
+    sandbox)      exec python3 services/axon-sandbox/sandbox_manager.py ;; \
+    global-search) exec python3 services/axon-search/global_search_service.py ;; \
     *)            echo \"Unknown service: $AXON_SERVICE\"; exit 1 ;; \
   esac \
 "]

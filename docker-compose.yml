@@ -1,5 +1,3 @@
-version: "3.8"
-
 # Axon OS Docker Compose — runs all services in containers.
 # Usage: docker compose up -d
 # Each service connects to Ollama (host network) and the D-Bus session bus.
@@ -8,7 +6,7 @@ x-common-env: &common-env
   PYTHONUNBUFFERED: "1"
   OLLAMA_BASE_URL: http://host.docker.internal:11434
   AXON_DIR: /data/axon
-  DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
+  DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/${UID:-1000}/bus
 
 services:
   axon-brain:
@@ -17,6 +15,8 @@ services:
       dockerfile: Dockerfile.service
     container_name: axon-brain
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       <<: *common-env
       AXON_SERVICE: brain
@@ -36,6 +36,8 @@ services:
       dockerfile: Dockerfile.service
     container_name: axon-context
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       <<: *common-env
       AXON_SERVICE: context
@@ -53,6 +55,8 @@ services:
       dockerfile: Dockerfile.service
     container_name: axon-search
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       <<: *common-env
       AXON_SERVICE: search
@@ -93,6 +97,8 @@ services:
       dockerfile: Dockerfile.service
     container_name: axon-gui-agent
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       <<: *common-env
       AXON_SERVICE: gui-agent
@@ -108,6 +114,8 @@ services:
       dockerfile: Dockerfile.service
     container_name: axon-sandbox
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       <<: *common-env
       AXON_SERVICE: sandbox
@@ -125,6 +133,8 @@ services:
       dockerfile: Dockerfile.service
     container_name: axon-global-search
     restart: unless-stopped
+    cap_drop:
+      - ALL
     environment:
       <<: *common-env
       AXON_SERVICE: global-search

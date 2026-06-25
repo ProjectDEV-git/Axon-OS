@@ -15,9 +15,14 @@ gi.require_version("Gdk", "4.0")
 from file_indexer import FileIndexer, format_size, format_timestamp
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
+_css_loaded = False
+
 
 def load_css():
     """Loads application CSS styling."""
+    global _css_loaded
+    if _css_loaded:
+        return
     css_path = Path(__file__).parent / "main.css"
     if css_path.exists():
         provider = Gtk.CssProvider()
@@ -27,6 +32,7 @@ def load_css():
             provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
+    _css_loaded = True
 
 
 class SidebarRow(Gtk.ListBoxRow):
@@ -386,7 +392,7 @@ class FilesWindow(Adw.ApplicationWindow):
         self.update_path_bar()
 
         # Match sidebar selection if it matches one of the root folders
-        for idx in range(self.sidebar_list.get_child_visible() or 8):
+        for idx in range(8):
             row = self.sidebar_list.get_row_at_index(idx)
             if row and row.path_val == self.current_dir:
                 self.sidebar_list.select_row(row)
@@ -1060,8 +1066,8 @@ def list_directory_contents(dir_path, indexer):
 
             entry_str = str(entry)
             try:
-                stat = entry.stat()
-                mtime = stat.st_mtime
+                file_stat = entry.stat()
+                mtime = file_stat.st_mtime
             except Exception:
                 continue
 
@@ -1100,7 +1106,7 @@ def list_directory_contents(dir_path, indexer):
                             "file_path": entry_str,
                             "file_name": entry.name,
                             "file_type": entry.suffix.lower().lstrip("."),
-                            "file_size": stat.st_size,
+                            "file_size": file_stat.st_size,
                             "last_modified": mtime,
                             "content_summary": "File is not yet indexed (Sync Index)",
                             "similarity": 0.0,

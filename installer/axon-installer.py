@@ -168,8 +168,10 @@ class UserSetupPage(Gtk.Box):
             return "Hostname cannot be empty."
         if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,61}[a-zA-Z0-9])?$", v["hostname"]):
             return "Hostname must be a valid RFC 1123 name (letters, digits, hyphens, dots)."
-        if v["timezone"] and not re.match(r"^[A-Za-z0-9_/-]+$", v["timezone"]):
-            return "Timezone must contain only letters, digits, underscores, hyphens, and slashes."
+        if v["timezone"] and (
+            ".." in v["timezone"] or not re.match(r"^[A-Za-z0-9_/.-]+$", v["timezone"])
+        ):
+            return "Invalid timezone format."
         if v["keymap"] and not re.match(r"^[A-Za-z0-9_-]+$", v["keymap"]):
             return "Keymap must contain only letters, digits, underscores, and hyphens."
         return None
@@ -781,11 +783,17 @@ class InstallerApp(Adw.ApplicationWindow):
 
             self._set_progress(0.85, "Creating swapfile…")
             if not part.dry_run:
+                subprocess.run(["chroot", mount, "chattr", "+C", "/swapfile"], check=False)
                 subprocess.run(["chroot", mount, "fallocate", "-l", "2G", "/swapfile"], check=False)
                 subprocess.run(["chroot", mount, "chmod", "600", "/swapfile"], check=False)
                 subprocess.run(["chroot", mount, "mkswap", "/swapfile"], check=False)
-                with open(os.path.join(mount, "etc", "fstab"), "a") as f:
-                    f.write("/swapfile none swap sw 0 0\n")
+                fstab_path = os.path.join(mount, "etc", "fstab")
+                existing = ""
+                if os.path.exists(fstab_path):
+                    existing = open(fstab_path).read()
+                if "/swapfile" not in existing:
+                    with open(fstab_path, "a") as f:
+                        f.write("/swapfile none swap sw 0 0\n")
 
             self._set_progress(0.90, "Installing bootloader (configuring dual boot GRUB)…")
             if not part.dry_run:

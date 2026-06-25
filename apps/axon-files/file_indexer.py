@@ -43,6 +43,8 @@ logger = configure_app_logger(__name__)
 def format_size(size_in_bytes):
     if size_in_bytes is None:
         return ""
+    if size_in_bytes < 0:
+        return "Unknown"
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_in_bytes < 1024.0:
             return f"{size_in_bytes:.1f} {unit}" if unit != "B" else f"{size_in_bytes} B"

@@ -91,6 +91,12 @@ class FileIndexer:
             if not p.exists() or not p.is_file():
                 return
 
+            try:
+                if p.stat().st_size > 512 * 1024:
+                    return
+            except OSError:
+                return
+
             mtime = p.stat().st_mtime
 
             # Check DB

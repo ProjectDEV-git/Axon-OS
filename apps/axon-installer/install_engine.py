@@ -34,6 +34,7 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 TARGET = "/target"
 MIN_INSTALL_MIB = 16384  # 16 GiB minimum for the root partition
@@ -531,7 +532,7 @@ def strip_live_artifacts() -> None:
         if os.path.exists(full):
             os.remove(full)
     # Fresh machine identity on first boot
-    open(f"{TARGET}/etc/machine-id", "w").close()
+    Path(f"{TARGET}/etc/machine-id").write_text("")
 
 
 def install_bootloader(disk: str, mode: str) -> None:

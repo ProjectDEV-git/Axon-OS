@@ -408,17 +408,19 @@ class ModelMarketplaceService(dbus.service.Object):
                 result = json.loads(CATALOG_FILE.read_text())
                 if isinstance(result, list):
                     return result
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("Catalog file unreadable, resetting to defaults: %s", e)
         self._save_catalog(DEFAULT_CATALOG)
         return DEFAULT_CATALOG
 
     def _save_catalog(self, catalog: list) -> None:
         try:
             AXON_DIR.mkdir(parents=True, exist_ok=True)
-            CATALOG_FILE.write_text(json.dumps(catalog, indent=2))
-        except Exception:
-            pass
+            tmp = CATALOG_FILE.with_suffix(".tmp")
+            tmp.write_text(json.dumps(catalog, indent=2))
+            tmp.replace(CATALOG_FILE)
+        except Exception as e:
+            log.warning("Failed to save catalog: %s", e)
 
     def _find_in_catalog(self, name: str) -> dict | None:
         for m in self._catalog:

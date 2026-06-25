@@ -30,9 +30,8 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
 
         self._executor = SettingsExecutor()
 
-        # Load styling sheet
         css_path = Path(__file__).resolve().parent / "main.css"
-        if css_path.exists():
+        if css_path.exists() and not hasattr(AxonSettingsWindow, "_css_loaded"):
             css_provider = Gtk.CssProvider()
             css_provider.load_from_path(str(css_path))
             Gtk.StyleContext.add_provider_for_display(
@@ -40,6 +39,7 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
                 css_provider,
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
             )
+            AxonSettingsWindow._css_loaded = True
 
         # Main Layout
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
