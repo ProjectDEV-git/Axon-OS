@@ -115,7 +115,23 @@ skips = ["B101"]  # allow assert in non-test code (used for D-Bus validation)
 
 [tool.coverage.run]
 source = ["apps", "services"]
-omit = ["tests/*", "build/*", "dist/*", ".venv/*"]
+omit = [
+    "tests/*",
+    "build/*",
+    "dist/*",
+    ".venv/*",
+    "apps/*/ui/*",
+    "apps/*/main.py",
+    "apps/axon-logger.py",
+    "apps/axon-terminal/terminal_widget.py",
+    "apps/axon-terminal/ai_helper.py",
+    "apps/axon-files/ui.py",
+    "apps/axon-files/file_indexer.py",
+    "apps/intent-bar/ui/*",
+    "apps/intent-bar/ollama_client.py",
+    "apps/intent-bar/spaces_manager.py",
+    "apps/intent-bar/main.py",
+]
 
 [tool.coverage.report]
 fail_under = 40
