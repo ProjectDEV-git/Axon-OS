@@ -100,3 +100,17 @@ dmypy.json
 
 # Ignore build ISOs
 *.iso
+
+# Kernel build artifacts
+kernel/**/*.o
+kernel/**/*.ko
+kernel/**/*.mod
+kernel/**/*.mod.c
+kernel/**/*.mod.o
+kernel/**/.cmd
+kernel/**/Module.symvers
+kernel/**/modules.order
+kernel/**/.module-common.o
+
+# wget logs
+wget-log.*

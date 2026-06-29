@@ -381,7 +381,7 @@ class AdvancedVoiceService(dbus.service.Object):
                     rec.AcceptWaveform(data)
 
             result = json.loads(rec.FinalResult())
-            return result.get("text", "")
+            return str(result.get("text", ""))
         except ImportError:
             log.warning("Vosk not installed, falling back to whisper")
             return self._transcribe_whisper(file_path)

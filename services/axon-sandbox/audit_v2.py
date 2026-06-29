@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import shlex
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -62,7 +63,7 @@ class ThreatRule:
     name: str
     severity: Severity
     description: str
-    match_fn: object  # Callable[[CommandNode], bool]
+    match_fn: Callable[[CommandNode], bool]
 
 
 def _is_dangerous_rm(node: CommandNode) -> bool:
@@ -417,7 +418,7 @@ def analyze_script_ast(text: str) -> list[Finding]:
             continue
 
         # Walk the pipeline and check each node
-        current = node
+        current: CommandNode | None = node
         while current:
             for rule in _THREAT_RULES:
                 try:

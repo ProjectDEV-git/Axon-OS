@@ -150,7 +150,6 @@ wireless-tools
 iw
 rfkill
 wpasupplicant
-bcmwl-kernel-source
 
 # Bluetooth
 bluez
@@ -245,8 +244,30 @@ steam-devices
 lutris
 gamemode
 mangohud
+# DirectX translation layers (DXVK + vkd3d-proton)
+dxvk
+vkd3d-proton
+# Vulkan runtime
+mesa-vulkan-drivers
+vulkan-tools
+libvulkan1
+libvulkan-dev
+# Gamepad support
+libevdev-dev
+libudev-dev
+joystick
+jstest-gtk
+# Audio (PipeWire already installed for system, add -dev for WASAPI bridge)
+libpipewire-0.3-dev
+libspa-0.2-dev
 wine64
 wine32:i386
+
+# ── Windows ABI desktop integration ─────────────────────────────────────────
+xdg-utils
+shared-mime-info
+desktop-file-utils
+polkitd
 
 # ── Everyday Tasks & Utilities ────────────────────────────────────────────────
 flatpak

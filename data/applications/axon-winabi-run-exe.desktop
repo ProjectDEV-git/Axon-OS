@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Windows Application Launcher
+Comment=Run Windows applications on Axon OS
+Exec=axon-winabi-run %f
+Icon=application-x-executable
+Terminal=false
+MimeType=application/x-ms-dos-executable;application/x-ms-shortcut;application/x-ms-installer;
+NoDisplay=true
+Categories=System;
+StartupNotify=false

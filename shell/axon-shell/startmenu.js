@@ -352,7 +352,7 @@ class StartMenuPopup extends St.BoxLayout {
                 try {
                     let [, stdout, stderr] = p.communicate_utf8_finish(res);
                     if (p.get_successful() && stdout && stdout.length > 0) {
-                        const lines = stdout.split('\\n');
+                        const lines = stdout.split('\n');
                         let count = 0;
                         lines.forEach(line => {
                             if (!line.trim()) return;

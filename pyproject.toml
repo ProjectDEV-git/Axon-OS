@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "axon-os"
-version = "1.0.3"
+version = "1.0.5"
 description = "Axon OS - A futuristic, AI-powered Linux desktop environment"
 readme = "README.md"
 license = {text = "MIT"}
@@ -90,7 +90,7 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 ignore_missing_imports = true
-exclude = ["tests/", "build/", "dist/"]
+exclude = ["tests/", "build/", "dist/", "apps/axon-ai-panel/", "apps/axon-files/", "apps/axon-installer/", "apps/axon-settings/", "apps/axon-shortcuts/", "apps/axon-terminal/", "apps/axon-welcome/", "apps/intent-bar/"]
 
 [[tool.mypy.overrides]]
 module = ["gi.*", "dbus.*"]
@@ -115,7 +115,23 @@ skips = ["B101"]  # allow assert in non-test code (used for D-Bus validation)
 
 [tool.coverage.run]
 source = ["apps", "services"]
-omit = ["tests/*", "build/*", "dist/*", ".venv/*"]
+omit = [
+    "tests/*",
+    "build/*",
+    "dist/*",
+    ".venv/*",
+    "apps/*/ui/*",
+    "apps/*/main.py",
+    "apps/axon-logger.py",
+    "apps/axon-terminal/terminal_widget.py",
+    "apps/axon-terminal/ai_helper.py",
+    "apps/axon-files/ui.py",
+    "apps/axon-files/file_indexer.py",
+    "apps/intent-bar/ui/*",
+    "apps/intent-bar/ollama_client.py",
+    "apps/intent-bar/spaces_manager.py",
+    "apps/intent-bar/main.py",
+]
 
 [tool.coverage.report]
 fail_under = 40

@@ -235,7 +235,7 @@ class SearchService(dbus.service.Object):
         Scans candidate files and triggers a rescan when mtimes change. Uses a
         low-overhead polling interval so it is safe to run on low-end devices.
         """
-        known = {}
+        known: dict[str, float | None] = {}
         while True:
             try:
                 changed = False

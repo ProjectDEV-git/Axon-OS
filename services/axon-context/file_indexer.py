@@ -48,7 +48,7 @@ class FileIndexer:
         """Close the database connection."""
         if self.conn:
             self.conn.close()
-            self.conn = None
+            self.conn = None  # type: ignore[assignment]
 
     def __del__(self):
         self.close()

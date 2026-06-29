@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-ms-dos-executable">
+    <comment>Windows Executable</comment>
+    <comment xml:lang="es">Ejecutable de Windows</comment>
+    <glob pattern="*.exe"/>
+    <glob pattern="*.EXE"/>
+    <magic priority="60">
+      <match value="0x4d5a" type="big16" offset="0"/>
+    </magic>
+    <sub-class-of type="application/x-executable"/>
+  </mime-type>
+  <mime-type type="application/x-ms-shortcut">
+    <comment>Windows Shortcut</comment>
+    <glob pattern="*.lnk"/>
+    <glob pattern="*.LNK"/>
+  </mime-type>
+  <mime-type type="application/x-ms-installer">
+    <comment>Windows Installer Package</comment>
+    <glob pattern="*.msi"/>
+    <glob pattern="*.MSI"/>
+  </mime-type>
+</mime-info>

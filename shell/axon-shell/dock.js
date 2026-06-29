@@ -349,12 +349,14 @@ export default class DockManager {
         // Restore native GNOME panel items
         const quickSettings = this._actor ? this._actor._quickSettingsHolder : null;
         if (quickSettings && Main.panel) {
-            quickSettings.get_parent().remove_child(quickSettings);
+            const qsParent = quickSettings.get_parent();
+            if (qsParent) qsParent.remove_child(quickSettings);
             Main.panel._rightBox.add_child(quickSettings);
         }
         const dateMenu = this._actor ? this._actor._dateMenuHolder : null;
         if (dateMenu && Main.panel) {
-            dateMenu.get_parent().remove_child(dateMenu);
+            const dmParent = dateMenu.get_parent();
+            if (dmParent) dmParent.remove_child(dateMenu);
             Main.panel._centerBox.add_child(dateMenu);
         }
 

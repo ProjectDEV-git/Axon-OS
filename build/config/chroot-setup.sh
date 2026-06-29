@@ -67,12 +67,27 @@ done
 # ---------------------------------------------------------------------------
 log "Installing desktop packages from packages.list..."
 mapfile -t PACKAGES < <(grep -vE '^\s*(#|$)' "${SRC}/build/config/packages.list")
-if ! apt-get install -y "${PACKAGES[@]}"; then
+# DKMS/WiFi packages often fail on mismatched kernels — install them last
+# and tolerate failures so the rest of the build continues.
+DKMS_PACKAGES=(bcmwl-kernel-source broadcom-sta-dkms)
+NON_DKMS_PACKAGES=()
+for p in "${PACKAGES[@]}"; do
+    skip=false
+    for dk in "${DKMS_PACKAGES[@]}"; do
+        [[ "${p}" == "${dk}" ]] && skip=true && break
+    done
+    ${skip} || NON_DKMS_PACKAGES+=("${p}")
+done
+if ! apt-get install -y "${NON_DKMS_PACKAGES[@]}"; then
     log "Bulk install failed — retrying packages one at a time..."
-    for p in "${PACKAGES[@]}"; do
+    for p in "${NON_DKMS_PACKAGES[@]}"; do
         apt-get install -y "${p}" || log "WARNING: package ${p} failed to install"
     done
 fi
+# Install DKMS packages separately, tolerate failure (host kernel may differ)
+for p in "${DKMS_PACKAGES[@]}"; do
+    apt-get install -y "${p}" 2>/dev/null || log "WARNING: DKMS package ${p} failed (expected if host kernel differs)"
+done
 
 log "Adding flathub remote..."
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
@@ -280,6 +295,90 @@ StartupNotify=false
 X-GNOME-Autostart-enabled=true
 X-GNOME-Autostart-Phase=Applications
 EOF
+
+# ── 5a. Axon Windows ABI kernel module ──────────────────────────────────────
+log "Building Axon Windows ABI kernel module..."
+if [[ -d "${SRC}/kernel/axon-winabi" ]]; then
+    # Install kernel headers if not already present
+    apt-get install -y linux-headers-$(uname -r) || \
+        apt-get install -y linux-headers-generic || \
+        log "WARNING: could not install kernel headers — Windows ABI module skipped"
+
+    if [[ -d /usr/src/linux-headers-$(uname -r) ]]; then
+        (cd "${SRC}/kernel/axon-winabi" && \
+         make KDIR=/usr/src/linux-headers-$(uname -r) && \
+         make KDIR=/usr/src/linux-headers-$(uname -r) install) || \
+            log "WARNING: Windows ABI kernel module build failed"
+
+        # Auto-load the module on boot
+        echo "axon-winabi" >> /etc/modules-load.d/axon-winabi.conf 2>/dev/null || \
+            echo "axon-winabi" > /etc/modules-load.d/axon-winabi.conf
+
+        # Configure binfmt_misc support
+        echo "binfmt_misc" >> /etc/modules-load.d/binfmt.conf 2>/dev/null || \
+            echo "binfmt_misc" > /etc/modules-load.d/binfmt.conf
+    fi
+else
+    log "Windows ABI module source not found — skipping"
+fi
+
+# ── 5a2. DirectX / Gaming integration ──────────────────────────────────────
+log "Configuring DirectX translation layers..."
+# Register DXVK and vk3d-proton DLL overrides
+mkdir -p /usr/lib/axon-winabi/dlls
+# Symlink DXVK native libraries
+for dll in d3d9 d3d10 d3d10_1 d3d10core d3d11 dxgi; do
+    if [ -f "/usr/lib/dxvk/${dll}.dll.so" ]; then
+        ln -sf "/usr/lib/dxvk/${dll}.dll.so" "/usr/lib/axon-winabi/dlls/${dll}.dll.so"
+        log "Linked DXVK ${dll}"
+    fi
+done
+# Symlink vkd3d-proton
+for dll in d3d12; do
+    if [ -f "/usr/lib/vkd3d-proton/${dll}.dll.so" ]; then
+        ln -sf "/usr/lib/vkd3d-proton/${dll}.dll.so" "/usr/lib/axon-winabi/dlls/${dll}.dll.so"
+        log "Linked vkd3d-proton ${dll}"
+    fi
+done
+
+# ── 5a3. Windows ABI desktop integration ─────────────────────────────────────
+log "Configuring Windows ABI desktop integration..."
+
+# Install launcher script
+install -Dm755 "${SRC}/scripts/axon-winabi-run" /usr/local/bin/axon-winabi-run
+install -Dm755 "${SRC}/scripts/axon-winabi-sandbox" /usr/local/bin/axon-winabi-sandbox
+
+# MIME type for .exe files
+cp "${SRC}/data/mime/axon-winabi-exe.xml" /usr/share/mime/packages/
+update-mime-database /usr/share/mime || true
+
+# Desktop entries for file associations
+cp "${SRC}/data/applications/axon-winabi-run-exe.desktop" /usr/share/applications/
+cp "${SRC}/data/applications/axon-winabi-exe-handler.desktop" /usr/share/applications/
+update-desktop-database /usr/share/applications || true
+
+# Polkit policy
+cp "${SRC}/data/polkit/org.axonos.winabi.policy" /usr/share/polkit-1/actions/
+
+# Create registry directory
+mkdir -p /var/lib/axon-winabi/registry
+
+# Create default Windows C: drive structure
+mkdir -p /usr/lib/axon-winabi/drive_c/windows/system32
+mkdir -p /usr/lib/axon-winabi/drive_c/windows/temp
+mkdir -p /usr/lib/axon-winabi/drive_c/Program\ Files
+mkdir -p /usr/lib/axon-winabi/drive_c/users
+
+# Set up default environment
+cat > /etc/profile.d/axon-winabi.sh <<'EOF'
+# Axon Windows ABI environment
+export WINEDLLPATH=/usr/lib/axon-winabi/dlls
+export WINEPREFIX=${HOME}/.axon-winabi/prefix
+export AXON_WINABI=1
+EOF
+
+# GNOME desktop integration: set .exe as default handler for PE files
+xdg-mime default axon-winabi-run-exe.desktop application/x-ms-dos-executable 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # 5b. Networking — hand every interface to NetworkManager
@@ -523,7 +622,8 @@ log "Regenerating initramfs..."
 update-initramfs -u -k all
 
 log "Cleaning up..."
-apt-get autoremove -y
+dpkg --configure -a 2>/dev/null || log "WARNING: dpkg configure had errors (DKMS-related, non-fatal)"
+apt-get autoremove -y 2>/dev/null || log "WARNING: autoremove had errors (non-fatal)"
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 rm -f /usr/sbin/policy-rc.d /root/.bash_history /root/.wget-hsts

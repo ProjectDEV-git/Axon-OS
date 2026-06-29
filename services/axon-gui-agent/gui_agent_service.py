@@ -96,7 +96,8 @@ class GuiAgentService(dbus.service.Object):
         if raw is None:
             return {"ok": False, "error": "AI brain unavailable", "executed": [], "skipped": []}
         ops, errors = plan_mod.validate_plan(raw)
-        executed, failed = [], []
+        executed: list[str] = []
+        failed: list[str] = []
         for op in ops:
             ok, detail = self._apply(op)
             (executed if ok else failed).append(detail)

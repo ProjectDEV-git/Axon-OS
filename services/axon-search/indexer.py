@@ -6,6 +6,7 @@ Kept free of D-Bus/GTK imports so the logic is unit-testable.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 # File types worth embedding: prose, notes, code, configs.
@@ -135,7 +136,7 @@ def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) 
     return chunks
 
 
-def iter_candidate_files(home: str | Path, roots: tuple[str, ...] = DEFAULT_ROOTS):
+def iter_candidate_files(home: str | Path, roots: tuple[str, ...] = DEFAULT_ROOTS) -> Iterator[str]:
     """Yield indexable file paths beneath the given home-relative roots."""
     home = Path(home)
     seen: set[str] = set()

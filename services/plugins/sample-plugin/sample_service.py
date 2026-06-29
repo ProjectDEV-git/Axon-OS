@@ -27,7 +27,7 @@ class SamplePluginService(ServiceBase):
         return f"Hello from SamplePlugin! (call #{self._counter})"
 
     @dbus.service.method("org.axonos.plugins.Sample", out_signature="s")
-    def Echo(self, message: str):
+    def Echo(self, message: str) -> str:
         return message
 
 

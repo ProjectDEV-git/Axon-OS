@@ -8,6 +8,7 @@ chrome. Fades out automatically when listening stops.
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import gi
 
@@ -109,7 +110,7 @@ class VoiceOverlay:
             self._status_label.set_text(self._status)
         return True
 
-    def _draw_wave(self, _area, cr, width: int, height: int) -> None:
+    def _draw_wave(self, _area: Any, cr: Any, width: int, height: int) -> None:
         bar_w = width / (_BAR_COUNT * 1.6)
         gap = bar_w * 0.6
         mid = height / 2.0

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# axon-winabi-sandbox — Sandboxed execution of Windows .exe files
+# Usage: axon-winabi-sandbox <file.exe> [args...]
+set -euo pipefail
+
+EXE="${1:?Usage: axon-winabi-sandbox <file.exe> [args...]}"
+shift
+EXE_ARGS=("$@")
+
+if [[ ! -f "$EXE" ]]; then
+    echo "Error: file not found: $EXE" >&2
+    exit 1
+fi
+
+WINEPREFIX="${HOME}/.axon-winabi/prefix"
+WINEDRIVE="${WINEPREFIX}/drive_c"
+EXE_DIR=$(dirname "$(realpath "$EXE")")
+EXE_BASENAME=$(basename "$EXE")
+
+# Create isolated temp directory for this run
+SANDBOX_TMP=$(mktemp -d /tmp/axon-winabi-XXXXXX)
+trap 'rm -rf "$SANDBOX_TMP"' EXIT
+
+# Copy exe into sandbox
+cp "$EXE" "${SANDBOX_TMP}/${EXE_BASENAME}"
+
+exec bwrap \
+    --ro-bind / / \
+    --dev /dev \
+    --proc /proc \
+    --tmpfs /tmp \
+    --bind "${SANDBOX_TMP}" /tmp \
+    --bind "${WINEPREFIX}" "${WINEPREFIX}" \
+    --ro-bind "${EXE_DIR}" "${EXE_DIR}" \
+    --unshare-net \
+    --unshare-pid \
+    --die-with-parent \
+    --new-session \
+    --cap-drop ALL \
+    --cap-add SYS_CHROOT \
+    --seccomp 3 3< <(cat <<'SECCOMP'
+{
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "architectures": ["SCMP_ARCH_X86_64"],
+  "syscalls": [
+    {"names": ["reboot", "kexec_load", "kexec_file_load", "init_module", "finit_module", "delete_module"], "action": "SCMP_ACT_ERRNO"}
+  ]
+}
+SECCOMP
+) \
+    -- "${SANDBOX_TMP}/${EXE_BASENAME}" "${EXE_ARGS[@]:-}"

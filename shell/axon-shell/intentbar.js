@@ -189,7 +189,7 @@ export default class IntentBar {
         if (this._brainProxy) {
             try {
                 this._brainProxy.Generate(
-                    prompt, '', systemPrompt, false,
+                    prompt, systemPrompt, '', false,
                     (result, error) => {
                         if (error) {
                             logError(error, 'AxonShell: Brain Generate failed');
@@ -212,8 +212,8 @@ export default class IntentBar {
   <interface name="org.axonos.Brain">
     <method name="Generate">
       <arg type="s" name="prompt" direction="in"/>
+      <arg type="s" name="context" direction="in"/>
       <arg type="s" name="model" direction="in"/>
-      <arg type="s" name="system" direction="in"/>
       <arg type="b" name="stream" direction="in"/>
       <arg type="s" name="response" direction="out"/>
     </method>
@@ -226,7 +226,7 @@ export default class IntentBar {
                 '/org/axonos/Brain'
             );
             proxy.Generate(
-                prompt, '', systemPrompt, false,
+                prompt, systemPrompt, '', false,
                 (result, error) => {
                     if (error) {
                         logError(error, 'AxonShell: Brain Generate failed');
@@ -297,7 +297,7 @@ export default class IntentBar {
                     });
                     proc.init(null);
                 } catch(e) {
-                    log(`Failed to launch ${appName}: ${e.message}`);
+                    console.error(`Failed to launch ${appName}: ${e.message}`);
                 }
                 this._setResponse(`Opening ${appName}…`);
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
@@ -319,7 +319,7 @@ export default class IntentBar {
                         proc.init(null);
                     }
                 } catch(e) {
-                    log(`Failed to run command: ${e.message}`);
+                    console.error(`Failed to run command: ${e.message}`);
                 }
                 this._setResponse(`Running: ${action.command}`);
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {

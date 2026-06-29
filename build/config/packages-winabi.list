@@ -1,0 +1,6 @@
+# Axon Windows ABI — additional packages
+linux-headers-generic
+mingw-w64
+wine64
+wine32:i386
+winetricks

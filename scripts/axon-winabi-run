@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# axon-winabi-run — Launch Windows executables on Axon OS
+# Usage: axon-winabi-run [--sandbox] [--debug] <file.exe> [args...]
+set -euo pipefail
+
+WINABI_LIB="/usr/lib/axon-winabi"
+WINABI_DLLS="${WINABI_LIB}/dlls"
+WINABI_REGISTRY="/var/lib/axon-winabi/registry"
+SANDBOX_ENABLED=false
+DEBUG_MODE=false
+
+# Parse arguments
+EXE=""
+EXE_ARGS=()
+for arg in "$@"; do
+    case "$arg" in
+        --sandbox) SANDBOX_ENABLED=true ;;
+        --debug) DEBUG_MODE=true ;;
+        --help|-h)
+            echo "Usage: axon-winabi-run [--sandbox] [--debug] <file.exe> [args...]"
+            echo ""
+            echo "Options:"
+            echo "  --sandbox   Run in a bubblewrap sandbox"
+            echo "  --debug     Enable debug output"
+            echo "  --help      Show this help"
+            exit 0
+            ;;
+        *)
+            if [[ -z "$EXE" ]]; then
+                EXE="$arg"
+            else
+                EXE_ARGS+=("$arg")
+            fi
+            ;;
+    esac
+done
+
+if [[ -z "$EXE" ]]; then
+    echo "Error: no .exe file specified" >&2
+    echo "Usage: axon-winabi-run [--sandbox] [--debug] <file.exe> [args...]" >&2
+    exit 1
+fi
+
+if [[ ! -f "$EXE" ]]; then
+    echo "Error: file not found: $EXE" >&2
+    exit 1
+fi
+
+# Check if the kernel module is loaded
+if ! lsmod | grep -q axon_winabi; then
+    echo "Warning: axon-winabi kernel module not loaded" >&2
+    echo "Attempting to load..." >&2
+    sudo modprobe axon-winabi 2>/dev/null || true
+fi
+
+# Set up environment
+export WINEDLLPATH="${WINABI_DLLS}"
+export WINEPREFIX="${HOME}/.axon-winabi/prefix"
+export WINEDRIVE="${WINEPREFIX}/drive_c"
+
+# Create prefix directory if needed
+mkdir -p "${WINEPREFIX}"
+mkdir -p "${WINEDRIVE}/windows/system32"
+mkdir -p "${WINEDRIVE}/windows/temp"
+
+# Link DLLs into the prefix
+for dll in "${WINABI_DLLS}"/*.c; do
+    name=$(basename "$dll" .c)
+    if [[ ! -e "${WINEDRIVE}/windows/system32/${name}.dll" ]]; then
+        ln -sf "${dll}" "${WINEDRIVE}/windows/system32/${name}.dll" 2>/dev/null || true
+    fi
+done
+
+# Copy exe to prefix if not already there
+EXE_BASENAME=$(basename "$EXE")
+if [[ "$EXE" != "${WINEDRIVE}/$EXE_BASENAME" ]]; then
+    cp -f "$EXE" "${WINEDRIVE}/${EXE_BASENAME}" 2>/dev/null || true
+fi
+
+if [[ "$DEBUG_MODE" == "true" ]]; then
+    echo "[axon-winabi] Executing: ${EXE}"
+    echo "[axon-winabi] DLL Path: ${WINABI_DLLS}"
+    echo "[axon-winabi] Prefix: ${WINEPREFIX}"
+    echo "[axon-winabi] Args: ${EXE_ARGS[*]:-none}"
+fi
+
+# Run with or without sandbox
+if [[ "$SANDBOX_ENABLED" == "true" ]]; then
+    exec bwrap \
+        --ro-bind / / \
+        --dev /dev \
+        --proc /proc \
+        --tmpfs /tmp \
+        --bind "${WINEPREFIX}" "${WINEPREFIX}" \
+        --bind "$(dirname "$EXE")" "$(dirname "$EXE")" \
+        --unshare-net \
+        --die-with-parent \
+        -- "${WINEDRIVE}/${EXE_BASENAME}" "${EXE_ARGS[@]:-}"
+else
+    exec "${WINEDRIVE}/${EXE_BASENAME}" "${EXE_ARGS[@]:-}"
+fi

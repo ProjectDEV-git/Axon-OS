@@ -5,6 +5,7 @@ Provides gettext setup for Python services with fallback to English.
 
 import gettext
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 # Default locale directory
@@ -63,7 +64,7 @@ def setup_i18n(domain: str = _DOMAIN, locale_dir: str | None = None) -> gettext.
     return translation
 
 
-def get_translator(domain: str = _DOMAIN, locale_dir: str | None = None):
+def get_translator(domain: str = _DOMAIN, locale_dir: str | None = None) -> "Callable[[str], str]":
     """Get a translator function for the given domain.
 
     Returns:
@@ -86,4 +87,4 @@ def translate(text: str) -> str:
     Returns:
         The translated string, or the original if no translation is found.
     """
-    return _(text)
+    return str(_(text))

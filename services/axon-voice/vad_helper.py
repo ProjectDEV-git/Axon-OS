@@ -13,7 +13,7 @@ import struct
 from pathlib import Path
 
 try:
-    import webrtcvad  # type: ignore
+    import webrtcvad
 
     HAVE_WEBRTC = True
 except Exception:

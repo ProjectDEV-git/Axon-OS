@@ -147,8 +147,8 @@ const BrainGenerateInterface = `
   <interface name="org.axonos.Brain">
     <method name="Generate">
       <arg type="s" name="prompt" direction="in"/>
+      <arg type="s" name="context" direction="in"/>
       <arg type="s" name="model" direction="in"/>
-      <arg type="s" name="system" direction="in"/>
       <arg type="b" name="stream" direction="in"/>
       <arg type="s" name="response" direction="out"/>
     </method>
@@ -179,71 +179,79 @@ export default class AxonShellExtension extends Extension {
 
     enable() {
         try {
-            this._contextProxy = new ContextProxy(
-                Gio.DBus.session,
-                'org.axonos.Context',
-                '/org/axonos/Context'
-            );
-        } catch (e) {
-            console.warn('AxonShell: could not create ContextProxy in extension.js:', e.message);
-        }
-
-        try {
-            this._brainProxy = new BrainFullProxy(
-                Gio.DBus.session,
-                'org.axonos.Brain',
-                '/org/axonos/Brain'
-            );
-        } catch (e) {
-            console.warn('AxonShell: could not create BrainProxy in extension.js:', e.message);
-            this._brainProxy = null;
-        }
-
-        // Hide default GNOME Top Panel for a Windows layout
-        if (Main.panel) {
-            Main.panel.hide();
-        }
-
-        this._spacesManager = new SpacesManager(this);
-        this._spacesManager.enable();
-
-        this._intentBar = new IntentBar(this, this._spacesManager);
-        this._intentBar.enable();
-
-        this._dockManager = new DockManager(this, this._intentBar);
-        this._dockManager.enable();
-
-        this._aiIndicator = new AxonAIIndicator(this);
-        // Put AI indicator on the taskbar right box instead
-        if (this._dockManager && this._dockManager._actor) {
-            const rightBox = this._dockManager._actor.get_children().find(c => c.style_class === 'axon-taskbar-right');
-            if (rightBox) {
-                rightBox.insert_child_at_index(this._aiIndicator, 0);
-            }
-        }
-
-        this._registerKeybindings();
-
-        // 1. Intercept the Super / Windows Key press to toggle Start Menu
-        this._overlayKeyId = global.display.connect('overlay-key', () => {
-            if (this._dockManager && this._dockManager._startMenuPopup) {
-                this._dockManager._startMenuPopup.toggle();
-            }
-        });
-
-        // Listen for focused window changes
-        this._focusWindowId = global.display.connect('notify::focus-window', () => {
             try {
-                let win = global.display.focus_window;
-                if (win && this._contextProxy) {
-                    let title = win.get_title() || "None";
-                    let wmClass = win.get_wm_class() || "None";
-                    this._contextProxy.SetActiveWindowRemote(title, wmClass, (result, error) => {});
-                }
+                this._contextProxy = new ContextProxy(
+                    Gio.DBus.session,
+                    'org.axonos.Context',
+                    '/org/axonos/Context'
+                );
             } catch (e) {
-                console.warn('AxonShell: focus window track error:', e.message);
+                console.warn('AxonShell: could not create ContextProxy in extension.js:', e.message);
             }
-        });
+
+            try {
+                this._brainProxy = new BrainFullProxy(
+                    Gio.DBus.session,
+                    'org.axonos.Brain',
+                    '/org/axonos/Brain'
+                );
+            } catch (e) {
+                console.warn('AxonShell: could not create BrainProxy in extension.js:', e.message);
+                this._brainProxy = null;
+            }
+
+            this._spacesManager = new SpacesManager(this);
+            this._spacesManager.enable();
+
+            this._intentBar = new IntentBar(this, this._spacesManager);
+            this._intentBar.enable();
+
+            this._dockManager = new DockManager(this, this._intentBar);
+            this._dockManager.enable();
+
+            this._aiIndicator = new AxonAIIndicator(this);
+            // Put AI indicator on the taskbar right box instead
+            if (this._dockManager && this._dockManager._actor) {
+                const rightBox = this._dockManager._actor.get_children().find(c => c.style_class === 'axon-taskbar-right');
+                if (rightBox) {
+                    rightBox.insert_child_at_index(this._aiIndicator, 0);
+                }
+            }
+
+            this._registerKeybindings();
+
+            // 1. Intercept the Super / Windows Key press to toggle Start Menu
+            this._overlayKeyId = global.display.connect('overlay-key', () => {
+                if (this._dockManager && this._dockManager._startMenuPopup) {
+                    this._dockManager._startMenuPopup.toggle();
+                }
+            });
+
+            // Listen for focused window changes
+            this._focusWindowId = global.display.connect('notify::focus-window', () => {
+                try {
+                    let win = global.display.focus_window;
+                    if (win && this._contextProxy) {
+                        let title = win.get_title() || "None";
+                        let wmClass = win.get_wm_class() || "None";
+                        this._contextProxy.SetActiveWindowRemote(title, wmClass, (result, error) => {});
+                    }
+                } catch (e) {
+                    console.warn('AxonShell: focus window track error:', e.message);
+                }
+            });
+
+            // Hide default GNOME Top Panel AFTER all initialization succeeds
+            if (Main.panel) {
+                Main.panel.hide();
+            }
+        } catch (e) {
+            console.error('AxonShell: enable() failed, restoring panel:', e);
+            // Restore the panel so the desktop doesn't go black
+            if (Main.panel) {
+                Main.panel.show();
+            }
+        }
     }
 
     _registerKeybindings() {
@@ -497,57 +505,61 @@ export default class AxonShellExtension extends Extension {
     }
 
     disable() {
-        if (this._voiceOverlayProc) {
-            this._voiceOverlayProc.force_exit();
-            this._voiceOverlayProc = null;
-        }
-        this._voiceProxy = null;
-        // Remove Super key overlay listener
-        if (this._overlayKeyId) {
-            global.display.disconnect(this._overlayKeyId);
-            this._overlayKeyId = null;
-        }
+        try {
+            if (this._voiceOverlayProc) {
+                this._voiceOverlayProc.force_exit();
+                this._voiceOverlayProc = null;
+            }
+            this._voiceProxy = null;
+            // Remove Super key overlay listener
+            if (this._overlayKeyId) {
+                global.display.disconnect(this._overlayKeyId);
+                this._overlayKeyId = null;
+            }
 
-        // Restore default GNOME Top Panel
-        if (Main.panel) {
-            Main.panel.show();
-        }
+            for (const id of this._keybindingIds) {
+                try {
+                    Main.wm.removeKeybinding(id);
+                } catch (e) {
+                    console.warn(`AxonShell: could not remove keybinding ${id}:`, e.message);
+                }
+            }
+            this._keybindingIds = [];
 
-        for (const id of this._keybindingIds) {
-            try {
-                Main.wm.removeKeybinding(id);
-            } catch (e) {
-                console.warn(`AxonShell: could not remove keybinding ${id}:`, e.message);
+            if (this._focusWindowId) {
+                global.display.disconnect(this._focusWindowId);
+                this._focusWindowId = null;
+            }
+
+            if (this._aiIndicator) {
+                this._aiIndicator.destroy();
+                this._aiIndicator = null;
+            }
+
+            if (this._dockManager) {
+                this._dockManager.disable();
+                this._dockManager = null;
+            }
+
+            if (this._intentBar) {
+                this._intentBar.disable();
+                this._intentBar = null;
+            }
+
+            if (this._spacesManager) {
+                this._spacesManager.disable();
+                this._spacesManager = null;
+            }
+
+            this._contextProxy = null;
+            this._brainProxy = null;
+        } catch (e) {
+            console.error('AxonShell: disable() error:', e);
+        } finally {
+            // Always restore the panel — even if teardown partially failed
+            if (Main.panel) {
+                Main.panel.show();
             }
         }
-        this._keybindingIds = [];
-
-        if (this._focusWindowId) {
-            global.display.disconnect(this._focusWindowId);
-            this._focusWindowId = null;
-        }
-
-        if (this._aiIndicator) {
-            this._aiIndicator.destroy();
-            this._aiIndicator = null;
-        }
-
-        if (this._dockManager) {
-            this._dockManager.disable();
-            this._dockManager = null;
-        }
-
-        if (this._intentBar) {
-            this._intentBar.disable();
-            this._intentBar = null;
-        }
-
-        if (this._spacesManager) {
-            this._spacesManager.disable();
-            this._spacesManager = null;
-        }
-
-        this._contextProxy = null;
-        this._brainProxy = null;
     }
 }

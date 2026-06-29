@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Run with Windows Compatibility
+Comment=Execute this Windows program using the Axon Windows ABI
+Exec=axon-winabi-run %f
+Icon=application-x-executable
+Terminal=false
+MimeType=application/x-ms-dos-executable;
+NoDisplay=true
