@@ -21,7 +21,7 @@ VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "${BAS
 VERSION="${VERSION:-0.3.0}"
 ARCH="amd64"
 DIST="noble"
-MIRROR="http://archive.ubuntu.com/ubuntu/"
+MIRROR="http://us.archive.ubuntu.com/ubuntu/"
 ISO_NAME="axon-os-${VERSION}-${ARCH}.iso"
 VOLID="AXON_OS"
 
@@ -155,10 +155,14 @@ bootstrap() {
     debootstrap --arch="${ARCH}" "${DIST}" "${CHROOT}" "${MIRROR}"
 
     # Fix IPv6 unreachable + hash mismatch errors inside the chroot
+    # archive.ubuntu.com CDN sometimes serves corrupted .deb files; use direct US mirror
     cat > "${CHROOT}/etc/apt/apt.conf.d/99force-ipv4" <<'APTEOF'
 Acquire::ForceIPv4 "true";
-Acquire::Check-Valid-Until "false";
+Acquire::Retries "3";
+Acquire::http::Pipeline-Depth "0";
 APTEOF
+    # Rewrite sources.list to use direct US mirror instead of CDN
+    sed -i 's|http://archive.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' "${CHROOT}/etc/apt/sources.list"
 }
 
 # ---------------------------------------------------------------------------

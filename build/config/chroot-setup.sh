@@ -26,12 +26,19 @@ chmod +x /usr/sbin/policy-rc.d
 # ---------------------------------------------------------------------------
 log "Writing APT sources..."
 cat > /etc/apt/sources.list <<'EOF'
-deb http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
+deb http://us.archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
+deb http://us.archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse
 EOF
 # debootstrap may have created the new deb822 file; sources.list wins, drop it
 rm -f /etc/apt/sources.list.d/ubuntu.sources
+
+# Force IPv4 and retries to avoid CDN hash-mismatch errors
+cat > /etc/apt/apt.conf.d/99force-ipv4 <<'APTEOF'
+Acquire::ForceIPv4 "true";
+Acquire::Retries "3";
+Acquire::http::Pipeline-Depth "0";
+APTEOF
 
 dpkg --add-architecture i386
 apt-get update
