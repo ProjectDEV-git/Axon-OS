@@ -153,6 +153,12 @@ bootstrap() {
     mkdir -p "${CHROOT}"
     log "Bootstrapping Ubuntu ${DIST} (${ARCH})... (this downloads ~100 MB)"
     debootstrap --arch="${ARCH}" "${DIST}" "${CHROOT}" "${MIRROR}"
+
+    # Fix IPv6 unreachable + hash mismatch errors inside the chroot
+    cat > "${CHROOT}/etc/apt/apt.conf.d/99force-ipv4" <<'APTEOF'
+Acquire::ForceIPv4 "true";
+Acquire::Check-Valid-Until "false";
+APTEOF
 }
 
 # ---------------------------------------------------------------------------
