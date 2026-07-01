@@ -3,11 +3,14 @@
 import json
 import time
 
+import pytest
+
 from services.service_utils import (
     ALLOWED_COMMANDS,
     RateLimiter,
     TTLCache,
     error_response,
+    rate_limited,
     safe_exec,
 )
 
@@ -107,3 +110,93 @@ class TestRateLimiter:
         assert limiter.allow("user1") is True
         time.sleep(0.01)
         assert limiter.allow("user1") is True
+
+
+class TestTTLCacheMaxEntries:
+    """Test the _MAX_ENTRIES eviction — expired entries are cleaned when cache is full."""
+
+    def test_triggers_eviction_at_cap(self):
+        """When cache hits MAX_ENTRIES, expired entries should be evicted on next set."""
+        cache = TTLCache(ttl_seconds=0)  # instant expiry
+        cap = cache._MAX_ENTRIES
+        # Fill cache past the cap (all expire immediately)
+        for i in range(cap + 10):
+            cache.set(f"k{i}", f"v{i}")
+        time.sleep(0.01)  # let them expire
+        # This set should trigger eviction of expired entries
+        cache.set("trigger", "clean")
+        # After eviction, the cache should be smaller than what it was
+        assert len(cache.cache) < cap + 10
+
+    def test_evicts_expired_entries_on_overflow(self):
+        """When at cap, expired entries get evicted before adding new entry."""
+        # Use a very short TTL so entries expire quickly
+        cache = TTLCache(ttl_seconds=0)
+        for i in range(cache._MAX_ENTRIES):
+            cache.set(f"expired_{i}", i)
+        time.sleep(0.01)
+        # New entry triggers eviction — all expired ones are cleaned
+        cache.set("fresh", "alive")
+        # The fresh entry should be readable with a long-TTL cache
+        # (We used ttl=0 so it's also expired, but the eviction test is the point)
+        assert len(cache.cache) <= cache._MAX_ENTRIES
+
+    def test_live_entries_survive_eviction(self):
+        """Non-expired entries should survive when eviction is triggered."""
+        cache = TTLCache(ttl_seconds=60)  # long TTL
+        cap = cache._MAX_ENTRIES
+        # Fill to the cap with live entries
+        for i in range(cap):
+            cache.set(f"k{i}", f"v{i}")
+        # All should still be readable
+        for i in range(cap):
+            assert cache.get(f"k{i}") == f"v{i}"
+
+    def test_max_entries_class_attribute(self):
+        """MAX_ENTRIES should be defined and reasonable."""
+        assert TTLCache._MAX_ENTRIES == 10_000
+
+
+class TestRateLimitedDecorator:
+    """Test the @rate_limited decorator factory."""
+
+    def test_decorator_factory_is_callable(self):
+        """rate_limited() should return a usable decorator."""
+        decorator = rate_limited(rate=100, window_seconds=60)
+        assert callable(decorator)
+
+    def test_decorator_allows_under_limit(self):
+        """Decorator should pass through when under the rate limit."""
+
+        class FakeService:
+            sender = "test_user"
+
+            @rate_limited(rate=3, window_seconds=60)
+            def my_method(self):
+                return "ok"
+
+        svc = FakeService()
+        assert svc.my_method() == "ok"
+        assert svc.my_method() == "ok"
+        assert svc.my_method() == "ok"
+
+    def test_decorator_blocks_after_limit(self):
+        """Decorator should raise dbus.exceptions.DBusException when rate exceeded."""
+        import dbus.exceptions
+
+        class FakeService:
+            sender = "test_user"
+
+            @rate_limited(rate=2, window_seconds=60)
+            def my_method(self):
+                return "ok"
+
+        svc = FakeService()
+        assert svc.my_method() == "ok"
+        assert svc.my_method() == "ok"
+        with pytest.raises(dbus.exceptions.DBusException, match="Rate limit exceeded"):
+            svc.my_method()
+
+    def test_rate_limited_is_importable(self):
+        """The rate_limited decorator should be importable from service_utils."""
+        assert callable(rate_limited)

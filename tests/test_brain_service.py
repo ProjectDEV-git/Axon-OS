@@ -1,5 +1,6 @@
-"""Tests for brain_service — sanitization, validation, and config logic."""
+"""Tests for brain_service — sanitization, validation, config logic, and SendMessage."""
 
+import inspect
 
 from services.axon_brain.brain_service import (
     BrainService,
@@ -66,3 +67,34 @@ class TestValidatePrompt:
         assert BrainService._validate_prompt(None) is False
         assert BrainService._validate_prompt(123) is False
         assert BrainService._validate_prompt("x" * 20000) is False
+
+
+class TestSendMessageSignature:
+    """Verify SendMessage has the correct 5-parameter signature after the context arg fix."""
+
+    def test_send_message_has_context_param(self):
+        """SendMessage should accept conversation_id, message, context, model, stream."""
+        sig = inspect.signature(BrainService.SendMessage)
+        params = list(sig.parameters.keys())
+        # First param is 'self'
+        assert params[0] == "self"
+        assert "conversation_id" in params
+        assert "message" in params
+        assert "context" in params
+        assert "model" in params
+        assert "stream" in params
+
+    def test_send_message_expects_five_params(self):
+        """SendMessage should accept exactly 5 args (+ self)."""
+        sig = inspect.signature(BrainService.SendMessage)
+        # Subtract 1 for 'self'
+        non_self = [p for p in sig.parameters if p != "self"]
+        assert len(non_self) == 5, f"Expected 5 params, got {len(non_self)}: {non_self}"
+
+    def test_send_message_context_before_model(self):
+        """Context should come before model in the parameter list."""
+        sig = inspect.signature(BrainService.SendMessage)
+        params = [p for p in sig.parameters if p != "self"]
+        assert params.index("context") < params.index("model"), (
+            "context must come before model (D-Bus positional args)"
+        )

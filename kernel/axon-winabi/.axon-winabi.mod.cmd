@@ -1,0 +1,1 @@
+savedcmd_axon-winabi.mod := printf '%s\n'   module-main.o pe-loader.o binfmt_win.o syscall_table.o nt-syscalls.o nt-section.o nt-thread.o nt-sync.o nt-registry.o nt-dll-loader.o | awk '!x[$$0]++ { print("./"$$0) }' > axon-winabi.mod

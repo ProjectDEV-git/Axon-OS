@@ -47,11 +47,18 @@ class ConversationStore:
         return conn
 
     def _close_connection(self, conn):
-        # Keep connection open for reuse; only close on errors
-        pass
+        """Close the connection to release file descriptors.
+
+        Daemon threads die without calling close(), leaking FDs. Each
+        sqlite3.connect() is ~0.1ms, so the per-call overhead is negligible.
+        """
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     def close(self):
-        """Explicitly close the per-thread connection."""
+        """Explicitly close the per-thread connection (legacy compat)."""
         conn = getattr(self._local, "conn", None)
         if conn is not None:
             try:
@@ -59,6 +66,9 @@ class ConversationStore:
             except Exception:
                 pass
             self._local.conn = None
+
+    def __del__(self) -> None:
+        self.close()
 
     def _init_db(self):
         conn = self._get_connection()

@@ -183,7 +183,7 @@ class ContextService(dbus.service.Object):
             brain_interface = dbus.Interface(brain_obj, "org.axonos.Brain")
             emb_json = brain_interface.GetEmbeddings(query_text, "")
             emb = json.loads(emb_json)
-            if not emb or len(emb) != 768:
+            if not emb or not isinstance(emb, list) or not isinstance(emb[0], (int, float)):
                 return "[]"
 
             from constants import SEMANTIC_INDEX_DB
@@ -464,8 +464,18 @@ class ContextService(dbus.service.Object):
 
 
 if __name__ == "__main__":
+    import signal
+
     loop = GLib.MainLoop()
     service = ContextService()
+
+    def _shutdown(signum, frame):
+        logger.info("Received signal %d, shutting down...", signum)
+        service.cleanup()
+        loop.quit()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
     try:
         loop.run()
     except KeyboardInterrupt:

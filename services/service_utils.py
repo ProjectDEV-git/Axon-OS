@@ -122,6 +122,8 @@ def error_response(message: str, code: str = "UNKNOWN") -> str:
 class TTLCache:
     """Thread-safe TTL (Time-To-Live) cache for frequently accessed data."""
 
+    _MAX_ENTRIES = 10_000  # hard cap to prevent unbounded memory growth
+
     def __init__(self, ttl_seconds: int = 300) -> None:
         """Initialize cache with TTL.
 
@@ -131,6 +133,13 @@ class TTLCache:
         self.ttl_seconds = ttl_seconds
         self.cache: dict[str, tuple[Any, float]] = {}
         self._lock = threading.Lock()
+
+    def _evict_expired(self) -> None:
+        """Remove all expired entries (called under lock)."""
+        now = time.time()
+        expired = [k for k, (_, ts) in self.cache.items() if now - ts >= self.ttl_seconds]
+        for k in expired:
+            del self.cache[k]
 
     def get(self, key: str) -> Any | None:
         """Retrieve value from cache if not expired.
@@ -152,11 +161,15 @@ class TTLCache:
     def set(self, key: str, value: Any) -> None:
         """Store value in cache with current timestamp.
 
+        Evicts expired entries when the cache exceeds MAX_ENTRIES.
+
         Args:
             key: Cache key to store.
             value: Value to cache.
         """
         with self._lock:
+            if len(self.cache) >= self._MAX_ENTRIES:
+                self._evict_expired()
             self.cache[key] = (value, time.time())
 
     def clear(self) -> None:

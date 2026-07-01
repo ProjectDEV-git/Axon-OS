@@ -10,6 +10,7 @@ milliseconds — no screenshot pipelines, no synthetic clicks.
 
 import json
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import plan as plan_mod
 
 log = configure_app_logger("axon-gui-agent", level=logging.INFO)
+
+# Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
+_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _validate_app_name(name: str) -> str | None:
+    """Return sanitized app name, or None if the name is unsafe."""
+    name = name.strip()
+    if not name or len(name) > 128:
+        return None
+    if not _SAFE_APP_RE.match(name):
+        return None
+    return name
+
 
 PLANNER_PROMPT = """\
 You are the desktop automation planner for Axon OS (GNOME). Convert the
@@ -141,6 +156,8 @@ class GuiAgentService(dbus.service.Object):
                 return True, detail
             if op_type == "launch_app":
                 app = str(op["app"])
+                if not _validate_app_name(app):
+                    return False, f"rejected: unsafe app name: {app!r}"
                 launcher = ["gtk-launch", app] if shutil.which("gtk-launch") else [app]
                 subprocess.Popen(launcher, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return True, f"launched {app}"
@@ -161,8 +178,17 @@ class GuiAgentService(dbus.service.Object):
 
 
 if __name__ == "__main__":
+    import signal
+
     loop = GLib.MainLoop()
     service = GuiAgentService()
+
+    def _shutdown(signum, frame):
+        log.info("Received signal %d, shutting down...", signum)
+        loop.quit()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
     try:
         loop.run()
     except KeyboardInterrupt:

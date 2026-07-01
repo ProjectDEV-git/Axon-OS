@@ -43,6 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import hardware_profiler
+from ai_router import AIRouter
 from constants import (
     AXON_DIR,
     MAX_MODEL_NAME_LEN,
@@ -51,6 +52,7 @@ from constants import (
 )
 from conversation_store import ConversationStore
 from prompts import CHAT_SYSTEM_PROMPT
+from service_utils import rate_limited
 
 CONFIG_FILE = AXON_DIR / "config.toml"
 
@@ -92,6 +94,7 @@ class BrainService(dbus.service.Object):
         self._config_lock = threading.RLock()
         self.store = ConversationStore()
         self.load_config()
+        self.router = AIRouter(self.config)
         logger.info("Axon Brain D-Bus Service registered successfully at /org/axonos/Brain")
 
     def save_config(self):
@@ -218,6 +221,7 @@ class BrainService(dbus.service.Object):
         return "[]"
 
     @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="b")
+    @rate_limited(rate=10, window_seconds=60)
     def PullModel(self, model_name):
         """Starts model pull in a background thread."""
         if not self._validate_model_name(str(model_name)):
@@ -227,6 +231,7 @@ class BrainService(dbus.service.Object):
         return True
 
     @dbus.service.method("org.axonos.Brain", in_signature="sssb", out_signature="s")
+    @rate_limited(rate=100, window_seconds=60)
     def Generate(self, prompt, context, model, stream):
         """Unified text generation interface. If streaming, returns a transaction ID."""
         if not self._validate_prompt(str(prompt)):
@@ -234,7 +239,7 @@ class BrainService(dbus.service.Object):
         if model and not self._validate_model_name(str(model)):
             return json.dumps({"error": f"invalid model name: {model!r}"})
         if not model:
-            model = self.config["general_model"]
+            model, _reason = self.router.select_model(str(prompt), str(context))
 
         system_prompt = ""
         if context:
@@ -288,12 +293,13 @@ class BrainService(dbus.service.Object):
         return True
 
     @dbus.service.method("org.axonos.Brain", in_signature="ssssb", out_signature="s")
+    @rate_limited(rate=100, window_seconds=60)
     def SendMessage(self, conversation_id, message, context, model, stream):
         """Persists user message and streams or blocks assistant reply with ambient context."""
         self.store.add_message(conversation_id, "user", message)
 
         if not model:
-            model = self.config["general_model"]
+            model, _reason = self.router.select_model(str(message), str(context))
 
         if stream:
             tx_id = str(uuid.uuid4())
@@ -311,7 +317,7 @@ class BrainService(dbus.service.Object):
     @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
     def ClassifyWindow(self, title, wm_class):
         """Classifies a newly opened window title/class into one of the 9 spaces."""
-        model = self.config["speed_model"]
+        model = self.router.get_model_for_classify_window()
         prompt = f"App: {_sanitize_context(wm_class)}\nWindow Title: {_sanitize_context(title)}"
         system_prompt = (
             "You are a workspace routing assistant for Axon OS. Classify this window into one of these 9 workspace spaces:\n"
@@ -349,9 +355,10 @@ class BrainService(dbus.service.Object):
         return "Default"
 
     @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="s")
+    @rate_limited(rate=100, window_seconds=60)
     def ClassifyIntent(self, text):
         """Spotlight-style classification of workspace intents using the Speed model."""
-        model = self.config["speed_model"]
+        model = self.router.get_model_for_intent()
         system_prompt = (
             "You are a command classifier for Axon OS. Classify the user query into one of these types:\n"
             "1. Run command: {'action': 'run_command', 'command': '<shell command>'}\n"
@@ -567,9 +574,18 @@ class BrainService(dbus.service.Object):
 
 
 if __name__ == "__main__":
+    import signal
+
     # Start loop
     loop = GLib.MainLoop()
     service = BrainService()
+
+    def _shutdown(signum, frame):
+        logger.info("Received signal %d, shutting down...", signum)
+        loop.quit()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
     try:
         loop.run()
     except KeyboardInterrupt:

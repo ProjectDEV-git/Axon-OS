@@ -62,6 +62,24 @@ logger = configure_app_logger("plugin-registry")
 # Data model
 # ---------------------------------------------------------------------------
 
+try:
+    from constants import (
+        DBUS_NAME_BRAIN,
+        DBUS_NAME_CONTEXT,
+        DBUS_NAME_GUI_AGENT,
+        DBUS_NAME_SANDBOX,
+        DBUS_NAME_SEARCH,
+        DBUS_NAME_VOICE,
+    )
+except ImportError:
+    # Fallback when constants.py is not on sys.path yet
+    DBUS_NAME_BRAIN = "org.axonos.Brain"
+    DBUS_NAME_CONTEXT = "org.axonos.Context"
+    DBUS_NAME_SEARCH = "org.axonos.Search"
+    DBUS_NAME_VOICE = "org.axonos.Voice"
+    DBUS_NAME_GUI_AGENT = "org.axonos.GuiAgent"
+    DBUS_NAME_SANDBOX = "org.axonos.Sandbox"
+
 
 @dataclass
 class ServiceManifest:
@@ -119,12 +137,12 @@ class PluginInfo:
 # Bus names that are part of core Axon (not plugins)
 _CORE_BUS_NAMES = frozenset(
     {
-        "org.axonos.Brain",
-        "org.axonos.Context",
-        "org.axonos.Search",
-        "org.axonos.Voice",
-        "org.axonos.GuiAgent",
-        "org.axonos.Sandbox",
+        DBUS_NAME_BRAIN,
+        DBUS_NAME_CONTEXT,
+        DBUS_NAME_SEARCH,
+        DBUS_NAME_VOICE,
+        DBUS_NAME_GUI_AGENT,
+        DBUS_NAME_SANDBOX,
     }
 )
 

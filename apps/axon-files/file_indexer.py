@@ -270,11 +270,16 @@ class FileIndexer:
                     embedding_json,
                 ),
             )
-            conn.commit()
 
+            # Batch commit every 100 files instead of per-file
             indexed_count += 1
+            if indexed_count % 100 == 0:
+                conn.commit()
             if progress_callback:
                 progress_callback(path_str, indexed_count, total_files)
+
+        # Flush remaining batched writes
+        conn.commit()
 
         # Cleanup deleted files from Database
         if not (cancel_event and cancel_event.is_set()):

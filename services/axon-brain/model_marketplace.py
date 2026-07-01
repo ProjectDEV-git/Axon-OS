@@ -430,8 +430,17 @@ class ModelMarketplaceService(dbus.service.Object):
 
 
 if __name__ == "__main__":
+    import signal
+
     loop = GLib.MainLoop()
     service = ModelMarketplaceService()
+
+    def _shutdown(signum, frame):
+        log.info("Received signal %d, shutting down...", signum)
+        loop.quit()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
     try:
         loop.run()
     except KeyboardInterrupt:

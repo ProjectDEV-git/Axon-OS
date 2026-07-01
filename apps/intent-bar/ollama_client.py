@@ -173,7 +173,7 @@ class OllamaClient:
                 self.q.get_nowait()
 
             # Call SendMessage to start stream and get transaction ID
-            self.current_tx = str(brain.SendMessage(conversation_id, message, model, True))
+            self.current_tx = str(brain.SendMessage(conversation_id, message, "", model, True))
 
             # Consume tokens from queue
             while True:

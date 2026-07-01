@@ -47,6 +47,7 @@ OPT_IN_FILE = TELEMETRY_DIR / "opt_in"
 EVENTS_FILE = TELEMETRY_DIR / "events.jsonl"
 CRASHES_FILE = TELEMETRY_DIR / "crashes.jsonl"
 DAILY_FILE = TELEMETRY_DIR / "daily.json"
+_MAX_JSONL_BYTES = 5 * 1024 * 1024  # 5 MB per JSONL file before rotation
 
 
 class Telemetry:
@@ -223,6 +224,15 @@ class Telemetry:
     def _append_jsonl(path: Path, entry: dict) -> None:
         try:
             TELEMETRY_DIR.mkdir(parents=True, exist_ok=True)
+            # Rotate if file exceeds max size
+            try:
+                if path.exists() and path.stat().st_size > _MAX_JSONL_BYTES:
+                    rotated = path.with_suffix(".jsonl.1")
+                    if rotated.exists():
+                        rotated.unlink()
+                    path.rename(rotated)
+            except OSError:
+                pass
             with open(path, "a") as f:
                 f.write(json.dumps(entry) + "\n")
         except Exception:

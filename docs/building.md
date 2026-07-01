@@ -56,6 +56,16 @@ Useful flags / environment:
 | `--keep-chroot` | Reuse the existing chroot for iterative rebuilds |
 | `AXON_BUILD_DIR=/path` | Work directory (default `/tmp/axon-build`, needs ~15 GB) |
 
+### Persistent APT Cache
+
+Downloaded `.deb` packages are cached in `${AXON_BUILD_DIR}/apt-cache/` and persist across builds. This means the first build downloads everything from the Ubuntu mirror, but subsequent builds (even with a fresh chroot) reuse cached packages — cutting the download phase from minutes to seconds.
+
+To clear the cache and start fresh:
+
+```bash
+sudo rm -rf /tmp/axon-build/apt-cache
+```
+
 ## CI Builds (GitHub Actions)
 
 Every push to `main` that touches `build/`, `apps/`, `services/`, `shell/`, `theme/`, `data/`, `installer/`, or `plymouth/` runs the **Build ISO** workflow (`.github/workflows/build-iso.yml`). Download the finished ISO from the workflow run's **Artifacts** section (`axon-os-iso`). Tagged pushes (`v*`) also attach the ISO to a GitHub Release when it fits the 2 GiB asset limit.

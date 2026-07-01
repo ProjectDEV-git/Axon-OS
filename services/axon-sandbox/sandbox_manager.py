@@ -276,11 +276,19 @@ class SandboxManager(dbus.service.Object):
 
 
 if __name__ == "__main__":
+    import signal
+
     # Initialize GTK before creating any GTK widgets
     Gtk.init()
     loop = GLib.MainLoop()
     service = SandboxManager()
 
+    def _shutdown(signum, frame):
+        logger.info("Received signal %d, shutting down...", signum)
+        loop.quit()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
     try:
         loop.run()
     except KeyboardInterrupt:
