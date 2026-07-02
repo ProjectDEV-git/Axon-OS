@@ -52,8 +52,8 @@ class GlobalSearchService(dbus.service.Object):
         except dbus.exceptions.DBusException:
             return None
 
-    def _get_brain(self):
-        if self._brain is None:
+    def _get_brain(self, force=False):
+        if self._brain is None or force:
             try:
                 obj = self.session_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
                 self._brain = dbus.Interface(obj, "org.axonos.Brain")
@@ -61,8 +61,8 @@ class GlobalSearchService(dbus.service.Object):
                 return None
         return self._brain
 
-    def _get_search(self):
-        if self._search is None:
+    def _get_search(self, force=False):
+        if self._search is None or force:
             try:
                 obj = self.session_bus.get_object("org.axonos.Search", "/org/axonos/Search")
                 self._search = dbus.Interface(obj, "org.axonos.Search")
@@ -70,8 +70,8 @@ class GlobalSearchService(dbus.service.Object):
                 return None
         return self._search
 
-    def _get_context(self):
-        if self._context is None:
+    def _get_context(self, force=False):
+        if self._context is None or force:
             try:
                 obj = self.session_bus.get_object("org.axonos.Context", "/org/axonos/Context")
                 self._context = dbus.Interface(obj, "org.axonos.Context")
@@ -97,7 +97,7 @@ class GlobalSearchService(dbus.service.Object):
             svc = self._get_search()
             if svc:
                 try:
-                    raw = svc.Search(query)
+                    raw = svc.Query(query, 8)
                     items = json.loads(raw) if raw else []
                     for item in items:
                         with results_lock:
@@ -110,6 +110,27 @@ class GlobalSearchService(dbus.service.Object):
                                     "source": "search",
                                 }
                             )
+                except dbus.exceptions.DBusException:
+                    # Backend service may have restarted — reset proxy and retry once
+                    self._search = None
+                    svc = self._get_search(force=True)
+                    if svc:
+                        try:
+                            raw = svc.Query(query, 8)
+                            items = json.loads(raw) if raw else []
+                            for item in items:
+                                with results_lock:
+                                    results.append(
+                                        {
+                                            "type": "file",
+                                            "title": item.get("path", "").split("/")[-1],
+                                            "subtitle": item.get("path", ""),
+                                            "score": item.get("score", 0),
+                                            "source": "search",
+                                        }
+                                    )
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
@@ -198,8 +219,19 @@ class GlobalSearchService(dbus.service.Object):
                 if context:
                     prompt = f"Search results:\n{context}\n\nQuestion: {query}"
                 return brain.Generate(prompt, context, "", False)
-            except Exception as e:
-                return json.dumps({"error": str(e)})
+            except dbus.exceptions.DBusException:
+                self._brain = None
+                brain = self._get_brain(force=True)
+                if brain:
+                    try:
+                        prompt = f"Based on these search results, answer the question: {query}"
+                        if context:
+                            prompt = f"Search results:\n{context}\n\nQuestion: {query}"
+                        return brain.Generate(prompt, context, "", False)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
         return json.dumps({"error": "Brain service not available"})
 

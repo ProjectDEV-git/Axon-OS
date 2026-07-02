@@ -264,7 +264,8 @@ class SearchService(dbus.service.Object):
 
     def _scan_once(self):
         db = open_db()
-        self._stats["indexing"] = True
+        with self._lock:
+            self._stats["indexing"] = True
         files = chunks = 0
         try:
             known_mtimes = {
@@ -294,14 +295,16 @@ class SearchService(dbus.service.Object):
                     self._delete_file(db, path)
             db.commit()
             total_chunks = db.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
-            self._stats.update(
-                files=files,
-                chunks=total_chunks,
-                vector_backend=vec_table_ready(db),
-                last_scan=time.time(),
-            )
+            with self._lock:
+                self._stats.update(
+                    files=files,
+                    chunks=total_chunks,
+                    vector_backend=vec_table_ready(db),
+                    last_scan=time.time(),
+                )
         finally:
-            self._stats["indexing"] = False
+            with self._lock:
+                self._stats["indexing"] = False
             db.close()
 
     def _delete_file(self, db, path):
@@ -379,6 +382,9 @@ class SearchService(dbus.service.Object):
         for path, text, dist in rows:
             if path in seen:
                 continue
+            # Filter out low-relevance vector matches
+            if float(dist) >= 4.0:
+                continue
             seen.add(path)
             out.append(
                 {
@@ -392,8 +398,22 @@ class SearchService(dbus.service.Object):
                 break
         return out
 
+    @staticmethod
+    def _escape_fts5_token(token):
+        """Escape FTS5 special characters in a search token."""
+        # Strip characters that are meaningful to the FTS5 query parser
+        for ch in ("*", "-", "(", ")", ":", "^", "~", "\\"):
+            token = token.replace(ch, "")
+        # Remove bare "OR" which is an FTS5 keyword
+        if token.upper() == "OR":
+            return ""
+        return token
+
     def _keyword_query(self, db, query, limit):
-        terms = " OR ".join(f'"{t}"' for t in query.replace('"', " ").split() if t)
+        raw_tokens = [t for t in query.replace('"', " ").split() if t]
+        safe_tokens = [self._escape_fts5_token(t) for t in raw_tokens]
+        safe_tokens = [t for t in safe_tokens if t]
+        terms = " OR ".join(f'"{t}"' for t in safe_tokens)
         if not terms:
             return []
         try:
@@ -430,7 +450,8 @@ class SearchService(dbus.service.Object):
 
     @dbus.service.method("org.axonos.Search", in_signature="", out_signature="s")
     def GetStats(self):
-        return json.dumps(self._stats)
+        with self._lock:
+            return json.dumps(self._stats.copy())
 
 
 if __name__ == "__main__":

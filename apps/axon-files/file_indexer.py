@@ -80,7 +80,7 @@ def fetch_embedding_dbus(prompt: str) -> list:
         bus = dbus.SessionBus()
         brain_obj = bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
         # Call GetEmbeddings(prompt, model)
-        embeddings_json = brain_obj.GetEmbeddings(prompt, "", dbus_interface="org.axonos.Brain")
+        embeddings_json = brain_obj.GetEmbeddings(prompt, "", dbus_interface="org.axonos.Brain", timeout=30)
         embedding = json.loads(embeddings_json)
         if isinstance(embedding, list):
             return embedding
@@ -143,6 +143,8 @@ class FileIndexer:
 
     def init_db(self):
         conn = sqlite3.connect(self.db_path, timeout=30.0)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS files (

@@ -32,6 +32,8 @@ class FileIndexer:
         AXON_DIR.mkdir(parents=True, exist_ok=True)
         self.session_bus = dbus.SessionBus()
         self.conn = sqlite3.connect(str(DB_PATH))
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=5000")
         self.conn.enable_load_extension(True)
         sqlite_vec.load(self.conn)
 
@@ -77,7 +79,7 @@ class FileIndexer:
             brain_obj = self.session_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
             brain_interface = dbus.Interface(brain_obj, "org.axonos.Brain")
             # Use general model or default for embedding
-            emb_json = brain_interface.GetEmbeddings(text, "")
+            emb_json = brain_interface.GetEmbeddings(text, "", timeout=30)
             emb = json.loads(emb_json)
             if isinstance(emb, list) and emb and isinstance(emb[0], (int, float)):
                 return emb
