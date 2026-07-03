@@ -56,6 +56,26 @@ Useful flags / environment:
 | `--keep-chroot` | Reuse the existing chroot for iterative rebuilds |
 | `AXON_BUILD_DIR=/path` | Work directory (default `/tmp/axon-build`, needs ~15 GB) |
 
+### Keep Chroot (Interactive Development)
+
+For iterating on the chroot configuration without rebuilding the full ISO, use the standalone `keep-chroot` command:
+
+```bash
+# Enter an interactive shell inside the persistent chroot
+sudo bash scripts/keep-chroot.sh
+
+# Run chroot-setup.sh to install all Axon components, then enter the shell
+sudo bash scripts/keep-chroot.sh --setup
+
+# Run a single command inside the chroot without entering interactively
+sudo bash scripts/keep-chroot.sh --cmd "apt list --installed"
+
+# Destroy the existing chroot and start fresh
+sudo bash scripts/keep-chroot.sh --reset
+```
+
+The chroot is created via `debootstrap` on first run and persisted at `/tmp/axon-build/chroot`. Subsequent runs reuse the same chroot, so you can install packages, edit configs, and test changes without re-downloading everything. Use `--setup` to apply the full Axon component installation from `chroot-setup.sh`.
+
 ### Persistent APT Cache
 
 Downloaded `.deb` packages are cached in `${AXON_BUILD_DIR}/apt-cache/` and persist across builds. This means the first build downloads everything from the Ubuntu mirror, but subsequent builds (even with a fresh chroot) reuse cached packages — cutting the download phase from minutes to seconds.
