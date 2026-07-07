@@ -112,5 +112,6 @@ class TestTelemetrySingleton:
         with patch("services.telemetry.TELEMETRY_DIR", tmp_path):
             with patch("services.telemetry._instance", None):
                 from services.telemetry import get_telemetry
+
                 t = get_telemetry()
                 assert isinstance(t, Telemetry)

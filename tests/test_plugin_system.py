@@ -396,3 +396,76 @@ class TestPluginDeploy:
         policy = generate_dbus_policy(manifest, user="myuser")
 
         assert '<policy user="myuser">' in policy
+
+
+# ---------------------------------------------------------------------------
+# Plugin lifecycle end-to-end test
+# ---------------------------------------------------------------------------
+
+
+class TestPluginLifecycle:
+    """End-to-end lifecycle test using a minimal ServiceBase subclass."""
+
+    @patch("dbus.service.BusName")
+    @patch("dbus.service.Object.__init__")
+    @patch("dbus.mainloop.glib.DBusGMainLoop")
+    @patch("dbus.SessionBus")
+    def test_full_lifecycle(self, mock_bus, mock_loop, mock_obj_init, mock_busname):
+        """Discover a plugin, load its manifest, instantiate a ServiceBase
+        subclass, and verify health/status methods work."""
+        from services.plugin_registry import ServiceManifest, ServiceRegistry
+        from services.service_base import ServiceBase
+
+        mock_bus.return_value = MagicMock()
+
+        # 1. Discover plugin
+        registry = ServiceRegistry(plugins_dir=Path("/nonexistent"))
+        assert registry.discover() == []  # empty dir, no plugins
+
+        # 2. Load a manifest directly
+        manifest = ServiceManifest(
+            name="lifecycle-test",
+            description="E2E test",
+            bus_name="org.axonos.plugins.LifecycleTest",
+            object_path="/org/axonos/plugins/LifecycleTest",
+            entry_point="svc.py",
+            manifest_path=Path("/nonexistent/manifest.toml"),
+            dependencies=[],
+            after=[],
+            restart_sec=3,
+        )
+        assert manifest.name == "lifecycle-test"
+
+        # 3. Instantiate a real ServiceBase subclass
+        class MockService(ServiceBase):
+            BUS_NAME = manifest.bus_name
+            OBJECT_PATH = manifest.object_path
+            SERVICE_NAME = manifest.name
+
+            def _setup(self):
+                self.custom_ready = True
+
+        svc = MockService()
+
+        # 4. Verify lifecycle methods
+        assert svc.is_healthy()
+        assert svc.uptime >= 0
+        svc.set_healthy(False)
+        assert not svc.is_healthy()
+        svc.set_healthy(True)
+        assert svc.is_healthy()
+
+        # 5. Verify D-Bus status method returns valid JSON
+        import json
+
+        status_json = svc.GetStatus()
+        status = json.loads(status_json)
+        assert status["service"] == manifest.name
+        assert "healthy" in status
+        assert "uptime" in status
+
+        # 6. Verify custom setup ran
+        assert svc.custom_ready is True
+
+        # 7. Verify GetServiceName returns correct name
+        assert svc.GetServiceName() == manifest.name

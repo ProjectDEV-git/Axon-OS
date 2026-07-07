@@ -1,5 +1,6 @@
 """Tests for SandboxManager fail-closed behavior."""
 
+import logging
 from unittest.mock import MagicMock, patch
 
 
@@ -13,6 +14,7 @@ class TestSandboxFailClosed:
 
             manager = SandboxManager.__new__(SandboxManager)
             manager.session_bus = MagicMock()
+            manager.logger = logging.getLogger("test")
             return manager
 
     def test_missing_file_returns_deny(self):

@@ -15,6 +15,12 @@ CODENAME="Pulse"
 
 log() { echo "[chroot-setup] $*"; }
 
+# QUICK mode: passed from build.sh via env var. Skips expensive non-essential
+# steps (theme rebuilds, kernel module rebuild, initramfs regen) to speed up
+# iterative development rebuilds. Set AXON_QUICK=1 to enable.
+QUICK="${AXON_QUICK:-0}"
+[[ "${QUICK}" == "1" ]] && log "QUICK MODE enabled — skipping expensive non-essential steps"
+
 # ---------------------------------------------------------------------------
 # 0. Guards against services starting inside the chroot
 # ---------------------------------------------------------------------------
@@ -34,10 +40,13 @@ EOF
 rm -f /etc/apt/sources.list.d/ubuntu.sources
 
 # Force IPv4 and retries to avoid CDN hash-mismatch errors
+# Parallel downloads for speed (16 concurrent connections)
 cat > /etc/apt/apt.conf.d/99force-ipv4 <<'APTEOF'
 Acquire::ForceIPv4 "true";
 Acquire::Retries "3";
 Acquire::http::Pipeline-Depth "0";
+Acquire::Parallel::Downloads "16";
+APT::Acquire::QueueMode "acquire";
 APTEOF
 
 dpkg --add-architecture i386
@@ -100,7 +109,7 @@ log "Adding flathub remote..."
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
 
 log "Installing Python AI libraries inside chroot..."
-pip3 install faster-whisper sqlite-vec --break-system-packages || log "WARNING: Python AI libraries failed to install"
+pip3 install --no-cache-dir faster-whisper sqlite-vec --break-system-packages || log "WARNING: Python AI libraries failed to install"
 
 
 # ---------------------------------------------------------------------------
@@ -305,25 +314,35 @@ EOF
 
 # ── 5a. Axon Windows ABI kernel module ──────────────────────────────────────
 log "Building Axon Windows ABI kernel module..."
+MODULE_BUILT=false
 if [[ -d "${SRC}/kernel/axon-winabi" ]]; then
-    # Install kernel headers if not already present
-    apt-get install -y linux-headers-$(uname -r) || \
-        apt-get install -y linux-headers-generic || \
-        log "WARNING: could not install kernel headers — Windows ABI module skipped"
+    # Check if module is already built (for --quick mode)
+    KMOD_DIR="/lib/modules/$(uname -r)/extra"
+    if [[ "${QUICK}" == "1" ]] && [[ -f "${KMOD_DIR}/axon-winabi.ko" ]]; then
+        log "Quick mode: Windows ABI module already built — skipping rebuild"
+        MODULE_BUILT=true
+    fi
 
-    if [[ -d /usr/src/linux-headers-$(uname -r) ]]; then
-        (cd "${SRC}/kernel/axon-winabi" && \
-         make KDIR=/usr/src/linux-headers-$(uname -r) && \
-         make KDIR=/usr/src/linux-headers-$(uname -r) install) || \
-            log "WARNING: Windows ABI kernel module build failed"
+    if [[ "${MODULE_BUILT}" == "false" ]]; then
+        # Install kernel headers if not already present
+        apt-get install -y linux-headers-$(uname -r) || \
+            apt-get install -y linux-headers-generic || \
+            log "WARNING: could not install kernel headers — Windows ABI module skipped"
 
-        # Auto-load the module on boot
-        echo "axon-winabi" >> /etc/modules-load.d/axon-winabi.conf 2>/dev/null || \
-            echo "axon-winabi" > /etc/modules-load.d/axon-winabi.conf
+        if [[ -d /usr/src/linux-headers-$(uname -r) ]]; then
+            (cd "${SRC}/kernel/axon-winabi" && \
+             make KDIR=/usr/src/linux-headers-$(uname -r) && \
+             make KDIR=/usr/src/linux-headers-$(uname -r) install) || \
+                log "WARNING: Windows ABI kernel module build failed"
 
-        # Configure binfmt_misc support
-        echo "binfmt_misc" >> /etc/modules-load.d/binfmt.conf 2>/dev/null || \
-            echo "binfmt_misc" > /etc/modules-load.d/binfmt.conf
+            # Auto-load the module on boot
+            echo "axon-winabi" >> /etc/modules-load.d/axon-winabi.conf 2>/dev/null || \
+                echo "axon-winabi" > /etc/modules-load.d/axon-winabi.conf
+
+            # Configure binfmt_misc support
+            echo "binfmt_misc" >> /etc/modules-load.d/binfmt.conf 2>/dev/null || \
+                echo "binfmt_misc" > /etc/modules-load.d/binfmt.conf
+        fi
     fi
 else
     log "Windows ABI module source not found — skipping"
@@ -418,29 +437,42 @@ systemctl enable NetworkManager.service || log "WARNING: could not enable Networ
 # macOS-style look: WhiteSur GTK + Shell + icon themes (built from source at
 # image-build time; falls back to the Axon dark theme if anything fails).
 log "Installing WhiteSur (macOS-style) themes..."
-apt-get install -y sassc libglib2.0-dev-bin || log "WARNING: theme build deps failed"
 GTK_THEME_NAME='axon-gtk'
 ICON_THEME_NAME='Papirus-Dark'
 SHELL_THEME_NAME=''
-# Pinned commit hashes for reproducible builds — update these when bumping themes.
-WHITESUR_GTK_COMMIT="${WHITESUR_GTK_COMMIT:-master}"
-WHITESUR_ICON_COMMIT="${WHITESUR_ICON_COMMIT:-master}"
-if git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git /tmp/wsg \
-   && git -C /tmp/wsg checkout "${WHITESUR_GTK_COMMIT}" \
-   && /tmp/wsg/install.sh -d /usr/share/themes -c Dark -N glassy; then
+
+# In quick mode, skip theme rebuild if themes are already installed
+WHITESUR_SKIP=false
+if [[ "${QUICK}" == "1" ]] && [[ -d /usr/share/themes/WhiteSur-Dark ]] && [[ -d /usr/share/icons/WhiteSur-dark ]]; then
+    log "Quick mode: WhiteSur themes already installed — skipping rebuild"
     GTK_THEME_NAME='WhiteSur-Dark'
-    SHELL_THEME_NAME='WhiteSur-Dark'
-else
-    log "WARNING: WhiteSur GTK theme install failed — keeping axon-gtk"
-fi
-if git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git /tmp/wsi \
-   && git -C /tmp/wsi checkout "${WHITESUR_ICON_COMMIT}" \
-   && /tmp/wsi/install.sh -d /usr/share/icons; then
     ICON_THEME_NAME='WhiteSur-dark'
-else
-    log "WARNING: WhiteSur icon theme install failed — keeping Papirus-Dark"
+    SHELL_THEME_NAME='WhiteSur-Dark'
+    WHITESUR_SKIP=true
 fi
-rm -rf /tmp/wsg /tmp/wsi
+
+if [[ "${WHITESUR_SKIP}" == "false" ]]; then
+    apt-get install -y sassc libglib2.0-dev-bin || log "WARNING: theme build deps failed"
+    # Pinned commit hashes for reproducible builds — update these when bumping themes.
+    WHITESUR_GTK_COMMIT="${WHITESUR_GTK_COMMIT:-master}"
+    WHITESUR_ICON_COMMIT="${WHITESUR_ICON_COMMIT:-master}"
+    if git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git /tmp/wsg \
+       && git -C /tmp/wsg checkout "${WHITESUR_GTK_COMMIT}" \
+       && /tmp/wsg/install.sh -d /usr/share/themes -c Dark -N glassy; then
+        GTK_THEME_NAME='WhiteSur-Dark'
+        SHELL_THEME_NAME='WhiteSur-Dark'
+    else
+        log "WARNING: WhiteSur GTK theme install failed — keeping axon-gtk"
+    fi
+    if git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git /tmp/wsi \
+       && git -C /tmp/wsi checkout "${WHITESUR_ICON_COMMIT}" \
+       && /tmp/wsi/install.sh -d /usr/share/icons; then
+        ICON_THEME_NAME='WhiteSur-dark'
+    else
+        log "WARNING: WhiteSur icon theme install failed — keeping Papirus-Dark"
+    fi
+    rm -rf /tmp/wsg /tmp/wsi
+fi
 
 # The user-theme extension schema lives outside the default schema dir; copy
 # it in so the gschema override below can reference it.
@@ -625,8 +657,12 @@ EOF
 # ---------------------------------------------------------------------------
 # 10. Regenerate initramfs (casper + plymouth hooks) and clean up
 # ---------------------------------------------------------------------------
-log "Regenerating initramfs..."
-update-initramfs -u -k all
+if [[ "${QUICK}" == "1" ]]; then
+    log "Quick mode: skipping initramfs regeneration"
+else
+    log "Regenerating initramfs..."
+    update-initramfs -u -k all
+fi
 
 log "Cleaning up..."
 dpkg --configure -a 2>/dev/null || log "WARNING: dpkg configure had errors (DKMS-related, non-fatal)"

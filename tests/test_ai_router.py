@@ -1,6 +1,5 @@
 """Tests for ai_router — task classification and model selection."""
 
-
 from services.axon_brain.ai_router import AIRouter, get_router
 
 
@@ -102,7 +101,9 @@ class TestAIRouterHelpers:
         assert self.router.get_model_for_generate("yes") == "llama3.2:3b"
 
     def test_get_model_for_generate_deep(self):
-        assert self.router.get_model_for_generate("write a function for a linked list") == "qwen2.5:7b"
+        assert (
+            self.router.get_model_for_generate("write a function for a linked list") == "qwen2.5:7b"
+        )
 
     def test_get_routing_info(self):
         info = self.router.get_routing_info()

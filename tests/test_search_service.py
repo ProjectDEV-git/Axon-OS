@@ -158,9 +158,7 @@ class TestKeywordQuery:
             ("/home/user/doc.txt", 100.0, 1, "alpha delta epsilon"),
         )
         tmp_db.commit()
-        tmp_db.execute(
-            "INSERT INTO fts_chunks(rowid, text) VALUES (1, ?)", ("alpha beta gamma",)
-        )
+        tmp_db.execute("INSERT INTO fts_chunks(rowid, text) VALUES (1, ?)", ("alpha beta gamma",))
         tmp_db.execute(
             "INSERT INTO fts_chunks(rowid, text) VALUES (2, ?)", ("alpha delta epsilon",)
         )
@@ -239,9 +237,7 @@ class TestReindexFile:
             with patch("indexer.chunk_text", return_value=["chunk1", "chunk2"]):
                 service._reindex_file(tmp_db, "/tmp/test.txt", 100.0, "chunk1 chunk2")
 
-        rows = tmp_db.execute(
-            "SELECT * FROM chunks WHERE path=?", ("/tmp/test.txt",)
-        ).fetchall()
+        rows = tmp_db.execute("SELECT * FROM chunks WHERE path=?", ("/tmp/test.txt",)).fetchall()
         assert len(rows) == 2
 
     def test_reindex_replaces_old_chunks(self, tmp_db):
@@ -258,9 +254,7 @@ class TestReindexFile:
             with patch("indexer.chunk_text", return_value=["new chunk"]):
                 service._reindex_file(tmp_db, "/tmp/test.txt", 200.0, "new content")
 
-        rows = tmp_db.execute(
-            "SELECT * FROM chunks WHERE path=?", ("/tmp/test.txt",)
-        ).fetchall()
+        rows = tmp_db.execute("SELECT * FROM chunks WHERE path=?", ("/tmp/test.txt",)).fetchall()
         assert len(rows) == 1
         assert rows[0][4] == "new chunk"
 
@@ -276,9 +270,7 @@ class TestReindexFile:
                 ):
                     service._reindex_file(tmp_db, "/tmp/vec.txt", 100.0, "hello world")
 
-        rows = tmp_db.execute(
-            "SELECT * FROM chunks WHERE path=?", ("/tmp/vec.txt",)
-        ).fetchall()
+        rows = tmp_db.execute("SELECT * FROM chunks WHERE path=?", ("/tmp/vec.txt",)).fetchall()
         assert len(rows) == 1
         # Verify embed was called
         service._embed.assert_called_once()

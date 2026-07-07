@@ -18,6 +18,21 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# Service subdirectories that tests import from directly.
+for _subdir in (
+    "services",
+    "services/axon-search",
+    "services/axon-voice",
+    "services/axon-sandbox",
+    "services/axon-gui-agent",
+    "services/axon-brain",
+    "apps/axon-installer",
+    "apps/axon-terminal",
+):
+    _full = str(ROOT / _subdir)
+    if _full not in sys.path:
+        sys.path.insert(0, _full)
+
 # Underscore package name -> real hyphenated directory.
 _SERVICE_PACKAGES = {
     "services.axon_brain": ROOT / "services" / "axon-brain",

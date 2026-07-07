@@ -198,6 +198,9 @@ def _validate_app_name(name: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+_css_loaded = False
+
+
 class IntentBarWindow(Adw.Window):
     """Floating intent bar with streaming AI responses."""
 
@@ -216,6 +219,7 @@ class IntentBarWindow(Adw.Window):
 
         # Accumulator for streaming tokens
         self._stream_parts: list[str] = []
+        self._stream_cancelled: bool = False
 
         self.set_decorated(False)
         self.set_default_size(660, -1)
@@ -226,18 +230,24 @@ class IntentBarWindow(Adw.Window):
         self._build_ui()
         self._connect_signals()
 
+        # Clean up streaming and resources on destroy
+        self.connect("destroy", self._on_destroy)
+
     # ------------------------------------------------------------------
     # CSS
     # ------------------------------------------------------------------
 
     def _apply_css(self) -> None:
-        provider = Gtk.CssProvider()
-        provider.load_from_data(_CSS)
-        Gtk.StyleContext.add_provider_for_display(
-            self.get_display(),
-            provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-        )
+        global _css_loaded
+        if not _css_loaded:
+            provider = Gtk.CssProvider()
+            provider.load_from_data(_CSS)
+            Gtk.StyleContext.add_provider_for_display(
+                self.get_display(),
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+            _css_loaded = True
 
     # ------------------------------------------------------------------
     # UI construction
@@ -481,11 +491,15 @@ class IntentBarWindow(Adw.Window):
         self._stream_parts = []
         try:
             for token in self._ollama.generate_stream(query, system=system):
+                if self._stream_cancelled:
+                    break
                 self._stream_parts.append(token)
                 GLib.idle_add(self._append_token, token)
         except Exception as exc:
-            GLib.idle_add(self._append_token, f"\n[error] {exc}")
-        GLib.idle_add(self._finish_stream, "".join(self._stream_parts))
+            if not self._stream_cancelled:
+                GLib.idle_add(self._append_token, f"\n[error] {exc}")
+        if not self._stream_cancelled:
+            GLib.idle_add(self._finish_stream, "".join(self._stream_parts))
 
     def _append_token(self, token: str) -> bool:
         """Append a streaming token to the response label (GTK main thread)."""
@@ -641,3 +655,11 @@ class IntentBarWindow(Adw.Window):
     # ------------------------------------------------------------------
     # Semantic File Search Helpers
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    def _on_destroy(self, _widget: Gtk.Widget) -> None:
+        """Cancel streaming and clean up resources on window close."""
+        self._stream_cancelled = True

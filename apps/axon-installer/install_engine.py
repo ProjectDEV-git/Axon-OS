@@ -32,6 +32,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -104,6 +105,12 @@ def validate_config(cfg: dict) -> list:
     disk = cfg.get("target_disk", "")
     if not disk.startswith("/dev/"):
         problems.append(f"target_disk must be a /dev path, got: {disk!r}")
+    else:
+        # Validate the disk actually exists and is a block device
+        if not os.path.exists(disk):
+            problems.append(f"target_disk does not exist: {disk!r}")
+        elif not stat.S_ISBLK(os.stat(disk).st_mode):
+            problems.append(f"target_disk is not a block device: {disk!r}")
 
     if cfg.get("install_mode") not in ("erase", "alongside"):
         problems.append("install_mode must be 'erase' or 'alongside'")

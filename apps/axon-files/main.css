@@ -1,7 +1,8 @@
 /* Axon Files Modern Glassmorphic Stylesheet */
+@import url("../shared/axon-design-tokens.css");
 
 .window-bg {
-    background-color: #09090f;
+    background-color: @bg_primary;
 }
 
 /* Sidebar styling */
@@ -37,13 +38,13 @@
 
 /* Main Area styling */
 .main-content {
-    background-color: #0c0c14;
+    background-color: @bg_secondary;
     padding: 16px;
 }
 
 .path-bar {
     padding: 4px 8px;
-    background-color: #11111e;
+    background-color: @bg_secondary;
     border-radius: 8px;
     border: 1px solid rgba(139, 92, 246, 0.1);
     margin-bottom: 12px;
@@ -87,7 +88,7 @@
 .file-name-label {
     font-size: 14px;
     font-weight: bold;
-    color: #e8e8f4;
+    color: @text_primary;
 }
 
 .file-path-label {
@@ -102,7 +103,7 @@
 
 /* Preview Panel */
 .preview-panel {
-    background-color: #11111e;
+    background-color: @bg_secondary;
     border-left: 1px solid rgba(139, 92, 246, 0.15);
     padding: 20px;
     width: 280px;
@@ -111,7 +112,7 @@
 .preview-title {
     font-size: 18px;
     font-weight: bold;
-    color: #e8e8f4;
+    color: @text_primary;
     margin-bottom: 8px;
 }
 
@@ -122,7 +123,7 @@
 }
 
 .preview-summary-box {
-    background-color: #09090f;
+    background-color: @bg_primary;
     border-radius: 8px;
     border: 1px solid rgba(139, 92, 246, 0.1);
     padding: 12px;

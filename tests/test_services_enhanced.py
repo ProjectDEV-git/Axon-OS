@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Test suite for Axon D-Bus services."""
 
+from unittest.mock import patch
+
 import threading
 import time
 
@@ -205,8 +207,9 @@ class TestServiceUtils:
 
         cache = TTLCache(ttl_seconds=1)
         cache.set("test_key", "test_value")
-        time.sleep(1.1)
-        assert cache.get("test_key") is None
+        # Simulate time advancing past TTL without real sleep
+        with patch("services.service_utils.time.time", return_value=time.time() + 2.0):
+            assert cache.get("test_key") is None
 
     def test_ttl_cache_clear(self) -> None:
         """Test TTL cache clear operation."""
@@ -237,12 +240,14 @@ class TestServiceUtils:
 
         limiter = RateLimiter(rate=1, window_seconds=1)
         identifier = "test_client"
+        now = time.time()
 
         assert limiter.allow(identifier)
         assert not limiter.allow(identifier)
 
-        time.sleep(1.1)
-        assert limiter.allow(identifier)
+        # Simulate time advancing past window without real sleep
+        with patch("services.service_utils.time.time", return_value=now + 2.0):
+            assert limiter.allow(identifier)
 
     def test_ttl_cache_thread_safety(self) -> None:
         """Test TTLCache is safe under concurrent access."""

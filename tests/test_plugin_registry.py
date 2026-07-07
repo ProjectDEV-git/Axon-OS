@@ -1,6 +1,5 @@
 """Tests for plugin_registry — manifest parsing, validation, and PluginInfo."""
 
-
 import pytest
 
 from services.plugin_registry import (

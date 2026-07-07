@@ -19,6 +19,8 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, Gtk, Pango
 
+_css_loaded = False
+
 # Shortcut definitions grouped by category
 SHORTCUTS = [
     {
@@ -85,16 +87,19 @@ class ShortcutsWindow(Adw.ApplicationWindow):
         self.set_default_size(720, 560)
         self.set_resizable(True)
 
-        # Load CSS
-        css_path = Path(__file__).resolve().parent / "main.css"
-        if css_path.exists():
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_path(str(css_path))
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
+        # Load CSS (guard against re-registration)
+        global _css_loaded
+        if not _css_loaded:
+            css_path = Path(__file__).resolve().parent / "main.css"
+            if css_path.exists():
+                css_provider = Gtk.CssProvider()
+                css_provider.load_from_path(str(css_path))
+                Gtk.StyleContext.add_provider_for_display(
+                    Gdk.Display.get_default(),
+                    css_provider,
+                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+                )
+            _css_loaded = True
 
         # Close on Escape key
         esc_controller = Gtk.EventControllerKey()

@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import mock_open, patch
-
-# Paths
-TESTS_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = TESTS_DIR.parent
-BRAIN_SERVICE_DIR = PROJECT_ROOT / "services" / "axon-brain"
-sys.path.insert(0, str(BRAIN_SERVICE_DIR))
 
 import hardware_profiler
 

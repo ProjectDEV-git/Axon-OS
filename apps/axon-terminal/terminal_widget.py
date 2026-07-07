@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import signal
 
 import gi
 
@@ -328,6 +329,14 @@ class TerminalWidget(Gtk.Box):
 
     def _on_close_page(self, tab_view: Adw.TabView, page: Adw.TabPage) -> bool:
         """Handle tab close request."""
+        # Send SIGHUP to the child process to ensure clean shutdown
+        for tab in self._tabs:
+            if tab.page is page and tab.pid > 0:
+                try:
+                    os.kill(tab.pid, signal.SIGHUP)
+                except (ProcessLookupError, OSError):
+                    pass
+                break
         # Remove from our tracking list
         self._tabs = [t for t in self._tabs if t.page is not page]
         tab_view.close_page_finish(page, True)
@@ -539,28 +548,23 @@ class TerminalWidget(Gtk.Box):
         findings = decision.findings
 
         if decision.sandbox_recommended:
-            # Build a simple inline prompt in GTK4-friendly style.
-            transient = self.get_root() if hasattr(self.get_root(), "present") else None
-            dialog = Gtk.Dialog(
-                title="Suspicious command detected", transient_for=transient, modal=True
+            # Use Adw.AlertDialog (modern replacement for deprecated Gtk.Dialog).
+            dialog = Adw.AlertDialog(
+                heading="Suspicious command detected",
+                body=format_findings(findings),
             )
-            dialog.add_button("Block", Gtk.ResponseType.CANCEL)
-            dialog.add_button("Allow Once", Gtk.ResponseType.YES)
-            dialog.add_button("Run Sandboxed", Gtk.ResponseType.OK)
-            box = dialog.get_content_area()
-            label = Gtk.Label(label=format_findings(findings))
-            label.set_wrap(True)
-            label.set_margin_top(12)
-            label.set_margin_bottom(12)
-            label.set_margin_start(12)
-            label.set_margin_end(12)
-            box.append(label)
+            dialog.add_response("cancel", "Block")
+            dialog.add_response("yes", "Allow Once")
+            dialog.add_response("ok", "Run Sandboxed")
+            dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+            dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+            dialog.set_default_response("cancel")
+            dialog.set_close_response("cancel")
 
-            def _finish(resp: Gtk.ResponseType) -> None:
-                dialog.destroy()
-                if resp == Gtk.ResponseType.CANCEL:
+            def _finish(dialog: Adw.AlertDialog, response: str) -> None:
+                if response == "cancel":
                     return
-                if resp == Gtk.ResponseType.OK:
+                if response == "ok":
                     try:
                         tmp_fd, tmp_path = tempfile.mkstemp(prefix="axon-term-", suffix=".sh")
                         os.close(tmp_fd)
@@ -588,8 +592,8 @@ class TerminalWidget(Gtk.Box):
                     tab.last_command = command
                     self._command_history.append(command)
 
-            dialog.connect("response", lambda _dlg, resp: _finish(resp))
-            dialog.present()
+            dialog.connect("response", _finish)
+            dialog.present(self.get_root())
             return
 
         tab = self._get_active_tab()
@@ -602,3 +606,9 @@ class TerminalWidget(Gtk.Box):
         """Return the active VTE terminal widget, or None."""
         tab = self._get_active_tab()
         return tab.terminal if tab is not None else None
+
+    def close_active_tab(self) -> None:
+        """Close the currently active terminal tab."""
+        tab = self._get_active_tab()
+        if tab is not None and tab.page is not None:
+            self._on_close_page(self._tab_view, tab.page)

@@ -6,19 +6,9 @@ None of these imports require D-Bus, GTK, or root.
 """
 
 import sys
-from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
-
-ROOT = Path(__file__).resolve().parent.parent
-for sub in (
-    "services/axon-search",
-    "services/axon-voice",
-    "services/axon-sandbox",
-    "services/axon-gui-agent",
-    "apps/axon-installer",
-):
-    sys.path.insert(0, str(ROOT / sub))
 
 import audit
 import indexer

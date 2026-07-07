@@ -162,6 +162,8 @@ class UserSetupPage(Gtk.Box):
             return "Username must be lowercase, start with a letter, and contain only a-z, 0-9, or hyphens (max 32 chars)."
         if not v["password"]:
             return "Password cannot be empty."
+        if len(v["password"]) < 4:
+            return "Password must be at least 4 characters."
         if v["password"] != v["password2"]:
             return "Passwords do not match."
         if not v["hostname"]:
@@ -745,9 +747,12 @@ class InstallerApp(Adw.ApplicationWindow):
                 # Add rootflags=subvol=@ so the kernel mounts the correct BTRFS subvolume
                 with open(os.path.join(mount, "etc", "default", "grub"), "a") as f:
                     f.write("\nGRUB_DISABLE_OS_PROBER=false\n")
-                    f.write(
-                        'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash rootflags=subvol=@ console=tty0"\n'
-                    )
+                    # Only append GRUB_CMDLINE_LINUX_DEFAULT if not already present
+                    existing_grub = open(os.path.join(mount, "etc", "default", "grub")).read()
+                    if "GRUB_CMDLINE_LINUX_DEFAULT" not in existing_grub:
+                        f.write(
+                            'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash rootflags=subvol=@ console=tty0"\n'
+                        )
                     f.write('GRUB_CMDLINE_LINUX=""\n')
 
                 # Create user with password via chpasswd

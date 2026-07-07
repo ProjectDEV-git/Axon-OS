@@ -1,5 +1,6 @@
 """Extended tests for SandboxManager — static fallback analysis and edge cases."""
 
+import logging
 from unittest.mock import MagicMock, patch
 
 
@@ -12,6 +13,7 @@ class TestSandboxStaticFallback:
 
             manager = SandboxManager.__new__(SandboxManager)
             manager.session_bus = MagicMock()
+            manager.logger = logging.getLogger("test")
             return manager
 
     def test_ssh_content_detected_in_fallback(self):
@@ -108,6 +110,7 @@ class TestSandboxContentTruncation:
 
             manager = SandboxManager.__new__(SandboxManager)
             manager.session_bus = MagicMock()
+            manager.logger = logging.getLogger("test")
             return manager
 
     def test_content_truncated_to_3000(self):
@@ -144,6 +147,7 @@ class TestSandboxBrainResponse:
 
             manager = SandboxManager.__new__(SandboxManager)
             manager.session_bus = MagicMock()
+            manager.logger = logging.getLogger("test")
             return manager
 
     def test_brain_json_with_markdown_fence(self):

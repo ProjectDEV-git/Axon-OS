@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "axon-installer"))
 
@@ -27,7 +28,10 @@ def _valid_config():
 
 
 def test_valid_config_passes():
-    assert install_engine.validate_config(_valid_config()) == []
+    with patch("os.path.exists", return_value=True), patch("os.stat") as mock_stat:
+        import stat as _stat
+        mock_stat.return_value.st_mode = _stat.S_IFBLK | 0o640
+        assert install_engine.validate_config(_valid_config()) == []
 
 
 def test_rejects_bad_disk():
@@ -76,7 +80,10 @@ def test_rejects_provider_without_key():
 def test_ollama_provider_needs_no_key():
     cfg = _valid_config()
     cfg["ai"]["providers"] = [{"id": "ollama"}]
-    assert install_engine.validate_config(cfg) == []
+    with patch("os.path.exists", return_value=True), patch("os.stat") as mock_stat:
+        import stat as _stat
+        mock_stat.return_value.st_mode = _stat.S_IFBLK | 0o640
+        assert install_engine.validate_config(cfg) == []
 
 
 def test_part_node_naming():

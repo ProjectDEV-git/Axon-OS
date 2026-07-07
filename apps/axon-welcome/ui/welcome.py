@@ -126,6 +126,9 @@ _CSS = b"""
 """
 
 
+_css_loaded = False
+
+
 def _add_class(widget: Gtk.Widget, css_class: str) -> None:
     widget.get_style_context().add_class(css_class)
 
@@ -159,14 +162,17 @@ class WelcomeWindow(Adw.Window):
         self.set_default_size(640, 600)
         self.set_decorated(True)
 
-        # Load CSS
-        provider = Gtk.CssProvider()
-        provider.load_from_data(_CSS)
-        Gtk.StyleContext.add_provider_for_display(
-            self.get_display(),
-            provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-        )
+        # Load CSS (guard against re-registration)
+        global _css_loaded
+        if not _css_loaded:
+            provider = Gtk.CssProvider()
+            provider.load_from_data(_CSS)
+            Gtk.StyleContext.add_provider_for_display(
+                self.get_display(),
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+            _css_loaded = True
 
         # Root layout
         root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)

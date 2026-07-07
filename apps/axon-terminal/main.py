@@ -114,6 +114,10 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
             if keyval in (Gdk.KEY_t, Gdk.KEY_T):
                 self._terminal_widget.new_tab()
                 return True
+            # Ctrl+Shift+W — close active tab
+            if keyval in (Gdk.KEY_w, Gdk.KEY_W):
+                self._terminal_widget.close_active_tab()
+                return True
 
         return False
 

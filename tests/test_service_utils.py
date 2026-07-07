@@ -38,7 +38,7 @@ class TestSafeExec:
         assert safe_exec("echo 'unterminated") is None
 
     def test_allowlist_contains_common_commands(self):
-        for cmd in ["ls", "cat", "grep", "find", "echo", "date", "whoami"]:
+        for cmd in ["ls", "cat", "grep", "echo", "date", "whoami"]:
             assert cmd in ALLOWED_COMMANDS
 
 

@@ -236,6 +236,9 @@ def _apply_markup(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+_css_loaded = False
+
+
 class AIPanelWindow(Adw.Window):
     """Main side-panel window for the Axon AI assistant."""
 
@@ -360,16 +363,20 @@ class AIPanelWindow(Adw.Window):
         self._ctx_reader = context_reader
         self._streaming = False
         self._stream_bubble: MessageBubble | None = None
+        self._stream_cancelled = False
         self._conv_id: str = ""
 
-        # Apply CSS
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_data(self._CSS)
-        Gtk.StyleContext.add_provider_for_display(
-            self.get_display(),
-            css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-        )
+        # Apply CSS (guard against re-registration)
+        global _css_loaded
+        if not _css_loaded:
+            css_provider = Gtk.CssProvider()
+            css_provider.load_from_data(self._CSS)
+            Gtk.StyleContext.add_provider_for_display(
+                self.get_display(),
+                css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+            _css_loaded = True
 
         self.set_default_size(420, 860)
         self.set_resizable(True)
@@ -493,6 +500,9 @@ class AIPanelWindow(Adw.Window):
         esc_ctrl = Gtk.EventControllerKey()
         esc_ctrl.connect("key-pressed", self._on_key_pressed)
         self.add_controller(esc_ctrl)
+
+        # Clean up streaming and resources on destroy
+        self.connect("destroy", self._on_destroy)
 
         # Fetch real model list in background
         threading.Thread(target=self._fetch_models, daemon=True).start()
@@ -666,15 +676,19 @@ class AIPanelWindow(Adw.Window):
     def _stream_response(self, text: str, ctx: str, model: str) -> None:
         accumulated = ""
         try:
-            for chunk in self._client.send_message_stream(self._conv_id, text, model=model):
+            for chunk in self._client.send_message_stream(self._conv_id, text, model=model, ctx=ctx):
+                if self._stream_cancelled:
+                    break
                 accumulated += chunk
                 GLib.idle_add(self._on_chunk, chunk)
         except Exception as exc:
-            error_text = f"\n[Error: {exc}]"
-            accumulated += error_text
-            GLib.idle_add(self._on_chunk, error_text)
+            if not self._stream_cancelled:
+                error_text = f"\n[Error: {exc}]"
+                accumulated += error_text
+                GLib.idle_add(self._on_chunk, error_text)
         finally:
-            GLib.idle_add(self._on_stream_done, accumulated)
+            if not self._stream_cancelled:
+                GLib.idle_add(self._on_stream_done, accumulated)
 
     def _on_chunk(self, chunk: str) -> bool:
         if self._stream_bubble is not None:
@@ -699,3 +713,11 @@ class AIPanelWindow(Adw.Window):
             self.set_visible(False)
         else:
             self.present()
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    def _on_destroy(self, _widget: Gtk.Widget) -> None:
+        """Cancel streaming and clean up resources on window close."""
+        self._stream_cancelled = True

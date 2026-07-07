@@ -7,7 +7,17 @@
 # GitHub Actions ubuntu-24.04 runners.
 #
 # Usage:
-#   sudo bash build/build.sh [--ci] [--compression xz|gzip] [--keep-chroot]
+#   sudo bash build/build.sh [--ci] [--compression xz|gzip] [--keep-chroot] [--quick] [--chroot]
+#
+# Flags:
+#   --ci              Non-interactive (default)
+#   --compression=X   Squashfs compression (default: xz)
+#   --keep-chroot     Reuse existing chroot without re-bootstrapping (AUTO if chroot exists)
+#   --quick           Fast rebuild: skips debootstrap + runs chroot-setup (already-installed pkgs are no-ops)
+#   --fast            Ultra-fast rebuild: quick mode + gzip compression (smaller ISO but 3-5x faster)
+#   --fresh           Force full rebuild: deletes chroot + base image cache, starts from scratch
+#   --chroot          Drop into the existing build chroot shell
+#   --cmd 'CMD'       Run a command inside the chroot (combine with --chroot)
 #
 # Environment:
 #   AXON_BUILD_DIR   Work directory (default: /tmp/axon-build)
@@ -29,6 +39,7 @@ WORK_DIR="${AXON_BUILD_DIR:-/tmp/axon-build}"
 CHROOT="${WORK_DIR}/chroot"
 IMAGE="${WORK_DIR}/image"
 APT_CACHE="${WORK_DIR}/apt-cache"  # persistent .deb cache across builds
+BASE_IMAGE="${WORK_DIR}/base-${DIST}-${ARCH}.tar.xz"  # cached chroot tarball
 
 # Reproducible builds: set SOURCE_DATE_EPOCH for deterministic timestamps
 # If not set externally, use the last git commit timestamp
@@ -44,19 +55,43 @@ STAGING="${WORK_DIR}/staging"
 DIST_DIR="${BASE_DIR}/dist"
 
 COMPRESSION="xz"
+QUICK=false
 KEEP_CHROOT=false
+CHROOT_SHELL=false
+CHROOT_CMD=""
+FRESH=false
 
 for arg in "$@"; do
     case "${arg}" in
         --ci) ;; # reserved; everything is already non-interactive
         --compression=*) COMPRESSION="${arg#*=}" ;;
         --keep-chroot) KEEP_CHROOT=true ;;
+        --quick) QUICK=true; KEEP_CHROOT=true ;; # --quick implies --keep-chroot
+        --fast) QUICK=true; KEEP_CHROOT=true; COMPRESSION=gzip ;; # --fast is quick + fast compression
+        --chroot) CHROOT_SHELL=true ;;
+        --fresh) FRESH=true ;; # force full rebuild: delete chroot + base image
+        --cmd) ;; # value parsed below
         *) echo "[axon-build] Unknown option: ${arg}" >&2; exit 2 ;;
     esac
 done
+# Extract --cmd value
+for ((i=1; i<=$#; i++)); do
+    eval "val=\${$i}"
+    if [[ "${val}" == "--cmd" ]]; then
+        next=$((i+1))
+        eval "CHROOT_CMD=\${$next}"
+    fi
+done
 
+BUILD_START=$(date +%s)
 log() { echo "[axon-build] $*"; }
 die() { echo "[axon-build] ERROR: $*" >&2; exit 1; }
+timer() {
+    local elapsed=$(($(date +%s) - BUILD_START))
+    local mins=$((elapsed / 60))
+    local secs=$((elapsed % 60))
+    printf "[%dm%ds] %s\n" "$mins" "$secs" "$*"
+}
 
 # ---------------------------------------------------------------------------
 # Preflight
@@ -142,27 +177,92 @@ umount_chroot() {
 trap umount_chroot EXIT
 
 # ---------------------------------------------------------------------------
-# Phase 1: bootstrap base system
+# Quick chroot entry (--chroot / --chroot --cmd)
+# ---------------------------------------------------------------------------
+chroot_shell() {
+    if [[ ! -d "${CHROOT}" ]]; then
+        die "No chroot found at ${CHROOT}. Run a full build first."
+    fi
+    mount_chroot
+    if [[ -n "${CHROOT_CMD}" ]]; then
+        log "Running command in chroot: ${CHROOT_CMD}"
+        chroot "${CHROOT}" /usr/bin/env -i \
+            HOME=/root \
+            TERM="${TERM:-xterm-256color}" \
+            PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+            /bin/bash -c "${CHROOT_CMD}"
+    else
+        log "Entering chroot shell (exit to leave)..."
+        chroot "${CHROOT}" /usr/bin/env -i \
+            HOME=/root \
+            TERM="${TERM:-xterm-256color}" \
+            PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+            /bin/bash --login
+    fi
+    umount_chroot
+    exit 0
+}
+
+# ---------------------------------------------------------------------------
+# Phase 1: bootstrap base system (from tarball cache or debootstrap)
 # ---------------------------------------------------------------------------
 bootstrap() {
-    if [[ -d "${CHROOT}" && "${KEEP_CHROOT}" == "true" ]]; then
-        log "Reusing existing chroot at ${CHROOT} (--keep-chroot)."
+    # --fresh: nuke everything and start over
+    if [[ "${FRESH}" == "true" ]]; then
+        log "FRESH mode: removing existing chroot + base image..."
+        rm -rf "${CHROOT}"
+        rm -f "${BASE_IMAGE}"
+    fi
+
+    # Reuse existing chroot if it's already there
+    if [[ -d "${CHROOT}" ]]; then
+        log "Reusing existing chroot at ${CHROOT}."
         return 0
     fi
+
+    # FAST PATH: restore from cached base image tarball (skips debootstrap + all apt)
+    if [[ -f "${BASE_IMAGE}" ]]; then
+        log "Restoring chroot from cached base image: ${BASE_IMAGE}"
+        log "  ($(du -sh "${BASE_IMAGE}" | cut -f1), extracting...)"
+        local restore_start=$(date +%s)
+        mkdir -p "${CHROOT}"
+        tar -xJf "${BASE_IMAGE}" -C "${WORK_DIR}"
+        local restore_secs=$(($(date +%s) - restore_start))
+        log "  Chroot restored in ${restore_secs}s — skipping debootstrap."
+        return 0
+    fi
+
+    # SLOW PATH: full debootstrap (first build only)
     rm -rf "${CHROOT}"
     mkdir -p "${CHROOT}"
-    log "Bootstrapping Ubuntu ${DIST} (${ARCH})... (this downloads ~100 MB)"
+    log "Bootstrapping Ubuntu ${DIST} (${ARCH})... (first time — downloads ~100 MB)"
     debootstrap --arch="${ARCH}" "${DIST}" "${CHROOT}" "${MIRROR}"
 
     # Fix IPv6 unreachable + hash mismatch errors inside the chroot
-    # archive.ubuntu.com CDN sometimes serves corrupted .deb files; use direct US mirror
     cat > "${CHROOT}/etc/apt/apt.conf.d/99force-ipv4" <<'APTEOF'
 Acquire::ForceIPv4 "true";
 Acquire::Retries "3";
 Acquire::http::Pipeline-Depth "0";
 APTEOF
-    # Rewrite sources.list to use direct US mirror instead of CDN
     sed -i 's|http://archive.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' "${CHROOT}/etc/apt/sources.list"
+}
+
+# ---------------------------------------------------------------------------
+# Save chroot as cached base image (called after configure_chroot)
+# ---------------------------------------------------------------------------
+save_base_image() {
+    if [[ -f "${BASE_IMAGE}" ]]; then
+        log "Base image already cached: ${BASE_IMAGE}"
+        return 0
+    fi
+    log "Saving base image for fast rebuilds: ${BASE_IMAGE}"
+    log "  (this is a one-time cost — future builds restore from this)"
+    # Temporarily remove resolv.conf symlink (it points to host path)
+    rm -f "${CHROOT}/etc/resolv.conf"
+    tar -cJf "${BASE_IMAGE}" -C "${WORK_DIR}" chroot
+    # Restore resolv.conf
+    ln -fs ../run/systemd/resolve/stub-resolv.conf "${CHROOT}/etc/resolv.conf"
+    log "  Base image saved: $(du -sh "${BASE_IMAGE}" | cut -f1)"
 }
 
 # ---------------------------------------------------------------------------
@@ -176,14 +276,19 @@ configure_chroot() {
         --exclude='__pycache__' --exclude='*.pyc' --exclude='*.iso' \
         "${BASE_DIR}/" "${CHROOT}/opt/axon-src/"
 
-    log "Entering chroot to install system (this takes a while)..."
     mount_chroot
+
+    if [[ "${QUICK}" == "true" ]]; then
+        log "QUICK mode: re-running component install (apt is idempotent, fast)..."
+    else
+        log "Entering chroot to install system (this takes a while)..."
+    fi
     chroot "${CHROOT}" /usr/bin/env \
         AXON_VERSION="${VERSION}" \
+        AXON_QUICK="${QUICK}" \
         /bin/bash /opt/axon-src/build/config/chroot-setup.sh
     umount_chroot
     rm -f "${CHROOT}/etc/resolv.conf"
-    # The installed system manages resolv.conf via systemd-resolved
     ln -fs ../run/systemd/resolve/stub-resolv.conf "${CHROOT}/etc/resolv.conf"
 }
 
@@ -208,9 +313,9 @@ build_image_tree() {
         > "${IMAGE}/casper/filesystem.manifest"
     cp "${IMAGE}/casper/filesystem.manifest" "${IMAGE}/casper/filesystem.manifest-desktop"
 
-    log "Compressing root filesystem (squashfs, ${COMPRESSION})..."
-    local comp_args=(-comp "${COMPRESSION}")
-    [[ "${COMPRESSION}" == "xz" ]] && comp_args+=(-b 1M)
+    log "Compressing root filesystem (squashfs, ${COMPRESSION}, $(nproc) cores)..."
+    local comp_args=(-comp "${COMPRESSION}" -processors "$(nproc)")
+    [[ "${COMPRESSION}" == "xz" ]] && comp_args+=(-b 1M -Xbcj x86)
     mksquashfs "${CHROOT}" "${IMAGE}/casper/filesystem.squashfs" \
         -noappend -wildcards "${comp_args[@]}" \
         -e 'proc/*' 'sys/*' 'dev/*' 'run/*' 'tmp/*' 'opt/axon-src' \
@@ -425,30 +530,45 @@ EOF
 # Main
 # ---------------------------------------------------------------------------
 main() {
+    # Quick chroot entry — bypass build entirely
+    if [[ "${CHROOT_SHELL}" == "true" ]]; then
+        chroot_shell
+    fi
+
     log "============================================"
     log " Axon OS Build System v${VERSION}"
     log " Base:    Ubuntu ${DIST} (${ARCH})"
     log " Workdir: ${WORK_DIR}"
     log " Output:  ${DIST_DIR}/${ISO_NAME}"
+    [[ -f "${BASE_IMAGE}" ]] && log " Cache:   ${BASE_IMAGE} ($(du -sh "${BASE_IMAGE}" | cut -f1))" || log " Cache:   (none — first build will create it)"
+    [[ "${QUICK}" == "true" && "${COMPRESSION}" == "gzip" ]] && log " Mode:    FAST (quick rebuild + gzip compression)"
+    [[ "${QUICK}" == "true" && "${COMPRESSION}" != "gzip" ]] && log " Mode:    QUICK (fast rebuild)"
+    [[ "${FRESH}" == "true" ]] && log " Mode:    FRESH (full rebuild from scratch)"
     log "============================================"
 
-    log "Phase 1/4: Dependencies"
+    timer "Phase 1/4: Dependencies"
     check_deps
     mkdir -p "${WORK_DIR}"
 
-    log "Phase 2/4: Bootstrap + configure root filesystem"
+    timer "Phase 2/4: Bootstrap + configure root filesystem"
     bootstrap
     configure_chroot
+    save_base_image
 
-    log "Phase 3/4: Live image tree"
+    timer "Phase 3/4: Live image tree"
     build_image_tree
 
-    log "Phase 4/4: Bootable hybrid ISO"
+    timer "Phase 4/4: Bootable hybrid ISO"
     build_iso
 
+    local total=$(($(date +%s) - BUILD_START))
+    local mins=$((total / 60))
+    local secs=$((total % 60))
     log "============================================"
-    log " Build complete: ${DIST_DIR}/${ISO_NAME}"
-    log " Test it:  qemu-system-x86_64 -enable-kvm -m 4G -cdrom '${DIST_DIR}/${ISO_NAME}'"
+    log " Build complete in ${mins}m${secs}s: ${DIST_DIR}/${ISO_NAME}"
+    log " Size:    $(du -sh "${DIST_DIR}/${ISO_NAME}" | cut -f1)"
+    log " Test it: qemu-system-x86_64 -enable-kvm -m 4G -cdrom '${DIST_DIR}/${ISO_NAME}'"
+    log " Chroot:  sudo bash build/build.sh --chroot"
     log "============================================"
 }
 

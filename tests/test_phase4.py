@@ -41,7 +41,8 @@ class TestAIRouter:
         from services.axon_brain.ai_router import AIRouter
 
         router = AIRouter()
-        assert router.classify_task("search files") == "embedding"
+        # 2-word prompts are too short for embedding routing (< 3 words guard)
+        assert router.classify_task("search files") == "speed"
         assert router.classify_task("find similar documents") == "embedding"
 
     def test_select_model_explicit(self):

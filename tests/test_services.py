@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -8,6 +9,7 @@ import unittest
 from pathlib import Path
 
 import dbus
+import pytest
 
 # Paths
 TESTS_DIR = Path(__file__).resolve().parent
@@ -16,10 +18,28 @@ BRAIN_SCRIPT = PROJECT_ROOT / "services" / "axon-brain" / "brain_service.py"
 CONTEXT_SCRIPT = PROJECT_ROOT / "services" / "axon-context" / "context_service.py"
 
 
+@pytest.mark.integration
 class TestAxonServices(unittest.TestCase):
+    """Integration tests requiring a live D-Bus session bus."""
+
     @classmethod
     def setUpClass(cls):
         """Spawns the D-Bus Brain and Context daemons in background processes for testing."""
+        if not shutil.which("dbus-daemon"):
+            pytest.skip("No D-Bus session daemon available")
+        # Also skip if we can't connect to session bus
+        try:
+            bus = dbus.SessionBus()
+            bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+            # If the service is already running, no need to spawn
+            cls.bus = bus
+            cls.brain = bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+            cls.context = bus.get_object("org.axonos.Context", "/org/axonos/Context")
+            cls.brain_proc = None
+            cls.context_proc = None
+            return
+        except dbus.exceptions.DBusException:
+            pass  # Service not running, try to spawn it
         # Ensure they are executable
         os.chmod(BRAIN_SCRIPT, 0o755)
         os.chmod(CONTEXT_SCRIPT, 0o755)
@@ -35,18 +55,24 @@ class TestAxonServices(unittest.TestCase):
         # Wait for services to register on Session Bus
         time.sleep(2.0)
 
-        # Connect DBus
-        cls.bus = dbus.SessionBus()
-        cls.brain = cls.bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
-        cls.context = cls.bus.get_object("org.axonos.Context", "/org/axonos/Context")
+        # Connect DBus — skip if daemons failed to register
+        try:
+            cls.bus = dbus.SessionBus()
+            cls.brain = cls.bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+            cls.context = cls.bus.get_object("org.axonos.Context", "/org/axonos/Context")
+        except dbus.exceptions.DBusException:
+            cls.tearDownClass()
+            pytest.skip("Could not start Axon OS D-Bus services")
 
     @classmethod
     def tearDownClass(cls):
-        # Tear down daemons
-        cls.brain_proc.terminate()
-        cls.context_proc.terminate()
-        cls.brain_proc.wait()
-        cls.context_proc.wait()
+        # Tear down daemons (only if we spawned them)
+        if getattr(cls, "brain_proc", None) is not None:
+            cls.brain_proc.terminate()
+            cls.brain_proc.wait()
+        if getattr(cls, "context_proc", None) is not None:
+            cls.context_proc.terminate()
+            cls.context_proc.wait()
 
     # ------------------------------------------------------------------
     # Brain Service Tests

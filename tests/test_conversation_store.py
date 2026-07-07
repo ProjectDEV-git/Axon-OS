@@ -44,8 +44,8 @@ class TestConversationStore(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(st.st_mode), 0o600)
 
 
-class TestConversationStoreConnectionCleanup(unittest.TestCase):
-    """Test that _close_connection actually closes the SQLite connection (FD leak fix)."""
+class TestConversationStoreConnectionLifecycle(unittest.TestCase):
+    """Test that connections are reused via threading.local() and properly cleaned up."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -54,37 +54,42 @@ class TestConversationStoreConnectionCleanup(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def test_close_connection_closes_sqlite_connection(self):
-        """_close_connection should call conn.close() on the underlying connection."""
+    def test_close_method_releases_connection(self):
+        """close() should release the per-thread connection."""
         store = ConversationStore(db_path=self.db_path)
-        # The store should have a connection after init
         conn = store._get_connection()
         self.assertIsNotNone(conn)
-        # Close it
-        store._close_connection(conn)
-        # After close, trying to use the connection should raise
-        import sqlite3
+        # close() releases the connection
+        store.close()
+        # After close, _get_connection creates a fresh one
+        conn2 = store._get_connection()
+        self.assertIsNotNone(conn2)
 
-        with self.assertRaises((sqlite3.ProgrammingError, AttributeError)):
-            conn.execute("SELECT 1")
-
-    def test_close_connection_handles_none(self):
-        """_close_connection should not crash if given a bad reference."""
+    def test_get_connection_reuses_open_connection(self):
+        """_get_connection should return the same connection on repeated calls."""
         store = ConversationStore(db_path=self.db_path)
-        # Should not raise even if called with a value that's already closed
-        conn = store._get_connection()
-        store._close_connection(conn)
-        # Double-close should be safe
-        store._close_connection(conn)
+        conn1 = store._get_connection()
+        conn2 = store._get_connection()
+        self.assertIs(conn1, conn2)
 
     def test_get_connection_after_close_creates_new(self):
         """After closing, _get_connection should create a fresh connection."""
         store = ConversationStore(db_path=self.db_path)
         conn1 = store._get_connection()
-        store._close_connection(conn1)
+        store.close()
         conn2 = store._get_connection()
         # Should get a new connection object
         self.assertIsNotNone(conn2)
+        self.assertIsNot(conn1, conn2)
+
+    def test_operations_work_without_reconnect(self):
+        """Multiple operations should reuse the same connection successfully."""
+        store = ConversationStore(db_path=self.db_path)
+        conv_id = store.create_conversation(title="Test")
+        store.add_message(conv_id, "user", "Hello")
+        store.add_message(conv_id, "assistant", "Hi there")
+        messages = store.get_messages(conv_id)
+        self.assertEqual(len(messages), 2)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 """Tests for i18n — translation helper functions."""
 
-
 from services.i18n import get_translator, translate
 
 

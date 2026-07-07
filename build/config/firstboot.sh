@@ -113,6 +113,11 @@ gsettings set org.gnome.desktop.interface gtk-theme axon-gtk || true
 gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
 
 # 6. Start Ollama service (if installed and not already running)
+# NOTE: Ollama should ideally run as a systemd user service (e.g.,
+# ollama.service) for proper lifecycle management (restart on crash,
+# graceful shutdown). This background-process approach is a temporary
+# workaround until a systemd unit is shipped with Ollama or added to the
+# Axon OS service layer. See: https://github.com/kaorii-ako/Axon-OS/issues
 if command -v ollama &>/dev/null; then
     if ! pgrep -x ollama &>/dev/null; then
         ollama serve &>/dev/null &

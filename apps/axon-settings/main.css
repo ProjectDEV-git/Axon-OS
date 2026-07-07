@@ -1,12 +1,13 @@
 /* Axon Assistant Stylings sheet */
+@import url("../shared/axon-design-tokens.css");
 
 window {
-    background-color: #0f0f14;
-    color: #e4e4e8;
+    background-color: @bg_primary;
+    color: @text_primary;
 }
 
 .settings-header {
-    background-color: #0c0c10;
+    background-color: @bg_primary;
     border-bottom: 1px solid rgba(139, 92, 246, 0.15);
 }
 
@@ -20,7 +21,7 @@ window {
     font-family: "Inter", "Outfit", "Ubuntu", sans-serif;
     font-size: 18px;
     font-weight: 700;
-    color: #e4e4e8;
+    color: @text_primary;
 }
 
 /* Feedback card styles */
@@ -85,7 +86,7 @@ window {
     background-color: rgba(15, 15, 25, 0.9);
     border: 1px solid rgba(139, 92, 246, 0.25);
     border-radius: 8px;
-    color: #e4e4e8;
+    color: @text_primary;
     font-family: "Inter", "Ubuntu", sans-serif;
     font-size: 13px;
     padding: 8px 12px;
@@ -99,7 +100,7 @@ window {
 }
 
 .settings-apply-btn {
-    background-color: #8b5cf6;
+    background-color: @accent;
     border: none;
     border-radius: 8px;
     color: #ffffff;
@@ -111,11 +112,11 @@ window {
 }
 
 .settings-apply-btn:hover {
-    background-color: #7c3aed;
+    background-color: @accent_hover;
     box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
 }
 
 .settings-apply-btn:active {
-    background-color: #6d28d9;
+    background-color: @accent_active;
     transform: scale(0.96);
 }

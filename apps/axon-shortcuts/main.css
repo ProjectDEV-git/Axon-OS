@@ -1,8 +1,9 @@
 /* Axon Shortcuts Overlay — main.css */
+@import url("../shared/axon-design-tokens.css");
 
 /* Window background */
 window {
-    background-color: #0f0f14;
+    background-color: @bg_primary;
 }
 
 /* Header */
@@ -20,7 +21,7 @@ window {
     font-family: "Inter", "Cantarell", sans-serif;
     font-size: 22px;
     font-weight: 700;
-    color: #e2e8f0;
+    color: @text_primary;
     letter-spacing: 0.5px;
 }
 
@@ -52,7 +53,7 @@ window {
     font-family: "Inter", "Cantarell", sans-serif;
     font-size: 15px;
     font-weight: 600;
-    color: #8B5CF6;
+    color: @accent;
     letter-spacing: 0.3px;
 }
 
@@ -68,7 +69,7 @@ window {
     font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
     font-size: 12px;
     font-weight: 600;
-    color: #e2e8f0;
+    color: @text_primary;
     background-color: rgba(124, 58, 237, 0.15);
     border: 1px solid rgba(124, 58, 237, 0.3);
     border-radius: 6px;
