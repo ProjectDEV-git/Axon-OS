@@ -17,9 +17,9 @@
 #include <linux/uaccess.h>
 #include <linux/sched.h>
 #include <linux/sched/task.h>
+#include <linux/sched/mm.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
-#include <linux/kthread.h>
 #include <linux/kthread.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
@@ -37,6 +37,7 @@ struct nt_thread_ctx {
 	unsigned long start_routine;
 	unsigned long argument;
 	size_t stack_size;
+	struct mm_struct *mm;
 };
 
 /*
@@ -52,6 +53,10 @@ static int nt_thread_trampoline(void *data)
 
 	ctx = *(struct nt_thread_ctx *)data;
 	kfree(data);
+
+	/* Share the parent's address space — must be done in the child */
+	kthread_use_mm(ctx.mm);
+	mmput(ctx.mm);
 
 	/* Allocate a user-space stack */
 	user_sp = vm_mmap(NULL, 0, ctx.stack_size,
@@ -116,17 +121,23 @@ static __u32 do_create_thread(__u64 __user *handle_out,
 	ctx->argument = argument;
 	ctx->stack_size = stack_size;
 
+	/* Hold a reference to the parent's mm for the child thread */
+	ctx->mm = get_task_mm(current);
+	if (!ctx->mm) {
+		pr_err("nt_thread: failed to get parent mm\n");
+		kfree(ctx);
+		return NT_STATUS_NO_MEMORY;
+	}
+
 	task = kthread_create(nt_thread_trampoline, ctx, "ntthr/%d",
 			      atomic_inc_return(&nt_handle_counter));
 	if (IS_ERR(task)) {
 		pr_err("nt_thread: kthread_create failed: %ld\n",
 		       PTR_ERR(task));
+		mmput(ctx->mm);
 		kfree(ctx);
 		return NT_STATUS_NO_MEMORY;
 	}
-
-	/* Share the parent's address space */
-	kthread_use_mm(current->mm);
 
 	handle = (__u32)atomic_read(&nt_handle_counter);
 	wake_up_process(task);

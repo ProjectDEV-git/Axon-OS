@@ -5,6 +5,11 @@
 
 #include <string.h>
 
+/* MAX_PATH — Windows convention for path buffer sizes */
+#ifndef MAX_PATH
+#define MAX_PATH 260
+#endif
+
 /* ── Type Definitions ────────────────────────────────────────────────────── */
 
 typedef void *HWND;
@@ -82,7 +87,7 @@ BOOL SHGetSpecialFolderPathA(HWND hwnd, LPSTR pszPath, int csidl,
 	if (!pszPath)
 		return FALSE;
 
-	strcpy(pszPath, "/tmp");
+	strscpy(pszPath, "/tmp", MAX_PATH);
 	return TRUE;
 }
 

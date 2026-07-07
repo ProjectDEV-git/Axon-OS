@@ -18,8 +18,14 @@ static int dxgi_initialized = 0;
 #define E_FAIL 0x80004005
 
 static void dxgi_init(void) {
-    if (dxgi_initialized) return;
-    dxgi_initialized = 1;
+    /* Fast path: already initialized */
+    if (__atomic_load_n(&dxgi_initialized, __ATOMIC_ACQUIRE)) return;
+
+    /* Slow path: atomically claim init rights */
+    if (!__atomic_compare_exchange_n(&dxgi_initialized, &(int){0}, 1,
+                                      false, __ATOMIC_ACQUIRE,
+                                      __ATOMIC_RELAXED))
+        return; /* Another thread is initializing — skip */
     
     dxgi_lib = dlopen("dxgi.dll.so", RTLD_LAZY);
     if (!dxgi_lib) dxgi_lib = dlopen("/usr/lib/dxvk/dxgi.dll.so", RTLD_LAZY);

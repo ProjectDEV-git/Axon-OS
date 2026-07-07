@@ -47,12 +47,17 @@ struct axon_task_state *axon_get_task_state(struct task_struct *tsk)
 {
     struct axon_task_entry *entry;
     pid_t pid = task_pid_vnr(tsk);
+    struct axon_task_state *result = NULL;
 
+    spin_lock(&axon_task_lock);
     hash_for_each_possible(axon_task_table, entry, node, pid) {
-        if (entry->pid == pid)
-            return &entry->state;
+        if (entry->pid == pid) {
+            result = &entry->state;
+            break;
+        }
     }
-    return NULL;
+    spin_unlock(&axon_task_lock);
+    return result;
 }
 
 int axon_task_state_alloc(pid_t pid)
@@ -158,6 +163,7 @@ static void __exit axon_winabi_exit(void)
     axon_registry_exit();
     axon_syscall_table_exit();
     axon_handle_table_exit();
+    axon_file_idr_cleanup();
 
     /* Clean up any remaining task states */
     spin_lock(&axon_task_lock);

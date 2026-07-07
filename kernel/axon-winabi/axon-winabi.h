@@ -283,6 +283,9 @@ bool nt_is_registry_handle(u32 handle);
 /* Section (memory-mapped file) support — nt-section.c */
 void axon_section_cleanup(void);
 
+/* File handle IDR cleanup — nt-syscalls.c */
+void axon_file_idr_cleanup(void);
+
 /* DLL loader — nt-dll-loader.c */
 struct axon_loaded_dll;
 int axon_dll_loader_init(void);

@@ -9,6 +9,8 @@
 #include <linux/uaccess.h>
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
+// NOTE: <linux/exit.h> was removed in kernel 6.11.
+// do_group_exit() is declared in <linux/sched/signal.h> (included above).
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
@@ -63,6 +65,21 @@ static int axon_file_install(struct file *f)
 	return id;
 }
 
+// ── File Handle IDR Cleanup ──────────────────────────────────────────────────
+
+void axon_file_idr_cleanup(void)
+{
+	struct file *f;
+	int id;
+
+	spin_lock(&axon_file_idr_lock);
+	idr_for_each_entry(&axon_file_idr, f, id) {
+		idr_remove(&axon_file_idr, id);
+		fput(f);
+	}
+	spin_unlock(&axon_file_idr_lock);
+}
+
 // ── Process Lifecycle ────────────────────────────────────────────────────────
 
 __u32 nt_terminate_process(const __u64 *args)
@@ -70,8 +87,12 @@ __u32 nt_terminate_process(const __u64 *args)
 	int exit_code = (int)args[1];
 
 	pr_info("NtTerminateProcess: exit_code=%d\n", exit_code);
-	send_sig(SIGKILL, current, 1);
-	return NT_STATUS_SUCCESS; // unreachable
+	/* Use do_group_exit to kill the entire process (thread group),
+	 * not just the current thread. send_sig(SIGKILL, current, 1) only
+	 * targeted the single thread, leaving other threads running.
+	 */
+	do_group_exit(exit_code);
+	return NT_STATUS_SUCCESS; /* unreachable */
 }
 
 __u32 nt_get_current_process_id(const __u64 *args)
@@ -157,10 +178,46 @@ __u32 nt_allocate_virtual_memory(const __u64 *args)
 
 	region_size = ALIGN(region_size, PAGE_SIZE);
 
-	prot = PROT_READ | PROT_WRITE;
-	if (protect & 0x10 /* PAGE_EXECUTE */ ||
-	    protect & 0x20 /* PAGE_EXECUTE_READ */)
-		prot |= PROT_EXEC;
+	/* Windows memory protection flags to Linux PROT_* translation.
+	 *
+	 * PAGE_NOACCESS        (0x01) -> PROT_NONE
+	 * PAGE_READONLY        (0x02) -> PROT_READ
+	 * PAGE_READWRITE       (0x04) -> PROT_READ|PROT_WRITE
+	 * PAGE_WRITECOPY       (0x08) -> PROT_READ|PROT_WRITE (closest match)
+	 * PAGE_EXECUTE         (0x10) -> PROT_EXEC
+	 * PAGE_EXECUTE_READ    (0x20) -> PROT_READ|PROT_EXEC
+	 * PAGE_EXECUTE_READWRITE (0x40) -> PROT_READ|PROT_WRITE|PROT_EXEC
+	 * PAGE_EXECUTE_WRITECOPY (0x80) -> PROT_READ|PROT_WRITE|PROT_EXEC
+	 */
+	switch (protect & 0xFF) {
+	case 0x01: /* PAGE_NOACCESS */
+		prot = PROT_NONE;
+		break;
+	case 0x02: /* PAGE_READONLY */
+		prot = PROT_READ;
+		break;
+	case 0x04: /* PAGE_READWRITE */
+		prot = PROT_READ | PROT_WRITE;
+		break;
+	case 0x08: /* PAGE_WRITECOPY */
+		prot = PROT_READ | PROT_WRITE;
+		break;
+	case 0x10: /* PAGE_EXECUTE */
+		prot = PROT_EXEC;
+		break;
+	case 0x20: /* PAGE_EXECUTE_READ */
+		prot = PROT_READ | PROT_EXEC;
+		break;
+	case 0x40: /* PAGE_EXECUTE_READWRITE */
+		prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+		break;
+	case 0x80: /* PAGE_EXECUTE_WRITECOPY */
+		prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+		break;
+	default:
+		prot = PROT_READ | PROT_WRITE;
+		break;
+	}
 
 	addr = vm_mmap(NULL, addr_hint, region_size, prot,
 		       MAP_PRIVATE | MAP_ANONYMOUS, 0);

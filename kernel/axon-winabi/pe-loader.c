@@ -140,6 +140,9 @@ static int pe_read_headers(struct file *file,
 				  pe_off + sizeof(__u32) + sizeof(*coff));
 		if (ret)
 			return ret;
+		/* Clamp NumberOfRvaAndSizes to prevent OOB access into DataDirectory */
+		if (opt64->NumberOfRvaAndSizes > PE_DIR_MAX)
+			opt64->NumberOfRvaAndSizes = PE_DIR_MAX;
 		*is_64bit = true;
 	} else if (opt_magic == PE_OPT_MAGIC32) {
 		if (coff->SizeOfOptionalHeader < sizeof(*opt32))
@@ -148,6 +151,9 @@ static int pe_read_headers(struct file *file,
 				  pe_off + sizeof(__u32) + sizeof(*coff));
 		if (ret)
 			return ret;
+		/* Clamp NumberOfRvaAndSizes to prevent OOB access into DataDirectory */
+		if (opt32->NumberOfRvaAndSizes > PE_DIR_MAX)
+			opt32->NumberOfRvaAndSizes = PE_DIR_MAX;
 		*is_64bit = false;
 	} else {
 		pr_err("unknown optional header magic: 0x%04x\n", opt_magic);
@@ -380,11 +386,17 @@ static int pe_apply_relocs(struct file *file,
 			__u16 entry = ((__u16 *)(blk + 1))[j];
 			__u16 type = entry >> 12;
 			__u16 rva_off = entry & 0x0FFF;
-			unsigned long patch_addr =
-				(unsigned long)mod->base + page_rva + rva_off;
+			__u32 patch_rva = page_rva + rva_off;
+			unsigned long patch_addr;
 
 			if (type == PE_REL_ABSOLUTE)
 				continue;
+
+			/* Bounds check: ensure patch RVA is within image */
+			if (patch_rva >= mod->size_of_image)
+				continue;
+
+			patch_addr = (unsigned long)mod->base + patch_rva;
 
 			if (type == PE_REL_DIR64 && is_64bit) {
 				__u64 val;

@@ -194,11 +194,27 @@ __u32 nt_pulse_event(const __u64 *args)
 	if (!evt)
 		return NT_STATUS_INVALID_HANDLE;
 
+	/* Set signaled under lock, then wake waiters outside the lock.
+	 * This avoids calling wake_up_all while holding a spinlock
+	 * (which can deadlock if a waiter's condition re-acquires the
+	 * same lock) and ensures waiters can observe signaled=true
+	 * before we clear it.
+	 */
 	spin_lock(&evt->lock);
 	evt->signaled = true;
-	wake_up_all(&evt->wq);
-	evt->signaled = false;
 	spin_unlock(&evt->lock);
+
+	wake_up_all(&evt->wq);
+
+	/* Now auto-reset: clear signaled after waiters have been woken.
+	 * For manual-reset events, we do not clear it here (the waiters
+	 * consume it themselves).
+	 */
+	if (!evt->manual_reset) {
+		spin_lock(&evt->lock);
+		evt->signaled = false;
+		spin_unlock(&evt->lock);
+	}
 
 	return NT_STATUS_SUCCESS;
 }

@@ -60,7 +60,7 @@ static int __axon_load_dll(const char *name, struct axon_loaded_dll **out);
 static u64 __axon_resolve_import(const char *dll_name, const char *func_name);
 static u64 __axon_resolve_import_ordinal(const char *dll_name, u32 ordinal);
 static void __apply_relocs(void *reloc_buf, u32 reloc_size, void *base,
-			   s64 delta, bool is_64bit);
+			   u32 image_size, s64 delta, bool is_64bit);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ static inline u32 djb2_hash(const char *str)
 // ── Relocation Application (kernel-buffer variant) ────────────────────────────
 
 static void __apply_relocs(void *reloc_buf, u32 reloc_size, void *base,
-			   s64 delta, bool is_64bit)
+			   u32 image_size, s64 delta, bool is_64bit)
 {
 	u32 off = 0;
 
@@ -112,10 +112,25 @@ static void __apply_relocs(void *reloc_buf, u32 reloc_size, void *base,
 			u16 entry = ((u16 *)(blk + 1))[j];
 			u16 type = entry >> 12;
 			u16 rva_off = entry & 0x0FFF;
-			void *patch = base + page_rva + rva_off;
+			u32 patch_rva = page_rva + rva_off;
+			void *patch;
 
 			if (type == PE_REL_ABSOLUTE)
 				continue;
+
+			/* Bounds check: ensure patch target is within image bounds */
+			if (type == PE_REL_DIR64 && is_64bit) {
+				if (patch_rva + sizeof(u64) > image_size)
+					continue;
+			} else if (type == PE_REL_HIGHLOW && !is_64bit) {
+				if (patch_rva + sizeof(u32) > image_size)
+					continue;
+			} else {
+				if (patch_rva + sizeof(u16) > image_size)
+					continue;
+			}
+
+			patch = base + patch_rva;
 
 			if (type == PE_REL_DIR64 && is_64bit)
 				*(u64 *)patch += (u64)delta;
@@ -610,8 +625,9 @@ static int __axon_load_dll(const char *name, struct axon_loaded_dll **out)
 					       dll->base + reloc_rva,
 					       reloc_size);
 					__apply_relocs(reloc_buf, reloc_size,
-						       dll->base, delta,
-						       is_64bit);
+						       dll->base,
+						       dll->size_of_image,
+						       delta, is_64bit);
 					kvfree(reloc_buf);
 				}
 			}

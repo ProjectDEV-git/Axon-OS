@@ -21,8 +21,14 @@ static int d3d12_initialized = 0;
 
 static void d3d12_init(void)
 {
-    if (d3d12_initialized) return;
-    d3d12_initialized = 1;
+    /* Fast path: already initialized */
+    if (__atomic_load_n(&d3d12_initialized, __ATOMIC_ACQUIRE)) return;
+
+    /* Slow path: atomically claim init rights */
+    if (!__atomic_compare_exchange_n(&d3d12_initialized, &(int){0}, 1,
+                                      false, __ATOMIC_ACQUIRE,
+                                      __ATOMIC_RELAXED))
+        return; /* Another thread is initializing — skip */
 
     vkd3d_d3d12 = dlopen("d3d12.dll.so", RTLD_LAZY);
     if (!vkd3d_d3d12)

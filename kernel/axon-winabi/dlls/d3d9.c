@@ -32,13 +32,19 @@ typedef int (*PFN_Direct3DCreate9Ex)(uint32_t SDKVersion, IDirect3D9Ex **ppD3D);
 static PFN_Direct3DCreate9 pfn_Direct3DCreate9 = NULL;
 static PFN_Direct3DCreate9Ex pfn_Direct3DCreate9Ex = NULL;
 
-/* ── Initialization ── */
+/* ── Initialization (thread-safe via atomic compare-and-swap) ── */
 
 static void d3d9_init(void)
 {
-    if (d3d9_initialized)
+    /* Fast path: already initialized */
+    if (__atomic_load_n(&d3d9_initialized, __ATOMIC_ACQUIRE))
         return;
-    d3d9_initialized = 1;
+
+    /* Slow path: atomically claim init rights */
+    if (!__atomic_compare_exchange_n(&d3d9_initialized, &(int){0}, 1,
+                                      false, __ATOMIC_ACQUIRE,
+                                      __ATOMIC_RELAXED))
+        return; /* Another thread is initializing — skip */
 
     /* Try common DXVK d3d9 library locations */
     dxvk_d3d9 = dlopen("d3d9-native.so", RTLD_LAZY);

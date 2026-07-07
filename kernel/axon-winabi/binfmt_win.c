@@ -91,16 +91,16 @@ static int axon_binfmt_load_binary(struct linux_binprm *bprm)
 		return ret;
 	}
 
-	ret = axon_pe_load(bprm, &mod);
-	if (ret) {
-		pr_err("PE load failed: %d\n", ret);
-		return ret;
-	}
-
+	/* Call begin_new_exec FIRST to set up the new address space.
+	 * Previously, PE sections were mapped into the old address space
+	 * via axon_pe_load, and then begin_new_exec wiped them by replacing
+	 * current->mm. By calling begin_new_exec first, subsequent
+	 * vm_mmap calls inside axon_pe_load map into the fresh address space.
+	 */
 	ret = begin_new_exec(bprm);
 	if (ret) {
 		pr_err("begin_new_exec failed: %d\n", ret);
-		goto err_unload;
+		return ret;
 	}
 
 	/* Personality stays as default Linux */
@@ -111,11 +111,18 @@ static int axon_binfmt_load_binary(struct linux_binprm *bprm)
 
 	set_binfmt(&axon_binfmt);
 
+	/* Now load the PE image — sections are mapped into the new mm */
+	ret = axon_pe_load(bprm, &mod);
+	if (ret) {
+		pr_err("PE load failed: %d\n", ret);
+		return ret;
+	}
+
 	entry_addr = axon_pe_map_user(mod);
 	if (!entry_addr) {
 		pr_err("PE user-space mapping failed\n");
 		ret = -ENOMEM;
-		goto err_unload;
+		return ret;
 	}
 
 	entry_addr += mod->entry_point_rva;
@@ -123,7 +130,7 @@ static int axon_binfmt_load_binary(struct linux_binprm *bprm)
 	ret = axon_task_state_alloc(current->pid);
 	if (ret) {
 		pr_err("task state alloc failed: %d\n", ret);
-		goto err_unload;
+		return ret;
 	}
 
 	state = axon_get_task_state(current);
@@ -133,10 +140,13 @@ static int axon_binfmt_load_binary(struct linux_binprm *bprm)
 	ret = setup_user_stack(bprm, &stack_addr);
 	if (ret) {
 		pr_err("user stack setup failed: %d\n", ret);
-		goto err_free_state;
+		axon_task_state_free(current->pid);
+		return ret;
 	}
 
-	setup_new_exec(bprm);
+	/* NOTE: begin_new_exec already called setup_new_exec internally.
+	 * Do NOT call setup_new_exec again — it would be a double-call.
+	 */
 
 	regs = task_pt_regs(current);
 #ifdef CONFIG_X86_64
@@ -156,13 +166,6 @@ static int axon_binfmt_load_binary(struct linux_binprm *bprm)
 		mod->name, entry_addr, stack_addr);
 
 	return 0;
-
-err_free_state:
-	axon_task_state_free(current->pid);
-err_unload:
-	if (mod)
-		axon_pe_unload(mod);
-	return ret;
 }
 
 int axon_binfmt_init(void)

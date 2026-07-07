@@ -64,9 +64,9 @@ static inline uint32_t nt_syscall(uint32_t nr, const uint64_t *args)
 }
 
 /* NT syscall numbers — must match nt-registry.c / syscall_table.c */
-#define NR_NT_OPEN_KEY        0x0F4
+#define NR_NT_OPEN_KEY        0x2C
 #define NR_NT_QUERY_VALUE_KEY 0x0F7
-#define NR_NT_CLOSE           0x00F
+#define NR_NT_CLOSE           0x09
 
 /* ── Registry Functions ──────────────────────────────────────────────────── */
 
@@ -74,6 +74,7 @@ LONG RegOpenKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD ulOptions,
 		   DWORD samDesired, PHKEY phkResult)
 {
 	uint64_t args[5];
+	uint32_t status;
 
 	if (!phkResult)
 		return 0xC000000D; /* STATUS_INVALID_PARAMETER */
@@ -84,11 +85,17 @@ LONG RegOpenKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD ulOptions,
 	args[3] = (uint64_t)ulOptions;
 	args[4] = (uint64_t)samDesired;
 
-	nt_syscall(NR_NT_OPEN_KEY, args);
+	status = nt_syscall(NR_NT_OPEN_KEY, args);
 
 	/* If the kernel returned a valid handle, use it; otherwise fake one */
 	if (*phkResult == NULL)
 		*phkResult = (HKEY)(unsigned long long)0x10001;
+
+	/* Map NTSTATUS to Win32 error: success (0x0) = ERROR_SUCCESS,
+	 * any error status (high bit set or non-zero) = ERROR_FILE_NOT_FOUND
+	 */
+	if (status != 0 && status != 0x103 /* STATUS_PENDING */)
+		return 2; /* ERROR_FILE_NOT_FOUND */
 
 	return ERROR_SUCCESS;
 }

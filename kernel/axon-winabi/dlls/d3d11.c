@@ -20,8 +20,14 @@ static int d3d11_initialized = 0;
 #define E_FAIL 0x80004005
 
 static void d3d11_init(void) {
-    if (d3d11_initialized) return;
-    d3d11_initialized = 1;
+    /* Fast path: already initialized */
+    if (__atomic_load_n(&d3d11_initialized, __ATOMIC_ACQUIRE)) return;
+
+    /* Slow path: atomically claim init rights */
+    if (!__atomic_compare_exchange_n(&d3d11_initialized, &(int){0}, 1,
+                                      false, __ATOMIC_ACQUIRE,
+                                      __ATOMIC_RELAXED))
+        return; /* Another thread is initializing — skip */
     
     dxvk_d3d11 = dlopen("d3d11.dll.so", RTLD_LAZY);
     if (!dxvk_d3d11) dxvk_d3d11 = dlopen("/usr/lib/dxvk/d3d11.dll.so", RTLD_LAZY);

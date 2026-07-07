@@ -6,6 +6,9 @@
 
 #include <stdio.h>
 #include <wchar.h>
+#include <unistd.h>
+#include <poll.h>
+#include <stdint.h>
 
 /* ── Windows-compatible type definitions ── */
 
@@ -53,6 +56,9 @@ typedef struct tagMSG {
 
 #define SM_CXSCREEN 0
 #define SM_CYSCREEN 1
+
+/* Shared message pipe: GetMessageA reads, PostMessageA writes */
+static int axon_msg_write_fd = -1;
 
 /* ── Message Box ── */
 
@@ -138,8 +144,64 @@ LRESULT DispatchMessageA(const MSG *lpMsg)
 
 BOOL GetMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax)
 {
-    (void)lpMsg; (void)hWnd; (void)wMsgFilterMin; (void)wMsgFilterMax;
-    return FALSE;
+    /* Basic message loop implementation.
+     * Previously returned FALSE immediately, causing all GUI apps to exit.
+     * Now blocks on a pipe until a message is posted via PostMessageA,
+     * keeping the application's message loop alive.
+     *
+     * GetMessageA and PostMessageA share a single pipe (msg_pipe_fd).
+     * GetMessageA reads from msg_pipe_fd[0]; PostMessageA writes to
+     * msg_pipe_fd[1].
+     */
+    static int msg_pipe_fd = -1;  /* read end, -1 = not yet created */
+    struct pollfd pfd;
+    uint64_t val = 0;
+
+    if (msg_pipe_fd == -1) {
+        int fds[2];
+        if (pipe(fds) == 0) {
+            msg_pipe_fd = fds[0];
+            axon_msg_write_fd = fds[1];
+        }
+    }
+
+    if (msg_pipe_fd == -1) {
+        /* Fallback: if pipe creation failed, return WM_NULL */
+        if (lpMsg) {
+            lpMsg->hwnd = hWnd;
+            lpMsg->message = 0; /* WM_NULL */
+            lpMsg->wParam = 0;
+            lpMsg->lParam = 0;
+            lpMsg->time = 0;
+            lpMsg->pt.x = 0;
+            lpMsg->pt.y = 0;
+        }
+        return TRUE;
+    }
+
+    /* Block until a message is available */
+    pfd.fd = msg_pipe_fd;
+    pfd.events = POLLIN;
+    poll(&pfd, 1, -1);
+
+    if (read(msg_pipe_fd, &val, sizeof(val)) != sizeof(val))
+        return FALSE;
+
+    /* WM_QUIT signals the loop to exit */
+    if (val == 0x0012) /* WM_QUIT */
+        return FALSE;
+
+    if (lpMsg) {
+        lpMsg->hwnd = hWnd;
+        lpMsg->message = (UINT)val;
+        lpMsg->wParam = 0;
+        lpMsg->lParam = 0;
+        lpMsg->time = 0;
+        lpMsg->pt.x = 0;
+        lpMsg->pt.y = 0;
+    }
+
+    return TRUE;
 }
 
 BOOL PeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin,
@@ -152,8 +214,20 @@ BOOL PeekMessageA(LPMSG lpMsg, HWND hWnd, UINT wMsgFilterMin,
 
 BOOL PostMessageA(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 {
-    (void)hWnd; (void)Msg; (void)wParam; (void)lParam;
-    return FALSE;
+    uint64_t val;
+
+    (void)hWnd; (void)wParam; (void)lParam;
+
+    /* Write the message type to the shared message pipe.
+     * GetMessageA's poll() on the read end will wake up.
+     */
+    if (axon_msg_write_fd == -1)
+        return FALSE;
+
+    val = (uint64_t)Msg;
+    if (write(axon_msg_write_fd, &val, sizeof(val)) != sizeof(val))
+        return FALSE;
+    return TRUE;
 }
 
 LRESULT SendMessageA(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
