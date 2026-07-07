@@ -29,6 +29,7 @@ from axon_logger import configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import indexer
+from service_base import ServiceBase
 
 log = configure_app_logger("axon-search", level=logging.INFO)
 
@@ -93,17 +94,12 @@ def vec_table_ready(db, dim=None):
         return False
 
 
-class SearchService(dbus.service.Object):
-    def __init__(self):
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
-        try:
-            self.bus_name = dbus.service.BusName("org.axonos.Search", bus=self.session_bus)
-        except dbus.exceptions.NameExistsException:
-            log.error("org.axonos.Search service is already running.")
-            sys.exit(1)
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Search")
+class SearchService(ServiceBase):
+    BUS_NAME = "org.axonos.Search"
+    OBJECT_PATH = "/org/axonos/Search"
+    SERVICE_NAME = "axon-search"
 
+    def _setup(self):
         self._lock = threading.Lock()
         self._stats = {
             "files": 0,
@@ -117,7 +113,6 @@ class SearchService(dbus.service.Object):
         threading.Thread(target=self._index_loop, daemon=True).start()
         # Start the watchdog watcher (falls back to polling watcher if watchdog is not available)
         self._start_watchdog()
-        log.info("Axon Search D-Bus service registered at /org/axonos/Search")
 
     # ------------------------------------------------------------------
     # Brain helpers

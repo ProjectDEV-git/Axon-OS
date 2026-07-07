@@ -24,6 +24,7 @@ from axon_logger import configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from constants import AXON_DIR, OLLAMA_BASE_URL
+from service_base import ServiceBase
 
 log = configure_app_logger("axon-marketplace", level=__import__("logging").INFO)
 
@@ -177,23 +178,15 @@ def _http_post(url, payload, timeout=10.0):
         return None
 
 
-class ModelMarketplaceService(dbus.service.Object):
-    def __init__(self):
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
-        try:
-            self.bus_name = dbus.service.BusName(
-                "org.axonos.ModelMarketplace", bus=self.session_bus
-            )
-        except dbus.exceptions.NameExistsException:
-            log.error("org.axonos.ModelMarketplace service is already running.")
-            sys.exit(1)
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/ModelMarketplace")
+class ModelMarketplaceService(ServiceBase):
+    BUS_NAME = "org.axonos.ModelMarketplace"
+    OBJECT_PATH = "/org/axonos/ModelMarketplace"
+    SERVICE_NAME = "axon-marketplace"
 
+    def _setup(self):
         self._catalog = self._load_catalog()
         self._downloads: dict[str, dict] = {}
         self._lock = threading.Lock()
-        log.info("ModelMarketplace registered at /org/axonos/ModelMarketplace")
 
     # ------------------------------------------------------------------
     # D-Bus API

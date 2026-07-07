@@ -46,19 +46,8 @@ class ConversationStore:
         self._local.conn = conn
         return conn
 
-    def _close_connection(self, conn):
-        """Close the connection to release file descriptors.
-
-        Daemon threads die without calling close(), leaking FDs. Each
-        sqlite3.connect() is ~0.1ms, so the per-call overhead is negligible.
-        """
-        try:
-            conn.close()
-        except Exception:
-            pass
-
     def close(self):
-        """Explicitly close the per-thread connection (legacy compat)."""
+        """Close the per-thread connection explicitly."""
         conn = getattr(self._local, "conn", None)
         if conn is not None:
             try:
@@ -72,34 +61,32 @@ class ConversationStore:
 
     def _init_db(self):
         conn = self._get_connection()
-        try:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS conversations (
-                    id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    system_prompt TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    conversation_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
-                )
-            """)
-
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)"
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS conversations (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                system_prompt TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            conn.commit()
-        finally:
-            self._close_connection(conn)
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+            )
+        """)
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)"
+        )
+        conn.commit()
+        # Connection stays open via threading.local() for reuse.
 
     def create_conversation(self, system_prompt=None, title=None, conv_id=None):
         if not conv_id:
@@ -109,103 +96,80 @@ class ConversationStore:
 
         with self._lock:
             conn = self._get_connection()
-            try:
-                conn.execute(
-                    "INSERT INTO conversations (id, title, system_prompt) VALUES (?, ?, ?)",
-                    (conv_id, title, system_prompt),
-                )
-                conn.commit()
-            finally:
-                self._close_connection(conn)
+            conn.execute(
+                "INSERT INTO conversations (id, title, system_prompt) VALUES (?, ?, ?)",
+                (conv_id, title, system_prompt),
+            )
+            conn.commit()
         return conv_id
 
     def add_message(self, conversation_id, role, content):
         with self._lock:
             conn = self._get_connection()
-            try:
-                cursor = conn.execute(
-                    "SELECT 1 FROM conversations WHERE id = ?", (conversation_id,)
+            cursor = conn.execute("SELECT 1 FROM conversations WHERE id = ?", (conversation_id,))
+            if not cursor.fetchone():
+                conn.execute(
+                    "INSERT INTO conversations (id, title) VALUES (?, ?)",
+                    (
+                        conversation_id,
+                        f"New Chat ({datetime.now().strftime('%Y-%m-%d %H:%M')})",
+                    ),
                 )
-                if not cursor.fetchone():
-                    conn.execute(
-                        "INSERT INTO conversations (id, title) VALUES (?, ?)",
-                        (
-                            conversation_id,
-                            f"New Chat ({datetime.now().strftime('%Y-%m-%d %H:%M')})",
-                        ),
-                    )
 
-                conn.execute(
-                    "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
-                    (conversation_id, role, content),
-                )
-                conn.execute(
-                    "UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (conversation_id,),
-                )
-                conn.commit()
-            finally:
-                self._close_connection(conn)
+            conn.execute(
+                "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
+                (conversation_id, role, content),
+            )
+            conn.execute(
+                "UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (conversation_id,),
+            )
+            conn.commit()
 
     def get_messages(self, conversation_id):
         with self._lock:
             conn = self._get_connection()
-            try:
-                cursor = conn.execute(
-                    "SELECT role, content, timestamp FROM messages WHERE conversation_id = ? ORDER BY id ASC",
-                    (conversation_id,),
-                )
-                return [dict(row) for row in cursor.fetchall()]
-            finally:
-                self._close_connection(conn)
+            cursor = conn.execute(
+                "SELECT role, content, timestamp FROM messages WHERE conversation_id = ? ORDER BY id ASC",
+                (conversation_id,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def list_conversations(self):
         with self._lock:
             conn = self._get_connection()
-            try:
-                cursor = conn.execute(
-                    "SELECT id, title, system_prompt, created_at, updated_at FROM conversations ORDER BY updated_at DESC"
-                )
-                return [dict(row) for row in cursor.fetchall()]
-            finally:
-                self._close_connection(conn)
+            cursor = conn.execute(
+                "SELECT id, title, system_prompt, created_at, updated_at FROM conversations ORDER BY updated_at DESC"
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def delete_conversation(self, conversation_id):
         with self._lock:
             conn = self._get_connection()
-            try:
-                conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
-                conn.commit()
-            finally:
-                self._close_connection(conn)
+            conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+            conn.commit()
 
     def update_title(self, conversation_id, title):
         with self._lock:
             conn = self._get_connection()
-            try:
-                conn.execute(
-                    "UPDATE conversations SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (title, conversation_id),
-                )
-                conn.commit()
-            finally:
-                self._close_connection(conn)
+            conn.execute(
+                "UPDATE conversations SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (title, conversation_id),
+            )
+            conn.commit()
 
     def search_messages(self, query):
         with self._lock:
             conn = self._get_connection()
-            try:
-                safe_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-                cursor = conn.execute(
-                    """
-                    SELECT m.conversation_id, c.title as conversation_title, m.role, m.content, m.timestamp
-                    FROM messages m
-                    JOIN conversations c ON m.conversation_id = c.id
-                    WHERE m.content LIKE ? ESCAPE '\\'
-                    ORDER BY m.timestamp DESC
-                """,
-                    (f"%{safe_query}%",),
-                )
-                return [dict(row) for row in cursor.fetchall()]
-            finally:
-                self._close_connection(conn)
+            safe_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            cursor = conn.execute(
+                """
+                SELECT m.conversation_id, c.title as conversation_title, m.role, m.content, m.timestamp
+                FROM messages m
+                JOIN conversations c ON m.conversation_id = c.id
+                WHERE m.content LIKE ? ESCAPE '\\'
+                ORDER BY m.timestamp DESC
+            """,
+                (f"%{safe_query}%",),
+            )
+            return [dict(row) for row in cursor.fetchall()]

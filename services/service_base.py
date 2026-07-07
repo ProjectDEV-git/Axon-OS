@@ -58,7 +58,12 @@ class ServiceBase(dbus.service.Object):
     def __init__(self) -> None:
         # --- GLib / D-Bus bootstrap ---
         dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
+        try:
+            self.session_bus = dbus.SessionBus()
+        except dbus.exceptions.DBusException as exc:
+            # Use print here because logger may not be ready yet
+            print(f"Cannot connect to D-Bus session bus: {exc}", file=sys.stderr)  # noqa: T201
+            sys.exit(1)
 
         try:
             self.bus_name = dbus.service.BusName(self.BUS_NAME, bus=self.session_bus)

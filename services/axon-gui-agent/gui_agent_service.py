@@ -27,6 +27,7 @@ from axon_logger import configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import plan as plan_mod
+from service_base import ServiceBase
 
 log = configure_app_logger("axon-gui-agent", level=logging.INFO)
 
@@ -65,17 +66,13 @@ Respond with ONLY the JSON array. No markdown, no commentary.
 User request: """
 
 
-class GuiAgentService(dbus.service.Object):
-    def __init__(self):
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
-        try:
-            self.bus_name = dbus.service.BusName("org.axonos.GuiAgent", bus=self.session_bus)
-        except dbus.exceptions.NameExistsException:
-            log.error("org.axonos.GuiAgent service is already running.")
-            sys.exit(1)
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/GuiAgent")
-        log.info("Axon GUI Agent registered at /org/axonos/GuiAgent")
+class GuiAgentService(ServiceBase):
+    BUS_NAME = "org.axonos.GuiAgent"
+    OBJECT_PATH = "/org/axonos/GuiAgent"
+    SERVICE_NAME = "axon-gui-agent"
+
+    def _setup(self):
+        pass
 
     # ------------------------------------------------------------------
     # D-Bus API

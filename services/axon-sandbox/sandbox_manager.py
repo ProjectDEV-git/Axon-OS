@@ -16,15 +16,7 @@ from gi.repository import Gdk, GLib, Gtk
 
 # Ensure we can load axon_logger
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-try:
-    from axon_logger import configure_app_logger
-
-    logger = configure_app_logger(__name__)
-except ImportError:
-    import logging
-
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger("axon-sandbox")
+from service_base import ServiceBase
 
 
 class SandboxPromptDialog(Gtk.Window):
@@ -170,21 +162,13 @@ class SandboxPromptDialog(Gtk.Window):
         return False
 
 
-class SandboxManager(dbus.service.Object):
-    def __init__(self):
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
+class SandboxManager(ServiceBase):
+    BUS_NAME = "org.axonos.Sandbox"
+    OBJECT_PATH = "/org/axonos/Sandbox"
+    SERVICE_NAME = "axon-sandbox"
 
-        try:
-            self.bus_name = dbus.service.BusName("org.axonos.Sandbox", bus=self.session_bus)
-        except dbus.exceptions.NameExistsException:
-            logger.error("org.axonos.Sandbox service is already running.")
-            sys.exit(1)
-
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Sandbox")
-        logger.info(
-            "Axon Sandbox Manager D-Bus Service registered successfully at /org/axonos/Sandbox"
-        )
+    def _setup(self):
+        pass
 
     @dbus.service.method(
         "org.axonos.Sandbox",
@@ -194,7 +178,7 @@ class SandboxManager(dbus.service.Object):
     )
     def AuditAndPrompt(self, script_path, dbus_ok, dbus_err):
         """Asynchronously audits a script and prompts the user for sandbox choice."""
-        logger.info(f"Received Sandbox audit request for: {script_path}")
+        self.logger.info(f"Received Sandbox audit request for: {script_path}")
         threading.Thread(
             target=self._do_audit_and_prompt, args=(script_path, dbus_ok, dbus_err), daemon=True
         ).start()
@@ -203,7 +187,7 @@ class SandboxManager(dbus.service.Object):
         try:
             p = Path(script_path)
             if not p.exists() or not p.is_file():
-                logger.warning(
+                self.logger.warning(
                     "Sandbox audit: file not found or not a regular file: %s", script_path
                 )
                 dbus_ok("deny")
@@ -213,7 +197,7 @@ class SandboxManager(dbus.service.Object):
             try:
                 content = p.read_text(encoding="utf-8", errors="ignore")[:3000].strip()
             except Exception as e:
-                logger.warning("Sandbox audit: failed to read script %s: %s", script_path, e)
+                self.logger.warning("Sandbox audit: failed to read script %s: %s", script_path, e)
                 dbus_ok("deny")
                 return
 
@@ -241,7 +225,7 @@ class SandboxManager(dbus.service.Object):
                     clean_json = clean_json.replace("```json", "").replace("```", "").strip()
                 warnings = json.loads(clean_json)
             except Exception as e:
-                logger.error(f"Failed to fetch AI sandbox analysis: {e}")
+                self.logger.error(f"Failed to fetch AI sandbox analysis: {e}")
                 # Simple static parsing backup
                 if "ssh" in content.lower():
                     warnings.append("Accesses ssh parameters")
@@ -252,7 +236,7 @@ class SandboxManager(dbus.service.Object):
 
             # Open warning prompt if warnings exist, otherwise run normally
             if warnings:
-                logger.info(f"Script {script_path} flagged. Displaying warning prompt...")
+                self.logger.info(f"Script {script_path} flagged. Displaying warning prompt...")
 
                 def launch_dialog():
                     dialog = SandboxPromptDialog(
@@ -264,11 +248,11 @@ class SandboxManager(dbus.service.Object):
 
                 GLib.idle_add(launch_dialog)
             else:
-                logger.info(f"Script {script_path} is marked clean. Allow execution.")
+                self.logger.info(f"Script {script_path} is marked clean. Allow execution.")
                 dbus_ok("allow")
 
         except Exception:
-            logger.exception("Error in sandbox manager:")
+            self.logger.exception("Error in sandbox manager:")
             try:
                 dbus_ok("deny")
             except Exception:
@@ -284,7 +268,9 @@ if __name__ == "__main__":
     service = SandboxManager()
 
     def _shutdown(signum, frame):
-        logger.info("Received signal %d, shutting down...", signum)
+        import logging
+
+        logging.getLogger("axon-sandbox").info("Received signal %d, shutting down...", signum)
         loop.quit()
 
     signal.signal(signal.SIGTERM, _shutdown)
@@ -292,5 +278,7 @@ if __name__ == "__main__":
     try:
         loop.run()
     except KeyboardInterrupt:
-        logger.info("Stopping Axon Sandbox Manager...")
+        import logging
+
+        logging.getLogger("axon-sandbox").info("Stopping Axon Sandbox Manager...")
         loop.quit()

@@ -25,10 +25,12 @@ import dbus.service
 from gi.repository import GLib
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from service_base import ServiceBase
+
 from axon_logger import configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from constants import WHISPER_DIR
+from constants import MAX_RECORD_SECONDS, WHISPER_DIR
 
 log = configure_app_logger("axon-advanced-voice", level=logging.INFO)
 
@@ -57,17 +59,12 @@ LANGUAGES = {
 }
 
 
-class AdvancedVoiceService(dbus.service.Object):
-    def __init__(self):
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
-        try:
-            self.bus_name = dbus.service.BusName("org.axonos.AdvancedVoice", bus=self.session_bus)
-        except dbus.exceptions.NameExistsException:
-            log.error("org.axonos.AdvancedVoice service is already running.")
-            sys.exit(1)
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/AdvancedVoice")
+class AdvancedVoiceService(ServiceBase):
+    BUS_NAME = "org.axonos.AdvancedVoice"
+    OBJECT_PATH = "/org/axonos/AdvancedVoice"
+    SERVICE_NAME = "axon-advanced-voice"
 
+    def _setup(self):
         self._whisper_model = None
         self._vosk_model = None
         self._recorder = None
@@ -82,7 +79,8 @@ class AdvancedVoiceService(dbus.service.Object):
         self._audio_level = 0.0
         self._lock = threading.Lock()
         self._partial_transcript = ""
-        log.info("AdvancedVoice registered at /org/axonos/AdvancedVoice")
+        self._record_timeout_id = 0
+        self._vosk_model_path = None
 
     # ------------------------------------------------------------------
     # D-Bus API
@@ -191,16 +189,65 @@ class AdvancedVoiceService(dbus.service.Object):
 
     @dbus.service.method("org.axonos.AdvancedVoice", in_signature="s", out_signature="b")
     def Speak(self, text):
-        """Text-to-speech using spd-say."""
-        if not text or not shutil.which("spd-say"):
+        """Text-to-speech with multi-engine fallback."""
+        if not text:
             return False
-        try:
-            subprocess.Popen(
-                ["spd-say", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-            return True
-        except Exception:
-            return False
+        candidates = ["piper", "espeak", "espeak-ng", "pico2wave", "spd-say"]
+        for eng in candidates:
+            if eng == "piper" and shutil.which("piper"):
+                try:
+                    subprocess.Popen(
+                        ["piper", "-t", text[:1000]],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return True
+                except Exception as e:
+                    log.debug("piper TTS failed: %s", e)
+                    continue
+            if eng in ("espeak", "espeak-ng") and shutil.which(eng):
+                try:
+                    subprocess.Popen(
+                        [eng, text[:1000]],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return True
+                except Exception as e:
+                    log.debug("%s TTS failed: %s", eng, e)
+                    continue
+            if eng == "pico2wave" and shutil.which("pico2wave") and shutil.which("aplay"):
+                try:
+                    fd, tmp = tempfile.mkstemp(prefix="axon-tts-", suffix=".wav")
+                    os.close(fd)
+                    subprocess.check_call(["pico2wave", "-w", tmp, text[:1000]])
+                    proc = subprocess.Popen(
+                        ["aplay", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    )
+                    threading.Thread(
+                        target=self._cleanup_after_tts, args=(proc, tmp), daemon=True
+                    ).start()
+                    return True
+                except Exception as e:
+                    log.debug("pico2wave TTS failed: %s", e)
+                    try:
+                        os.unlink(tmp)
+                    except OSError:
+                        pass
+                    continue
+            if eng == "spd-say" and shutil.which("spd-say"):
+                try:
+                    subprocess.Popen(
+                        ["spd-say", text[:500]],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return True
+                except Exception as e:
+                    log.debug("spd-say TTS failed: %s", e)
+                    continue
+        log.warning("No TTS engine available (tried: %s)", ", ".join(candidates))
+        return False
 
     # ------------------------------------------------------------------
     # Signals
@@ -259,6 +306,11 @@ class AdvancedVoiceService(dbus.service.Object):
             self._wav_path = tmp.name
         cmd = self._recorder_command(self._wav_path)
         if not cmd:
+            try:
+                os.unlink(self._wav_path)
+            except OSError:
+                pass
+            self._wav_path = None
             self._busy = False
             self._listening = False
             self.StateChanged("error")
@@ -269,6 +321,10 @@ class AdvancedVoiceService(dbus.service.Object):
             )
             # Audio level monitor
             threading.Thread(target=self._monitor_audio, daemon=True).start()
+            # Hard cap so a forgotten toggle doesn't record forever.
+            self._record_timeout_id = GLib.timeout_add_seconds(
+                MAX_RECORD_SECONDS, self._force_stop_and_transcribe
+            )
         except Exception as e:
             log.error("Recording failed: %s", e)
             self._busy = False
@@ -277,6 +333,9 @@ class AdvancedVoiceService(dbus.service.Object):
 
     def _stop_and_transcribe(self):
         with self._lock:
+            if self._record_timeout_id:
+                GLib.source_remove(self._record_timeout_id)
+                self._record_timeout_id = 0
             rec = self._recorder
             self._recorder = None
             wav_path = self._wav_path
@@ -299,6 +358,27 @@ class AdvancedVoiceService(dbus.service.Object):
         else:
             self._busy = False
             self.StateChanged("idle")
+
+    def _force_stop_and_transcribe(self):
+        """Called by recording timeout — force stop if still listening."""
+        if self._listening:
+            log.warning(
+                "Recording timeout after %d seconds, forcing stop",
+                MAX_RECORD_SECONDS,
+            )
+            GLib.idle_add(self._stop_and_transcribe)
+        return False  # do not repeat
+
+    def _cleanup_after_tts(self, proc, tmp_path):
+        """Wait for TTS playback to finish, then delete the temp file."""
+        try:
+            proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
     def _monitor_audio(self):
         """Monitor audio levels during recording."""
@@ -369,7 +449,10 @@ class AdvancedVoiceService(dbus.service.Object):
                 log.warning("Vosk model not found at %s, falling back", model_path)
                 return self._transcribe_whisper(file_path)
 
-            model = Model(model_path)
+            if self._vosk_model is None or self._vosk_model_path != model_path:
+                self._vosk_model = Model(model_path)
+                self._vosk_model_path = model_path
+            model = self._vosk_model
             with wave.open(file_path, "rb") as wf:
                 rec = KaldiRecognizer(model, wf.getframerate())
                 rec.SetWords(True)

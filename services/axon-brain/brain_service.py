@@ -3,6 +3,7 @@
 
 import json
 import re
+import shutil
 import sys
 import threading
 import time
@@ -16,6 +17,7 @@ import dbus.mainloop.glib
 import dbus.service
 import tomllib
 from gi.repository import GLib
+from service_base import ServiceBase
 
 try:
     from axon_logger import configure_app_logger
@@ -57,7 +59,15 @@ from service_utils import rate_limited
 CONFIG_FILE = AXON_DIR / "config.toml"
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
-_MAX_CONTEXT_LEN = 2000
+_MAX_CONTEXT_LEN = 500
+
+# Patterns commonly used in prompt injection attacks.
+_INJECTION_PATTERNS = re.compile(
+    r"(ignore previous|ignore all previous|you are now|system:|"
+    r"assistant:|IMPORTANT:|disregard.*instructions|new instructions|"
+    r"override.*system|forget everything)",
+    re.IGNORECASE,
+)
 
 
 def _sanitize_output(text: str) -> str:
@@ -68,34 +78,91 @@ def _sanitize_output(text: str) -> str:
 
 
 def _sanitize_context(context: str) -> str:
-    """Truncate and clean context before embedding in system prompt."""
+    """Sanitize and wrap context before embedding in system prompt.
+
+    Strips null bytes, removes common prompt-injection patterns,
+    truncates to _MAX_CONTEXT_LEN chars, and wraps in untrusted tags
+    so the model treats the content as inert data.
+    """
     safe = context.replace("\x00", "")
+    safe = _INJECTION_PATTERNS.sub("", safe)
     if len(safe) > _MAX_CONTEXT_LEN:
         safe = safe[:_MAX_CONTEXT_LEN]
-    return safe
+    return f"<untrusted_context>{safe}</untrusted_context>"
 
 
-class BrainService(dbus.service.Object):
-    def __init__(self):
-        # Initialise GLib main loop integration with D-Bus
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
+class TokenBuffer:
+    """Batch token signals to prevent D-Bus signal flooding.
 
-        # Request name org.axonos.Brain
-        try:
-            self.bus_name = dbus.service.BusName("org.axonos.Brain", bus=self.session_bus)
-        except dbus.exceptions.NameExistsException:
-            logger.error("org.axonos.Brain service is already running.")
-            sys.exit(1)
+    Accumulates tokens and flushes them either when the buffer is full
+    or when the flush interval has elapsed, whichever comes first.
+    """
 
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Brain")
+    def __init__(self, emit_fn, flush_interval: float = 0.1, max_tokens: int = 10):
+        self._buffer: list[tuple[str, str]] = []  # (transaction_id, token)
+        self._last_flush = time.monotonic()
+        self._flush_interval = flush_interval
+        self._max_tokens = max_tokens
+        self._emit_fn = emit_fn
+        self._lock = threading.Lock()
 
+    def add(self, token: str, transaction_id: str) -> None:
+        """Add a token to the buffer, flushing if thresholds are exceeded."""
+        with self._lock:
+            self._buffer.append((transaction_id, token))
+            now = time.monotonic()
+            if (
+                len(self._buffer) >= self._max_tokens
+                or now - self._last_flush >= self._flush_interval
+            ):
+                self._flush()
+
+    def flush(self) -> None:
+        """Force-flush any buffered tokens."""
+        with self._lock:
+            self._flush()
+
+    def _flush(self) -> None:
+        """Emit all buffered tokens. Caller must hold _lock."""
+        if not self._buffer:
+            return
+        batch = self._buffer[:]
+        self._buffer.clear()
+        self._last_flush = time.monotonic()
+        for tx_id, tok in batch:
+            self._emit_fn(tx_id, tok)
+
+    @property
+    def pending_count(self) -> int:
+        with self._lock:
+            return len(self._buffer)
+
+
+# Per-read timeout for Ollama streaming (seconds).
+# If no data arrives within this window, the stream is considered hung.
+_STREAM_READ_TIMEOUT = 30.0
+
+
+class BrainService(ServiceBase):
+    BUS_NAME = "org.axonos.Brain"
+    OBJECT_PATH = "/org/axonos/Brain"
+    SERVICE_NAME = "axon-brain"
+
+    def _setup(self):
         # Initialize sub-components
         self._config_lock = threading.RLock()
         self.store = ConversationStore()
         self.load_config()
         self.router = AIRouter(self.config)
-        logger.info("Axon Brain D-Bus Service registered successfully at /org/axonos/Brain")
+        # FIX 4: Transaction registry for stream cancellation
+        self._active_streams: dict[str, threading.Event] = {}
+        # FIX 5: Token buffer for backpressure on signal emission
+        # Use GLib.idle_add to safely emit signals from worker threads
+        self._token_buffer = TokenBuffer(
+            emit_fn=lambda tx_id, tok: GLib.idle_add(self.TokenGenerated, tx_id, tok),
+            flush_interval=0.1,
+            max_tokens=10,
+        )
 
     def save_config(self):
         """Saves current configuration to TOML format atomically."""
@@ -103,8 +170,13 @@ class BrainService(dbus.service.Object):
             try:
                 content = "# Axon OS AI Configuration\n\n"
                 for k, v in self.config.items():
-                    escaped_v = str(v).replace("\\", "\\\\").replace('"', '\\"')
-                    content += f'{k} = "{escaped_v}"\n'
+                    if isinstance(v, bool):
+                        content += f"{k} = {'true' if v else 'false'}\n"
+                    elif isinstance(v, (int, float)):
+                        content += f"{k} = {v}\n"
+                    else:
+                        escaped_v = str(v).replace("\\", "\\\\").replace('"', '\\"')
+                        content += f'{k} = "{escaped_v}"\n'
                 tmp_path = CONFIG_FILE.with_suffix(".tmp")
                 tmp_path.write_text(content)
                 tmp_path.replace(CONFIG_FILE)
@@ -126,14 +198,29 @@ class BrainService(dbus.service.Object):
                         return
                 except Exception as e:
                     logger.debug("Config file not loaded, using defaults: %s", e)
+                    # Back up corrupted config before replacing
+                    try:
+                        backup_path = CONFIG_FILE.with_suffix(".toml.bak")
+                        shutil.copy2(CONFIG_FILE, backup_path)
+                        logger.info("Corrupted config backed up to %s", backup_path)
+                    except OSError as backup_err:
+                        logger.warning("Could not back up corrupted config: %s", backup_err)
 
             # Profile hardware and save default config
-            profile = hardware_profiler.profile_hardware()
-            self.config = {
-                "speed_model": profile["recommendations"]["speed"]["model"],
-                "general_model": profile["recommendations"]["general"]["model"],
-                "deep_model": profile["recommendations"]["deep"]["model"],
-            }
+            try:
+                profile = hardware_profiler.profile_hardware()
+                self.config = {
+                    "speed_model": profile["recommendations"]["speed"]["model"],
+                    "general_model": profile["recommendations"]["general"]["model"],
+                    "deep_model": profile["recommendations"]["deep"]["model"],
+                }
+            except Exception as e:
+                logger.warning("Hardware profiling failed, using fallback defaults: %s", e)
+                self.config = {
+                    "speed_model": "qwen2.5:1.5b",
+                    "general_model": "qwen2.5:7b",
+                    "deep_model": "qwen2.5:14b",
+                }
             self.save_config()
 
     def _http_post(self, url, payload, stream=False, timeout=60.0, max_retries=5):
@@ -189,6 +276,21 @@ class BrainService(dbus.service.Object):
         if not isinstance(prompt, str) or not prompt:
             return False
         return len(prompt) <= BrainService._MAX_PROMPT_LEN
+
+    @staticmethod
+    def _set_stream_timeout(response, timeout: float = _STREAM_READ_TIMEOUT) -> None:
+        """Set a per-read socket timeout on an HTTP response for streaming.
+
+        Prevents the daemon thread from blocking forever if Ollama hangs
+        mid-stream. Raises ``TimeoutError`` on the next read if no data
+        arrives within *timeout* seconds.
+        """
+        try:
+            fp = response.raw._fp
+            if fp is not None and hasattr(fp, "sock") and fp.sock is not None:
+                fp.sock.settimeout(timeout)
+        except (AttributeError, OSError):
+            pass  # Socket not yet connected or already closed
 
     # ------------------------------------------------------------------
     # D-Bus Methods
@@ -249,6 +351,9 @@ class BrainService(dbus.service.Object):
 
         if stream:
             tx_id = str(uuid.uuid4())
+            # FIX 4: Register transaction for cancellation support
+            cancel_flag = threading.Event()
+            self._active_streams[tx_id] = cancel_flag
             threading.Thread(
                 target=self._do_generate_stream,
                 args=(tx_id, prompt, system_prompt, model),
@@ -257,6 +362,20 @@ class BrainService(dbus.service.Object):
             return tx_id
         else:
             return self._do_generate_sync(prompt, system_prompt, model)
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="b")
+    def CancelStream(self, transaction_id: str) -> bool:
+        """Cancel an active streaming transaction.
+
+        Returns True if the stream was found and cancelled, False if no
+        matching transaction was active.
+        """
+        cancel_flag = self._active_streams.get(transaction_id)
+        if cancel_flag is not None:
+            cancel_flag.set()
+            self.logger.debug("Stream %s cancellation requested", transaction_id)
+            return True
+        return False
 
     @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
     def CreateConversation(self, system_prompt, title):
@@ -303,6 +422,9 @@ class BrainService(dbus.service.Object):
 
         if stream:
             tx_id = str(uuid.uuid4())
+            # FIX 4: Register transaction for cancellation support
+            cancel_flag = threading.Event()
+            self._active_streams[tx_id] = cancel_flag
             threading.Thread(
                 target=self._do_chat_stream,
                 args=(tx_id, conversation_id, context, model),
@@ -417,8 +539,7 @@ class BrainService(dbus.service.Object):
     def GetEmbeddings(self, prompt, model):
         """Generates embedding vector for a given prompt using Ollama."""
         if not model:
-            # Try speed model, general model or default nomic-embed-text
-            model = self.config.get("speed_model", "nomic-embed-text")
+            model = self.config.get("embedding_model", "nomic-embed-text")
         try:
             # Try newer /api/embed endpoint first
             payload = {"model": model, "input": prompt}
@@ -483,10 +604,10 @@ class BrainService(dbus.service.Object):
                     status = data.get("status", "")
                     completed = data.get("completed", 0)
                     total = data.get("total", 0)
-                    self.PullProgress(model_name, completed, total, status)
+                    GLib.idle_add(self.PullProgress, model_name, completed, total, status)
         except Exception as e:
             logger.debug("Pull failed for %s: %s", model_name, e)
-            self.PullProgress(model_name, 0, 0, "Pull failed")
+            GLib.idle_add(self.PullProgress, model_name, 0, 0, "Pull failed")
 
     def _do_generate_sync(self, prompt, system, model):
         try:
@@ -501,23 +622,40 @@ class BrainService(dbus.service.Object):
             return "[Error: AI generation unavailable]"
 
     def _do_generate_stream(self, tx_id, prompt, system, model):
+        cancel_flag = self._active_streams.get(tx_id)
         try:
             payload = {"model": model, "prompt": prompt, "stream": True}
             if system:
                 payload["system"] = system
             with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload) as r:
+                # FIX 3: Set per-read timeout on the underlying socket
+                self._set_stream_timeout(r)
                 for raw_line in r:
+                    # FIX 4: Check cancellation before processing
+                    if cancel_flag is not None and cancel_flag.is_set():
+                        logger.debug("Generate stream %s cancelled by client", tx_id)
+                        break
                     line = raw_line.decode().strip()
                     if not line:
                         continue
                     chunk = json.loads(line)
                     token = chunk.get("response", "")
                     if token:
-                        self.TokenGenerated(tx_id, _sanitize_output(token))
-            self.GenerationCompleted(tx_id, True, "")
+                        # FIX 5: Use token buffer for backpressure
+                        self._token_buffer.add(_sanitize_output(token), tx_id)
+            # Flush any remaining buffered tokens
+            self._token_buffer.flush()
+            GLib.idle_add(self.GenerationCompleted, tx_id, True, "")
+        except TimeoutError:
+            logger.warning("Generate stream %s timed out (Ollama hung)", tx_id)
+            self._token_buffer.flush()
+            GLib.idle_add(self.GenerationCompleted, tx_id, False, "Generation timed out")
         except Exception as e:
             logger.debug("Generate stream failed: %s", e)
-            self.GenerationCompleted(tx_id, False, "Generation failed")
+            self._token_buffer.flush()
+            GLib.idle_add(self.GenerationCompleted, tx_id, False, "Generation failed")
+        finally:
+            self._active_streams.pop(tx_id, None)
 
     def _do_chat_sync(self, conv_id, context, model):
         messages = self.store.get_messages(conv_id)
@@ -540,6 +678,7 @@ class BrainService(dbus.service.Object):
             return "[Error: AI chat unavailable]"
 
     def _do_chat_stream(self, tx_id, conv_id, context, model):
+        cancel_flag = self._active_streams.get(tx_id)
         messages = self.store.get_messages(conv_id)
         api_msgs = [{"role": m["role"], "content": m["content"]} for m in messages]
         system_prompt = CHAT_SYSTEM_PROMPT
@@ -555,7 +694,13 @@ class BrainService(dbus.service.Object):
                 "system": system_prompt,
             }
             with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as r:
+                # FIX 3: Set per-read timeout on the underlying socket
+                self._set_stream_timeout(r)
                 for raw_line in r:
+                    # FIX 4: Check cancellation before processing
+                    if cancel_flag is not None and cancel_flag.is_set():
+                        logger.debug("Chat stream %s cancelled by client", tx_id)
+                        break
                     line = raw_line.decode().strip()
                     if not line:
                         continue
@@ -564,13 +709,23 @@ class BrainService(dbus.service.Object):
                     if token:
                         token = _sanitize_output(token)
                         accumulated += token
-                        self.TokenGenerated(tx_id, token)
+                        # FIX 5: Use token buffer for backpressure
+                        self._token_buffer.add(token, tx_id)
+            # Flush any remaining buffered tokens
+            self._token_buffer.flush()
             # Save final response
             self.store.add_message(conv_id, "assistant", accumulated)
-            self.GenerationCompleted(tx_id, True, "")
+            GLib.idle_add(self.GenerationCompleted, tx_id, True, "")
+        except TimeoutError:
+            logger.warning("Chat stream %s timed out (Ollama hung)", tx_id)
+            self._token_buffer.flush()
+            GLib.idle_add(self.GenerationCompleted, tx_id, False, "Chat timed out")
         except Exception as e:
             logger.debug("Chat stream failed: %s", e)
-            self.GenerationCompleted(tx_id, False, "Chat failed")
+            self._token_buffer.flush()
+            GLib.idle_add(self.GenerationCompleted, tx_id, False, "Chat failed")
+        finally:
+            self._active_streams.pop(tx_id, None)
 
 
 if __name__ == "__main__":

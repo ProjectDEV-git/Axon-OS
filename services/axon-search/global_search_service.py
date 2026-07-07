@@ -20,26 +20,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from axon_logger import configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from service_base import ServiceBase
+
 log = configure_app_logger("axon-global-search", level=__import__("logging").INFO)
 
 
-class GlobalSearchService(dbus.service.Object):
-    def __init__(self):
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
-        try:
-            self.bus_name = dbus.service.BusName("org.axonos.GlobalSearch", bus=self.session_bus)
-        except dbus.exceptions.NameExistsException:
-            log.error("org.axonos.GlobalSearch service is already running.")
-            sys.exit(1)
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/GlobalSearch")
+class GlobalSearchService(ServiceBase):
+    BUS_NAME = "org.axonos.GlobalSearch"
+    OBJECT_PATH = "/org/axonos/GlobalSearch"
+    SERVICE_NAME = "axon-global-search"
 
+    def _setup(self):
         self._brain = None
         self._search = None
         self._context = None
         self._lock = threading.Lock()
         self._recent_queries: list[dict] = []
-        log.info("GlobalSearch registered at /org/axonos/GlobalSearch")
 
     # ------------------------------------------------------------------
     # Lazy D-Bus proxy helpers

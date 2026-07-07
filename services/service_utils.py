@@ -19,7 +19,8 @@ ALLOWED_COMMANDS: set[str] = {
     "ls",
     "cat",
     "grep",
-    "find",
+    # NOTE: find intentionally removed — enables systematic file enumeration
+    # for credential hunting without metacharacters (see audit H5).
     "echo",
     "date",
     "whoami",
@@ -56,12 +57,13 @@ ALLOWED_COMMANDS: set[str] = {
     "paplay",
     "xdg-open",
     "gtk-launch",
-    "gio",
+    # NOTE: gio intentionally removed — can make arbitrary D-Bus calls
+    # (see audit M2).
     "notify-send",
     "zenity",
 }
 
-_SHELL_META_CHARS = frozenset("|;&$`\\(){}[]<>*?~!#")
+_SHELL_META_CHARS = frozenset("|;&$`\\(){}[]<>*?~!#\n\t\x00")
 
 
 def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:

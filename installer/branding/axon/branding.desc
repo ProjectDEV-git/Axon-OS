@@ -11,15 +11,15 @@ componentName: axon
 strings:
     productName:         "Axon OS"
     shortProductName:    "Axon"
-    version:             "0.2.0"
-    shortVersion:        "0.2"
-    versionedName:       "Axon OS 0.2.0"
-    shortVersionedName:  "Axon 0.2"
+    version:             "0.3.0"
+    shortVersion:        "0.3"
+    versionedName:       "Axon OS 0.3.0"
+    shortVersionedName:  "Axon 0.3"
     bootloaderEntryName: "Axon OS"
-    productUrl:          "https://github.com/axonos/axon-os"
-    supportUrl:          "https://github.com/axonos/axon-os/issues"
-    knownIssuesUrl:      "https://github.com/axonos/axon-os/issues"
-    releaseNotesUrl:     "https://github.com/axonos/axon-os/releases"
+    productUrl:          "https://github.com/kaorii-ako/Axon-OS"
+    supportUrl:          "https://github.com/kaorii-ako/Axon-OS/issues"
+    knownIssuesUrl:      "https://github.com/kaorii-ako/Axon-OS/issues"
+    releaseNotesUrl:     "https://github.com/kaorii-ako/Axon-OS/releases"
 
 # -----------------------------------------------------------------------
 # Images — paths are relative to this branding directory

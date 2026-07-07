@@ -55,7 +55,7 @@ _GENERAL_PATTERNS = [
 
 _CODE_PATTERNS = [
     r"(write|create|generate|implement|build)\s+(a |an )?(function|class|script|program|code|module|file)",
-    r"(fix|debug|debug|patch|refactor|optimize|rewrite)\s+(this|the|my)?\s*(code|bug|error|function|class)",
+    r"(fix|debug|patch|refactor|optimize|rewrite)\s+(this|the|my)?\s*(code|bug|error|function|class)",
     r"(python|javascript|rust|golang|java|c\+\+|bash|shell|html|css|sql|typescript)\s+(code|function|script)",
     r"(how to|how do i|how can i)\s+(implement|write|create|build|make)\s",
     r"(refactor|clean up|restructure|reorganize)\s",
@@ -96,7 +96,7 @@ class AIRouter:
         self._speed_model: str = self._config.get("speed_model", "llama3.2:3b")
         self._general_model: str = self._config.get("general_model", "mistral:7b")
         self._deep_model: str = self._config.get("deep_model", "qwen2.5:7b")
-        self._embed_model: str = "nomic-embed-text"
+        self._embed_model: str = self._config.get("embedding_model", "nomic-embed-text")
 
     def select_model(
         self,
@@ -135,19 +135,27 @@ class AIRouter:
         """
         text = prompt.lower().strip()
 
-        # Check for embedding/search tasks
+        # Guard: too short for meaningful embedding request
         words = set(text.split())
-        if words & _EMBEDDING_KEYWORDS and len(text.split()) < 10:
+        if len(text.split()) < 3:
+            # Don't route single words like "find" or "search" to embedding
+            pass
+        elif words & _EMBEDDING_KEYWORDS and len(text.split()) < 10:
             return self.EMBEDDING
 
         # Check for code patterns (before speed to avoid false positives)
         code_score = sum(1 for p in _CODE_PATTERNS if re.search(p, text, re.IGNORECASE))
-        if code_score >= 1 and len(text.split()) > 5:
+        if code_score >= 1 and len(text.split()) > 3:
             return self.DEEP
 
         # Check for speed patterns (short, simple)
         for pattern in _SPEED_PATTERNS:
             if re.search(pattern, text, re.IGNORECASE):
+                # Context override: code editor context upgrades speed to deep
+                if context and any(
+                    kw in context.lower() for kw in ["code", "vim", "neovim", "vscode", "terminal"]
+                ):
+                    return self.DEEP
                 return self.SPEED
 
         # Check for general patterns
@@ -157,9 +165,20 @@ class AIRouter:
 
         # Length-based fallback
         if len(text) < 15:
+            # Context override: code editor context upgrades short text to deep
+            if context and any(
+                kw in context.lower() for kw in ["code", "vim", "neovim", "vscode", "terminal"]
+            ):
+                return self.DEEP
             return self.SPEED
         if len(text) > 200 or text.count("?") > 2:
             return self.DEEP
+
+        # Context-based routing adjustments for GENERAL fallback
+        if context:
+            ctx_lower = context.lower()
+            if any(kw in ctx_lower for kw in ["document", "pdf", "browser"]):
+                return self.GENERAL  # explicit for clarity
 
         return self.GENERAL
 
@@ -173,7 +192,7 @@ class AIRouter:
 
     def get_model_for_chat(self, message_length: int = 0) -> str:
         """Model for chat based on expected complexity."""
-        if message_length > 500:
+        if message_length > 200:
             return self._deep_model
         return self._general_model
 

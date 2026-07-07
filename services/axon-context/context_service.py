@@ -30,28 +30,21 @@ except ImportError:  # running standalone — repo root / installed shim not on 
             return _logging.getLogger(name)
 
 
+from service_base import ServiceBase
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from clipboard_store import ClipboardStore
 
-logger = configure_app_logger(__name__)
 
+class ContextService(ServiceBase):
+    BUS_NAME = "org.axonos.Context"
+    OBJECT_PATH = "/org/axonos/Context"
+    SERVICE_NAME = "axon-context"
 
-class ContextService(dbus.service.Object):
-    def __init__(self):
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
-
-        try:
-            self.bus_name = dbus.service.BusName("org.axonos.Context", bus=self.session_bus)
-        except dbus.exceptions.NameExistsException:
-            logger.error("org.axonos.Context service is already running.")
-            sys.exit(1)
-
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Context")
-
+    def _setup(self):
         # State tracking (updated dynamically by shell extension or helpers)
         self.active_window_title = "None"
         self.active_window_app = "None"
@@ -72,8 +65,6 @@ class ContextService(dbus.service.Object):
         self._terminal_cache = None
         self._terminal_cache_mtime = {}
         self._start_clipboard_watcher()
-
-        logger.info("Axon Context Engine Service registered successfully at /org/axonos/Context")
 
     def _load_config(self):
         config_path = Path.home() / ".config" / "axon-os" / "context.json"

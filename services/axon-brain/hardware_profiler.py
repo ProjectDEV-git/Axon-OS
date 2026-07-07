@@ -88,12 +88,36 @@ def get_gpu_info():
                 "status": "unsupported_driver",
             }
         elif "Intel" in lspci_out:
-            return {
-                "vendor": "Intel",
-                "model": "Intel Integrated Graphics",
-                "vram": 2.0,
-                "status": "cpu_shared",
-            }
+            # Parse model string to distinguish Arc (discrete) from integrated
+            model_str = ""
+            for line in lspci_out.splitlines():
+                if "Intel" in line and ("VGA" in line or "3D" in line or "Display" in line):
+                    model_str = line
+                    break
+
+            if "Arc" in model_str:
+                # Intel Arc discrete GPU
+                if "A770" in model_str:
+                    vram_gb = 16.0
+                elif "A750" in model_str:
+                    vram_gb = 8.0
+                elif "A380" in model_str:
+                    vram_gb = 6.0
+                else:
+                    vram_gb = 8.0  # conservative default for Arc
+                return {
+                    "vendor": "Intel",
+                    "model": model_str.strip() if model_str else "Intel Arc GPU",
+                    "vram": vram_gb,
+                    "status": "detected",
+                }
+            else:
+                return {
+                    "vendor": "Intel",
+                    "model": "Intel Integrated Graphics",
+                    "vram": 2.0,
+                    "status": "cpu_shared",
+                }
     except Exception as e:
         logger.debug("lspci detection failed: %s", e)
 
@@ -164,7 +188,21 @@ def profile_hardware():
     else:
         # CPU or Integrated GPU fallback
         # If CPU has plenty of RAM, we can still run a 3B/8B model but it will be slow
-        if ram >= 16.0:
+        if ram < 4.0:
+            # Very low RAM: only safe to use tiny models
+            rec["recommendations"]["speed"] = {
+                "model": "llama3.2:1b",
+                "description": "Llama 3.2 1B — tiny footprint, runs on systems with minimal RAM.",
+            }
+            rec["recommendations"]["general"] = {
+                "model": "llama3.2:1b",
+                "description": "Llama 3.2 1B — only safe option with <4 GB system RAM.",
+            }
+            rec["recommendations"]["deep"] = {
+                "model": "llama3.2:1b",
+                "description": "Llama 3.2 1B — limited by system RAM; deep reasoning unavailable.",
+            }
+        elif ram >= 16.0:
             rec["recommendations"]["deep"] = {
                 "model": "llama3:8b",
                 "description": "Llama 3 8B — high reasoning, runs on CPU RAM (will have moderate response latency).",

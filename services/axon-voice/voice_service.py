@@ -35,6 +35,7 @@ from axon_logger import configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from intent_router import clean_transcript, parse_intent_response
+from service_base import ServiceBase
 from vad_helper import is_speech_wav
 
 log = configure_app_logger("axon-voice", level=logging.INFO)
@@ -55,17 +56,12 @@ def _validate_app_name(name: str) -> str | None:
     return name
 
 
-class VoiceService(dbus.service.Object):
-    def __init__(self):
-        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-        self.session_bus = dbus.SessionBus()
-        try:
-            self.bus_name = dbus.service.BusName("org.axonos.Voice", bus=self.session_bus)
-        except dbus.exceptions.NameExistsException:
-            log.error("org.axonos.Voice service is already running.")
-            sys.exit(1)
-        dbus.service.Object.__init__(self, self.session_bus, "/org/axonos/Voice")
+class VoiceService(ServiceBase):
+    BUS_NAME = "org.axonos.Voice"
+    OBJECT_PATH = "/org/axonos/Voice"
+    SERVICE_NAME = "axon-voice"
 
+    def _setup(self):
         self._lock = threading.Lock()
         self._recorder = None  # subprocess.Popen while recording
         self._wav_path = None
@@ -78,7 +74,6 @@ class VoiceService(dbus.service.Object):
         self._ambient_stop = threading.Event()
         # TTS engine cached choice (env var overrides)
         self._tts_engine = os.environ.get("AXON_TTS_ENGINE", "")
-        log.info("Axon Voice D-Bus service registered at /org/axonos/Voice")
 
     # ------------------------------------------------------------------
     # D-Bus API
@@ -93,6 +88,7 @@ class VoiceService(dbus.service.Object):
                 return False
             if self._busy:
                 return False
+            self._busy = True  # claim immediately inside lock
         GLib.idle_add(self._start_recording)
         return True
 
@@ -449,6 +445,12 @@ if __name__ == "__main__":
 
     def _shutdown(signum, frame):
         log.info("Received signal %d, shutting down...", signum)
+        if service._recorder:
+            try:
+                service._recorder.kill()
+                service._recorder.wait(timeout=2)
+            except Exception:
+                pass
         loop.quit()
 
     signal.signal(signal.SIGTERM, _shutdown)
