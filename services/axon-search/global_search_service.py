@@ -163,6 +163,9 @@ class GlobalSearchService(ServiceBase):
                 schemas = subprocess.run(
                     ["gsettings", "list-schemas"], capture_output=True, text=True, timeout=3
                 )
+            except subprocess.TimeoutExpired:
+                return
+            try:
                 for schema in schemas.stdout.strip().splitlines():
                     if query.lower() in schema.lower():
                         with results_lock:

@@ -893,7 +893,15 @@ class FilesWindow(Adw.ApplicationWindow):
         def do_rename(new_name):
             if not new_name:
                 return
+            # Reject path traversal in new name
+            if "/" in new_name or "\\" in new_name or ".." in new_name:
+                self.status_lbl.set_text("Rename failed: invalid characters in name")
+                return
             dest = src.parent / new_name
+            # Verify resolved path stays in same directory
+            if dest.resolve().parent != src.parent.resolve():
+                self.status_lbl.set_text("Rename failed: path escapes directory")
+                return
             try:
                 src.rename(dest)
                 self.status_lbl.set_text(f"Renamed to: {new_name}")

@@ -80,8 +80,9 @@ class SpacesManager:
                     for item in raw:
                         space = Space.from_dict(item)
                         self._spaces[space.id] = space
-                except (json.JSONDecodeError, KeyError):
-                    pass
+                except (json.JSONDecodeError, KeyError) as exc:
+                    import logging
+                    logging.getLogger(__name__).warning("Corrupted spaces.json, creating default: %s", exc)
 
             if not self._spaces:
                 default = Space(
@@ -117,7 +118,8 @@ class SpacesManager:
     def get_current_space(self) -> Space | None:
         """Return the currently active space, or None if unset."""
         if not _CURRENT_SPACE_FILE.exists():
-            spaces = self.get_spaces()
+            with self._lock:
+                spaces = sorted(self._spaces.values(), key=lambda s: s.last_active, reverse=True)
             return spaces[0] if spaces else None
         try:
             space_id = _CURRENT_SPACE_FILE.read_text().strip()

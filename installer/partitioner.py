@@ -269,6 +269,28 @@ class Partitioner:
           1. EFI  FAT32  1 MiB – 513 MiB  (with esp + boot flags)
           2. Root btrfs  513 MiB – 100%
         """
+        # Pre-flight: verify device has enough space for EFI (512 MiB) + minimal root (1 GiB)
+        disks = {d.device: d for d in self.list_disks()}
+        disk_info = disks.get(device)
+        if disk_info and disk_info.size:
+            size_match = re.match(r"([\d.]+)\s*([A-Za-z]+)", disk_info.size)
+            if size_match:
+                size_val = float(size_match.group(1))
+                unit = size_match.group(2).upper()
+                if unit in ("G", "GB"):
+                    size_mib = size_val * 1024
+                elif unit in ("T", "TB"):
+                    size_mib = size_val * 1024 * 1024
+                elif unit in ("M", "MB"):
+                    size_mib = size_val
+                else:
+                    size_mib = 0
+                min_required_mib = 513 + 1024  # EFI + 1 GiB minimum root
+                if size_mib < min_required_mib:
+                    raise ValueError(
+                        f"Disk {device} ({disk_info.size}) is too small "
+                        f"\u2014 need at least {min_required_mib / 1024:.1f} GiB"
+                    )
         self._run(["parted", "-s", device, "mklabel", "gpt"])
 
         # EFI System Partition

@@ -3,6 +3,7 @@
 
 import json
 import re
+import shlex
 import shutil
 import sys
 import threading
@@ -68,6 +69,67 @@ _INJECTION_PATTERNS = re.compile(
     r"override.*system|forget everything)",
     re.IGNORECASE,
 )
+# Commands the AI is allowed to suggest (base name only).
+_ALLOWED_CMD_PREFIXES = frozenset({
+    "ls", "cat", "head", "tail", "grep", "find", "wc", "du", "df",
+    "ps", "top", "free", "uname", "whoami", "hostname", "date",
+    "echo", "printf", "env", "which", "file", "stat",
+    "mkdir", "cp", "mv", "ln", "touch", "chmod",
+    "git", "python3", "pip3", "node", "npm",
+    "systemctl", "journalctl", "dmesg",
+    "ping", "ip", "ss", "curl", "wget",
+})
+_DANGEROUS_CMD_PATTERNS = [
+    re.compile(r"\brm\s+(-[a-zA-Z]*\s+)*\/"),  # rm /...
+    re.compile(r"\bmkfs\b"),  # mkfs
+    re.compile(r"\bdd\s+"),  # dd
+    re.compile(r"\bchmod\s+777\b"),  # chmod 777
+    re.compile(r"\b(rm\s+-rf|--no-preserve-root)"),  # rm -rf / --no-preserve-root
+    re.compile(r">\s*\/etc\/"),  # write to /etc
+    re.compile(r"\bshutdown\b|\breboot\b|\bpoweroff\b"),  # power commands
+    re.compile(r"\bsudo\b|\bsu\s"),  # privilege escalation
+    re.compile(r"\bcurl\b|\bwget\b"),  # network downloads
+    re.compile(r"\bnc\b|\bnetcat\b|\bncat\b"),  # netcat
+    re.compile(r";\s*(rm|dd|mkfs|chmod)"),  # chained dangerous cmds
+]
+
+
+def _sanitize_command(command: str) -> str | None:
+    """Validate an AI-generated shell command against a safe allowlist.
+
+    Returns the command if safe, None if it should be blocked.
+    """
+    command = command.strip()
+    if not command:
+        return None
+
+    # Extract the base command (first token)
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        logger.warning("sanitize_command: failed to parse command: %s", command[:100])
+        return None
+    if not parts:
+        return None
+    base = parts[0].split("/")[-1]  # strip path prefix
+
+    # Reject path traversal in arguments
+    for arg in parts[1:]:
+        if ".." in arg:
+            logger.warning("sanitize_command: blocked path traversal in args: %s", command[:100])
+            return None
+
+    if base not in _ALLOWED_CMD_PREFIXES:
+        logger.warning("sanitize_command: blocked unwhitelisted command: %s", base)
+        return None
+
+    # Check against dangerous patterns
+    for pattern in _DANGEROUS_CMD_PATTERNS:
+        if pattern.search(command):
+            logger.warning("sanitize_command: blocked dangerous pattern in: %s", command[:100])
+            return None
+
+    return command
 
 
 def _sanitize_output(text: str) -> str:

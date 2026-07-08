@@ -112,7 +112,12 @@ def install_plugin(manifest_path: Path) -> None:
     systemd_dir = Path.home() / ".config" / "systemd" / "user"
     dbus_services_dir = Path.home() / ".local" / "share" / "dbus-1" / "services"
     dbus_policy_dir = Path("/usr/share/dbus-1/session.d")
-    axon_plugin_dir = Path.home() / ".local" / "share" / "axon" / "plugins" / name
+    base_plugin_dir = Path.home() / ".local" / "share" / "axon" / "plugins"
+    axon_plugin_dir = (base_plugin_dir / name).resolve()
+    # Defense-in-depth: verify resolved path stays under the plugins directory
+    if not str(axon_plugin_dir).startswith(str(base_plugin_dir.resolve()) + "/"):
+        print(f"Error: plugin name '{name}' resolves outside plugins directory")  # noqa: T201
+        return
 
     # Create dirs
     systemd_dir.mkdir(parents=True, exist_ok=True)

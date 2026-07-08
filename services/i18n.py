@@ -13,25 +13,9 @@ _LOCALE_DIR = Path("/usr/share/locale")
 _DOMAIN = "axon-os"
 
 # Fallback translations (when .mo files are not available)
-_FALLBACK_TRANSLATIONS = {
-    "What do you want to do?": "What do you want to do?",
-    "Thinking…": "Thinking…",
-    "AI service unavailable. Is Axon Brain running?": "AI service unavailable. Is Axon Brain running?",
-    "Start Menu": "Start Menu",
-    "Intent Bar (Search / AI)": "Intent Bar (Search / AI)",
-    "Empty workspace": "Empty workspace",
-    "Workspace active": "Workspace active",
-    "Error": "Error",
-    "Warning": "Warning",
-    "Info": "Info",
-    "OK": "OK",
-    "Cancel": "Cancel",
-    "Yes": "Yes",
-    "No": "No",
-    "Close": "Close",
-    "Save": "Save",
-    "Delete": "Delete",
-}
+# Maps English source strings to translated strings. Empty values mean
+# no translation is available yet -- the source string is used as-is.
+_FALLBACK_TRANSLATIONS: dict[str, str] = {}
 
 
 def setup_i18n(domain: str = _DOMAIN, locale_dir: str | None = None) -> gettext.NullTranslations:

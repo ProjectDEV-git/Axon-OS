@@ -192,7 +192,9 @@ class SettingsExecutor:
                     ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{vol}%"], check=True
                 )
                 return {"success": True, "message": f"Volume adjusted to {vol}%."}
-        except (subprocess.SubprocessError, OSError, ValueError) as e:
+        except (ValueError, TypeError) as e:
+            return {"success": False, "message": f"Invalid volume value: {e}"}
+        except (subprocess.SubprocessError, OSError) as e:
             logger.debug("pactl failed, trying amixer: %s", e)
             try:
                 if value == "mute":

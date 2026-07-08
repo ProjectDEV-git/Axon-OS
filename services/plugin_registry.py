@@ -224,7 +224,12 @@ class ServiceRegistry:
             raise ValueError(f"Duplicate plugin name: {manifest.name}")
 
         # Entry point must exist relative to the manifest directory
-        entry = manifest.manifest_path.parent / manifest.entry_point
+        entry = (manifest.manifest_path.parent / manifest.entry_point).resolve()
+        plugin_dir = manifest.manifest_path.parent.resolve()
+        if not str(entry).startswith(str(plugin_dir) + "/"):
+            raise ValueError(
+                f"Entry point '{manifest.entry_point}' escapes plugin directory for '{manifest.name}'"
+            )
         if not entry.is_file():
             raise ValueError(f"Entry point {entry} not found for plugin '{manifest.name}'")
 

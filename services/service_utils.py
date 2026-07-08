@@ -223,6 +223,9 @@ class RateLimiter:
 def cached(ttl_seconds: int = 300) -> Callable:
     """Decorator to cache D-Bus method results with TTL.
 
+    Excludes 'stream' keyword from cache key to avoid returning
+    non-stream results for stream requests.
+
     Args:
         ttl_seconds: Time to live for cached results.
 
@@ -234,7 +237,9 @@ def cached(ttl_seconds: int = 300) -> Callable:
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            cache_key = f"{func.__name__}:{args}:{kwargs}"
+            # Exclude stream-like params from cache key
+            cache_kwargs = {k: v for k, v in kwargs.items() if k != "stream"}
+            cache_key = f"{func.__name__}:{args}:{cache_kwargs}"
             cached_result = cache.get(cache_key)
             if cached_result is not None:
                 return cached_result

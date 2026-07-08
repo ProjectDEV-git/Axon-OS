@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import dbus
@@ -58,6 +59,7 @@ class ContextService(ServiceBase):
         self._clipboard_store = ClipboardStore(
             max_entries=MAX_CLIPBOARD_HISTORY, max_entry_len=MAX_CLIPBOARD_ENTRY_LEN
         )
+        self._clipboard_lock = threading.Lock()
         self._clipboard_history = self._clipboard_store.to_deque()
         self._clipboard_watcher = None
         self._clipboard_watch_id = None
@@ -106,6 +108,11 @@ class ContextService(ServiceBase):
     # D-Bus Query Methods
     # ------------------------------------------------------------------
 
+    def _get_clipboard_snapshot(self) -> list[str]:
+        """Return a thread-safe snapshot of the clipboard history."""
+        with self._clipboard_lock:
+            return list(self._clipboard_history)
+
     @dbus.service.method("org.axonos.Context", in_signature="", out_signature="s")
     def GetActiveContext(self):
         """Aggregates all current session context into a JSON string."""
@@ -115,7 +122,7 @@ class ContextService(ServiceBase):
             "open_files": self._get_open_files(),
             "terminal_commands": self._get_terminal_commands(),
             "last_stderr": self._get_last_stderr(),
-            "clipboard_history": list(self._clipboard_history),
+            "clipboard_history": self._get_clipboard_snapshot(),
         }
         return json.dumps(context)
 
@@ -147,9 +154,11 @@ class ContextService(ServiceBase):
         if stderr:
             parts.append(f"Last terminal error:\n{stderr}")
 
-        if self._clipboard_history:
+        with self._clipboard_lock:
+            clipboard_snapshot = list(self._clipboard_history)
+        if clipboard_snapshot:
             parts.append("Recent clipboard entries:")
-            for i, entry in enumerate(reversed(list(self._clipboard_history)), 1):
+            for i, entry in enumerate(reversed(clipboard_snapshot), 1):
                 # Truncate long entries for prompt injection
                 display = entry[:120] + "..." if len(entry) > 120 else entry
                 parts.append(f"  [{i}] {display}")
@@ -291,7 +300,8 @@ class ContextService(ServiceBase):
                 if text:
                     added = self._clipboard_store.add(text)
                     if added:
-                        self._clipboard_history = self._clipboard_store.to_deque()
+                        with self._clipboard_lock:
+                            self._clipboard_history = self._clipboard_store.to_deque()
                         self.ContextChanged(self.GetActiveContext())
         except Exception as e:
             logger.debug("Clipboard data read error: %s", e)
@@ -313,7 +323,8 @@ class ContextService(ServiceBase):
             if text:
                 added = self._clipboard_store.add(text)
                 if added:
-                    self._clipboard_history = self._clipboard_store.to_deque()
+                    with self._clipboard_lock:
+                        self._clipboard_history = self._clipboard_store.to_deque()
                     self.ContextChanged(self.GetActiveContext())
         except Exception as e:
             logger.debug("xclip poll error: %s", e)

@@ -143,23 +143,25 @@ class FileIndexer:
 
     def init_db(self):
         conn = sqlite3.connect(self.db_path, timeout=30.0)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS files (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_path TEXT UNIQUE,
-                file_name TEXT,
-                file_type TEXT,
-                file_size INTEGER,
-                last_modified REAL,
-                content_summary TEXT,
-                embedding TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    file_path TEXT UNIQUE,
+                    file_name TEXT,
+                    file_type TEXT,
+                    file_size INTEGER,
+                    last_modified REAL,
+                    content_summary TEXT,
+                    embedding TEXT
+                )
+            """)
+            conn.commit()
+        finally:
+            conn.close()
 
     def get_indexed_count(self) -> int:
         conn = sqlite3.connect(self.db_path, timeout=30.0)
@@ -317,19 +319,21 @@ class FileIndexer:
         if not query_text.strip():
             conn = sqlite3.connect(self.db_path, timeout=30.0)
             conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
-                FROM files
-                ORDER BY last_modified DESC
-                LIMIT ?
-            """,
-                (limit,),
-            )
-            rows = cursor.fetchall()
-            conn.close()
-            return [dict(row) for row in rows]
+            try:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
+                    FROM files
+                    ORDER BY last_modified DESC
+                    LIMIT ?
+                """,
+                    (limit,),
+                )
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+            finally:
+                conn.close()
 
         if use_semantic:
             query_emb = fetch_embedding_dbus(query_text)

@@ -34,4 +34,5 @@ RUN useradd --create-home --shell /bin/bash builder && \
 WORKDIR /workspace
 
 # Default entry point is running the master build script
+USER builder
 CMD ["/workspace/build/build.sh"]

@@ -49,6 +49,7 @@ class VoiceOverlay(Gtk.ApplicationWindow):
         self.connect(
             "destroy", lambda _: GLib.source_remove(self._timer_id) if self._timer_id else None
         )
+        self._timer_id = 0  # Mark as removed after destroy to prevent double-remove
 
         # Center the window at the bottom of the screen
         self.present()

@@ -267,16 +267,23 @@ class TerminalWidget(Gtk.Box):
         term.set_color_cursor_foreground(_BG)
         term.set_colors(_FG, _BG, _PALETTE)
 
-        # Spawn user shell
+        # Spawn user shell (allowlist of known safe shells)
+        _ALLOWED_SHELLS = frozenset({
+            "/bin/bash", "/bin/sh", "/bin/dash", "/bin/zsh",
+            "/usr/bin/bash", "/usr/bin/sh", "/usr/bin/zsh", "/usr/bin/fish",
+        })
         shell = "/bin/bash"
         config_path = Path.home() / ".config" / "axon-os" / "shell.conf"
         if config_path.exists():
             try:
-                shell = config_path.read_text().strip()
+                candidate = config_path.read_text().strip()
+                if candidate in _ALLOWED_SHELLS:
+                    shell = candidate
             except Exception:
                 pass
-        if not Path(shell).exists() or not os.access(shell, os.X_OK):
-            shell = os.environ.get("SHELL", "/bin/bash")
+        if shell not in _ALLOWED_SHELLS or not Path(shell).exists() or not os.access(shell, os.X_OK):
+            env_shell = os.environ.get("SHELL", "/bin/bash")
+            shell = env_shell if env_shell in _ALLOWED_SHELLS else "/bin/bash"
 
         term.spawn_async(
             Vte.PtyFlags.DEFAULT,

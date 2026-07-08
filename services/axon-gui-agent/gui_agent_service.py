@@ -167,11 +167,12 @@ class GuiAgentService(ServiceBase):
 
     def _notify(self, title, body):
         if shutil.which("notify-send"):
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 ["notify-send", "-i", "preferences-system", title, body[:300]],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            threading.Thread(target=proc.wait, daemon=True).start()
 
 
 if __name__ == "__main__":

@@ -182,8 +182,8 @@ class Telemetry:
                 tmp = self._daily_file().with_suffix(".tmp")
                 tmp.write_text(json.dumps(save_data, indent=2))
                 tmp.replace(self._daily_file())
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("telemetry: failed to save daily data: %s", exc)
 
     # ------------------------------------------------------------------
     # Summary / report
@@ -206,8 +206,8 @@ class Telemetry:
                         entry = json.loads(line)
                         if entry.get("ts", "").startswith(today):
                             crash_count += 1
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("telemetry: failed to read crash log: %s", exc)
 
         return {
             "enabled": True,

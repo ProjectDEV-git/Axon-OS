@@ -184,10 +184,9 @@ class MessageBubble(Gtk.Box):
         """Append *chunk* to the bubble label (used during streaming)."""
         self._text += chunk
         if self._role == "assistant":
-            try:
-                self._label.set_markup(_apply_markup(self._text))
-            except Exception:
-                self._label.set_text(self._text)
+            # During streaming, use plain text to avoid partial markup crashes.
+            # Final markup is applied in set_final_text() once streaming completes.
+            self._label.set_text(self._text)
         else:
             self._label.set_text(self._text)
 

@@ -21,6 +21,10 @@ class ContextReader:
         self.context_obj: Any = None
         self._connect()
 
+    def close(self) -> None:
+        """Release the D-Bus connection."""
+        self.context_obj = None
+
     def _connect(self) -> None:
         if self.context_obj is None:
             try:

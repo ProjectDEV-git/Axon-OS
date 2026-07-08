@@ -168,9 +168,10 @@ class OllamaClient:
         """Send a message to a conversation and yield response tokens via D-Bus."""
         try:
             brain = self._get_brain()
-            # Reset queue
-            while not self.q.empty():
-                self.q.get_nowait()
+            with self._stream_lock:
+                # Reset queue
+                while not self.q.empty():
+                    self.q.get_nowait()
 
             # Call SendMessage to start stream and get transaction ID
             self.current_tx = str(brain.SendMessage(conversation_id, message, ctx, model, True))

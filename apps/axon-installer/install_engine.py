@@ -652,6 +652,7 @@ def setup_ai(cfg: dict) -> None:
     home = f"{TARGET}/home/{user}"
     axon_dir = f"{home}/.axon"
     os.makedirs(axon_dir, exist_ok=True)
+    os.chmod(axon_dir, 0o700)
     config_path = f"{axon_dir}/config.toml"
     with open(config_path, "w") as f:
         f.write("\n".join(lines) + "\n")
@@ -726,7 +727,7 @@ def main() -> int:
             cfg = json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"could not read config: {exc}")
-        return 1
+        return 1  # unreachable after fail() but keeps type checker happy
 
     try:
         os.unlink(config_path)

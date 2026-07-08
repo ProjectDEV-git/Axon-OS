@@ -505,6 +505,7 @@ class AdvancedVoiceService(ServiceBase):
         """Ambient listening loop with wake word detection."""
         log.info("Wake word detection started")
         while not self._wake_stop.is_set():
+            wake_path = None
             try:
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                     wake_path = tmp.name
@@ -531,14 +532,16 @@ class AdvancedVoiceService(ServiceBase):
                             self.StateChanged("wake-detected")
                             log.info("Wake word detected: %s", wake_word)
                             break
-                    try:
-                        os.unlink(wake_path)
-                    except OSError:
-                        pass
 
             except Exception as e:
                 log.debug("Wake loop error: %s", e)
                 time.sleep(1)
+            finally:
+                if wake_path:
+                    try:
+                        os.unlink(wake_path)
+                    except OSError:
+                        pass
 
         log.info("Wake word detection stopped")
 

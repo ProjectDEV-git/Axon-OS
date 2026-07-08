@@ -275,20 +275,22 @@ class VoiceService(ServiceBase):
         for eng in candidates:
             if eng == "piper" and shutil.which("piper"):
                 try:
-                    subprocess.Popen(
+                    proc = subprocess.Popen(
                         ["piper", "-t", text[:1000]],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
+                    threading.Thread(target=proc.wait, daemon=True).start()
                     return
                 except Exception as e:
                     log.debug("piper TTS failed: %s", e)
                     continue
             if eng in ("espeak", "espeak-ng") and shutil.which(eng):
                 try:
-                    subprocess.Popen(
+                    proc = subprocess.Popen(
                         [eng, text[:1000]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                     )
+                    threading.Thread(target=proc.wait, daemon=True).start()
                     return
                 except Exception as e:
                     log.debug("%s TTS failed: %s", eng, e)
@@ -314,11 +316,12 @@ class VoiceService(ServiceBase):
                     continue
             if eng == "spd-say" and shutil.which("spd-say"):
                 try:
-                    subprocess.Popen(
+                    proc = subprocess.Popen(
                         ["spd-say", "--wait-mode", "no", text[:500]],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
+                    threading.Thread(target=proc.wait, daemon=True).start()
                     return
                 except Exception as e:
                     log.debug("spd-say TTS failed: %s", e)
@@ -330,11 +333,12 @@ class VoiceService(ServiceBase):
 
     def _notify(self, title, body):
         if shutil.which("notify-send"):
-            subprocess.Popen(
+            proc = subprocess.Popen(
                 ["notify-send", "-i", "audio-input-microphone", title, body[:400]],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
+            threading.Thread(target=proc.wait, daemon=True).start()
 
     def _cleanup_after_tts(self, proc, tmp_path):
         """Wait for TTS playback to finish, then delete the temp file."""
