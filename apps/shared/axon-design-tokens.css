@@ -1,0 +1,32 @@
+/*
+ * axon-design-tokens.css — Unified design tokens for Axon OS.
+ *
+ * Import this file from each app's CSS to guarantee visual consistency.
+ * All apps should reference @define-color names instead of hardcoded values.
+ */
+
+/* ---- Backgrounds ---- */
+@define-color bg_primary #0f0f14;
+@define-color bg_secondary #11111e;
+@define-color bg_surface #12121c;
+
+/* ---- Text ---- */
+@define-color text_primary #e8e8f4;
+@define-color text_secondary #9090b8;
+@define-color text_muted #50507a;
+
+/* ---- Accent (purple) ---- */
+@define-color accent #8b5cf6;
+@define-color accent_hover #7c3aed;
+@define-color accent_active #6d28d9;
+
+/* ---- Borders ---- */
+@define-color border #2a2a42;
+
+/* ---- Semantic ---- */
+@define-color success #10b981;
+@define-color error #ef4444;
+
+/* ---- Accent variant (terminal / secondary) ---- */
+@define-color accent_light #c4b5fd;
+@define-color cyan #22d3ee;

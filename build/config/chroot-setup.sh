@@ -196,33 +196,13 @@ install -Dm644 "${SRC}/services/axon-sandbox/axon-sandbox-env.sh" /etc/profile.d
 # Python global logger path helper (copying to python standard dist-packages)
 cp "${SRC}/axon_logger.py" /usr/lib/python3/dist-packages/ || true
 
-# Append GRUB self-healing boot attempts watchdog logic to 00_header
-if [[ -f /etc/grub.d/00_header ]]; then
-    log "Injecting GRUB boot-attempts rollback watchdog logic..."
-    cat << 'EOF' >> /etc/grub.d/00_header
-
-# Axon OS Self-Healing Watchdog
-if [ -s \$prefix/grubenv ]; then
-  load_env boot_attempts
-fi
-if [ "\${boot_attempts}" -gt 2 ]; then
-  # Fallback to recovery, live session, or previous entry
-  set default="1"
-  echo "⬡ Axon Rogue Shield: Boot loop detected. Rolling back to fallback..."
-else
-  if [ -z "\${boot_attempts}" ]; then
-    set boot_attempts=1
-  elif [ "\${boot_attempts}" = "1" ]; then
-    set boot_attempts=2
-  elif [ "\${boot_attempts}" = "2" ]; then
-    set boot_attempts=3
-  else
-    set boot_attempts=1
-  fi
-  save_env boot_attempts
-fi
-EOF
-fi
+# NOTE: the boot-attempts watchdog lives in /etc/grub.d/06_axon_watchdog
+# (installed further below) and counts in a grubenv file on the ESP, which
+# GRUB can actually write. Do NOT append watchdog logic to 00_header:
+# appended lines execute as *bash* while update-grub runs (they are not
+# emitted into grub.cfg), where save_env does not exist — under 00_header's
+# `set -e` that aborts grub-mkconfig and leaves the system with a stale or
+# missing grub.cfg (boot error / blank screen).
 
 cat > /usr/share/applications/axon-update.desktop <<'EOF'
 [Desktop Entry]

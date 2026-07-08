@@ -16,11 +16,16 @@ def reset_boot_counter():
         print("boot_watchdog: must be run as root", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
-    grubenv = "/boot/grub/grubenv"
+    # The GRUB watchdog (/etc/grub.d/06_axon_watchdog) counts boot attempts in
+    # a grubenv file on the ESP — GRUB cannot write to btrfs, so /boot/grub/
+    # grubenv is never used for the counter. Reset the ESP copy.
+    grubenv = "/boot/efi/axon/grubenv"
     try:
         if not os.path.exists(grubenv):
-            log.error("grubenv file not found at %s", grubenv)
-            sys.exit(1)
+            # Live sessions, ext4 installs, and BIOS systems have no ESP
+            # counter — the watchdog is inactive, nothing to reset.
+            log.info("No watchdog grubenv at %s; nothing to do.", grubenv)
+            sys.exit(0)
         res = subprocess.run(
             ["grub-editenv", grubenv, "set", "boot_attempts=0"], capture_output=True, text=True
         )

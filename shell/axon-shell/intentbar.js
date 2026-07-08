@@ -30,7 +30,6 @@ export default class IntentBar {
     }
 
     enable() {
-        this._brainProxy = this._extension._brainProxy || null;
         this._buildUI();
     }
 
@@ -149,6 +148,7 @@ export default class IntentBar {
     }
 
     _positionCenter() {
+        if (!this._actor) return;
         const monitor = Main.layoutManager.primaryMonitor;
         if (!monitor) return;
 
@@ -185,10 +185,12 @@ export default class IntentBar {
             `{"action":"open_app","app":"<app-name>"} or {"action":"run_command","command":"<shell-command>"}. ` +
             `For general questions or requests that are not app/command actions, respond with plain text.`;
 
-        // Try Brain D-Bus proxy first
-        if (this._brainProxy) {
+        // Read the proxy at call time: the extension initializes it
+        // asynchronously, so it may not exist yet when enable() ran.
+        const brainProxy = this._brainProxy || this._extension._brainProxy || null;
+        if (brainProxy) {
             try {
-                this._brainProxy.Generate(
+                brainProxy.GenerateRemote(
                     prompt, systemPrompt, '', false,
                     (result, error) => {
                         if (error) {
@@ -196,7 +198,7 @@ export default class IntentBar {
                             this._setResponse(`Error: ${error.message}`);
                             return;
                         }
-                        this._handleResponse(result);
+                        this._handleResponse(result ? result[0] : null);
                     }
                 );
                 return;
@@ -205,7 +207,8 @@ export default class IntentBar {
             }
         }
 
-        // Fallback: try to create proxy on the fly
+        // Fallback: create a proxy on the fly (async — a sync constructor
+        // would freeze the compositor while the service starts).
         try {
             const BrainInterface = `
 <node>
@@ -220,20 +223,28 @@ export default class IntentBar {
   </interface>
 </node>`;
             const BrainProxy = Gio.DBusProxy.makeProxyWrapper(BrainInterface);
-            const proxy = new BrainProxy(
+            new BrainProxy(
                 Gio.DBus.session,
                 'org.axonos.Brain',
-                '/org/axonos/Brain'
-            );
-            proxy.Generate(
-                prompt, systemPrompt, '', false,
-                (result, error) => {
+                '/org/axonos/Brain',
+                (proxy, error) => {
                     if (error) {
-                        logError(error, 'AxonShell: Brain Generate failed');
-                        this._setResponse(`Error: ${error.message}`);
+                        logError(error, 'AxonShell: could not reach Brain service');
+                        this._setResponse('AI service unavailable. Is Axon Brain running?');
                         return;
                     }
-                    this._handleResponse(result);
+                    this._brainProxy = proxy;
+                    proxy.GenerateRemote(
+                        prompt, systemPrompt, '', false,
+                        (result, err) => {
+                            if (err) {
+                                logError(err, 'AxonShell: Brain Generate failed');
+                                this._setResponse(`Error: ${err.message}`);
+                                return;
+                            }
+                            this._handleResponse(result ? result[0] : null);
+                        }
+                    );
                 }
             );
         } catch (e) {

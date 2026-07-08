@@ -1,6 +1,16 @@
 # Axon OS - Rogue Software Shield Integration
 # Sourced by interactive bash shells to intercept untrusted scripts.
 
+# Only hook interactive bash shells. Without this guard the DEBUG trap and
+# extdebug get installed into every login shell — including GDM/session
+# startup scripts — where the per-command trap overhead and blocking D-Bus
+# calls stall the whole login. POSIX syntax: dash also sources profile.d.
+[ -n "${BASH_VERSION:-}" ] || return 0
+case $- in
+    *i*) ;;
+    *) return 0 ;;
+esac
+
 axon_sandbox_trap() {
     # Guard against nested calls or empty commands
     if [[ "${AXON_IN_SANDBOX:-0}" -eq 1 || -z "${BASH_COMMAND:-}" ]]; then
@@ -24,7 +34,9 @@ axon_sandbox_trap() {
             
             # Query decision via D-Bus org.axonos.Sandbox
             local decision
-            decision=$(dbus-send --session --dest=org.axonos.Sandbox --print-reply=literal /org/axonos/Sandbox org.axonos.Sandbox.AuditAndPrompt string:"$real_path" 2>/dev/null | xargs)
+            # Bounded reply timeout: the default (25 s) freezes the shell when
+            # the sandbox service is slow to activate or waits on a GUI prompt.
+            decision=$(dbus-send --session --reply-timeout=5000 --dest=org.axonos.Sandbox --print-reply=literal /org/axonos/Sandbox org.axonos.Sandbox.AuditAndPrompt string:"$real_path" 2>/dev/null | xargs)
             
             if [[ "$decision" == "sandbox" ]]; then
                 echo -e "\n\e[1;35m⬡ Rogue Software Shield: Running inside secure read-only sandbox...\e[0m"

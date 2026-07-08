@@ -40,6 +40,70 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
+# Shared update pipeline helpers
+# ---------------------------------------------------------------------------
+def _run_cmd_logged(cmd: list[str], extra_env: dict[str, str] | None = None) -> bool:
+    """Run a subprocess; returns True on success. Logs output on failure."""
+    try:
+        run_env = os.environ.copy()
+        if extra_env:
+            run_env.update(extra_env)
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=run_env,
+        )
+        if result.returncode != 0:
+            logger.error("Error running '%s':\n%s", " ".join(cmd), result.stdout)
+            return False
+        return True
+    except Exception as exc:
+        logger.exception("Exception running '%s': %s", " ".join(cmd), exc)
+        return False
+
+
+def run_headless_update() -> int:
+    """Non-interactive update pipeline for the axon-update-auto systemd unit.
+
+    The systemd timer invokes ``axon-update --auto`` with no display; the GTK
+    window cannot (and should not) be shown there.
+    """
+    if os.geteuid() != 0:
+        logger.error("axon-update --auto must run as root")
+        return 1
+
+    logger.info("Auto-update: creating snapshot")
+    if not _run_cmd_logged(["timeshift", "--create", "--comments", "Axon OS Auto-Update Snapshot"]):
+        logger.warning("Snapshot failed (Timeshift not configured?); proceeding")
+
+    logger.info("Auto-update: apt-get update")
+    if not _run_cmd_logged(["apt-get", "update"]):
+        logger.error("apt-get update failed; aborting auto-update")
+        return 1
+
+    logger.info("Auto-update: apt-get dist-upgrade")
+    if not _run_cmd_logged(
+        ["apt-get", "dist-upgrade", "-y", "-q"],
+        extra_env={"DEBIAN_FRONTEND": "noninteractive"},
+    ):
+        logger.error("dist-upgrade failed")
+        return 1
+
+    logger.info("Auto-update: flatpak update")
+    if not _run_cmd_logged(["flatpak", "update", "-y", "--noninteractive"]):
+        logger.warning("Flatpak update encountered an issue")
+
+    logger.info("Auto-update: update-grub")
+    if not _run_cmd_logged(["update-grub"]):
+        logger.error("update-grub failed — bootloader configuration may be stale")
+
+    logger.info("Auto-update complete")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Window
 # ---------------------------------------------------------------------------
 class AxonUpdaterWindow(Adw.ApplicationWindow):
@@ -312,6 +376,10 @@ class AxonUpdaterApp(Adw.Application):
 # Entry point
 # ---------------------------------------------------------------------------
 def main() -> int:
+    # Headless mode for the axon-update-auto.service systemd unit: no display
+    # is available there, and GTK would reject the unknown --auto option.
+    if "--auto" in sys.argv:
+        return run_headless_update()
     app = AxonUpdaterApp()
     return app.run(sys.argv)
 

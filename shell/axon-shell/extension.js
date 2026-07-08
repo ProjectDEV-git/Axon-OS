@@ -69,15 +69,21 @@ class AxonAIIndicator extends PanelMenu.Button {
         box.add_child(this._statusDot);
         this.add_child(box);
 
-        try {
-            this._proxy = new BrainProxy(
-                Gio.DBus.session,
-                'org.axonos.Brain',
-                '/org/axonos/Brain'
-            );
-        } catch (e) {
-            console.warn('AxonShell: could not create BrainProxy:', e.message);
-        }
+        // Async init: a synchronous constructor would block the compositor
+        // while D-Bus activation starts the Python service.
+        new BrainProxy(
+            Gio.DBus.session,
+            'org.axonos.Brain',
+            '/org/axonos/Brain',
+            (proxy, error) => {
+                if (error) {
+                    console.warn('AxonShell: could not create BrainProxy:', error.message);
+                    return;
+                }
+                this._proxy = proxy;
+                this._checkBrainStatus();
+            }
+        );
 
         this._checkBrainStatus();
 
@@ -179,26 +185,34 @@ export default class AxonShellExtension extends Extension {
 
     enable() {
         try {
-            try {
-                this._contextProxy = new ContextProxy(
-                    Gio.DBus.session,
-                    'org.axonos.Context',
-                    '/org/axonos/Context'
-                );
-            } catch (e) {
-                console.warn('AxonShell: could not create ContextProxy in extension.js:', e.message);
-            }
+            // Async init: synchronous D-Bus proxy constructors block the whole
+            // compositor while activation spawns the Python services, freezing
+            // the desktop at every login/unlock.
+            new ContextProxy(
+                Gio.DBus.session,
+                'org.axonos.Context',
+                '/org/axonos/Context',
+                (proxy, error) => {
+                    if (error) {
+                        console.warn('AxonShell: could not create ContextProxy in extension.js:', error.message);
+                        return;
+                    }
+                    this._contextProxy = proxy;
+                }
+            );
 
-            try {
-                this._brainProxy = new BrainFullProxy(
-                    Gio.DBus.session,
-                    'org.axonos.Brain',
-                    '/org/axonos/Brain'
-                );
-            } catch (e) {
-                console.warn('AxonShell: could not create BrainProxy in extension.js:', e.message);
-                this._brainProxy = null;
-            }
+            new BrainFullProxy(
+                Gio.DBus.session,
+                'org.axonos.Brain',
+                '/org/axonos/Brain',
+                (proxy, error) => {
+                    if (error) {
+                        console.warn('AxonShell: could not create BrainProxy in extension.js:', error.message);
+                        return;
+                    }
+                    this._brainProxy = proxy;
+                }
+            );
 
             this._spacesManager = new SpacesManager(this);
             this._spacesManager.enable();
@@ -354,20 +368,35 @@ export default class AxonShellExtension extends Extension {
                 </node>
                 `;
                 const VoiceProxy = Gio.DBusProxy.makeProxyWrapper(VoiceInterface);
-                this._voiceProxy = new VoiceProxy(
+                // Async init: the voice service loads speech models at startup;
+                // a sync constructor would freeze the compositor until then.
+                new VoiceProxy(
                     Gio.DBus.session,
                     'org.axonos.Voice',
-                    '/org/axonos/Voice'
+                    '/org/axonos/Voice',
+                    (proxy, error) => {
+                        if (error) {
+                            console.warn('AxonShell: could not create VoiceProxy:', error.message);
+                            return;
+                        }
+                        this._voiceProxy = proxy;
+                        this._voiceProxy.connectSignal('TranscriptReady', (p, sender, [text]) => {
+                            this._onTranscriptionCompleted(text, '');
+                        });
+                        this._toggleVoice();
+                    }
                 );
-                this._voiceProxy.connectSignal('TranscriptReady', (proxy, sender, [text]) => {
-                    this._onTranscriptionCompleted(text, '');
-                });
             } catch (e) {
                 console.warn('AxonShell: could not create VoiceProxy:', e.message);
-                return;
             }
+            return;
         }
 
+        this._toggleVoice();
+    }
+
+    _toggleVoice() {
+        if (!this._voiceProxy) return;
         this._voiceProxy.ToggleRemote((res, err) => {
             if (err) {
                 console.warn('AxonShell: Toggle voice failed:', err.message);

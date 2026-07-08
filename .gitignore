@@ -114,3 +114,7 @@ kernel/**/.module-common.o
 
 # wget logs
 wget-log.*
+
+# Build/debug artifacts
+debug-reports.zip
+wget-log*

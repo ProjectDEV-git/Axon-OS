@@ -101,12 +101,16 @@ if [[ -d "${DATA_APPS_DIR}" ]]; then
 fi
 
 # 5. Configure workspace names
+# GVariant string arrays need quoted elements; and none of these are worth
+# aborting first-boot over (set -e) — a failure here used to kill the script
+# before the .firstboot-done marker, so every login re-ran firstboot and
+# restarted all AI services mid-session.
 echo "[axon-firstboot] Applying workspace configurations..."
 gsettings set org.gnome.desktop.wm.preferences workspace-names \
-    "[Code,Web,Chat,Files,Media,Work,Personal,Terminal,Notes]"
-gsettings set org.gnome.desktop.wm.preferences num-workspaces 9
-gsettings set org.gnome.mutter dynamic-workspaces false
-gsettings set org.gnome.desktop.interface enable-animations true
+    "['Code','Web','Chat','Files','Media','Work','Personal','Terminal','Notes']" || true
+gsettings set org.gnome.desktop.wm.preferences num-workspaces 9 || true
+gsettings set org.gnome.mutter dynamic-workspaces false || true
+gsettings set org.gnome.desktop.interface enable-animations true || true
 
 # Apply theme preferences
 gsettings set org.gnome.desktop.interface gtk-theme axon-gtk || true

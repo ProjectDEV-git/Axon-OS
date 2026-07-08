@@ -21,6 +21,16 @@ class StartMenuPopup extends St.BoxLayout {
         this._spacesManager = spacesManager;
         this._intentBar = intentBar;
         this._appSystem = Shell.AppSystem.get_default();
+        this._clickDismissId = null;
+
+        // If destroyed while visible, the stage handler would keep firing
+        // against a dead actor on every click — disconnect it here.
+        this.connect('destroy', () => {
+            if (this._clickDismissId) {
+                global.stage.disconnect(this._clickDismissId);
+                this._clickDismissId = null;
+            }
+        });
 
         this._buildUI();
     }

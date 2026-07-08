@@ -138,25 +138,34 @@ export default class SpacesManager {
         this._ensureStateDir();
         this._loadState();
 
-        try {
-            this._contextProxy = new ContextProxy(
-                Gio.DBus.session,
-                'org.axonos.Context',
-                '/org/axonos/Context'
-            );
-        } catch (e) {
-            console.warn('AxonShell: could not create ContextProxy in spaces.js:', e.message);
-        }
+        // Async init: synchronous proxy constructors block the compositor
+        // while D-Bus activation starts the Python services.
+        new ContextProxy(
+            Gio.DBus.session,
+            'org.axonos.Context',
+            '/org/axonos/Context',
+            (proxy, error) => {
+                if (error) {
+                    console.warn('AxonShell: could not create ContextProxy in spaces.js:', error.message);
+                    return;
+                }
+                this._contextProxy = proxy;
+                this._updateIndicator();
+            }
+        );
 
-        try {
-            this._brainProxy = new BrainProxy(
-                Gio.DBus.session,
-                'org.axonos.Brain',
-                '/org/axonos/Brain'
-            );
-        } catch (e) {
-            console.warn('AxonShell: could not create BrainProxy in spaces.js:', e.message);
-        }
+        new BrainProxy(
+            Gio.DBus.session,
+            'org.axonos.Brain',
+            '/org/axonos/Brain',
+            (proxy, error) => {
+                if (error) {
+                    console.warn('AxonShell: could not create BrainProxy in spaces.js:', error.message);
+                    return;
+                }
+                this._brainProxy = proxy;
+            }
+        );
 
         this._indicator = new SpaceIndicator(this._extension);
         Main.panel.addToStatusArea('axon-space-indicator', this._indicator, 0, 'left');

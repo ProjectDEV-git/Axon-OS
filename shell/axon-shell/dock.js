@@ -298,25 +298,33 @@ export default class DockManager {
     }
 
     enable() {
-        try {
-            this._brainProxy = new BrainProxy(
-                Gio.DBus.session,
-                'org.axonos.Brain',
-                '/org/axonos/Brain'
-            );
-        } catch (e) {
-            console.warn('AxonTaskbar: could not create BrainProxy:', e.message);
-        }
+        // Async init: synchronous proxy constructors block the compositor
+        // while D-Bus activation starts the Python services.
+        new BrainProxy(
+            Gio.DBus.session,
+            'org.axonos.Brain',
+            '/org/axonos/Brain',
+            (proxy, error) => {
+                if (error) {
+                    console.warn('AxonTaskbar: could not create BrainProxy:', error.message);
+                    return;
+                }
+                this._brainProxy = proxy;
+            }
+        );
 
-        try {
-            this._contextProxy = new ContextProxy(
-                Gio.DBus.session,
-                'org.axonos.Context',
-                '/org/axonos/Context'
-            );
-        } catch (e) {
-            console.warn('AxonTaskbar: could not create ContextProxy:', e.message);
-        }
+        new ContextProxy(
+            Gio.DBus.session,
+            'org.axonos.Context',
+            '/org/axonos/Context',
+            (proxy, error) => {
+                if (error) {
+                    console.warn('AxonTaskbar: could not create ContextProxy:', error.message);
+                    return;
+                }
+                this._contextProxy = proxy;
+            }
+        );
 
         // Create Start Menu popup instance
         this._startMenuPopup = new StartMenuPopup(
@@ -346,18 +354,23 @@ export default class DockManager {
             this._monitorsChangedId = null;
         }
 
-        // Restore native GNOME panel items
+        // Restore native GNOME panel items into their original parents
+        // (their statusArea container bins), not directly into panel boxes.
         const quickSettings = this._actor ? this._actor._quickSettingsHolder : null;
         if (quickSettings && Main.panel) {
             const qsParent = quickSettings.get_parent();
             if (qsParent) qsParent.remove_child(quickSettings);
-            Main.panel._rightBox.add_child(quickSettings);
+            const qsHome = this._quickSettingsOrigParent || Main.panel._rightBox;
+            qsHome.add_child(quickSettings);
+            this._quickSettingsOrigParent = null;
         }
         const dateMenu = this._actor ? this._actor._dateMenuHolder : null;
         if (dateMenu && Main.panel) {
             const dmParent = dateMenu.get_parent();
             if (dmParent) dmParent.remove_child(dateMenu);
-            Main.panel._centerBox.add_child(dateMenu);
+            const dmHome = this._dateMenuOrigParent || Main.panel._centerBox;
+            dmHome.add_child(dateMenu);
+            this._dateMenuOrigParent = null;
         }
 
         if (this._actor) {
@@ -442,13 +455,17 @@ export default class DockManager {
         const clock = new TaskbarClock();
         rightBox.add_child(clock);
 
-        // Migrate native Quick Settings (network/volume/power aggregate)
+        // Migrate native Quick Settings (network/volume/power aggregate).
+        // Remember the original parent so disable() can restore the exact
+        // panel structure (statusArea items live inside a container bin —
+        // re-adding them elsewhere corrupts the panel across lock/unlock).
         const nativeQS = Main.panel.statusArea['quickSettings'];
         if (nativeQS) {
             const parent = nativeQS.get_parent();
             if (parent) parent.remove_child(nativeQS);
             rightBox.add_child(nativeQS);
             this._actor._quickSettingsHolder = nativeQS;
+            this._quickSettingsOrigParent = parent;
         }
 
         // Migrate native Clock/Calendar menu button (holds notifications)
@@ -458,6 +475,7 @@ export default class DockManager {
             if (parent) parent.remove_child(nativeDate);
             rightBox.add_child(nativeDate);
             this._actor._dateMenuHolder = nativeDate;
+            this._dateMenuOrigParent = parent;
         }
 
         // Register with Chrome Manager so windows respect taskbar boundary
