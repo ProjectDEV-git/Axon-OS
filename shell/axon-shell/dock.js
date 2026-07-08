@@ -478,6 +478,17 @@ export default class DockManager {
             this._dateMenuOrigParent = parent;
         }
 
+        // Show Desktop strip at the far right edge (Windows Aero Peek)
+        const showDesktopBtn = new St.Button({
+            style_class: 'axon-taskbar-showdesktop',
+            reactive: true,
+            track_hover: true,
+            can_focus: true,
+            accessible_name: 'Show Desktop',
+        });
+        showDesktopBtn.connect('clicked', () => this._toggleShowDesktop());
+        this._actor.add_child(showDesktopBtn);
+
         // Register with Chrome Manager so windows respect taskbar boundary
         Main.layoutManager.addChrome(this._actor, {
             affectsStruts: true,
@@ -527,9 +538,36 @@ export default class DockManager {
     _activateApp(app) {
         const windows = app.get_windows();
         if (windows.length > 0) {
-            app.activate();
+            // Windows-style taskbar behavior: clicking the focused app
+            // minimizes it; clicking an unfocused app raises it.
+            const focused = windows.some(w => w.has_focus());
+            if (focused) {
+                windows.forEach(w => w.minimize());
+            } else {
+                app.activate();
+            }
         } else {
             app.open_new_window(-1);
+        }
+    }
+
+    _toggleShowDesktop() {
+        const workspace = global.workspace_manager.get_active_workspace();
+        if (this._showDesktopRestore && this._showDesktopRestore.length > 0) {
+            for (const w of this._showDesktopRestore) {
+                try {
+                    w.unminimize();
+                } catch {
+                    // window was closed while the desktop was shown
+                }
+            }
+            this._showDesktopRestore = null;
+        } else {
+            const windows = workspace
+                .list_windows()
+                .filter(w => !w.skip_taskbar && !w.minimized);
+            windows.forEach(w => w.minimize());
+            this._showDesktopRestore = windows;
         }
     }
 

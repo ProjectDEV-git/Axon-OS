@@ -116,6 +116,11 @@ gsettings set org.gnome.desktop.interface enable-animations true || true
 gsettings set org.gnome.desktop.interface gtk-theme axon-gtk || true
 gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
 
+# Windows muscle-memory keybindings: Super+D shows desktop, Super+E opens
+# the file manager (GNOME's "home" media key launches the default one).
+gsettings set org.gnome.desktop.wm.keybindings show-desktop "['<Super>d']" || true
+gsettings set org.gnome.settings-daemon.plugins.media-keys home "['<Super>e']" || true
+
 # 6. Start Ollama service (if installed and not already running)
 # NOTE: Ollama should ideally run as a systemd user service (e.g.,
 # ollama.service) for proper lifecycle management (restart on crash,

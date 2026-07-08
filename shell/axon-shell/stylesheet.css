@@ -404,3 +404,14 @@
     text-transform: uppercase;
     font-family: "Inter", "Segoe UI", system-ui, sans-serif;
 }
+
+/* Show Desktop strip (Windows Aero Peek) */
+.axon-taskbar-showdesktop {
+    width: 10px;
+    height: 48px;
+    background-color: transparent;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+.axon-taskbar-showdesktop:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
