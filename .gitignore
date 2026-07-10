@@ -1,12 +1,27 @@
-# Python
+# =============================================================================
+# Axon OS .gitignore
+# =============================================================================
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.pyo
 *.pyd
 *.pyc
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+sdist/
+develop-eggs/
+dist/
+lib/
+lib64/
+parts/
+MANIFEST
 
-# Virtual environments
+# --- Virtual environments ---
 venv/
 .venv/
 env/
@@ -14,56 +29,30 @@ env/
 ENV/
 env.bak/
 venv.bak/
+test_env/
 
-# Environment variables
+# --- Environment variables ---
 .env
 .env.local
 .env.*.local
 
-# Distribution / packaging
-dist/
-# build/ is kept — it contains the Axon OS ISO build scripts (not a Python build dir)
-*.egg-info/
-*.egg
-.eggs/
-wheels/
-sdist/
-develop-eggs/
-lib/
-lib64/
-parts/
-MANIFEST
-
-# Installer artifacts
+# --- Distribution / packaging ---
+# build/ is KEPT — contains ISO build scripts
 output/
 *.iso
 
-# Logs
-*.log
-*.log.*
-logs/
+# --- Kernel build artifacts ---
+kernel/**/*.o
+kernel/**/*.ko
+kernel/**/*.mod
+kernel/**/*.mod.*
+kernel/**/*.cmd
+kernel/**/Module.symvers
+kernel/**/modules.order
+kernel/**/.module-common.o
+kernel/**/*.order
 
-# IDE - JetBrains
-.idea/
-*.iml
-*.ipr
-*.iws
-
-# IDE - VSCode
-.vscode/
-*.code-workspace
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# Testing
+# --- Testing ---
 .pytest_cache/
 .coverage
 htmlcov/
@@ -73,48 +62,57 @@ coverage.xml
 *.cover
 .hypothesis/
 
-# mypy / type checking
+# --- Type checking ---
 .mypy_cache/
 .dmypy.json
 dmypy.json
 .pytype/
 .pyre/
 
-# Ruff / linting
+# --- Linting ---
 .ruff_cache/
 
-# Jupyter
+# --- Jupyter ---
 .ipynb_checkpoints/
 *.ipynb
 
-# Compiled extensions
+# --- Compiled extensions ---
 *.so
 *.dylib
 *.dll
 
-# Temporary files
+# --- Logs ---
+*.log
+*.log.*
+logs/
+wget-log
+wget-log.*
+
+# --- Temporary files ---
 *.tmp
 *.swp
 *.swo
 *~
 
-# Ignore build ISOs
-*.iso
+# --- IDE - JetBrains ---
+.idea/
+*.iml
+*.ipr
+*.iws
 
-# Kernel build artifacts
-kernel/**/*.o
-kernel/**/*.ko
-kernel/**/*.mod
-kernel/**/*.mod.c
-kernel/**/*.mod.o
-kernel/**/.cmd
-kernel/**/Module.symvers
-kernel/**/modules.order
-kernel/**/.module-common.o
+# --- IDE - VSCode ---
+.vscode/
+*.code-workspace
 
-# wget logs
-wget-log.*
+# --- OS ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
-# Build/debug artifacts
+# --- Debug artifacts ---
 debug-reports.zip
-wget-log*
