@@ -156,7 +156,7 @@ self.rate_limiter = RateLimiter(
 ```ini
 [Unit]
 Description=Axon Brain AI Service
-Documentation=https://github.com/kaorii-ako/Axon-OS/docs
+Documentation=https://github.com/ProjectDEV-git/Axon-OS/docs
 
 [Service]
 Type=dbus
@@ -390,7 +390,7 @@ pip-compile --generate-hashes requirements.in
 ## Vulnerability Reporting
 
 **Security issues should not be disclosed publicly.** Please email:
-- security@axon-os.local (or appropriate contact)
+- projectdev.hq@gmail.com
 - Or use GitHub's [Security Advisory](https://docs.github.com/en/code-security/security-advisories) feature
 
 **Include:**

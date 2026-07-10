@@ -9,7 +9,7 @@ description = "Axon OS - A futuristic, AI-powered Linux desktop environment"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Axon Team", email = "team@axon-os.local"}
+    {name = "Project DEV", email = "projectdev.hq@gmail.com"}
 ]
 keywords = ["linux", "desktop", "ai", "gnome", "gtk"]
 classifiers = [
@@ -43,10 +43,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/kaorii-ako/Axon-OS"
-Repository = "https://github.com/kaorii-ako/Axon-OS"
-Documentation = "https://github.com/kaorii-ako/Axon-OS/blob/main/docs/"
-Issues = "https://github.com/kaorii-ako/Axon-OS/issues"
+Homepage = "https://github.com/ProjectDEV-git/Axon-OS"
+Repository = "https://github.com/ProjectDEV-git/Axon-OS"
+Documentation = "https://github.com/ProjectDEV-git/Axon-OS/blob/main/docs/"
+Issues = "https://github.com/ProjectDEV-git/Axon-OS/issues"
 
 [tool.setuptools]
 packages = ["apps", "services", "installer"]

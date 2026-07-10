@@ -513,7 +513,7 @@ If issues persist:
    ```
 
 2. **Search GitHub issues:**
-   - https://github.com/kaorii-ako/Axon-OS/issues
+   - https://github.com/ProjectDEV-git/Axon-OS/issues
 
 3. **Enable debug mode and report:**
    ```bash

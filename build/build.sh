@@ -502,7 +502,7 @@ generate_sbom() {
       "SPDXID": "SPDXRef-RootPackage",
       "name": "axon-os",
       "versionInfo": "${VERSION}",
-      "downloadLocation": "https://github.com/kaorii-ako/Axon-OS",
+      "downloadLocation": "https://github.com/ProjectDEV-git/Axon-OS",
       "filesAnalyzed": false,
       "primaryPackagePurpose": "OPERATING-SYSTEM"
     }

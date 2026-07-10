@@ -6,7 +6,7 @@ If you discover a security vulnerability in Axon OS, please **do not** open a pu
 
 ### Reporting Process
 
-1. **Email:** Send a detailed report to [security@axon-os.local] (or contact via GitHub)
+1. **Email:** Send a detailed report to [projectdev.hq@gmail.com](mailto:projectdev.hq@gmail.com) (or contact via GitHub)
 2. **Include:**
    - Description of the vulnerability
    - Steps to reproduce
@@ -48,7 +48,7 @@ When using Axon OS:
 
 ## Security Contacts
 
-- **GitHub:** [@kaorii-ako](https://github.com/kaorii-ako)
-- **Website:** [Axon OS](https://github.com/kaorii-ako/Axon-OS)
+- **GitHub:** [@ProjectDEV-git](https://github.com/ProjectDEV-git)
+- **Website:** [Axon OS](https://github.com/ProjectDEV-git/Axon-OS)
 
 Thank you for helping keep Axon OS secure!

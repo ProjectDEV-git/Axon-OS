@@ -623,9 +623,9 @@ VERSION_CODENAME=${CODENAME,,}
 ID=axonos
 ID_LIKE="ubuntu debian"
 UBUNTU_CODENAME=noble
-HOME_URL="https://github.com/kaorii-ako/Axon-OS"
-SUPPORT_URL="https://github.com/kaorii-ako/Axon-OS/issues"
-BUG_REPORT_URL="https://github.com/kaorii-ako/Axon-OS/issues"
+HOME_URL="https://github.com/ProjectDEV-git/Axon-OS"
+SUPPORT_URL="https://github.com/ProjectDEV-git/Axon-OS/issues"
+BUG_REPORT_URL="https://github.com/ProjectDEV-git/Axon-OS/issues"
 LOGO=axon-os
 EOF
 

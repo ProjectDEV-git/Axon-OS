@@ -1,7 +1,7 @@
 # Axon OS
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Build & Lint](https://github.com/kaorii-ako/Axon-OS/actions/workflows/build.yml/badge.svg)](https://github.com/kaorii-ako/Axon-OS/actions/workflows/build.yml)
+[![Build & Lint](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build.yml/badge.svg)](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build.yml)
 
 Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 24.04 LTS. Every AI capability runs entirely on-device through Ollama — no cloud accounts, no API keys, no data leaving your machine.
 
@@ -44,7 +44,7 @@ The operating system is built around two centralized D-Bus services — **Axon B
 
 ### From ISO (recommended)
 
-1. Download the latest `.iso` from the [Releases](https://github.com/kaorii-ako/Axon-OS/releases) page, or grab a fresh build from the latest [Build ISO workflow run](https://github.com/kaorii-ako/Axon-OS/actions/workflows/build-iso.yml) (Artifacts → `axon-os-iso`).
+1. Download the latest `.iso` from the [Releases](https://github.com/ProjectDEV-git/Axon-OS/releases) page, or grab a fresh build from the latest [Build ISO workflow run](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build-iso.yml) (Artifacts → `axon-os-iso`).
 2. Flash to a USB drive (replace `/dev/sdX` with your device):
    ```bash
    sudo dd if=axon-os.iso of=/dev/sdX bs=4M status=progress oflag=sync
@@ -55,7 +55,7 @@ The operating system is built around two centralized D-Bus services — **Axon B
 
 ```bash
 # Clone the repository
-git clone https://github.com/kaorii-ako/Axon-OS.git
+git clone https://github.com/ProjectDEV-git/Axon-OS.git
 cd Axon-OS
 
 # Install system dependencies

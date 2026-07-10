@@ -9,7 +9,7 @@ updates:
       time: "03:00"
     open-pull-requests-limit: 5
     reviewers:
-      - "kaorii-ako"
+      - "ProjectDEV-git"
     labels:
       - "dependencies"
       - "python"
@@ -27,7 +27,7 @@ updates:
       day: "monday"
       time: "04:00"
     reviewers:
-      - "kaorii-ako"
+      - "ProjectDEV-git"
     labels:
       - "dependencies"
       - "ci"

@@ -24,7 +24,7 @@ sudo apt-get install -y \
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/kaorii-ako/Axon-OS.git
+git clone https://github.com/ProjectDEV-git/Axon-OS.git
 cd Axon-OS
 
 # 2. Run the main build script (root required for debootstrap/chroot)

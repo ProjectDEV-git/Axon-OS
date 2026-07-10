@@ -126,7 +126,7 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys home "['<Super>e']" |
 # ollama.service) for proper lifecycle management (restart on crash,
 # graceful shutdown). This background-process approach is a temporary
 # workaround until a systemd unit is shipped with Ollama or added to the
-# Axon OS service layer. See: https://github.com/kaorii-ako/Axon-OS/issues
+# Axon OS service layer. See: https://github.com/ProjectDEV-git/Axon-OS/issues
 if command -v ollama &>/dev/null; then
     if ! pgrep -x ollama &>/dev/null; then
         ollama serve &>/dev/null &
