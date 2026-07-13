@@ -121,4 +121,6 @@ def to_gvariant(value: object) -> str:
         return str(value)
     if isinstance(value, list):
         return json.dumps(value).replace('"', "'")
-    return f"'{value!s}'" if not str(value).startswith("'") else str(value)
+    # Escape single quotes to prevent GVariant injection
+    escaped = str(value).replace("\\", "\\\\").replace("'", "\\'")
+    return f"'{escaped}'"
