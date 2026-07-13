@@ -37,6 +37,7 @@ logger = configure_app_logger("axon-context")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
+from service_utils import rate_limited
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from clipboard_store import ClipboardStore
@@ -115,6 +116,7 @@ class ContextService(ServiceBase):
         with self._clipboard_lock:
             return list(self._clipboard_history)
 
+    @rate_limited(rate=60, window_seconds=60)
     @dbus.service.method("org.axonos.Context", in_signature="", out_signature="s")
     def GetActiveContext(self):
         """Aggregates all current session context into a JSON string."""
@@ -128,6 +130,7 @@ class ContextService(ServiceBase):
         }
         return json.dumps(context)
 
+    @rate_limited(rate=30, window_seconds=60)
     @dbus.service.method("org.axonos.Context", in_signature="", out_signature="s")
     def GetContextString(self):
         """Formats context for injection into LLM system prompts."""
@@ -170,6 +173,7 @@ class ContextService(ServiceBase):
 
         return "\n".join(parts)
 
+    @rate_limited(rate=20, window_seconds=60)
     @dbus.service.method("org.axonos.Context", in_signature="s", out_signature="s")
     def SemanticSearch(self, query_text):
         """Performs vector search in the indexed documents using sqlite-vec."""
