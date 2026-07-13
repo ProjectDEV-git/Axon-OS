@@ -30,6 +30,20 @@
 | 20 | Dead code removed (_sanitize_command, unused imports) | Fact 1 | 0b97afc |
 | 21 | _log_helper migration (service_base, brain, ai_router, telemetry) | Fact 2 | 12b1bac, 7eb019e |
 | 22 | 4 pre-existing test failures resolved | Tests | f47dcf8 |
+| 23 | Escape single quotes in to_gvariant | M9 | 637d86f |
+| 24 | Extend FileIndexer._lock to full DB transactions | C4 | f06c726 |
+| 25 | Add start_new_session=True to safe_exec Popen | H3 | f06c726 |
+| 26 | Filter sensitive paths from /proc scanning | H4 | f06c726 |
+| 27 | Class-level _write_lock for JSONL writes | H6 | f06c726 |
+| 28 | Periodic rebuild of _watch_loop known dict | H7 | f06c726 |
+| 29 | Unlink temp file on early return (voice) | M1 | f06c726 |
+| 30 | chmod 0o600 on temp audio files | M3 | f06c726 |
+| 31 | Store stdout ref to prevent GC (clipboard) | M4 | f06c726 |
+| 32 | Prune terminal cache mtime dict | M5 | f06c726 |
+| 33 | Guard sys.path.insert calls (11 files) | M6 | f06c726 |
+| 34 | Reject empty-segment bus names | L3 | f06c726 |
+| 35 | Rate-limit SearchCatalog method | L4 | f06c726 |
+| 36 | Log exceptions in audit rule matching | L10 | f06c726 |
 
 ## Summary
 
