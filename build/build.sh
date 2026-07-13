@@ -244,7 +244,7 @@ Acquire::ForceIPv4 "true";
 Acquire::Retries "3";
 Acquire::http::Pipeline-Depth "0";
 APTEOF
-    sed -i 's|http://archive.ubuntu.com/ubuntu/|http://us.archive.ubuntu.com/ubuntu/|g' "${CHROOT}/etc/apt/sources.list"
+    sed -i 's|http://archive.ubuntu.com/ubuntu/|https://us.archive.ubuntu.com/ubuntu/|g' "${CHROOT}/etc/apt/sources.list"
 }
 
 # ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # ---------------------------------------------------------------------------
 DIST="noble"
 ARCH="amd64"
-MIRROR="http://us.archive.ubuntu.com/ubuntu/"
+MIRROR="https://us.archive.ubuntu.com/ubuntu/"
 
 WORK_DIR="${AXON_BUILD_DIR:-/tmp/axon-build}"
 CHROOT="${WORK_DIR}/chroot"
