@@ -44,6 +44,11 @@
 | 34 | Reject empty-segment bus names | L3 | f06c726 |
 | 35 | Rate-limit SearchCatalog method | L4 | f06c726 |
 | 36 | Log exceptions in audit rule matching | L10 | f06c726 |
+| 37 | f-string logger to %s formatting | L2 | 2de1fe0 |
+| 38 | Unicode NFKD normalization in injection filter | L5 | 2de1fe0 |
+| 39 | Lazy i18n _() to avoid import side effect | L7 | 2de1fe0 |
+| 40 | Thread-safe sample plugin counter | L8 | 2de1fe0 |
+| 41 | D-Bus Generate arg mismatch fallback | L12 | 2de1fe0 |
 
 ## Summary
 
