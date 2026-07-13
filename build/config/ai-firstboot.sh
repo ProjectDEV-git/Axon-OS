@@ -37,15 +37,13 @@ if ! curl -sf --max-time 5 https://ollama.com >/dev/null 2>&1; then
     exit 0
 fi
 
-if ! command -v ollama >/dev/null 2>&1; then
-    echo "installing Ollama..."
-    # SECURITY: curl | sh executes remote code without integrity verification.
+echo "installing Ollama (idempotent — safe to re-run)..."
+# SECURITY: curl | sh executes remote code without integrity verification.
 # TODO: pin a SHA-256 hash of the installer and verify before execution.
 # See: https://cheatsheetseries.owasp.org/cheatsheets/Secure\_Command\_Execution\_Cheat\_Sheet.html
 if ! curl -fsSL https://ollama.com/install.sh | sh; then
         echo "Ollama install failed — will retry on next boot"
         exit 0
-    fi
 fi
 
 systemctl enable --now ollama.service 2>/dev/null || true

@@ -32,12 +32,7 @@ detect_gpu() {
 # Downloads and installs Ollama unless already present.
 # ---------------------------------------------------------------------------
 install_ollama() {
-    if command -v ollama &>/dev/null; then
-        echo "[axon] Ollama already installed — skipping download."
-        return 0
-    fi
-
-    echo "[axon] Installing Ollama..."
+    echo "[axon] Installing Ollama (idempotent — safe to re-run)..."
 # SECURITY: curl | sh executes remote code without integrity verification.
 # TODO: pin a SHA-256 hash of the installer and verify before execution.
     curl -fsSL https://ollama.com/install.sh | sh

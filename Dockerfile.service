@@ -8,14 +8,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-dbus \
-    python3-gi \
+    libglib2.0-dev \
+    libdbus-1-dev \
+    libcairo2-dev \
+    pkg-config \
     gir1.2-gtk-4.0 \
     gir1.2-adw-1 \
     gir1.2-vte-2.91 \
-    libglib2.0-0 \
-    libdbus-1-3 \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Python bindings via pip so they match the container's Python 3.12
+RUN pip install --no-cache-dir dbus-python PyGObject
 
 WORKDIR /app
 
