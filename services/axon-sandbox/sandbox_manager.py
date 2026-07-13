@@ -271,6 +271,10 @@ if __name__ == "__main__":
         import logging
 
         logging.getLogger("axon-sandbox").info("Received signal %d, shutting down...", signum)
+        try:
+            service._cleanup()
+        except Exception:
+            pass
         loop.quit()
 
     signal.signal(signal.SIGTERM, _shutdown)
@@ -278,7 +282,4 @@ if __name__ == "__main__":
     try:
         loop.run()
     except KeyboardInterrupt:
-        import logging
-
-        logging.getLogger("axon-sandbox").info("Stopping Axon Sandbox Manager...")
         loop.quit()
