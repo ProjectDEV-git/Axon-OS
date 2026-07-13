@@ -24,6 +24,7 @@ from gi.repository import GLib
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from constants import AXON_DIR, EMBED_MODEL, RESCAN_INTERVAL, SEMANTIC_INDEX_DB
+from service_utils import rate_limited
 
 from axon_logger import configure_app_logger
 
@@ -351,6 +352,7 @@ class SearchService(ServiceBase):
     # D-Bus API
     # ------------------------------------------------------------------
 
+    @rate_limited(rate=30, window_seconds=60)
     @dbus.service.method("org.axonos.Search", in_signature="si", out_signature="s")
     def Query(self, query, limit):
         """Semantic (vector) search with FTS5 keyword fallback.
