@@ -14,24 +14,7 @@ import sys
 import threading
 from pathlib import Path
 
-try:
-    from axon_logger import configure_app_logger
-except ImportError:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    try:
-        from axon_logger import configure_app_logger
-    except ImportError:
-        import logging as _logging
-
-        def configure_app_logger(
-            name: str,
-            level: int = _logging.INFO,
-            log_file: str | None = None,
-            json_output: bool = False,
-        ) -> _logging.Logger:
-            _logging.basicConfig(level=level)
-            return _logging.getLogger(name)
-
+from _log_helper import resolve_logger as configure_app_logger
 
 log = configure_app_logger("ai-router")
 
