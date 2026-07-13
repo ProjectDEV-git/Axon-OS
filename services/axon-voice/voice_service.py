@@ -75,6 +75,15 @@ class VoiceService(ServiceBase):
         # TTS engine cached choice (env var overrides)
         self._tts_engine = os.environ.get("AXON_TTS_ENGINE", "")
 
+    def _cleanup(self):
+        """Kill recorder subprocess on shutdown."""
+        if self._recorder is not None:
+            try:
+                self._recorder.kill()
+                self._recorder.wait(timeout=2)
+            except Exception:
+                pass
+
     # ------------------------------------------------------------------
     # D-Bus API
     # ------------------------------------------------------------------
@@ -442,24 +451,4 @@ class VoiceService(ServiceBase):
 
 
 if __name__ == "__main__":
-    import signal
-
-    loop = GLib.MainLoop()
-    service = VoiceService()
-
-    def _shutdown(signum, frame):
-        log.info("Received signal %d, shutting down...", signum)
-        if service._recorder:
-            try:
-                service._recorder.kill()
-                service._recorder.wait(timeout=2)
-            except Exception:
-                pass
-        loop.quit()
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-    try:
-        loop.run()
-    except KeyboardInterrupt:
-        loop.quit()
+    VoiceService.main()

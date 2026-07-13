@@ -148,6 +148,10 @@ class BrainService(ServiceBase):
             max_tokens=10,
         )
 
+    def _cleanup(self):
+        """Close DB connection pool on shutdown."""
+        self.store.close_all()
+
     def save_config(self):
         """Saves current configuration to TOML format atomically."""
         with self._config_lock:
@@ -720,22 +724,4 @@ class BrainService(ServiceBase):
 
 
 if __name__ == "__main__":
-    import signal
-
-    # Start loop
-    loop = GLib.MainLoop()
-    service = BrainService()
-
-    def _shutdown(signum, frame):
-        logger.info("Received signal %d, shutting down...", signum)
-        if hasattr(service, 'store') and hasattr(service.store, 'close_all'):
-            service.store.close_all()
-        loop.quit()
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-    try:
-        loop.run()
-    except KeyboardInterrupt:
-        logger.info("Stopping Axon Brain service...")
-        loop.quit()
+    BrainService.main()

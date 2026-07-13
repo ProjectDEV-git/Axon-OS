@@ -82,6 +82,15 @@ class AdvancedVoiceService(ServiceBase):
         self._record_timeout_id = 0
         self._vosk_model_path = None
 
+    def _cleanup(self):
+        """Kill recorder subprocess on shutdown."""
+        if self._recorder is not None:
+            try:
+                self._recorder.kill()
+                self._recorder.wait(timeout=2)
+            except Exception:
+                pass
+
     # ------------------------------------------------------------------
     # D-Bus API
     # ------------------------------------------------------------------
@@ -547,24 +556,4 @@ class AdvancedVoiceService(ServiceBase):
 
 
 if __name__ == "__main__":
-    import signal
-
-    loop = GLib.MainLoop()
-    service = AdvancedVoiceService()
-
-    def _shutdown(signum, frame):
-        log.info("Received signal %d, shutting down...", signum)
-        if service._recorder is not None:
-            try:
-                service._recorder.kill()
-                service._recorder.wait(timeout=2)
-            except Exception:
-                pass
-        loop.quit()
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-    try:
-        loop.run()
-    except KeyboardInterrupt:
-        loop.quit()
+    AdvancedVoiceService.main()

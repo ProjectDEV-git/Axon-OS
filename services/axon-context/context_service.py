@@ -273,7 +273,7 @@ class ContextService(ServiceBase):
         GLib.timeout_add_seconds(2, self._poll_xclip)
         logger.info("Clipboard watcher started (X11/xclip polling)")
 
-    def cleanup(self):
+    def _cleanup(self):
         """Terminate the clipboard watcher subprocess and close DB connections on shutdown."""
         if self._clipboard_store is not None:
             try:
@@ -477,23 +477,4 @@ class ContextService(ServiceBase):
 
 
 if __name__ == "__main__":
-    import signal
-
-    loop = GLib.MainLoop()
-    service = ContextService()
-
-    def _shutdown(signum, frame):
-        logger.info("Received signal %d, shutting down...", signum)
-        service.cleanup()
-        loop.quit()
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-    try:
-        loop.run()
-    except KeyboardInterrupt:
-        logger = configure_app_logger(__name__)
-        logger.info("Stopping Axon Context service...")
-    finally:
-        service.cleanup()
-        loop.quit()
+    ContextService.main()
