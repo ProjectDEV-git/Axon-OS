@@ -22,7 +22,7 @@ class ClipboardStore:
         self.db_path = db_path
         self.max_entries = max_entries
         self.max_entry_len = max_entry_len
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._local = threading.local()
         self._all_connections: list[sqlite3.Connection] = []
         self._init_db()

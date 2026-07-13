@@ -112,10 +112,12 @@ class TestClipboardStore(unittest.TestCase):
 
     def test_clear_removes_unpinned(self):
         store = self._make_store()
-        store.add("Keep this")
         store.add("Remove this")
-        entry_id = store.get_recent(10)[0]["id"]  # most recent
-        store.pin(entry_id)
+        store.add("Keep this")
+        # Pin "Keep this" (last added, second in recent order)
+        entries = store.get_recent(10)
+        keep_id = [e["id"] for e in entries if e["content"] == "Keep this"][0]
+        store.pin(keep_id)
         store.clear()
         remaining = store.get_recent(10)
         self.assertEqual(len(remaining), 1)
@@ -189,7 +191,8 @@ class TestConnectionPooling(unittest.TestCase):
 
     def test_close_all_closes_everything(self):
         store = self._make_store()
-        # Create connections from multiple threads
+        initial_count = len(store._all_connections)  # 1 from _init_db
+        # Create connections from 5 additional threads
         conns = []
 
         def grab_conn():
@@ -202,7 +205,8 @@ class TestConnectionPooling(unittest.TestCase):
             t.join()
 
         self.assertEqual(len(conns), 5)
-        self.assertEqual(len(store._all_connections), 5)
+        # 1 from init + 5 from threads = 6
+        self.assertEqual(len(store._all_connections), initial_count + 5)
 
         store.close_all()
 
