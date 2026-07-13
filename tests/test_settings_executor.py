@@ -141,18 +141,14 @@ class TestExecuteCommand:
             result = executor.execute_command("mute sound")
         assert result["success"] is True
 
-    def test_set_volume_out_of_range_falls_to_amixer(self):
+    def test_set_volume_out_of_range_fails(self):
         brain = MagicMock()
         brain.Generate.return_value = json.dumps({"action": "set_volume", "value": 150})
         executor = self._make_executor(brain_mock=brain)
-        # Volume 150 fails range check in pactl path, falls through to amixer
-        # which succeeds with mock — this tests the fallback path works
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
-            result = executor.execute_command("max volume")
-        # The fallback amixer path succeeds, so overall success is True
-        assert result["success"] is True
-        assert "150" in result["message"]
+        # Volume 150 fails range check (0-100) and returns error
+        result = executor.execute_command("max volume")
+        assert result["success"] is False
+        assert "150" in result["message"] or "volume" in result["message"].lower()
 
     def test_set_wifi_on(self):
         brain = MagicMock()

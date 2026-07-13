@@ -16,7 +16,7 @@ def _valid_config():
         "user": {
             "full_name": "Ada Lovelace",
             "username": "ada",
-            "password": "hunter2",
+            "password": "hunter22",
             "hostname": "axon",
         },
         "ai": {

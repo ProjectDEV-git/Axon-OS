@@ -18,7 +18,7 @@ class ConversationStore:
         # Ensure directory exists with restricted permissions
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._local = threading.local()
         # Track every connection ever created so close_all() can reach
         # thread-local connections whose owning thread has already exited.
