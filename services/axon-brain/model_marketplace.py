@@ -371,7 +371,7 @@ class ModelMarketplaceService(ServiceBase):
                         completed = data.get("completed", 0)
                         total = data.get("total", 0)
                         progress = int(completed / total * 100) if total > 0 else -1
-                        self.PullProgress(model_name, status, progress)
+                        GLib.idle_add(self.PullProgress, model_name, status, progress)
                         with self._lock:
                             if model_name in self._downloads:
                                 self._downloads[model_name]["status"] = status

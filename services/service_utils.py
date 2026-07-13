@@ -274,10 +274,6 @@ def rate_limited(rate: int = 100, window_seconds: int = 60) -> Callable:
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            from axon_logger import configure_app_logger
-
-            logger = configure_app_logger(__name__)
-
             # Use sender info if available from D-Bus context
             identifier = getattr(self, "sender", "default")
             if not limiter.allow(identifier):
