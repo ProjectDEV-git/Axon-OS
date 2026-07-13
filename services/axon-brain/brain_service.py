@@ -688,7 +688,8 @@ class BrainService(ServiceBase):
             return "[Error: AI generation unavailable]"
 
     def _do_generate_stream(self, tx_id, prompt, system, model):
-        cancel_flag = self._active_streams.get(tx_id)
+        with self._streams_lock:
+            cancel_flag = self._active_streams.get(tx_id)
         try:
             payload = {"model": model, "prompt": prompt, "stream": True}
             if system:
@@ -745,7 +746,8 @@ class BrainService(ServiceBase):
             return "[Error: AI chat unavailable]"
 
     def _do_chat_stream(self, tx_id, conv_id, context, model):
-        cancel_flag = self._active_streams.get(tx_id)
+        with self._streams_lock:
+            cancel_flag = self._active_streams.get(tx_id)
         messages = self.store.get_messages(conv_id)
         api_msgs = [{"role": m["role"], "content": m["content"]} for m in messages]
         system_prompt = CHAT_SYSTEM_PROMPT
