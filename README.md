@@ -71,9 +71,31 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 > **Note**: Running from source requires an existing Ubuntu 24.04 GNOME session.
 
-## Building
+## Building the ISO
 
-Full build instructions — including how to produce a bootable ISO with the custom installer and Plymouth splash — are documented in [docs/building.md](docs/building.md).
+```bash
+# Full build (requires sudo)
+sudo bash build/build.sh
+
+# Quick rebuild — reuse existing chroot, skip debootstrap
+sudo bash build/build.sh --quick
+
+# Ultra-fast rebuild — quick + gzip compression (3-5x faster)
+sudo bash build/build.sh --fast
+
+# Force full clean rebuild from scratch
+sudo bash build/build.sh --fresh
+
+# Keep chroot after build for debugging
+sudo bash build/build.sh --keep-chroot
+
+# Combine flags
+sudo bash build/build.sh --quick --keep-chroot
+```
+
+The output ISO is written to `/tmp/axon-build/axon-os-<version>-amd64.iso`.
+
+Full build documentation — including custom installer, Plymouth splash, and CI details — is in [docs/building.md](docs/building.md).
 
 ## Architecture
 
