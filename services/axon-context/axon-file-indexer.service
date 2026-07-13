@@ -7,6 +7,12 @@ Type=simple
 ExecStart=/usr/bin/python3 AXON_SERVICES_DIR/axon-context/file_indexer.py
 Restart=on-failure
 RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 
 [Install]
 WantedBy=default.target

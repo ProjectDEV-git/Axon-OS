@@ -11,6 +11,12 @@ Restart=on-failure
 RestartSec=3
 Nice=10
 IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 
 [Install]
 WantedBy=default.target

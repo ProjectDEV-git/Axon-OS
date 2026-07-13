@@ -9,6 +9,12 @@ BusName=org.axonos.Brain
 ExecStart=/usr/bin/python3 AXON_SERVICES_DIR/axon-brain/brain_service.py
 Restart=on-failure
 RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 
 [Install]
 WantedBy=default.target
