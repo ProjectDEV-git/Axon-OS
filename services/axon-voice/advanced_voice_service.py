@@ -198,7 +198,10 @@ class AdvancedVoiceService(ServiceBase):
     @dbus.service.method("org.axonos.AdvancedVoice", out_signature="s")
     def GetPartialTranscript(self):
         """Get current partial (streaming) transcript."""
-        return self._partial_transcript
+        # FIX: Read _partial_transcript under lock to avoid data race
+        # with the transcription thread writing partial results.
+        with self._lock:
+            return self._partial_transcript
 
     @dbus.service.method("org.axonos.AdvancedVoice", in_signature="s", out_signature="b")
     def Speak(self, text):

@@ -107,24 +107,32 @@ class VoiceService(ServiceBase):
 
     @dbus.service.method("org.axonos.Voice", in_signature="", out_signature="b")
     def IsListening(self):
-        return self._recorder is not None
+        # FIX: Read _recorder under lock to avoid data race with
+        # _start_recording/_stop_and_process running on the GLib thread.
+        with self._lock:
+            return self._recorder is not None
 
     @dbus.service.method("org.axonos.Voice", in_signature="", out_signature="b")
     def StartAmbient(self):
         """Begin ambient listening (VAD-based wake capture)."""
-        if self._ambient_thread and self._ambient_thread.is_alive():
-            return False
-        self._ambient_stop.clear()
-        self._ambient_thread = threading.Thread(target=self._ambient_loop, daemon=True)
-        self._ambient_thread.start()
+        # FIX: Read and update _ambient_thread under lock to avoid race conditions
+        # with concurrent Toggle/StartAmbient calls from D-Bus clients.
+        with self._lock:
+            if self._ambient_thread and self._ambient_thread.is_alive():
+                return False
+            self._ambient_stop.clear()
+            self._ambient_thread = threading.Thread(target=self._ambient_loop, daemon=True)
+            self._ambient_thread.start()
         return True
 
     @dbus.service.method("org.axonos.Voice", in_signature="", out_signature="b")
     def StopAmbient(self):
         """Stop ambient listening."""
-        if not self._ambient_thread:
-            return False
-        self._ambient_stop.set()
+        # FIX: Check _ambient_thread under lock to avoid race with StartAmbient.
+        with self._lock:
+            if not self._ambient_thread:
+                return False
+            self._ambient_stop.set()
         return True
 
     @dbus.service.signal("org.axonos.Voice", signature="s")

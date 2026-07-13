@@ -119,19 +119,21 @@ def sandbox_command(target_cmd: list, no_net: bool) -> list:
     writable /tmp and current directory untouched (also read-only).
     """
     home = str(Path.home())
+    # FIX: Bind specific directories instead of entire root filesystem (--ro-bind / /)
+    # to reduce attack surface. Sandboxed processes can only access system binaries,
+    # libraries, config, and process/device info — not arbitrary root-level paths.
     cmd = [
         "bwrap",
-        "--ro-bind",
-        "/",
-        "/",
-        "--dev",
-        "/dev",
-        "--proc",
-        "/proc",
-        "--tmpfs",
-        "/tmp",
-        "--tmpfs",
-        "/run",
+        "--ro-bind", "/usr", "/usr",
+        "--ro-bind", "/etc", "/etc",
+        "--symlink", "usr/lib", "/lib",
+        "--symlink", "usr/lib64", "/lib64",
+        "--symlink", "usr/bin", "/bin",
+        "--symlink", "usr/sbin", "/sbin",
+        "--dev", "/dev",
+        "--proc", "/proc",
+        "--tmpfs", "/tmp",
+        "--tmpfs", "/run",
         "--ro-bind",
         home,
         home,

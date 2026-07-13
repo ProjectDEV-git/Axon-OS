@@ -98,6 +98,15 @@ class ClipboardStore:
         if not content or not content.strip():
             return False
 
+        # FIX: Truncate by bytes instead of codepoints to avoid panicking on
+        # multi-byte UTF-8 characters that straddle the truncation boundary.
+        # Encode to UTF-8, slice at the byte limit, then decode with error
+        # handling so no partial character can cause a UnicodeDecodeError.
+        max_bytes = self.max_entry_len * 4  # UTF-8: at most 4 bytes per codepoint
+        encoded = content.encode("utf-8")
+        if len(encoded) > max_bytes:
+            content = encoded[:max_bytes].decode("utf-8", errors="ignore")
+        # Also cap by character count for display/API consistency
         content = content[: self.max_entry_len].strip()
 
         with self._lock:

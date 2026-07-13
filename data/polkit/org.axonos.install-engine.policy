@@ -13,6 +13,10 @@
     <defaults>
       <allow_any>auth_admin</allow_any>
       <allow_inactive>auth_admin</allow_inactive>
+      <!-- SECURITY: allow_active=yes is intentional — the installer only runs
+           from a live ISO session where the user is already root-equivalent
+           and there is no admin password to prompt for. Remote/headless
+           sessions still require admin auth via allow_inactive/allow_any. -->
       <allow_active>yes</allow_active>
     </defaults>
     <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/axon-install-engine</annotate>
