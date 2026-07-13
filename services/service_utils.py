@@ -164,6 +164,7 @@ class TTLCache:
         """Store value in cache with current timestamp.
 
         Evicts expired entries when the cache exceeds MAX_ENTRIES.
+        If still over capacity after expired cleanup, evicts oldest entries.
 
         Args:
             key: Cache key to store.
@@ -172,6 +173,12 @@ class TTLCache:
         with self._lock:
             if len(self.cache) >= self._MAX_ENTRIES:
                 self._evict_expired()
+            # If still over cap after expired cleanup, evict oldest by timestamp
+            if len(self.cache) >= self._MAX_ENTRIES:
+                oldest_keys = sorted(self.cache, key=lambda k: self.cache[k][1])
+                excess = len(self.cache) - self._MAX_ENTRIES + 1
+                for k in oldest_keys[:excess]:
+                    del self.cache[k]
             self.cache[key] = (value, time.time())
 
     def clear(self) -> None:

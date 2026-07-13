@@ -85,6 +85,21 @@ class TestTTLCache:
         cache.set("k", "new")
         assert cache.get("k") == "new"
 
+    def test_max_entries_lru_eviction(self):
+        """Cache evicts oldest entries when all are still valid (not expired)."""
+        cache = TTLCache(ttl_seconds=3600)  # long TTL so nothing expires
+        cache._MAX_ENTRIES = 10  # small cap for testing
+        for i in range(15):
+            cache.set(f"key{i}", f"val{i}")
+        # Should have at most 10 entries
+        assert len(cache.cache) <= 10
+        # Most recent entries should survive
+        assert cache.get("key14") == "val14"
+        assert cache.get("key13") == "val13"
+        # Oldest entries should be evicted
+        assert cache.get("key0") is None
+        assert cache.get("key4") is None
+
 
 class TestRateLimiter:
     def test_allows_under_limit(self):
