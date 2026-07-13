@@ -1,11 +1,17 @@
 [Unit]
 Description=Axon OS boot watchdog — mark boot successful
-After=display-manager.service
-Wants=display-manager.service
+After=display-manager.service gdm.service graphical.target
+# NOTE: Do NOT add Wants=display-manager.service — it forces systemd to
+# pull in the display manager, which fails in live sessions where the
+# display-manager.service alias is absent.
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/axon-boot-ok
+# Always succeed — a boot-ok failure must never block boot.
+SuccessExitStatus=0 1 2
+StandardOutput=journal
+StandardError=journal
 
 [Install]
-WantedBy=graphical.target
+WantedBy=graphical.target multi-user.target
