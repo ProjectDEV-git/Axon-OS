@@ -6,8 +6,10 @@ import re
 import sys
 import types
 
-# We need to mock dbus before importing
 import pytest
+
+# gi.repository (GLib) is only available on Linux with GTK installed
+pytest.importorskip("gi", reason="Requires PyGObject (Linux only)")
 
 
 @pytest.fixture(autouse=True)
