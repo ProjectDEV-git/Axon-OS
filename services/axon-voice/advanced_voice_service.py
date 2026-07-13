@@ -24,12 +24,16 @@ import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
 from service_base import ServiceBase
 
 from _log_helper import resolve_logger as configure_app_logger
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_this = str(Path(__file__).resolve().parent)
+if _this not in sys.path:
+    sys.path.insert(0, _this)
 from constants import MAX_RECORD_SECONDS, WHISPER_DIR
 
 log = configure_app_logger("axon-advanced-voice", level=logging.INFO)
@@ -313,6 +317,7 @@ class AdvancedVoiceService(ServiceBase):
     def _start_recording(self):
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             self._wav_path = tmp.name
+        os.chmod(self._wav_path, 0o600)
         cmd = self._recorder_command(self._wav_path)
         if not cmd:
             try:

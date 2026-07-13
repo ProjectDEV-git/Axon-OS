@@ -21,9 +21,12 @@ from gi.repository import GLib
 
 from _log_helper import resolve_logger as configure_app_logger
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_this = str(Path(__file__).resolve().parent)
+if _this not in sys.path:
+    sys.path.insert(0, _this)
 from constants import AXON_DIR, OLLAMA_BASE_URL
 from service_base import ServiceBase
+from service_utils import rate_limited
 
 log = configure_app_logger("axon-marketplace", level=__import__("logging").INFO)
 
@@ -197,6 +200,7 @@ class ModelMarketplaceService(ServiceBase):
         """Return the full model catalog as JSON."""
         return json.dumps(self._catalog)
 
+    @rate_limited(rate=200, window_seconds=60)
     @dbus.service.method("org.axonos.ModelMarketplace", in_signature="s", out_signature="s")
     def SearchCatalog(self, query):
         """Search catalog by name, description, or tags."""

@@ -22,7 +22,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_this = str(Path(__file__).resolve().parent)
+if _this not in sys.path:
+    sys.path.insert(0, _this)
 import audit_v2 as audit
 
 AI_AUDIT_TIMEOUT = 25  # seconds; the shield never hard-blocks on the AI

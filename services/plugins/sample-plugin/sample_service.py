@@ -7,7 +7,9 @@ To install: place this directory under ~/.local/share/axon/plugins/
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+_plugin_parent = str(Path(__file__).resolve().parents[1])
+if _plugin_parent not in sys.path:
+    sys.path.insert(0, _plugin_parent)
 
 import dbus
 from service_base import ServiceBase

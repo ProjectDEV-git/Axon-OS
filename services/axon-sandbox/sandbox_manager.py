@@ -16,7 +16,9 @@ gi.require_version("Gdk", "4.0")
 from gi.repository import Gdk, GLib, Gtk
 
 # Ensure we can load axon_logger
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
 from service_base import ServiceBase
 
 

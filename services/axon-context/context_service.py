@@ -19,11 +19,15 @@ from service_base import ServiceBase
 
 logger = configure_app_logger("axon-context")
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+_parent = str(Path(__file__).resolve().parents[1])
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
 from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
 from service_utils import rate_limited
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_this = str(Path(__file__).resolve().parent)
+if _this not in sys.path:
+    sys.path.insert(0, _this)
 from clipboard_store import ClipboardStore
 
 
@@ -240,8 +244,9 @@ class ContextService(ServiceBase):
             )
             # Read clipboard changes in a GLib IO watch
             if self._clipboard_watcher.stdout is not None:
+                self._stdout_ref = self._clipboard_watcher.stdout  # prevent GC
                 self._clipboard_watch_id = GLib.io_add_watch(
-                    self._clipboard_watcher.stdout.fileno(),
+                    self._stdout_ref.fileno(),
                     GLib.IO_IN | GLib.IO_HUP,
                     self._on_clipboard_data,
                 )
@@ -352,6 +357,10 @@ class ContextService(ServiceBase):
 
         unique_paths = []
         seen = set()
+        # Filter patterns: paths containing these substrings are excluded
+        # to prevent leaking SSH keys, credentials, env files, etc.
+        _SENSITIVE = {'.ssh', '.gnupg', '.env', 'credentials', 'password',
+                      '.netrc', '.git-credentials', 'secret', 'token'}
         for pid in found_pids:
             fd_dir = Path(f"/proc/{pid}/fd")
             try:
@@ -368,7 +377,9 @@ class ContextService(ServiceBase):
                             continue
                     except OSError:
                         continue
-                    if target not in seen:
+                    if target not in seen and not any(
+                        s in target.lower() for s in _SENSITIVE
+                    ):
                         seen.add(target)
                         unique_paths.append(target)
                     if len(unique_paths) >= 10:
@@ -418,6 +429,11 @@ class ContextService(ServiceBase):
         commands = self._read_history_file(active_path)
         self._terminal_cache = commands
         self._terminal_cache_mtime[cache_key] = active_mtime
+        # Prune: keep only the 5 most recently accessed entries
+        if len(self._terminal_cache_mtime) > 5:
+            oldest = sorted(self._terminal_cache_mtime, key=self._terminal_cache_mtime.get)
+            for k in oldest[:-5]:
+                self._terminal_cache_mtime.pop(k, None)
         return commands[-n:]
 
     def _read_history_file(self, path, max_lines=50):

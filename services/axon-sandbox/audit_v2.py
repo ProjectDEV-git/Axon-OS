@@ -435,8 +435,8 @@ def analyze_script_ast(text: str) -> list[Finding]:
                                     source="ast",
                                 )
                             )
-                except Exception:
-                    pass  # Don't let rule errors break analysis
+                except Exception as e:
+                    logging.getLogger(__name__).debug("Rule %s failed: %s", rule.name, e)
             current = current.pipe_next
 
     # Phase 3: Obfuscation detection

@@ -103,7 +103,7 @@ def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
 
     defaults: dict[str, Any] = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     defaults.update(kwargs)
-    return subprocess.Popen(parts, **defaults)
+    return subprocess.Popen(parts, start_new_session=True, **defaults)
 
 
 def error_response(message: str, code: str = "UNKNOWN") -> str:

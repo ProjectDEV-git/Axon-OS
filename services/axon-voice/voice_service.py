@@ -27,13 +27,17 @@ import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
 from constants import MAX_RECORD_SECONDS, WHISPER_DIR
 from service_utils import safe_exec
 
 from _log_helper import resolve_logger as configure_app_logger
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_this = str(Path(__file__).resolve().parent)
+if _this not in sys.path:
+    sys.path.insert(0, _this)
 from intent_router import clean_transcript, parse_intent_response
 from service_base import ServiceBase
 from vad_helper import is_speech_wav
@@ -153,8 +157,13 @@ class VoiceService(ServiceBase):
     def _start_recording(self):
         fd, wav_path = tempfile.mkstemp(prefix="axon-voice-", suffix=".wav")
         os.close(fd)
+        os.chmod(wav_path, 0o600)
         cmd = self._recorder_command(wav_path)
         if cmd is None:
+            try:
+                os.unlink(wav_path)
+            except OSError:
+                pass
             self._notify(
                 "Axon Voice",
                 "No microphone recorder found (install pulseaudio-utils or alsa-utils).",

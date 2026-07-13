@@ -25,8 +25,12 @@ from _log_helper import resolve_logger as configure_app_logger
 logger = configure_app_logger("axon-brain")
 
 # Ensure we can import hardware_profiler and conversation_store
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+_from_services = str(Path(__file__).resolve().parent)
+if _from_services not in sys.path:
+    sys.path.insert(0, _from_services)
 
 import hardware_profiler
 from ai_router import AIRouter

@@ -29,7 +29,11 @@ _SAFE_BUS_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9._-]*$")
 
 def _validate_bus_name(bus_name: str) -> bool:
     """Return True if bus_name is safe for use in filesystem paths."""
-    return bool(_SAFE_BUS_RE.match(bus_name)) and ".." not in bus_name
+    return (
+        bool(_SAFE_BUS_RE.match(bus_name))
+        and ".." not in bus_name
+        and not any(part == "" for part in bus_name.split("."))
+    )
 
 
 def generate_systemd_unit(manifest: dict, install_dir: Path) -> str:

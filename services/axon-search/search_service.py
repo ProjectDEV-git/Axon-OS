@@ -22,13 +22,17 @@ import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
 from constants import AXON_DIR, EMBED_MODEL, RESCAN_INTERVAL, SEMANTIC_INDEX_DB
 from service_utils import rate_limited
 
 from _log_helper import resolve_logger as configure_app_logger
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_this = str(Path(__file__).resolve().parent)
+if _this not in sys.path:
+    sys.path.insert(0, _this)
 import indexer
 from service_base import ServiceBase
 
@@ -240,11 +244,18 @@ class SearchService(ServiceBase):
 
         Scans candidate files and triggers a rescan when mtimes change. Uses a
         low-overhead polling interval so it is safe to run on low-end devices.
+        Periodically rebuilds the known dict to prevent unbounded growth.
         """
         known: dict[str, float | None] = {}
+        cycle = 0
         while True:
             try:
                 changed = False
+                # Rebuild known dict every 100 cycles (~17 minutes) to prune
+                # disappeared files and cap memory usage.
+                if cycle % 100 == 0 and known:
+                    known.clear()
+                cycle += 1
                 for path in indexer.iter_candidate_files(Path.home()):
                     try:
                         mtime = Path(path).stat().st_mtime

@@ -95,18 +95,6 @@ class FileIndexer:
 
             mtime = p.stat().st_mtime
 
-            with self._lock:
-                # Check DB
-                cursor = self.conn.cursor()
-            cursor.execute("SELECT id, mtime FROM files WHERE path = ?", (str(p),))
-            row = cursor.fetchone()
-
-            if row and row[1] >= mtime:
-                # No change
-                return
-
-            logger.info(f"Indexing file: {p}")
-
             # Read first 1500 chars (reasonable context chunk)
             try:
                 content = p.read_text(encoding="utf-8", errors="ignore").strip()
@@ -124,25 +112,35 @@ class FileIndexer:
 
             emb_bytes = array("f", emb).tobytes()
 
-            if row:
-                doc_id = row[0]
-                cursor.execute(
-                    "UPDATE files SET mtime = ?, content = ? WHERE id = ?", (mtime, chunk, doc_id)
-                )
-                cursor.execute(
-                    "UPDATE vec_items SET embedding = ? WHERE rowid = ?", (emb_bytes, doc_id)
-                )
-            else:
-                cursor.execute(
-                    "INSERT INTO files (path, mtime, content) VALUES (?, ?, ?)",
-                    (str(p), mtime, chunk),
-                )
-                doc_id = cursor.lastrowid
-                cursor.execute(
-                    "INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)", (doc_id, emb_bytes)
-                )
+            with self._lock:
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT id, mtime FROM files WHERE path = ?", (str(p),))
+                row = cursor.fetchone()
 
-            self.conn.commit()
+                if row and row[1] >= mtime:
+                    return
+
+                logger.info(f"Indexing file: {p}")
+
+                if row:
+                    doc_id = row[0]
+                    cursor.execute(
+                        "UPDATE files SET mtime = ?, content = ? WHERE id = ?", (mtime, chunk, doc_id)
+                    )
+                    cursor.execute(
+                        "UPDATE vec_items SET embedding = ? WHERE rowid = ?", (emb_bytes, doc_id)
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO files (path, mtime, content) VALUES (?, ?, ?)",
+                        (str(p), mtime, chunk),
+                    )
+                    doc_id = cursor.lastrowid
+                    cursor.execute(
+                        "INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)", (doc_id, emb_bytes)
+                    )
+
+                self.conn.commit()
             logger.info(f"Successfully indexed: {p}")
         except Exception:
             logger.exception(f"Error indexing {file_path}:")
@@ -151,15 +149,15 @@ class FileIndexer:
         try:
             with self._lock:
                 cursor = self.conn.cursor()
-            cursor.execute("SELECT id, path FROM files")
-            rows = cursor.fetchall()
-            for row in rows:
-                doc_id, path_str = row
-                if not os.path.exists(path_str):
-                    logger.info(f"Removing deleted file from index: {path_str}")
-                    cursor.execute("DELETE FROM files WHERE id = ?", (doc_id,))
-                    cursor.execute("DELETE FROM vec_items WHERE rowid = ?", (doc_id,))
-            self.conn.commit()
+                cursor.execute("SELECT id, path FROM files")
+                rows = cursor.fetchall()
+                for row in rows:
+                    doc_id, path_str = row
+                    if not os.path.exists(path_str):
+                        logger.info(f"Removing deleted file from index: {path_str}")
+                        cursor.execute("DELETE FROM files WHERE id = ?", (doc_id,))
+                        cursor.execute("DELETE FROM vec_items WHERE rowid = ?", (doc_id,))
+                self.conn.commit()
         except Exception as e:
             logger.error(f"Error purging index: {e}")
 

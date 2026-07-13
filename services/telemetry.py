@@ -40,6 +40,8 @@ class Telemetry:
     ``~/.local/share/axon/telemetry/opt_in`` exists.
     """
 
+    _write_lock = threading.Lock()  # protects all JSONL writes
+
     def __init__(self, enabled: bool | None = None) -> None:
         self._lock = threading.Lock()
         self._session_id = f"{int(time.time())}"
@@ -205,21 +207,22 @@ class Telemetry:
 
     @staticmethod
     def _append_jsonl(path: Path, entry: dict) -> None:
-        try:
-            TELEMETRY_DIR.mkdir(parents=True, exist_ok=True)
-            # Rotate if file exceeds max size
+        with Telemetry._write_lock:
             try:
-                if path.exists() and path.stat().st_size > _MAX_JSONL_BYTES:
-                    rotated = path.with_suffix(".jsonl.1")
-                    if rotated.exists():
-                        rotated.unlink()
-                    path.rename(rotated)
-            except OSError:
+                TELEMETRY_DIR.mkdir(parents=True, exist_ok=True)
+                # Rotate if file exceeds max size
+                try:
+                    if path.exists() and path.stat().st_size > _MAX_JSONL_BYTES:
+                        rotated = path.with_suffix(".jsonl.1")
+                        if rotated.exists():
+                            rotated.unlink()
+                        path.rename(rotated)
+                except OSError:
+                    pass
+                with open(path, "a") as f:
+                    f.write(json.dumps(entry) + "\n")
+            except Exception:
                 pass
-            with open(path, "a") as f:
-                f.write(json.dumps(entry) + "\n")
-        except Exception:
-            pass
 
 
 # Singleton instance
