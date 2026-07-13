@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 import sys
 import threading
 from pathlib import Path
@@ -167,8 +168,21 @@ class SandboxManager(ServiceBase):
     OBJECT_PATH = "/org/axonos/Sandbox"
     SERVICE_NAME = "axon-sandbox"
 
+    # Directories from which scripts are allowed to be audited.
+    # Override via environment variable AXON_SANDBOX_ALLOWED_DIRS (colon-separated).
+    _DEFAULT_ALLOWED_DIRS = [
+        Path.home() / ".local" / "share" / "axon",
+        Path.home() / "Documents",
+        Path.home() / "bin",
+        Path.home() / ".local" / "bin",
+    ]
+
     def _setup(self):
-        pass
+        env_dirs = os.environ.get("AXON_SANDBOX_ALLOWED_DIRS", "")
+        if env_dirs:
+            self._allowed_base_dirs = [Path(d) for d in env_dirs.split(":") if d]
+        else:
+            self._allowed_base_dirs = list(self._DEFAULT_ALLOWED_DIRS)
 
     @dbus.service.method(
         "org.axonos.Sandbox",
