@@ -97,6 +97,13 @@ class ServiceBase(dbus.service.Object):
         Subclasses must override this method.
         """
 
+    def _cleanup(self) -> None:
+        """Service-specific cleanup. Called on SIGTERM/SIGINT before exit.
+
+        Subclasses should override to close DB connections, kill subprocesses,
+        or release other resources.
+        """
+
     # ------------------------------------------------------------------
     # Health / status
     # ------------------------------------------------------------------
@@ -145,8 +152,21 @@ class ServiceBase(dbus.service.Object):
     @classmethod
     def main(cls) -> None:
         """Instantiate and run the GLib main loop. Call from ``if __name__``."""
+        import signal
+
         loop = GLib.MainLoop()
         service = cls()  # noqa: F841 — side effect: starts D-Bus service
+
+        def _shutdown(signum, frame):
+            service.logger.info("Received signal %d, shutting down...", signum)
+            try:
+                service._cleanup()
+            except Exception:
+                pass
+            loop.quit()
+
+        signal.signal(signal.SIGTERM, _shutdown)
+        signal.signal(signal.SIGINT, _shutdown)
         try:
             loop.run()
         except KeyboardInterrupt:

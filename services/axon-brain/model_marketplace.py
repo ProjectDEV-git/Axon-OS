@@ -28,7 +28,6 @@ from service_base import ServiceBase
 
 log = configure_app_logger("axon-marketplace", level=__import__("logging").INFO)
 
-import urllib.error
 import urllib.request
 
 CATALOG_FILE = AXON_DIR / "model_catalog.json"
