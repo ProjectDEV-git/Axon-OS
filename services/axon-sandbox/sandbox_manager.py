@@ -194,7 +194,7 @@ class SandboxManager(ServiceBase):
     )
     def AuditAndPrompt(self, script_path, dbus_ok, dbus_err):
         """Asynchronously audits a script and prompts the user for sandbox choice."""
-        self.logger.info(f"Received Sandbox audit request for: {script_path}")
+        self.logger.info("Received Sandbox audit request for: %s", script_path)
         threading.Thread(
             target=self._do_audit_and_prompt, args=(script_path, dbus_ok, dbus_err), daemon=True
         ).start()

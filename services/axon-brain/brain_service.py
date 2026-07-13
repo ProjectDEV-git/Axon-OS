@@ -7,6 +7,7 @@ import shutil
 import sys
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 import uuid
@@ -67,11 +68,13 @@ def _sanitize_output(text: str) -> str:
 def _sanitize_context(context: str) -> str:
     """Sanitize and wrap context before embedding in system prompt.
 
-    Strips null bytes, removes common prompt-injection patterns,
-    truncates to _MAX_CONTEXT_LEN chars, and wraps in untrusted tags
-    so the model treats the content as inert data.
+    Strips null bytes, normalizes Unicode to NFKD (to catch homoglyph
+    bypasses), removes common prompt-injection patterns, truncates to
+    _MAX_CONTEXT_LEN chars, and wraps in untrusted tags so the model
+    treats the content as inert data.
     """
     safe = context.replace("\x00", "")
+    safe = unicodedata.normalize("NFKD", safe)
     safe = _INJECTION_PATTERNS.sub("", safe)
     if len(safe) > _MAX_CONTEXT_LEN:
         safe = safe[:_MAX_CONTEXT_LEN]

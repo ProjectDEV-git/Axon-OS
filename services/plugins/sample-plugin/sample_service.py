@@ -5,6 +5,7 @@ To install: place this directory under ~/.local/share/axon/plugins/
 """
 
 import sys
+import threading
 from pathlib import Path
 
 _plugin_parent = str(Path(__file__).resolve().parents[1])
@@ -22,11 +23,14 @@ class SamplePluginService(ServiceBase):
 
     def _setup(self) -> None:
         self._counter = 0
+        self._counter_lock = threading.Lock()
 
     @dbus.service.method("org.axonos.plugins.Sample", out_signature="s")
     def Hello(self):
-        self._counter += 1
-        return f"Hello from SamplePlugin! (call #{self._counter})"
+        with self._counter_lock:
+            self._counter += 1
+            count = self._counter
+        return f"Hello from SamplePlugin! (call #{count})"
 
     @dbus.service.method("org.axonos.plugins.Sample", in_signature="s", out_signature="s")
     def Echo(self, message: str) -> str:

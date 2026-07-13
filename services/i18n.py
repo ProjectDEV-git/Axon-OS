@@ -58,8 +58,19 @@ def get_translator(domain: str = _DOMAIN, locale_dir: str | None = None) -> "Cal
     return translation.gettext
 
 
-# Convenience function for quick translations
-_ = get_translator()
+_translator: "Callable[[str], str] | None" = None
+
+
+def _lazy(text: str) -> str:
+    """Lazy translator that defers gettext setup to first use."""
+    global _translator
+    if _translator is None:
+        _translator = get_translator()
+    return _translator(text)
+
+
+# Assign the lazy function as the module-level _ for `from i18n import _`
+_ = _lazy
 
 
 def translate(text: str) -> str:

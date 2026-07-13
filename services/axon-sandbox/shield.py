@@ -59,7 +59,11 @@ def ai_audit(script_text: str) -> str:
             "persistence, obfuscated payloads). Reply with one short "
             "paragraph starting with SAFE: or SUSPICIOUS:.\n\n" + script_text[:6000]
         )
-        return str(brain.Generate(prompt, "", "", False, timeout=AI_AUDIT_TIMEOUT)).strip()
+        try:
+            return str(brain.Generate(prompt, "", "", False, timeout=AI_AUDIT_TIMEOUT)).strip()
+        except TypeError:
+            # D-Bus interface signature changed — fall back to safe default
+            return ""
     except Exception:
         return ""
 
