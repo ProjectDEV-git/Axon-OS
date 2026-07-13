@@ -120,8 +120,8 @@ def validate_config(cfg: dict) -> list:
         problems.append("user.full_name is required")
     if not USERNAME_RE.match(user.get("username", "")):
         problems.append("user.username must match ^[a-z][a-z0-9-]{0,31}$")
-    if len(user.get("password", "")) < 4:
-        problems.append("user.password must be at least 4 characters")
+    if len(user.get("password", "")) < 8:
+        problems.append("user.password must be at least 8 characters")
     if not HOSTNAME_RE.match(user.get("hostname", "")):
         problems.append("user.hostname is not a valid hostname")
 

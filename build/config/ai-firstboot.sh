@@ -4,7 +4,7 @@
 # axon-ai-firstboot.service) when the installer deferred AI setup, e.g. the
 # install happened offline. Reads /etc/axon/ai-setup.json, installs Ollama
 # and pulls the chosen default model, then removes the marker file.
-set -uo pipefail
+set -euo pipefail
 
 SETUP_JSON="/etc/axon/ai-setup.json"
 LOG="/var/log/axon-ai-firstboot.log"
@@ -14,8 +14,8 @@ echo "=== axon-ai-firstboot $(date -Iseconds) ==="
 
 [[ -f "${SETUP_JSON}" ]] || { echo "no ${SETUP_JSON}; nothing to do"; exit 0; }
 
-INSTALL_OLLAMA="$(python3 -c "import json;print(json.load(open('${SETUP_JSON}')).get('install_ollama', False))")"
-MODEL="$(python3 -c "import json;print(json.load(open('${SETUP_JSON}')).get('ollama_model', 'llama3.2:3b'))")"
+INSTALL_OLLAMA="$(python3 -c "import json;print(json.load(open('${SETUP_JSON}')).get('install_ollama', False))" 2>/dev/null || echo "False")"
+MODEL="$(python3 -c "import json;print(json.load(open('${SETUP_JSON}')).get('ollama_model', 'llama3.2:3b'))" 2>/dev/null || echo "llama3.2:3b")"
 
 if [[ "${INSTALL_OLLAMA}" != "True" ]]; then
     echo "install_ollama disabled; cleaning up"
@@ -39,7 +39,10 @@ fi
 
 if ! command -v ollama >/dev/null 2>&1; then
     echo "installing Ollama..."
-    if ! curl -fsSL https://ollama.com/install.sh | sh; then
+    # SECURITY: curl | sh executes remote code without integrity verification.
+# TODO: pin a SHA-256 hash of the installer and verify before execution.
+# See: https://cheatsheetseries.owasp.org/cheatsheets/Secure\_Command\_Execution\_Cheat\_Sheet.html
+if ! curl -fsSL https://ollama.com/install.sh | sh; then
         echo "Ollama install failed — will retry on next boot"
         exit 0
     fi

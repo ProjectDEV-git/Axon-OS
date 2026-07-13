@@ -33,6 +33,13 @@ from service_base import ServiceBase
 
 log = configure_app_logger("axon-search", level=logging.INFO)
 
+# Standard embedding dimensions used by Ollama models (nomic-embed-text = 768,
+# all-minilm = 384, mxbai-embed-large = 1024, etc.).  128 is used by some
+# distilled models.  The vec0 table is created once for a fixed dimension, so
+# only these known sizes are accepted to prevent dimension-injection via the
+# Brain embedding response.
+_ALLOWED_VEC_DIMS = frozenset({128, 256, 384, 512, 768, 1024, 1536})
+
 DB_PATH = SEMANTIC_INDEX_DB
 
 try:
@@ -79,6 +86,9 @@ def vec_table_ready(db, dim=None):
     if row:
         return True
     if dim is None:
+        return False
+    if int(dim) not in _ALLOWED_VEC_DIMS:
+        log.warning("Rejected unsupported vec dim %s (allowed: %s)", dim, sorted(_ALLOWED_VEC_DIMS))
         return False
     try:
         db.execute(
@@ -395,9 +405,15 @@ class SearchService(ServiceBase):
 
     @staticmethod
     def _escape_fts5_token(token):
-        """Escape FTS5 special characters in a search token."""
+        """Escape FTS5 special characters in a search token.
+
+        Defense-in-depth: double quotes are also stripped here in addition to
+        the pre-processing ``query.replace('"', ' ')`` in ``_keyword_query``.
+        This prevents FTS5 query injection via crafted input if the outer
+        replacement is ever bypassed or refactored.
+        """
         # Strip characters that are meaningful to the FTS5 query parser
-        for ch in ("*", "-", "(", ")", ":", "^", "~", "\\"):
+        for ch in ('"', "*", "-", "(", ")", ":", "^", "~", "\\"):
             token = token.replace(ch, "")
         # Remove bare "OR" which is an FTS5 keyword
         if token.upper() == "OR":

@@ -17,7 +17,10 @@ class ContextReader:
     """Retrieves session context from the central Context Engine D-Bus service."""
 
     def __init__(self) -> None:
-        self.bus = dbus.SessionBus()
+        try:
+            self.bus = dbus.SessionBus()
+        except Exception:
+            self.bus = None
         self.context_obj: Any = None
         self._connect()
 
@@ -26,7 +29,7 @@ class ContextReader:
         self.context_obj = None
 
     def _connect(self) -> None:
-        if self.context_obj is None:
+        if self.context_obj is None and self.bus is not None:
             try:
                 self.context_obj = self.bus.get_object("org.axonos.Context", "/org/axonos/Context")
             except Exception:

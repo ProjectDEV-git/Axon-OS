@@ -31,7 +31,7 @@ VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "${BAS
 VERSION="${VERSION:-0.3.0}"
 ARCH="amd64"
 DIST="noble"
-MIRROR="http://us.archive.ubuntu.com/ubuntu/"
+MIRROR="https://us.archive.ubuntu.com/ubuntu/"
 ISO_NAME="axon-os-${VERSION}-${ARCH}.iso"
 VOLID="AXON_OS"
 
@@ -70,7 +70,7 @@ for arg in "$@"; do
         --fast) QUICK=true; KEEP_CHROOT=true; COMPRESSION=gzip ;; # --fast is quick + fast compression
         --chroot) CHROOT_SHELL=true ;;
         --fresh) FRESH=true ;; # force full rebuild: delete chroot + base image
-        --cmd) ;; # value parsed below
+        --cmd) [[ $# -gt $((i+1)) ]] || die "--cmd requires an argument" ;; # value parsed below
         *) echo "[axon-build] Unknown option: ${arg}" >&2; exit 2 ;;
     esac
 done

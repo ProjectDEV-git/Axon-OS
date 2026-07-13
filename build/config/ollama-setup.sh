@@ -38,7 +38,9 @@ install_ollama() {
     fi
 
     echo "[axon] Installing Ollama..."
-    curl -fsSL https://ollama.ai/install.sh | sh
+# SECURITY: curl | sh executes remote code without integrity verification.
+# TODO: pin a SHA-256 hash of the installer and verify before execution.
+    curl -fsSL https://ollama.com/install.sh | sh
     echo "[axon] Ollama installation complete."
 }
 

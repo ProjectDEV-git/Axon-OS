@@ -217,6 +217,7 @@ class BrainService(ServiceBase):
         self.load_config()
         self.router = AIRouter(self.config)
         # FIX 4: Transaction registry for stream cancellation
+        self._streams_lock = threading.Lock()
         self._active_streams: dict[str, threading.Event] = {}
         # FIX 5: Token buffer for backpressure on signal emission
         # Use GLib.idle_add to safely emit signals from worker threads
@@ -415,7 +416,8 @@ class BrainService(ServiceBase):
             tx_id = str(uuid.uuid4())
             # FIX 4: Register transaction for cancellation support
             cancel_flag = threading.Event()
-            self._active_streams[tx_id] = cancel_flag
+            with self._streams_lock:
+                self._active_streams[tx_id] = cancel_flag
             threading.Thread(
                 target=self._do_generate_stream,
                 args=(tx_id, prompt, system_prompt, model),
@@ -432,7 +434,8 @@ class BrainService(ServiceBase):
         Returns True if the stream was found and cancelled, False if no
         matching transaction was active.
         """
-        cancel_flag = self._active_streams.get(transaction_id)
+        with self._streams_lock:
+            cancel_flag = self._active_streams.get(transaction_id)
         if cancel_flag is not None:
             cancel_flag.set()
             self.logger.debug("Stream %s cancellation requested", transaction_id)
@@ -486,7 +489,8 @@ class BrainService(ServiceBase):
             tx_id = str(uuid.uuid4())
             # FIX 4: Register transaction for cancellation support
             cancel_flag = threading.Event()
-            self._active_streams[tx_id] = cancel_flag
+            with self._streams_lock:
+                self._active_streams[tx_id] = cancel_flag
             threading.Thread(
                 target=self._do_chat_stream,
                 args=(tx_id, conversation_id, context, model),
@@ -717,7 +721,8 @@ class BrainService(ServiceBase):
             self._token_buffer.flush()
             GLib.idle_add(self.GenerationCompleted, tx_id, False, "Generation failed")
         finally:
-            self._active_streams.pop(tx_id, None)
+            with self._streams_lock:
+                self._active_streams.pop(tx_id, None)
 
     def _do_chat_sync(self, conv_id, context, model):
         messages = self.store.get_messages(conv_id)
@@ -787,7 +792,8 @@ class BrainService(ServiceBase):
             self._token_buffer.flush()
             GLib.idle_add(self.GenerationCompleted, tx_id, False, "Chat failed")
         finally:
-            self._active_streams.pop(tx_id, None)
+            with self._streams_lock:
+                self._active_streams.pop(tx_id, None)
 
 
 if __name__ == "__main__":

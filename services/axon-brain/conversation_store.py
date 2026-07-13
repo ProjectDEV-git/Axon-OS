@@ -20,6 +20,9 @@ class ConversationStore:
         self.db_path = db_path
         self._lock = threading.Lock()
         self._local = threading.local()
+        # Track every connection ever created so close_all() can reach
+        # thread-local connections whose owning thread has already exited.
+        self._all_connections: list[sqlite3.Connection] = []
         self._init_db()
         # Restrict DB file permissions to owner-only (privacy: conversation history)
         try:
@@ -44,6 +47,8 @@ class ConversationStore:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys = ON")
         self._local.conn = conn
+        with self._lock:
+            self._all_connections.append(conn)
         return conn
 
     def close(self):
@@ -56,8 +61,24 @@ class ConversationStore:
                 pass
             self._local.conn = None
 
-    def __del__(self) -> None:
+    def close_all(self):
+        """Close every connection ever created, including those from dead threads.
+
+        Safe to call multiple times and from any thread.
+        """
+        with self._lock:
+            conns = list(self._all_connections)
+            self._all_connections.clear()
+        for conn in conns:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        # Also clear the calling thread's local ref if present
         self.close()
+
+    def __del__(self) -> None:
+        self.close_all()
 
     def _init_db(self):
         conn = self._get_connection()
@@ -175,4 +196,6 @@ class ConversationStore:
                 )
                 return [dict(row) for row in cursor.fetchall()]
             finally:
-                self._close_connection(conn)
+                # Connection is per-thread and managed by _get_connection();
+                # intentionally not closing here.
+                pass

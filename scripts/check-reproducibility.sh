@@ -34,7 +34,7 @@ BUILD_DIR_2="/tmp/axon-build-repro-2"
 
 cleanup() {
     echo "Cleaning up..."
-    sudo rm -rf "${BUILD_DIR_1}" "${BUILD_DIR_2}" 2>/dev/null || true
+    sudo rm -rf "${BUILD_DIR_1}" "${BUILD_DIR_2}" /tmp/axon-build-repro-1.log /tmp/axon-build-repro-2.log 2>/dev/null || true
 }
 
 trap cleanup EXIT
@@ -48,7 +48,8 @@ echo ""
 
 # Build 1
 log "Starting build 1..."
-AXON_BUILD_DIR="${BUILD_DIR_1}" sudo -E bash "${BUILD_SCRIPT}" --ci 2>&1 | tail -20
+BUILD_LOG_1="/tmp/axon-build-repro-1.log"
+AXON_BUILD_DIR="${BUILD_DIR_1}" sudo -E bash "${BUILD_SCRIPT}" --ci 2>&1 | tee "${BUILD_LOG_1}" | tail -20
 
 ISO_1=$(find "${BUILD_DIR_1}" -name "*.iso" -type f | head -1)
 if [[ -z "${ISO_1}" ]]; then
@@ -63,7 +64,8 @@ echo ""
 
 # Build 2
 log "Starting build 2..."
-AXON_BUILD_DIR="${BUILD_DIR_2}" sudo -E bash "${BUILD_SCRIPT}" --ci 2>&1 | tail -20
+BUILD_LOG_2="/tmp/axon-build-repro-2.log"
+AXON_BUILD_DIR="${BUILD_DIR_2}" sudo -E bash "${BUILD_SCRIPT}" --ci 2>&1 | tee "${BUILD_LOG_2}" | tail -20
 
 ISO_2=$(find "${BUILD_DIR_2}" -name "*.iso" -type f | head -1)
 if [[ -z "${ISO_2}" ]]; then

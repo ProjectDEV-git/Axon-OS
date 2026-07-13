@@ -212,6 +212,8 @@ class InstallerWindow(Adw.Window):
         self._engine_proc = None
         self._install_failed = False
         self._poll_running = False
+        self._connectivity_timeout_id = 0
+        self._tip_timeout_id = 0
 
         # Wizard state collected across pages
         self.state = {
@@ -247,7 +249,8 @@ class InstallerWindow(Adw.Window):
         self.set_content(root)
         self._current = 0
         self._update_sidebar()
-        GLib.timeout_add_seconds(4, self._poll_connectivity)
+        self._connectivity_timeout_id = GLib.timeout_add_seconds(4, self._poll_connectivity)
+        self.connect("destroy", self._on_wizard_destroy)
 
     # ------------------------------------------------------------------
     # Sidebar
@@ -606,7 +609,7 @@ class InstallerWindow(Adw.Window):
             except Exception:
                 pass
             GLib.idle_add(self._refresh_wifi)
-            self._poll_connectivity()
+            GLib.idle_add(self._poll_connectivity)
 
         threading.Thread(target=connect, daemon=True).start()
 
@@ -679,8 +682,8 @@ class InstallerWindow(Adw.Window):
         problem = ""
         if username and not USERNAME_RE.match(username):
             problem = "Username must start with a lowercase letter (a–z, 0–9, dashes)."
-        elif pw1 and len(pw1) < 4:
-            problem = "Password must be at least 4 characters."
+        elif pw1 and len(pw1) < 8:
+            problem = "Password must be at least 8 characters."
         elif pw2 and pw1 != pw2:
             problem = "Passwords do not match."
         elif hostname and not HOSTNAME_RE.match(hostname):
@@ -1035,13 +1038,22 @@ class InstallerWindow(Adw.Window):
         outer.append(self._install_error_box)
 
         self._tip_index = 0
-        GLib.timeout_add_seconds(7, self._rotate_tip)
+        self._tip_timeout_id = GLib.timeout_add_seconds(7, self._rotate_tip)
         return outer
 
     def _rotate_tip(self) -> bool:
         self._tip_index = (self._tip_index + 1) % len(INSTALL_TIPS)
         self._install_tip.set_label(INSTALL_TIPS[self._tip_index])
         return True
+
+    def _on_wizard_destroy(self, _widget: Gtk.Widget) -> None:
+        """Remove GLib timeout sources to prevent callbacks on destroyed widgets."""
+        if self._connectivity_timeout_id:
+            GLib.source_remove(self._connectivity_timeout_id)
+            self._connectivity_timeout_id = 0
+        if self._tip_timeout_id:
+            GLib.source_remove(self._tip_timeout_id)
+            self._tip_timeout_id = 0
 
     def _engine_config(self) -> dict:
         s = self.state

@@ -162,8 +162,8 @@ class UserSetupPage(Gtk.Box):
             return "Username must be lowercase, start with a letter, and contain only a-z, 0-9, or hyphens (max 32 chars)."
         if not v["password"]:
             return "Password cannot be empty."
-        if len(v["password"]) < 4:
-            return "Password must be at least 4 characters."
+        if len(v["password"]) < 8:
+            return "Password must be at least 8 characters."
         if v["password"] != v["password2"]:
             return "Passwords do not match."
         if not v["hostname"]:

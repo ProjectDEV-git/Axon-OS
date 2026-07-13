@@ -3,6 +3,7 @@ import json
 import os
 import sqlite3
 import sys
+import threading
 import time
 from array import array
 from pathlib import Path
@@ -31,7 +32,8 @@ class FileIndexer:
     def __init__(self):
         AXON_DIR.mkdir(parents=True, exist_ok=True)
         self.session_bus = dbus.SessionBus()
-        self.conn = sqlite3.connect(str(DB_PATH))
+        self._lock = threading.Lock()
+        self.conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA busy_timeout=5000")
         self.conn.enable_load_extension(True)
@@ -101,8 +103,9 @@ class FileIndexer:
 
             mtime = p.stat().st_mtime
 
-            # Check DB
-            cursor = self.conn.cursor()
+            with self._lock:
+                # Check DB
+                cursor = self.conn.cursor()
             cursor.execute("SELECT id, mtime FROM files WHERE path = ?", (str(p),))
             row = cursor.fetchone()
 
@@ -154,7 +157,8 @@ class FileIndexer:
 
     def remove_deleted_files(self):
         try:
-            cursor = self.conn.cursor()
+            with self._lock:
+                cursor = self.conn.cursor()
             cursor.execute("SELECT id, path FROM files")
             rows = cursor.fetchall()
             for row in rows:

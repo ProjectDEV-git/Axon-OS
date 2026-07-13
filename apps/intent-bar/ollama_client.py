@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import queue
+import threading
 from collections.abc import Iterator
 from typing import Any
 
@@ -33,6 +34,7 @@ class OllamaClient:
         self.model = model
         self.q: queue.Queue[str | None] = queue.Queue()
         self.current_tx: str | None = None
+        self._stream_lock: threading.Lock = threading.Lock()
 
         # Register signal listeners
         self.bus.add_signal_receiver(

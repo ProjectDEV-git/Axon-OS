@@ -74,13 +74,20 @@ def cosine_similarity(v1, v2):
     return dot_product / (magnitude1 * magnitude2)
 
 
+_embedding_bus = None
+_embedding_brain = None
+
+
 def fetch_embedding_dbus(prompt: str) -> list:
     """Generates embedding vector for a given prompt using Ollama via D-Bus."""
+    global _embedding_bus, _embedding_brain
     try:
-        bus = dbus.SessionBus()
-        brain_obj = bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+        if _embedding_brain is None:
+            _embedding_bus = dbus.SessionBus()
+            brain_obj = _embedding_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+            _embedding_brain = dbus.Interface(brain_obj, "org.axonos.Brain")
         # Call GetEmbeddings(prompt, model)
-        embeddings_json = brain_obj.GetEmbeddings(prompt, "", dbus_interface="org.axonos.Brain", timeout=30)
+        embeddings_json = _embedding_brain.GetEmbeddings(prompt, "", timeout=30)
         embedding = json.loads(embeddings_json)
         if isinstance(embedding, list):
             return embedding
@@ -88,6 +95,9 @@ def fetch_embedding_dbus(prompt: str) -> list:
             logger.error("D-Bus embedding error: %s", embedding["error"])
             return []
     except Exception as e:
+        # Reset cached connection on error
+        _embedding_bus = None
+        _embedding_brain = None
         logger.exception("Error fetching embedding via D-Bus: %s", e)
     return []
 

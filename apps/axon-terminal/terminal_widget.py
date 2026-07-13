@@ -453,12 +453,9 @@ class TerminalWidget(Gtk.Box):
             self._suggestion_box.append(chip)
 
     def _on_suggestion_clicked(self, button: Gtk.Button, command: str) -> None:
-        """Execute a suggested command in the active terminal."""
-        tab = self._get_active_tab()
-        if tab is not None:
-            tab.terminal.feed_child((command + "\n").encode())
-            tab.last_command = command
+        """Execute a suggested command via safety-assessed feed_command."""
         self._hide_diagnosis()
+        self.feed_command(command)
 
     def _clear_suggestions(self) -> None:
         """Remove all suggestion chip buttons."""

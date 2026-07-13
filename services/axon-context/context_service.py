@@ -33,6 +33,8 @@ except ImportError:  # running standalone — repo root / installed shim not on 
 
 from service_base import ServiceBase
 
+logger = configure_app_logger("axon-context")
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
 

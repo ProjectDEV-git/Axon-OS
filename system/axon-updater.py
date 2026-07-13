@@ -228,7 +228,7 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
     def _on_start_clicked(self, _btn: Gtk.Button) -> None:
         self._btn.set_sensitive(False)
         self._set_progress(0.0)
-        threading.Thread(target=self._update_process, daemon=False).start()
+        threading.Thread(target=self._update_process, daemon=True).start()
 
     # ---- update pipeline ------------------------------------------------
 

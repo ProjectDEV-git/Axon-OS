@@ -952,7 +952,14 @@ class FilesWindow(Adw.ApplicationWindow):
         def do_create(name):
             if not name:
                 return
+            # Reject path traversal in new name
+            if "/" in name or "\\" in name or ".." in name:
+                self.status_lbl.set_text("Failed to create folder: invalid characters in name")
+                return
             p = Path(dest_dir) / name
+            if p.resolve().parent != Path(dest_dir).resolve():
+                self.status_lbl.set_text("Failed to create folder: name escapes target directory")
+                return
             try:
                 p.mkdir(parents=True, exist_ok=False)
                 self.status_lbl.set_text(f"Created folder: {name}")
@@ -968,7 +975,14 @@ class FilesWindow(Adw.ApplicationWindow):
         def do_create(name):
             if not name:
                 return
+            # Reject path traversal in new name
+            if "/" in name or "\\" in name or ".." in name:
+                self.status_lbl.set_text("Failed to create file: invalid characters in name")
+                return
             p = Path(dest_dir) / name
+            if p.resolve().parent != Path(dest_dir).resolve():
+                self.status_lbl.set_text("Failed to create file: name escapes target directory")
+                return
             try:
                 p.touch(exist_ok=False)
                 self.status_lbl.set_text(f"Created file: {name}")
@@ -1056,13 +1070,15 @@ def list_directory_contents(dir_path, indexer):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
+            # Escape LIKE wildcards in path to prevent SQL injection
+            escaped_path = str(path_obj).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             cursor.execute(
                 """
                 SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary
                 FROM files
-                WHERE file_path LIKE ?
+                WHERE file_path LIKE ? ESCAPE '\\'
             """,
-                (f"{path_obj}/%",),
+                (f"{escaped_path}/%",),
             )
             db_files = {row["file_path"]: dict(row) for row in cursor.fetchall()}
         finally:

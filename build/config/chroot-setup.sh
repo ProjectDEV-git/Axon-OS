@@ -32,9 +32,9 @@ chmod +x /usr/sbin/policy-rc.d
 # ---------------------------------------------------------------------------
 log "Writing APT sources..."
 cat > /etc/apt/sources.list <<'EOF'
-deb http://us.archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
-deb http://us.archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
-deb http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse
+deb https://us.archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
+deb https://us.archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
+deb https://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse
 EOF
 # debootstrap may have created the new deb822 file; sources.list wins, drop it
 rm -f /etc/apt/sources.list.d/ubuntu.sources
@@ -158,7 +158,11 @@ for unit in "${SERVICES_DIR}"/*/axon-*.service; do
         > "/usr/lib/systemd/user/$(basename "${unit}")"
     AXON_USER_UNITS+=("$(basename "${unit}")")
 done
-systemctl --global enable "${AXON_USER_UNITS[@]}"
+if [[ ${#AXON_USER_UNITS[@]} -gt 0 ]]; then
+    systemctl --global enable "${AXON_USER_UNITS[@]}"
+else
+    log "WARNING: no systemd user units found to enable"
+fi
 
 # GNOME Shell extension, system-wide
 EXT_DIR="/usr/share/gnome-shell/extensions/axon-shell@axon-os"

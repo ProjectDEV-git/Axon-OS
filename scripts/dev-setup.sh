@@ -1,13 +1,13 @@
 #!/bin/bash
 # Development environment setup script for Axon OS
 
-set -e
+set -euo pipefail
 
 echo "🚀 Setting up Axon OS development environment..."
 
 # Update package lists
-apt-get update
-apt-get install -y \
+sudo apt-get update
+sudo apt-get install -y \
     python3-dbus \
     python3-gi \
     python3-gi-cairo \

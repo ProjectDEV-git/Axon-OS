@@ -144,9 +144,14 @@ else
             ollama_installer="$(mktemp /tmp/ollama-install.XXXXXX.sh)"
             trap 'rm -f "$ollama_installer"' EXIT
             if curl -fsSL --retry 3 --retry-delay 5 -o "$ollama_installer" https://ollama.com/install.sh; then
-                if head -c 100 "$ollama_installer" | grep -q '#!/'; then
+                # Validate: must be a shell script from Ollama, reasonable size (<100KB)
+                INSTALLER_SIZE=$(wc -c < "$ollama_installer")
+                if [[ "${INSTALLER_SIZE}" -gt 102400 ]]; then
+                    error "Downloaded installer is suspiciously large (${INSTALLER_SIZE} bytes) — refusing to execute"
+                    rm -f "$ollama_installer"
+                elif head -c 100 "$ollama_installer" | grep -q '#!'; then
                     # Verify script starts with known Ollama installer header
-                    if head -c 200 "$ollama_installer" | grep -q 'ollama.com\|Ollama'; then
+                    if head -c 500 "$ollama_installer" | grep -q 'ollama.com\|Ollama'; then
                         sh "$ollama_installer"
                         success "Ollama installed"
                     else

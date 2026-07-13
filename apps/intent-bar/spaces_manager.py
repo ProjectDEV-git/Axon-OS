@@ -129,8 +129,15 @@ class SpacesManager:
             return None
 
     def set_current_space(self, space_id: str) -> None:
-        """Write *space_id* to the current-space tracking file."""
-        _CURRENT_SPACE_FILE.write_text(space_id)
+        """Write *space_id* to the current-space tracking file (atomic)."""
+        fd, tmp_path = tempfile.mkstemp(dir=str(_CURRENT_SPACE_FILE.parent), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(space_id)
+            Path(tmp_path).replace(_CURRENT_SPACE_FILE)
+        except Exception:
+            Path(tmp_path).unlink(missing_ok=True)
+            raise
         with self._lock:
             if space_id in self._spaces:
                 self._spaces[space_id].last_active = time.time()
