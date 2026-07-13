@@ -27,6 +27,8 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         self.set_title("Axon Assistant")
         self.set_default_size(560, 420)
         self.set_resizable(False)
+        self._timer_ids: list[int] = []
+        self.connect("destroy", self._on_destroy)
 
         self._executor = SettingsExecutor()
 
@@ -207,10 +209,20 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         self._feedback_text.set_text(msg)
         if result.get("success"):
             self._feedback_card.add_css_class("success")
-            GLib.timeout_add(1500, lambda: self._feedback_card.remove_css_class("success") or False)
+            tid = GLib.timeout_add(1500, lambda: self._feedback_card.remove_css_class("success") or False)
+            self._timer_ids.append(tid)
         else:
             self._feedback_card.add_css_class("error")
-            GLib.timeout_add(2000, lambda: self._feedback_card.remove_css_class("error") or False)
+            tid = GLib.timeout_add(2000, lambda: self._feedback_card.remove_css_class("error") or False)
+            self._timer_ids.append(tid)
+
+    def _on_destroy(self, _widget: Gtk.Widget) -> None:
+        for tid in self._timer_ids:
+            try:
+                GLib.source_remove(tid)
+            except Exception:
+                pass
+        self._timer_ids.clear()
 
 
 class AxonSettingsApp(Adw.Application):
