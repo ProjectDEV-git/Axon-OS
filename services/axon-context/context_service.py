@@ -274,7 +274,12 @@ class ContextService(ServiceBase):
         logger.info("Clipboard watcher started (X11/xclip polling)")
 
     def cleanup(self):
-        """Terminate the clipboard watcher subprocess on shutdown."""
+        """Terminate the clipboard watcher subprocess and close DB connections on shutdown."""
+        if self._clipboard_store is not None:
+            try:
+                self._clipboard_store.close_all()
+            except Exception:
+                pass
         if self._clipboard_watcher is not None:
             try:
                 self._clipboard_watcher.terminate()

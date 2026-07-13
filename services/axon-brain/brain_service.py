@@ -807,6 +807,8 @@ if __name__ == "__main__":
 
     def _shutdown(signum, frame):
         logger.info("Received signal %d, shutting down...", signum)
+        if hasattr(service, 'store') and hasattr(service.store, 'close_all'):
+            service.store.close_all()
         loop.quit()
 
     signal.signal(signal.SIGTERM, _shutdown)
