@@ -554,6 +554,12 @@ if __name__ == "__main__":
 
     def _shutdown(signum, frame):
         log.info("Received signal %d, shutting down...", signum)
+        if service._recorder is not None:
+            try:
+                service._recorder.kill()
+                service._recorder.wait(timeout=2)
+            except Exception:
+                pass
         loop.quit()
 
     signal.signal(signal.SIGTERM, _shutdown)
