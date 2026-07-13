@@ -35,6 +35,7 @@ def get_gpu_info():
                 capture_output=True,
                 text=True,
                 check=True,
+                timeout=10,
             )
             line = result.stdout.strip().split("\n")[0]
             parts = [p.strip() for p in line.split(",")]
@@ -54,7 +55,8 @@ def get_gpu_info():
             # Try to get VRAM from rocm-smi
             # ROCm-smi output formats vary, we search for card info or usage
             result = subprocess.run(
-                ["rocm-smi", "--showmeminfo", "vram"], capture_output=True, text=True, check=True
+                ["rocm-smi", "--showmeminfo", "vram"], capture_output=True, text=True, check=True,
+                timeout=10,
             )
             # Find lines like "VRAM Total Memory (B): 8589934592" or "VRAM Size: ... MB"
             vram_bytes = re.search(r"VRAM Total Memory \(B\):\s+(\d+)", result.stdout)
@@ -72,7 +74,7 @@ def get_gpu_info():
     # 3. Inspect /sys/class/drm or lspci as fallback for general GPUs
     try:
         # Check lspci for VGA/3D controller
-        lspci_out = subprocess.check_output(["lspci"], text=True)
+        lspci_out = subprocess.check_output(["lspci"], text=True, timeout=10)
         if "NVIDIA" in lspci_out:
             return {
                 "vendor": "NVIDIA",
