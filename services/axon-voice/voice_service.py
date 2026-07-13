@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from constants import MAX_RECORD_SECONDS, WHISPER_DIR
 from service_utils import safe_exec
 
-from axon_logger import configure_app_logger
+from _log_helper import resolve_logger as configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from intent_router import clean_transcript, parse_intent_response

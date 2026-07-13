@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from constants import AXON_DIR, EMBED_MODEL, RESCAN_INTERVAL, SEMANTIC_INDEX_DB
 from service_utils import rate_limited
 
-from axon_logger import configure_app_logger
+from _log_helper import resolve_logger as configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import indexer

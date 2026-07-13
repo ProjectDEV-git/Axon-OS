@@ -224,7 +224,7 @@ def profile_hardware():
 
 if __name__ == "__main__":
     profile = profile_hardware()
-    from axon_logger import configure_app_logger
+    from _log_helper import resolve_logger as configure_app_logger
 
     logger = configure_app_logger(__name__)
     logger.debug(json.dumps(profile, indent=2))

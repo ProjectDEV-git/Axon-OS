@@ -11,17 +11,9 @@ from pathlib import Path
 import dbus
 import sqlite_vec
 
-# Ensure we can load axon_logger
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-try:
-    from axon_logger import configure_app_logger
+from _log_helper import resolve_logger as configure_app_logger
 
-    logger = configure_app_logger(__name__)
-except ImportError:
-    import logging
-
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger("axon-file-indexer")
+logger = configure_app_logger("axon-file-indexer")
 
 from constants import AXON_DIR
 

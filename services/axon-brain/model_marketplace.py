@@ -19,8 +19,7 @@ import dbus.mainloop.glib
 import dbus.service
 from gi.repository import GLib
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from axon_logger import configure_app_logger
+from _log_helper import resolve_logger as configure_app_logger
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from constants import AXON_DIR, OLLAMA_BASE_URL
