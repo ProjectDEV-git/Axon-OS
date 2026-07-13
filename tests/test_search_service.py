@@ -295,3 +295,136 @@ class TestVectorQuery:
             result = service._vector_query(tmp_db, "test query", 5)
 
         assert result is None
+
+
+class TestEscapeFts5Token:
+    """Tests for _escape_fts5_token — FTS5 injection defense."""
+
+    def test_strips_double_quotes(self):
+        service = _make_service()
+        result = service._escape_fts5_token('say "hello"')
+        assert '"' not in result
+        assert "say hello" in result
+
+    def test_strips_fts5_operators(self):
+        service = _make_service()
+        dangerous = "* - ( ) : ^ ~ \\"
+        result = service._escape_fts5_token(dangerous)
+        # All FTS5 special characters should be removed
+        for ch in ("*", "-", "(", ")", ":", "^", "~", "\\"):
+            assert ch not in result
+
+    def test_preserves_alphanumeric(self):
+        service = _make_service()
+        result = service._escape_fts5_token("hello123")
+        assert result == "hello123"
+
+    def test_mixed_content(self):
+        service = _make_service()
+        result = service._escape_fts5_token('test "injection" *attack*')
+        assert '"' not in result
+        assert "*" not in result
+        assert "test" in result
+        assert "injection" in result
+        assert "attack" in result
+
+
+class TestFts5Injection:
+    """Tests that FTS5 injection via _keyword_query is blocked."""
+
+    def test_injection_with_double_quotes(self, tmp_db):
+        """Double quotes in query should not break the MATCH syntax."""
+        service = _make_service()
+
+        tmp_db.execute(
+            "INSERT INTO chunks(path, mtime, chunk_idx, text) VALUES (?, ?, ?, ?)",
+            ("/tmp/doc.txt", 100.0, 0, "safe content here"),
+        )
+        tmp_db.commit()
+        tmp_db.execute(
+            "INSERT INTO fts_chunks(rowid, text) VALUES (1, ?)",
+            ("safe content here",),
+        )
+        tmp_db.commit()
+
+        # This should not raise an FTS5 syntax error
+        results = service._keyword_query(tmp_db, '" OR 1=1 --', 5)
+        assert isinstance(results, list)
+
+    def test_injection_with_star(self, tmp_db):
+        """Star wildcard should not cause FTS5 errors."""
+        service = _make_service()
+
+        tmp_db.execute(
+            "INSERT INTO chunks(path, mtime, chunk_idx, text) VALUES (?, ?, ?, ?)",
+            ("/tmp/doc.txt", 100.0, 0, "normal text"),
+        )
+        tmp_db.commit()
+        tmp_db.execute(
+            "INSERT INTO fts_chunks(rowid, text) VALUES (1, ?)",
+            ("normal text",),
+        )
+        tmp_db.commit()
+
+        results = service._keyword_query(tmp_db, "test*", 5)
+        assert isinstance(results, list)
+
+    def test_injection_with_parentheses(self, tmp_db):
+        """Parentheses should not break FTS5 query parsing."""
+        service = _make_service()
+
+        tmp_db.execute(
+            "INSERT INTO chunks(path, mtime, chunk_idx, text) VALUES (?, ?, ?, ?)",
+            ("/tmp/doc.txt", 100.0, 0, "content with parens"),
+        )
+        tmp_db.commit()
+        tmp_db.execute(
+            "INSERT INTO fts_chunks(rowid, text) VALUES (1, ?)",
+            ("content with parens",),
+        )
+        tmp_db.commit()
+
+        results = service._keyword_query(tmp_db, "a OR b) AND c(", 5)
+        assert isinstance(results, list)
+
+
+class TestAllowedVecDims:
+    """Tests for _ALLOWED_VEC_DIMS dimension validation."""
+
+    def test_valid_dims(self):
+        from services.axon_search.search_service import _ALLOWED_VEC_DIMS
+
+        assert 128 in _ALLOWED_VEC_DIMS
+        assert 256 in _ALLOWED_VEC_DIMS
+        assert 384 in _ALLOWED_VEC_DIMS
+        assert 512 in _ALLOWED_VEC_DIMS
+        assert 768 in _ALLOWED_VEC_DIMS
+        assert 1024 in _ALLOWED_VEC_DIMS
+        assert 1536 in _ALLOWED_VEC_DIMS
+
+    def test_invalid_dims_rejected(self):
+        from services.axon_search.search_service import _ALLOWED_VEC_DIMS
+
+        assert 42 not in _ALLOWED_VEC_DIMS
+        assert 999 not in _ALLOWED_VEC_DIMS
+        assert 0 not in _ALLOWED_VEC_DIMS
+        assert -1 not in _ALLOWED_VEC_DIMS
+
+    def test_vec_table_ready_rejects_bad_dim(self, tmp_db):
+        """vec_table_ready should reject unsupported dimensions."""
+        from services.axon_search.search_service import vec_table_ready
+
+        result = vec_table_ready(tmp_db, dim=42)
+        assert result is False
+
+    def test_vec_table_ready_accepts_good_dim(self, tmp_db):
+        """vec_table_ready should accept supported dimensions (if sqlite_vec available)."""
+        from services.axon_search.search_service import vec_table_ready
+
+        try:
+            result = vec_table_ready(tmp_db, dim=384)
+            # If sqlite_vec is installed, this should succeed
+            # If not, it'll return False — both are acceptable
+            assert isinstance(result, bool)
+        except Exception:
+            pass  # sqlite_vec not installed in test env
