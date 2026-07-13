@@ -4,6 +4,33 @@
 **Scope:** All `.py` files under `services/` (shared modules + 6 service directories)
 **Files Audited:** 32 Python files across 10 directories (services/ + plugins/)
 
+## Fixes Applied (2026-07-13)
+
+| # | Fix | Audit Item | Commit |
+|---|-----|-----------|--------|
+| 1 | Thread-safe `_active_streams` dict with Lock | C1 | bccd17d |
+| 2 | `search_messages()` fix `_close_connection` crash | C2 | f47dcf8 |
+| 3 | Module-level `logger` in context_service | C3 | f47dcf8 |
+| 4 | Subprocess timeouts in hardware_profiler (10s) | H8 | f4009fb |
+| 5 | Rate limiting on Brain.Generate/Chat, Context, Search D-Bus methods | H-level | 7909e16, abb4010 |
+| 6 | Systemd hardening (NoNewPrivileges, PrivateTmp, ProtectSystem, etc.) | Security | b2a0b58 |
+| 7 | Docker: healthcheck pgrep, Dockerfile Python version match | Docker | daba700, ceebfb0 |
+| 8 | Docker-compose healthcheck Python 3.12 | Docker | daba700 |
+| 9 | TTLCache LRU eviction when all entries valid | H-level | f97bb1a |
+| 10 | TOCTOU race in ollama setup removed | Security | e00d1ae |
+| 11 | HTTP→HTTPS APT mirrors | Security | e00d1ae |
+| 12 | ConversationStore deadlock (Lock→RLock) | M2 | 1523687 |
+| 13 | ClipboardStore connection pooling + deadlock fix | M2 | 1523687 |
+| 14 | boot_watchdog testability refactored | Testability | 6e9056e |
+| 15 | D-Bus signal marshaled to main thread (PullProgress) | M7 | 040c25d |
+| 16 | rate_limited decorator reimport eliminated | M8 | 040c25d |
+| 17 | DB connection pools closed on shutdown (brain, context) | Adjacent | 47c6134 |
+| 18 | Recorder subprocess killed on shutdown (advanced_voice) | Adjacent | d276d2e |
+| 19 | ServiceBase._cleanup() lifecycle hook added | Fact 4 | a020faa |
+| 20 | Dead code removed (_sanitize_command, unused imports) | Fact 1 | 0b97afc |
+| 21 | _log_helper migration (service_base, brain, ai_router, telemetry) | Fact 2 | 12b1bac, 7eb019e |
+| 22 | 4 pre-existing test failures resolved | Tests | f47dcf8 |
+
 ## Summary
 
 | Severity | Count |
