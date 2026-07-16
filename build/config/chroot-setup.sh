@@ -476,6 +476,16 @@ systemctl enable vboxservice 2>/dev/null || true
 # Also enable our custom unit as a safety net
 systemctl enable axon-vm-guest.service 2>/dev/null || true
 
+# Force the vboxvideo X driver so auto-resize works on VirtualBox.
+# Without this, X may fall back to vesa/fbdev which don't support resize.
+mkdir -p /usr/share/X11/xorg.conf.d
+cat > /usr/share/X11/xorg.conf.d/10-vboxvideo.conf <<'XVBOX'
+Section "Device"
+    Identifier  "VirtualBox Video"
+    Driver      "vboxvideo"
+EndSection
+XVBOX
+
 # ---------------------------------------------------------------------------
 # 6b. GNOME defaults (gschema overrides apply to every user, incl. live)
 # ---------------------------------------------------------------------------
