@@ -223,7 +223,7 @@ class IntentBarWindow(Adw.Window):
 
         self.set_decorated(False)
         self.set_default_size(660, -1)
-        self.set_resizable(False)
+        self.set_size_request(480, -1)  # minimum width so it still fits small screens
         self.add_css_class("intent-bar-window")
 
         self._apply_css()

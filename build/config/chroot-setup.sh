@@ -416,7 +416,44 @@ EOF
 systemctl enable NetworkManager.service || log "WARNING: could not enable NetworkManager"
 
 # ---------------------------------------------------------------------------
-# 6. GNOME defaults (gschema overrides apply to every user, incl. live)
+# 6a. VM guest integration (auto-resize display in VirtualBox/VMware/QEMU)
+# ---------------------------------------------------------------------------
+log "Configuring VM guest tools autostart..."
+install -Dm755 /dev/stdin /usr/local/bin/axon-vm-guest-init <<'VMEOF'
+#!/bin/sh
+# Detect the virtualisation platform and start the appropriate guest tools
+# so the display auto-resizes to match the host window.
+case "$(systemd-detect-virt 2>/dev/null || echo none)" in
+    oracle)   # VirtualBox
+        VBoxClient --vmsvga    2>/dev/null || true
+        VBoxClient --clipboard 2>/dev/null || true
+        VBoxClient --draganddrop 2>/dev/null || true
+        VBoxClient --seamless 2>/dev/null || true
+        VBoxClient --display 2>/dev/null || true
+        ;;
+    vmware)
+        /usr/bin/vmware-user-suid-wrapper 2>/dev/null || true
+        ;;
+    qemu|kvm)
+        spice-vdagent 2>/dev/null || true
+        ;;
+esac
+VMEOF
+
+cat > /etc/xdg/autostart/axon-vm-guest.desktop <<'VMDESK'
+[Desktop Entry]
+Type=Application
+Name=Axon VM Guest Integration
+Comment=Starts guest display tools for VirtualBox/VMware/QEMU auto-resize
+Exec=/usr/local/bin/axon-vm-guest-init
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Phase=Initialization
+VMDESK
+
+# ---------------------------------------------------------------------------
+# 6b. GNOME defaults (gschema overrides apply to every user, incl. live)
 # ---------------------------------------------------------------------------
 # macOS-style look: WhiteSur GTK + Shell + icon themes (built from source at
 # image-build time; falls back to the Axon dark theme if anything fails).
@@ -474,6 +511,8 @@ gtk-theme='${GTK_THEME_NAME}'
 icon-theme='${ICON_THEME_NAME}'
 font-name='Inter 11'
 enable-animations=true
+cursor-size=24
+text-scaling-factor=1.0
 
 [org.gnome.desktop.background]
 picture-uri='file:///usr/share/backgrounds/axon/axon-aurora.png'
@@ -491,6 +530,7 @@ button-layout='close,minimize,maximize:'
 [org.gnome.mutter]
 dynamic-workspaces=false
 edge-tiling=true
+experimental-features=['scale-monitor-framebuffer']
 
 [org.gnome.desktop.peripherals.touchpad]
 tap-to-click=true

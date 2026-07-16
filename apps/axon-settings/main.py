@@ -26,7 +26,6 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
         self.set_title("Axon Assistant")
         self.set_default_size(560, 420)
-        self.set_resizable(False)
         self._timer_ids: list[int] = []
         self.connect("destroy", self._on_destroy)
 

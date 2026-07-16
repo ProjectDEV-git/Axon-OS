@@ -202,6 +202,16 @@ class InstallerWindow(Adw.Window):
         self.set_title("Install Axon OS")
         self.set_default_size(1060, 720)
 
+        # On small screens (e.g. 1366x768 laptops), maximise so the wizard
+        # always fits without being clipped.
+        display = self.get_display()
+        monitors = display.get_monitors()
+        if monitors.get_n_items() > 0:
+            primary = monitors.get_item(0)
+            geo = primary.get_geometry()
+            if geo.width < 1100 or geo.height < 768:
+                self.maximize()
+
         provider = Gtk.CssProvider()
         provider.load_from_data(_CSS)
         Gtk.StyleContext.add_provider_for_display(
