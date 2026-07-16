@@ -192,7 +192,7 @@ install -Dm755 "${SRC}/apps/axon-voice-overlay/main.py" /usr/lib/axon/apps/axon-
 install -Dm755 "${SRC}/services/axon-sandbox/axon-run" /usr/local/bin/axon-run
 install -Dm755 "${SRC}/system/boot_watchdog.py" /usr/local/bin/axon-boot-watchdog
 install -Dm644 "${SRC}/system/axon-boot-watchdog.service" /lib/systemd/system/axon-boot-watchdog.service
-systemctl enable axon-boot-watchdog.service
+systemctl enable axon-boot-watchdog.service || log "WARNING: could not enable axon-boot-watchdog"
 
 # Shell environment interceptor for interactive shells
 install -Dm644 "${SRC}/services/axon-sandbox/axon-sandbox-env.sh" /etc/profile.d/axon-sandbox.sh
