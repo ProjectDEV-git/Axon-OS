@@ -352,12 +352,12 @@ if loadfont /boot/grub/themes/axon/unicode.pf2 ; then
 fi
 
 menuentry "Try or Install Axon OS ${VERSION}" --class axonos {
-    linux /casper/vmlinuz boot=casper quiet splash nomodeset console=tty0 vga=791 ---
+    linux /casper/vmlinuz boot=casper quiet splash ---
     initrd /casper/initrd
 }
 
 menuentry "Try or Install Axon OS ${VERSION} (safe graphics)" --class safe {
-    linux /casper/vmlinuz boot=casper nomodeset console=tty0 vga=normal ---
+    linux /casper/vmlinuz boot=casper nomodeset vga=normal ---
     initrd /casper/initrd
 }
 
