@@ -418,18 +418,17 @@ systemctl enable NetworkManager.service || log "WARNING: could not enable Networ
 # ---------------------------------------------------------------------------
 # 6a. VM guest integration (auto-resize display in VirtualBox/VMware/QEMU)
 # ---------------------------------------------------------------------------
-log "Configuring VM guest tools autostart..."
+log "Configuring VM guest tools..."
 install -Dm755 /dev/stdin /usr/local/bin/axon-vm-guest-init <<'VMEOF'
 #!/bin/sh
 # Detect the virtualisation platform and start the appropriate guest tools
 # so the display auto-resizes to match the host window.
 case "$(systemd-detect-virt 2>/dev/null || echo none)" in
     oracle)   # VirtualBox
-        VBoxClient --vmsvga    2>/dev/null || true
-        VBoxClient --clipboard 2>/dev/null || true
+        VBoxClient --display    2>/dev/null || true
+        VBoxClient --vmsvga     2>/dev/null || true
+        VBoxClient --clipboard  2>/dev/null || true
         VBoxClient --draganddrop 2>/dev/null || true
-        VBoxClient --seamless 2>/dev/null || true
-        VBoxClient --display 2>/dev/null || true
         ;;
     vmware)
         /usr/bin/vmware-user-suid-wrapper 2>/dev/null || true
@@ -440,6 +439,7 @@ case "$(systemd-detect-virt 2>/dev/null || echo none)" in
 esac
 VMEOF
 
+# XDG autostart (works for installed systems with a normal GNOME session)
 cat > /etc/xdg/autostart/axon-vm-guest.desktop <<'VMDESK'
 [Desktop Entry]
 Type=Application
@@ -451,6 +451,30 @@ StartupNotify=false
 X-GNOME-Autostart-enabled=true
 X-GNOME-Autostart-Phase=Initialization
 VMDESK
+
+# systemd service (more reliable, especially in live sessions)
+cat > /etc/systemd/system/axon-vm-guest.service <<'VMUNIT'
+[Unit]
+Description=Axon VM guest display auto-resize (VirtualBox/VMware/QEMU)
+After=display-manager.service
+Wants=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/axon-vm-guest-init
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target
+VMUNIT
+
+# Enable the vboxservice system service if present (VirtualBox's own
+# systemd unit that runs VBoxClient --vmsvga + clipboard + drag-and-drop).
+# This is the most reliable way to get auto-resize in VirtualBox.
+systemctl enable vboxservice 2>/dev/null || true
+
+# Also enable our custom unit as a safety net
+systemctl enable axon-vm-guest.service 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # 6b. GNOME defaults (gschema overrides apply to every user, incl. live)
