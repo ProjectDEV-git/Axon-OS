@@ -468,6 +468,52 @@ RemainAfterExit=yes
 WantedBy=graphical.target
 VMUNIT
 
+# Early-boot service: detect VirtualBox and inject the vboxvideo Xorg config
+# BEFORE the display manager starts. Without this, X falls back to vesa/fbdev.
+cat > /usr/local/bin/axon-vbox-xorg-setup <<'VBOXSETUP'
+#!/bin/sh
+# Only act inside VirtualBox
+VIRT=$(systemd-detect-virt 2>/dev/null || echo none)
+if [ "${VIRT}" != "oracle" ]; then
+    exit 0
+fi
+
+XCONF_DIR="/etc/X11/xorg.conf.d"
+XCONF_FILE="${XCONF_DIR}/10-vboxvideo.conf"
+
+# Write once; idempotent
+if [ -f "${XCONF_FILE}" ]; then
+    exit 0
+fi
+
+mkdir -p "${XCONF_DIR}"
+cat > "${XCONF_FILE}" <<'XVBOX'
+Section "Device"
+    Identifier  "VirtualBox Video"
+    Driver      "vboxvideo"
+EndSection
+XVBOX
+VBOXSETUP
+chmod 755 /usr/local/bin/axon-vbox-xorg-setup
+
+cat > /etc/systemd/system/axon-vbox-xorg-setup.service <<'VBOXSVC'
+[Unit]
+Description=Write vboxvideo Xorg config if running in VirtualBox
+Before=display-manager.service gdm.service
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/axon-vbox-xorg-setup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target
+VBOXSVC
+
+systemctl enable axon-vbox-xorg-setup.service 2>/dev/null || true
+
 # Enable the vboxservice system service if present (VirtualBox's own
 # systemd unit that runs VBoxClient --vmsvga + clipboard + drag-and-drop).
 # This is the most reliable way to get auto-resize in VirtualBox.
@@ -475,16 +521,6 @@ systemctl enable vboxservice 2>/dev/null || true
 
 # Also enable our custom unit as a safety net
 systemctl enable axon-vm-guest.service 2>/dev/null || true
-
-# Force the vboxvideo X driver so auto-resize works on VirtualBox.
-# Without this, X may fall back to vesa/fbdev which don't support resize.
-mkdir -p /usr/share/X11/xorg.conf.d
-cat > /usr/share/X11/xorg.conf.d/10-vboxvideo.conf <<'XVBOX'
-Section "Device"
-    Identifier  "VirtualBox Video"
-    Driver      "vboxvideo"
-EndSection
-XVBOX
 
 # ---------------------------------------------------------------------------
 # 6b. GNOME defaults (gschema overrides apply to every user, incl. live)
