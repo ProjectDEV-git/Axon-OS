@@ -59,11 +59,16 @@ run_check "Mypy"             mypy apps/ services/ --ignore-missing-imports
 run_check "Python syntax"    python3 -m py_compile services/service_base.py
 run_check "Python syntax"    python3 -m py_compile services/plugin_registry.py
 run_check "Python syntax"    python3 -m py_compile services/plugin_deploy.py
-run_check "ShellCheck"       bash -n install.sh
-run_check "ShellCheck build" bash -n build/build.sh
-run_check "ShellCheck chroot" bash -n build/config/chroot-setup.sh
-run_check "ShellCheck firstboot" bash -n build/config/firstboot.sh
-run_check "ShellCheck keep-chroot" bash -n scripts/keep-chroot.sh
+# --- Syntax & Lint Checks ---
+# bash -n is syntax-only parsing; genuine static analysis runs below via shellcheck (if installed).
+run_check "Bash syntax (install.sh)"      bash -n install.sh
+run_check "Bash syntax (build.sh)"        bash -n build/build.sh
+run_check "Bash syntax (chroot-setup.sh)" bash -n build/config/chroot-setup.sh
+run_check "Bash syntax (firstboot.sh)"    bash -n build/config/firstboot.sh
+run_check "Bash syntax (keep-chroot.sh)"  bash -n scripts/keep-chroot.sh
+run_optional "ShellCheck (static analysis)" shellcheck \
+    install.sh build/build.sh build/config/chroot-setup.sh \
+    build/config/firstboot.sh scripts/keep-chroot.sh
 run_check "JSON validation"  python3 -c "import json; json.load(open('shell/axon-shell/metadata.json'))"
 run_check "Pre-commit hooks" pre-commit run --all-files
 
