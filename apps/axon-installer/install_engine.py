@@ -374,23 +374,19 @@ def format_and_mount(esp: str, root: str, esp_is_new: bool) -> str:
     return fs_type
 
 
-# rsync exclude patterns for temp dirs, not temp-file usage.
-_TMP_EXCLUDE = "/tmp/*"  # nosec B108
-_VAR_TMP_EXCLUDE = "/var/tmp/*"  # nosec B108
-
 RSYNC_EXCLUDES = [
     "/dev/*",
     "/proc/*",
     "/sys/*",
     "/run/*",
-    _TMP_EXCLUDE,
+    "/tmp/*",  # nosec B108 - rsync exclude pattern, not a temp file
     "/mnt/*",
     "/media/*",
     "/cdrom",
     "/target",
     "/swapfile",
     "/var/crash/*",
-    _VAR_TMP_EXCLUDE,
+    "/var/tmp/*",  # nosec B108 - rsync exclude pattern
     "/lost+found",
     "/boot/efi/*",
     "/home/*/.cache/*",

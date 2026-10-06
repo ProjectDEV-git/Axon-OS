@@ -161,28 +161,32 @@ DEFAULT_CATALOG = [
 ]
 
 
+def _is_http_url(url):
+    """urllib also opens file:// and custom schemes; only HTTP(S) is expected."""
+    if url.startswith(("http://", "https://")):
+        return True
+    log.warning("Refusing non-HTTP URL: %s", url)
+    return False
+
+
 def _http_get(url, timeout=5.0):
-    if not url.startswith(("http://", "https://")):
-        log.debug("Refusing non-HTTP URL: %s", url)
+    if not _is_http_url(url):
         return None
     req = urllib.request.Request(url)
     try:
-        # Scheme restricted to http(s) above.
-        return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
+        return urllib.request.urlopen(req, timeout=timeout)  # nosec B310 - http(s) only
     except Exception as exc:
         log.debug("HTTP GET %s failed: %s", url, exc)
         return None
 
 
 def _http_post(url, payload, timeout=10.0):
-    if not url.startswith(("http://", "https://")):
-        log.debug("Refusing non-HTTP URL: %s", url)
+    if not _is_http_url(url):
         return None
     data = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
     try:
-        # Scheme restricted to http(s) above.
-        return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
+        return urllib.request.urlopen(req, timeout=timeout)  # nosec B310 - http(s) only
     except Exception as exc:
         log.debug("HTTP POST %s failed: %s", url, exc)
         return None

@@ -4,7 +4,6 @@ import os
 import sys
 import threading
 from pathlib import Path
-from typing import ClassVar
 
 import dbus
 import dbus.mainloop.glib
@@ -14,7 +13,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gdk, GLib, Gtk
+from gi.repository import GLib, Gtk
 
 # Ensure we can load axon_logger
 _parent = str(Path(__file__).resolve().parent.parent)
@@ -30,7 +29,8 @@ class SandboxPromptDialog(Gtk.Window):
         self.set_title("Axon Rogue Shield")
         self.set_default_size(520, 360)
         self.set_decorated(True)
-        # GTK4 removed set_keep_above(); stacking is left to the compositor.
+        # GTK 4 has no set_keep_above() (it raised AttributeError here);
+        # the caller present()s the dialog, which raises and focuses it.
 
         # UI Styling
         self.add_css_class("sandbox-dialog")
@@ -80,11 +80,9 @@ class SandboxPromptDialog(Gtk.Window):
         """,
             -1,
         )
-        display = Gdk.Display.get_default()
-        if display is not None:
-            Gtk.StyleContext.add_provider_for_display(
-                display, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
+        Gtk.StyleContext.add_provider_for_display(
+            self.get_display(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
         # Main Layout
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -175,12 +173,12 @@ class SandboxManager(ServiceBase):
 
     # Directories from which scripts are allowed to be audited.
     # Override via environment variable AXON_SANDBOX_ALLOWED_DIRS (colon-separated).
-    _DEFAULT_ALLOWED_DIRS: ClassVar[list[Path]] = [
+    _DEFAULT_ALLOWED_DIRS = (
         Path.home() / ".local" / "share" / "axon",
         Path.home() / "Documents",
         Path.home() / "bin",
         Path.home() / ".local" / "bin",
-    ]
+    )
 
     def _setup(self):
         env_dirs = os.environ.get("AXON_SANDBOX_ALLOWED_DIRS", "")

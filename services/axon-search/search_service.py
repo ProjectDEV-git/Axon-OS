@@ -146,7 +146,7 @@ class SearchService(ServiceBase):
         try:
             raw = brain.GetEmbeddings(text, EMBED_MODEL, timeout=30)
             vec = json.loads(raw)
-            if isinstance(vec, list) and vec and isinstance(vec[0], int | float):
+            if isinstance(vec, list) and vec and isinstance(vec[0], (int, float)):
                 return vec
             # Brain returned {"error": ...} — try pulling the model once.
             if not self._pull_attempted:

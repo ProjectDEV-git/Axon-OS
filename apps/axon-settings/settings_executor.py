@@ -33,7 +33,7 @@ class SettingsExecutor:
                 isinstance(value, str) and _SAFE_NUMBER_RE.match(value) is not None
             )
         if expected_type is float:
-            return isinstance(value, int | float) or (
+            return isinstance(value, (int, float)) or (
                 isinstance(value, str) and _SAFE_NUMBER_RE.match(value) is not None
             )
         if expected_type is str:

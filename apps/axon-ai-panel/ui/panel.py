@@ -47,8 +47,7 @@ except ImportError:
 
         def is_available(self) -> bool:
             try:
-                # BASE_URL is a hardcoded http://localhost constant.
-                urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=2)  # nosec B310
+                urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=2)  # nosec B310 - fixed http URL
                 return True
             except Exception:
                 return False
@@ -56,7 +55,6 @@ except ImportError:
         def list_models(self) -> list[str]:
             """Return list of locally available model names."""
             try:
-                # BASE_URL is a hardcoded http://localhost constant.
                 with urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=5) as resp:  # nosec B310
                     data = json.loads(resp.read().decode())
                     return [m["name"] for m in data.get("models", [])]
@@ -84,8 +82,7 @@ except ImportError:
                 headers={"Content-Type": "application/json"},
             )
             try:
-                # req targets the hardcoded http://localhost BASE_URL.
-                with urllib.request.urlopen(req, timeout=120) as resp:  # nosec B310
+                with urllib.request.urlopen(req, timeout=120) as resp:  # nosec B310 - BASE_URL
                     for raw_line in resp:
                         line = raw_line.decode().strip()
                         if not line:

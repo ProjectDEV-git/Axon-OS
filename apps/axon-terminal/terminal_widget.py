@@ -20,7 +20,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
-gi.require_version("Vte", "3.91")  # GTK4 binding; Vte 2.91 is GTK3-only
+gi.require_version("Vte", "3.91")  # VTE for GTK 4 (2.91 is the GTK 3 build)
 import sys
 import tempfile
 from pathlib import Path
@@ -68,6 +68,17 @@ for _hex in _PALETTE_HEX:
     _c = Gdk.RGBA()
     _c.parse(_hex)
     _PALETTE.append(_c)
+
+
+def exit_code_from_status(status: int) -> int:
+    """Decode the raw wait status VTE passes to ``child-exited``.
+
+    ``exit 3`` arrives as 768; a signal-killed shell yields ``-signum``.
+    """
+    try:
+        return os.waitstatus_to_exitcode(status)
+    except ValueError:  # not an exit/signal status (e.g. stopped)
+        return status
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +384,7 @@ class TerminalWidget(Gtk.Box):
         # for future enhancements (e.g. shell integration via OSC).
         pass
 
-    def _on_child_exited(self, terminal: Vte.Terminal, exit_status: int, tab: _TerminalTab) -> None:
+    def _on_child_exited(self, terminal: Vte.Terminal, status: int, tab: _TerminalTab) -> None:
         """Called when the shell or a command exits.
 
         For interactive shells the exit_status is from the shell itself.
@@ -389,13 +400,15 @@ class TerminalWidget(Gtk.Box):
         # the user typed 'exit N' or the shell crashed. Individual command
         # failures are harder to detect without shell integration.
         # For now we record the exit status.
-        tab.last_exit_code = exit_status
+        exit_code = exit_code_from_status(status)
+        tab.last_exit_code = exit_code
 
-        if exit_status != 0:
-            # Try to extract recent terminal output for diagnosis
+        if exit_code != 0:
+            # Try to extract recent terminal output for diagnosis.
+            # (get_text() asserts in VTE 0.76 when PyGObject passes its
+            # attributes array, returning nothing; get_text_format() is the
+            # supported replacement.)
             try:
-                # Vte 3.91's get_text() rejects the attributes array PyGObject
-                # passes (and is deprecated); get_text_format() returns a str.
                 recent_text = terminal.get_text_format(Vte.Format.TEXT) or ""
                 # Take the last ~40 lines for context
                 lines = recent_text.strip().split("\n")

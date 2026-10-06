@@ -8,7 +8,8 @@ pytest-timeout==2.2.0
 pytest-xdist==3.5.0
 
 # Linting & Code Quality
-ruff==0.2.0
+# Keep ruff in sync with .pre-commit-config.yaml and .github/workflows/build.yml
+ruff==0.8.6
 ruff-lsp==0.0.53
 
 # Type checking
@@ -27,6 +28,7 @@ sphinx==7.2.6
 sphinx-rtd-theme==2.0.0
 
 # Security & Performance
-bandit==1.7.5
-pbr>=6.0  # imported by bandit 1.7.5 at runtime, no longer pulled in transitively
+# 1.7.5 imports pbr without depending on it and crashes in fresh envs;
+# keep in sync with .pre-commit-config.yaml
+bandit==1.8.3
 memory-profiler==0.61.0

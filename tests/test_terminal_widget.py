@@ -41,7 +41,7 @@ class TestChildExited:
         widget._show_diagnosis_for.assert_called_once_with(tab)
         tab.terminal.get_text_format.assert_called_once_with(terminal_widget.Vte.Format.TEXT)
         assert "No targets" in tab.stderr_capture
-        assert tab.last_exit_code == 3 << 8
+        assert tab.last_exit_code == 3  # decoded by exit_code_from_status
 
     def test_live_tab_clean_exit_is_not_diagnosed(self):
         tab = _make_tab()

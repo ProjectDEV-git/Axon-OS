@@ -137,7 +137,7 @@ class ServiceBase(dbus.service.Object):
         import signal
 
         loop = GLib.MainLoop()
-        service = cls()  # side effect: starts D-Bus service
+        service = cls()  # side effect: exports the service on the bus
 
         def _shutdown(signum, frame):
             service.logger.info("Received signal %d, shutting down...", signum)

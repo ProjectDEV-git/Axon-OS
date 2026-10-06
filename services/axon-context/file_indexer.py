@@ -73,7 +73,7 @@ class FileIndexer:
             # Use general model or default for embedding
             emb_json = brain_interface.GetEmbeddings(text, "", timeout=30)
             emb = json.loads(emb_json)
-            if isinstance(emb, list) and emb and isinstance(emb[0], int | float):
+            if isinstance(emb, list) and emb and isinstance(emb[0], (int, float)):
                 return emb
         except Exception as e:
             logger.error(f"Failed to fetch embedding: {e}")

@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 import math
 import sys
-from typing import ClassVar
 
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Adw, Gdk, GLib, Gtk
+from gi.repository import Adw, GLib, Gtk
 
 
 class VoiceOverlay(Gtk.ApplicationWindow):
-    _css_loaded: ClassVar[bool] = False
+    _css_loaded = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -42,11 +41,9 @@ class VoiceOverlay(Gtk.ApplicationWindow):
             """,
                 -1,
             )
-            display = Gdk.Display.get_default()
-            if display is not None:
-                Gtk.StyleContext.add_provider_for_display(
-                    display, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-                )
+            Gtk.StyleContext.add_provider_for_display(
+                self.get_display(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
             VoiceOverlay._css_loaded = True
 
         # Animation loop (60 FPS)
@@ -121,8 +118,8 @@ class VoiceOverlayApp(Adw.Application):
         super().__init__(application_id="org.axonos.VoiceOverlay", **kwargs)
 
     def do_activate(self):
-        # The window presents itself. GTK4 has no set_keep_above(); stacking and
-        # placement are handled by the compositor via shell constraints.
+        # The window presents itself. GTK 4 has no set_keep_above() (calling it
+        # raised AttributeError); stacking is left to the compositor.
         VoiceOverlay(application=self)
 
 

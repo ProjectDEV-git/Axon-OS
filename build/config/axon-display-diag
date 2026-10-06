@@ -1,0 +1,139 @@
+#!/bin/bash
+# Axon OS — display / boot diagnostics collector.
+#
+# Gathers everything needed to debug "black screen on normal boot",
+# "only safe graphics works" and "wrong resolution / no auto-resize" reports
+# into one text file. Read-only: it changes nothing on the system.
+#
+# Usage:
+#   axon-display-diag              # current boot
+#   axon-display-diag --previous   # also the previous boot (installed systems
+#                                  # keep a persistent journal; the live ISO
+#                                  # does not, so run it from a TTY there)
+#   sudo axon-display-diag         # include logs only root can read
+#
+# On a black screen, press Ctrl+Alt+F3, log in (live user: axon, no
+# password) and run it from that console.
+set -u
+
+PREVIOUS=false
+for arg in "$@"; do
+    case "${arg}" in
+        --previous) PREVIOUS=true ;;
+        -h | --help)
+            sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "axon-display-diag: unknown option ${arg}" >&2
+            exit 2
+            ;;
+    esac
+done
+
+OUT_DIR="${HOME:-/tmp}"
+# Under sudo HOME is /root; write where the invoking user can attach it.
+if [[ -n "${SUDO_USER:-}" ]]; then
+    OUT_DIR="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+fi
+[[ -n "${OUT_DIR}" && -w "${OUT_DIR}" ]] || OUT_DIR=/tmp
+OUT="${OUT_DIR}/axon-display-report-$(date +%Y%m%d-%H%M%S).txt"
+
+section() { printf '\n===== %s =====\n' "$*"; }
+run() {
+    printf '$ %s\n' "$*"
+    "$@" 2>&1 || printf '(exit %d)\n' "$?"
+}
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# Error and driver-selection lines from an Xorg log, plus its tail.
+xorg_log() {
+    local log="$1"
+    [[ -r "${log}" ]] || return 0
+    section "Xorg log ${log}"
+    grep -E '\(EE\)|\(WW\)|LoadModule|Loading .*_drv|Matched .* as autoconfigured|Using config|Output .* connected|Virtual-?[0-9]+ (connected|disconnected)|Setting mode|modeset\(|VMWARE|vboxvideo|glamor' \
+        "${log}" | tail -n 120
+    printf -- '--- last 30 lines ---\n'
+    tail -n 30 "${log}"
+}
+
+journal_boot() {
+    local boot="$1"
+    section "Journal (boot ${boot}): display stack"
+    journalctl -b "${boot}" --no-pager -o short-monotonic \
+        -u gdm -u display-manager -u plymouth-start -u plymouth-quit \
+        -u plymouth-quit-wait -u virtualbox-guest-utils -u systemd-modules-load \
+        -u gpu-manager 2>&1 | tail -n 150
+    section "Journal (boot ${boot}): gnome-shell / Xorg / VBoxClient"
+    journalctl -b "${boot}" --no-pager -o short-monotonic \
+        _COMM=gnome-shell _COMM=Xorg _COMM=gdm-x-session _COMM=VBoxClient 2>&1 |
+        tail -n 150
+    section "Journal (boot ${boot}): kernel graphics"
+    journalctl -b "${boot}" -k --no-pager -o short-monotonic 2>&1 |
+        grep -i -E 'vmwgfx|vboxvideo|vboxguest|simpledrm|efifb|vesafb|\bdrm\b|fbcon|plymouth|nomodeset|segfault|BUG:|Oops|panic' |
+        tail -n 120
+    section "Journal (boot ${boot}): errors"
+    journalctl -b "${boot}" -p err --no-pager -o short-monotonic 2>&1 | tail -n 80
+}
+
+{
+    section "Axon OS display report — $(date -Is)"
+    cat /etc/axon-release 2>/dev/null
+    run uname -a
+    run cat /proc/cmdline
+    printf 'running as uid %s, DISPLAY=%s, XDG_SESSION_TYPE=%s\n' \
+        "$(id -u)" "${DISPLAY:-}" "${XDG_SESSION_TYPE:-}"
+
+    section "Virtualisation"
+    run systemd-detect-virt
+    for f in sys_vendor product_name product_version; do
+        printf '%s: %s\n' "${f}" "$(cat "/sys/class/dmi/id/${f}" 2>/dev/null)"
+    done
+
+    section "Graphics hardware and kernel drivers"
+    if have lspci; then
+        lspci -nnk | grep -A3 -E 'VGA|3D controller|Display controller|System peripheral.*80ee'
+    fi
+    run sh -c "lsmod | grep -E '^(vmwgfx|vboxvideo|vboxguest|vboxsf|simpledrm|bochs|qxl|virtio_gpu|drm) '"
+    run ls -l /dev/dri /dev/fb0
+    for c in /sys/class/drm/card*-*; do
+        [[ -e "${c}/status" ]] || continue
+        printf '%s: %s; modes: %s\n' "${c##*/}" "$(cat "${c}/status")" \
+            "$(head -n 5 "${c}/modes" 2>/dev/null | tr '\n' ' ')"
+    done
+
+    section "X configuration"
+    run ls -la /etc/X11/xorg.conf /etc/X11/xorg.conf.d /usr/share/X11/xorg.conf.d
+    for f in /etc/X11/xorg.conf /etc/X11/xorg.conf.d/*.conf; do
+        [[ -f "${f}" ]] && { printf -- '--- %s ---\n' "${f}"; cat "${f}"; }
+    done
+    run cat /etc/gdm3/custom.conf
+
+    section "Guest tools"
+    run sh -c 'pgrep -a VBoxClient; pgrep -a VBoxService; pgrep -a vmtoolsd; pgrep -a spice-vdagent'
+    run systemctl status virtualbox-guest-utils.service --no-pager -n 20
+    run /usr/lib/systemd/user-environment-generators/60-axon-vm-graphics
+    if [[ -n "${DISPLAY:-}" ]] && have xrandr; then
+        run xrandr --query
+    fi
+
+    section "Failed units"
+    run systemctl --failed --no-pager
+
+    # GDM runs Xorg rootless, so logs live in each user's home (gdm3 = greeter).
+    for log in /var/log/Xorg.0.log /var/lib/gdm3/.local/share/xorg/Xorg.*.log \
+        /home/*/.local/share/xorg/Xorg.*.log /root/.local/share/xorg/Xorg.*.log; do
+        xorg_log "${log}"
+    done
+
+    journal_boot 0
+    if [[ "${PREVIOUS}" == "true" ]]; then
+        journal_boot -1
+    fi
+} >"${OUT}" 2>&1
+[[ -n "${SUDO_USER:-}" ]] && chown "${SUDO_USER}:" "${OUT}" 2>/dev/null
+
+echo "Display report written to ${OUT}"
+if [[ "$(id -u)" -ne 0 ]]; then
+    echo "Tip: run with sudo to include logs that only root can read."
+fi

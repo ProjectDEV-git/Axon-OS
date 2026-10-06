@@ -1,5 +1,6 @@
 """Tests for ClipboardStore — connection pooling, close_all, and CRUD operations."""
 
+# Load the module directly (hyphenated directory name)
 import importlib.util
 import os
 import sys
@@ -8,7 +9,6 @@ import threading
 import unittest
 from pathlib import Path
 
-# Load the module directly (hyphenated directory name)
 SERVICES_DIR = Path(__file__).resolve().parent.parent / "services"
 CONTEXT_DIR = SERVICES_DIR / "axon-context"
 STORE_PATH = CONTEXT_DIR / "clipboard_store.py"
