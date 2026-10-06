@@ -7,6 +7,7 @@ regex-based audit.py for patterns that don't need AST analysis.
 
 from __future__ import annotations
 
+import logging
 import re
 import shlex
 from collections.abc import Callable

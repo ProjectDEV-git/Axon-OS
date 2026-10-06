@@ -11,17 +11,21 @@ import unicodedata
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import dbus
 import dbus.mainloop.glib
 import dbus.service
-import tomllib
+from _log_helper import resolve_logger as configure_app_logger
 from gi.repository import GLib
 from service_base import ServiceBase
 
-from _log_helper import resolve_logger as configure_app_logger
-
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
 logger = configure_app_logger("axon-brain")
 
@@ -58,6 +62,12 @@ _INJECTION_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+def _require_http_url(url: str) -> None:
+    """Reject non-HTTP(S) URLs; urllib would also open file:// and custom schemes."""
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"refusing non-HTTP URL: {url!r}")
+
+
 def _sanitize_output(text: str) -> str:
     """Strip ANSI escape sequences and null bytes from AI output."""
     text = _ANSI_RE.sub("", text)
@@ -88,7 +98,12 @@ class TokenBuffer:
     or when the flush interval has elapsed, whichever comes first.
     """
 
-    def __init__(self, emit_fn, flush_interval: float = 0.1, max_tokens: int = 10):
+    def __init__(
+        self,
+        emit_fn: Callable[[str, str], object],
+        flush_interval: float = 0.1,
+        max_tokens: int = 10,
+    ) -> None:
         self._buffer: list[tuple[str, str]] = []  # (transaction_id, token)
         self._last_flush = time.monotonic()
         self._flush_interval = flush_interval
@@ -220,12 +235,13 @@ class BrainService(ServiceBase):
 
     def _http_post(self, url, payload, stream=False, timeout=60.0, max_retries=5):
         """Helper to execute urllib POST requests with retry logic."""
+        _require_http_url(url)
         data = json.dumps(payload).encode()
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         max_backoff = 30.0
         for attempt in range(max_retries):
             try:
-                return urllib.request.urlopen(req, timeout=timeout)
+                return urllib.request.urlopen(req, timeout=timeout)  # nosec B310 - http(s) only
             except (urllib.error.URLError, OSError):
                 if attempt == max_retries - 1:
                     raise
@@ -234,12 +250,13 @@ class BrainService(ServiceBase):
 
     def _http_get(self, url, timeout=5.0):
         """Helper to execute urllib GET requests with retry logic."""
+        _require_http_url(url)
         req = urllib.request.Request(url)
         max_retries = 5
         max_backoff = 30.0
         for attempt in range(max_retries):
             try:
-                return urllib.request.urlopen(req, timeout=timeout)
+                return urllib.request.urlopen(req, timeout=timeout)  # nosec B310 - http(s) only
             except (urllib.error.URLError, OSError):
                 if attempt == max_retries - 1:
                     raise
@@ -273,7 +290,7 @@ class BrainService(ServiceBase):
         return len(prompt) <= BrainService._MAX_PROMPT_LEN
 
     @staticmethod
-    def _set_stream_timeout(response, timeout: float = _STREAM_READ_TIMEOUT) -> None:
+    def _set_stream_timeout(response: Any, timeout: float = _STREAM_READ_TIMEOUT) -> None:
         """Set a per-read socket timeout on an HTTP response for streaming.
 
         Prevents the daemon thread from blocking forever if Ollama hangs
