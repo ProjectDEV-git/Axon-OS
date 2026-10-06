@@ -54,7 +54,7 @@ Useful flags / environment:
 |--------|--------|
 | `--compression=gzip` | Faster squashfs (larger ISO); default is `xz` |
 | `--keep-chroot` | Reuse the existing chroot for iterative rebuilds |
-| `AXON_BUILD_DIR=/path` | Work directory (default `/tmp/axon-build`, needs ~15 GB) |
+| `AXON_BUILD_DIR=/path` | Work directory (default `/var/lib/axon-build`, needs ~15 GB) |
 
 ### Keep Chroot (Interactive Development)
 
@@ -74,7 +74,7 @@ sudo bash scripts/keep-chroot.sh --cmd "apt list --installed"
 sudo bash scripts/keep-chroot.sh --reset
 ```
 
-The chroot is created via `debootstrap` on first run and persisted at `/tmp/axon-build/chroot`. Subsequent runs reuse the same chroot, so you can install packages, edit configs, and test changes without re-downloading everything. Use `--setup` to apply the full Axon component installation from `chroot-setup.sh`.
+The chroot is created via `debootstrap` on first run and persisted at `/var/lib/axon-build/chroot`. Subsequent runs reuse the same chroot, so you can install packages, edit configs, and test changes without re-downloading everything. Use `--setup` to apply the full Axon component installation from `chroot-setup.sh`.
 
 ### Persistent APT Cache
 
@@ -83,7 +83,7 @@ Downloaded `.deb` packages are cached in `${AXON_BUILD_DIR}/apt-cache/` and pers
 To clear the cache and start fresh:
 
 ```bash
-sudo rm -rf /tmp/axon-build/apt-cache
+sudo rm -rf /var/lib/axon-build/apt-cache
 ```
 
 ## CI Builds (GitHub Actions)

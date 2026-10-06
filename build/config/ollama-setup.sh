@@ -33,9 +33,10 @@ detect_gpu() {
 # ---------------------------------------------------------------------------
 install_ollama() {
     echo "[axon] Installing Ollama (idempotent — safe to re-run)..."
-# SECURITY: curl | sh executes remote code without integrity verification.
-# TODO: pin a SHA-256 hash of the installer and verify before execution.
-    curl -fsSL https://ollama.com/install.sh | sh
+    # Pinned release verified by SHA-256 (never curl | sh as root)
+    local installer="/usr/lib/axon/ollama/install-ollama.sh"
+    [[ -x "${installer}" ]] || installer="$(dirname "${BASH_SOURCE[0]}")/install-ollama.sh"
+    sudo "${installer}"
     echo "[axon] Ollama installation complete."
 }
 

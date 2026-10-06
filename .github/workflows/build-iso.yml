@@ -18,8 +18,10 @@ on:
     tags:
       - "v*"
 
+# The build runs third-party package scripts as root, so it gets a read-only
+# token; only the tag-only publish job below can write to releases.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-iso-${{ github.ref }}
@@ -33,6 +35,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Free up runner disk space
         run: |
@@ -94,10 +98,24 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      - name: Attach ISO to release (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+  publish-release:
+    name: Attach ISO to release (tags only)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-iso
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: axon-os-iso
+          path: dist
+
+      - name: Attach ISO to release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             --title "Axon OS ${GITHUB_REF_NAME}" \

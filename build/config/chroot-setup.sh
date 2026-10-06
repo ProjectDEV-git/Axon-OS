@@ -122,7 +122,8 @@ log "Adding flathub remote..."
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
 
 log "Installing Python AI libraries inside chroot..."
-pip3 install --no-cache-dir faster-whisper sqlite-vec --break-system-packages || log "WARNING: Python AI libraries failed to install"
+# Pinned versions: unpinned installs pulled whatever PyPI served at build time
+pip3 install --no-cache-dir "faster-whisper==1.2.1" "sqlite-vec==0.1.9" --break-system-packages || log "WARNING: Python AI libraries failed to install"
 
 
 # ---------------------------------------------------------------------------
@@ -532,8 +533,9 @@ fi
 if [[ "${WHITESUR_SKIP}" == "false" ]]; then
     apt-get install -y sassc libglib2.0-dev-bin || log "WARNING: theme build deps failed"
     # Pinned commit hashes for reproducible builds — update these when bumping themes.
-    WHITESUR_GTK_COMMIT="${WHITESUR_GTK_COMMIT:-master}"
-    WHITESUR_ICON_COMMIT="${WHITESUR_ICON_COMMIT:-master}"
+    # Their install.sh runs as root in the image, so never track a branch.
+    WHITESUR_GTK_COMMIT="${WHITESUR_GTK_COMMIT:-d5782652d412137e26fb8ff55b55a5572e4c6995}"
+    WHITESUR_ICON_COMMIT="${WHITESUR_ICON_COMMIT:-73d8040da51a9ed74e47c7366e7e9ff437601a5c}"
     if git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git /tmp/wsg \
        && git -C /tmp/wsg checkout "${WHITESUR_GTK_COMMIT}" \
        && /tmp/wsg/install.sh -d /usr/share/themes -c Dark -N glassy; then
@@ -652,6 +654,9 @@ cp "${SRC}/data/polkit/org.axonos.install-engine.policy" /usr/share/polkit-1/act
 # installed system's first online boot. The unit stays disabled in the image;
 # the install engine enables it on the target when the user opts in.
 install -Dm755 "${SRC}/build/config/ai-firstboot.sh" /usr/local/bin/axon-ai-firstboot
+# Hash-pinned Ollama installer used by first boot and axon-ollama-setup
+install -Dm755 "${SRC}/build/config/install-ollama.sh" /usr/lib/axon/ollama/install-ollama.sh
+install -Dm644 "${SRC}/build/config/ollama-release.env" /usr/lib/axon/ollama/ollama-release.env
 cat > /usr/lib/systemd/system/axon-ai-firstboot.service <<'EOF'
 [Unit]
 Description=Axon OS AI first-boot setup (Ollama install + model pull)
