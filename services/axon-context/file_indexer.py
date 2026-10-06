@@ -2,7 +2,6 @@
 import json
 import os
 import sqlite3
-import sys
 import threading
 import time
 from array import array
@@ -10,7 +9,6 @@ from pathlib import Path
 
 import dbus
 import sqlite_vec
-
 from _log_helper import resolve_logger as configure_app_logger
 
 logger = configure_app_logger("axon-file-indexer")
@@ -75,7 +73,7 @@ class FileIndexer:
             # Use general model or default for embedding
             emb_json = brain_interface.GetEmbeddings(text, "", timeout=30)
             emb = json.loads(emb_json)
-            if isinstance(emb, list) and emb and isinstance(emb[0], (int, float)):
+            if isinstance(emb, list) and emb and isinstance(emb[0], int | float):
                 return emb
         except Exception as e:
             logger.error(f"Failed to fetch embedding: {e}")

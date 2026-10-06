@@ -117,7 +117,7 @@ def to_gvariant(value: object) -> str:
     """Serialise a JSON value for `gsettings set`."""
     if isinstance(value, bool):
         return "true" if value else "false"
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return str(value)
     if isinstance(value, list):
         return json.dumps(value).replace('"', "'")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import math
 import sys
+from typing import ClassVar
 
 import gi
 
@@ -11,6 +12,8 @@ from gi.repository import Adw, Gdk, GLib, Gtk
 
 
 class VoiceOverlay(Gtk.ApplicationWindow):
+    _css_loaded: ClassVar[bool] = False
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -28,7 +31,7 @@ class VoiceOverlay(Gtk.ApplicationWindow):
         # Phase offset for animation
         self.phase = 0.0
 
-        if not hasattr(VoiceOverlay, "_css_loaded"):
+        if not VoiceOverlay._css_loaded:
             css_provider = Gtk.CssProvider()
             css_provider.load_from_data(
                 """
@@ -39,9 +42,11 @@ class VoiceOverlay(Gtk.ApplicationWindow):
             """,
                 -1,
             )
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-            )
+            display = Gdk.Display.get_default()
+            if display is not None:
+                Gtk.StyleContext.add_provider_for_display(
+                    display, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
             VoiceOverlay._css_loaded = True
 
         # Animation loop (60 FPS)
@@ -116,11 +121,9 @@ class VoiceOverlayApp(Adw.Application):
         super().__init__(application_id="org.axonos.VoiceOverlay", **kwargs)
 
     def do_activate(self):
-        win = VoiceOverlay(application=self)
-
-        # Apply Wayland/X11 specific window positions
-        # In a real compositor, window configuration is handled via shell constraints
-        win.set_keep_above(True)
+        # The window presents itself. GTK4 has no set_keep_above(); stacking and
+        # placement are handled by the compositor via shell constraints.
+        VoiceOverlay(application=self)
 
 
 if __name__ == "__main__":

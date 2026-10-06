@@ -8,11 +8,10 @@ None of these imports require D-Bus, GTK, or root.
 import sys
 from unittest.mock import MagicMock
 
-import pytest
-
 import audit
 import indexer
 import plan
+import pytest
 from install_engine import fstab_lines
 from intent_router import clean_transcript, parse_intent_response
 
@@ -215,7 +214,6 @@ class TestFstab:
 # ---------------------------------------------------------------------------
 
 import sqlite3
-from unittest.mock import MagicMock
 
 # search_service imports dbus + gi at module load. Use the real bindings when
 # they exist (CI and dev machines install python3-dbus / python3-gi); only fall

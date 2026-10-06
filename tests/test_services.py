@@ -88,7 +88,7 @@ class TestAxonServices(unittest.TestCase):
     def test_brain_list_models(self):
         models_json = self.brain.ListModels(dbus_interface="org.axonos.Brain")
         models = json.loads(models_json)
-        self.assertTrue(isinstance(models, (list, dict)))
+        self.assertTrue(isinstance(models, list | dict))
 
     def test_brain_conversations_crud(self):
         # Create
@@ -128,7 +128,7 @@ class TestAxonServices(unittest.TestCase):
             "Test embedding query", "", dbus_interface="org.axonos.Brain"
         )
         data = json.loads(embeddings_json)
-        self.assertTrue(isinstance(data, (list, dict)))
+        self.assertTrue(isinstance(data, list | dict))
 
     # ------------------------------------------------------------------
     # Context Service Tests

@@ -5,8 +5,6 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 # Ensure services/ is on sys.path for imports
 _services_dir = str(Path(__file__).resolve().parent.parent / "services")
 if _services_dir not in sys.path:
