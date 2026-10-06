@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """SQLite-backed clipboard history store for Axon Context service."""
 
+import os
 import sqlite3
 import sys
 import threading
@@ -27,7 +28,17 @@ class ClipboardStore:
         self._lock = threading.RLock()
         self._local = threading.local()
         self._all_connections: list[sqlite3.Connection] = []
+        # Clipboard history can hold passwords: create the DB owner-only
+        try:
+            os.close(os.open(db_path, os.O_CREAT | os.O_WRONLY, 0o600))
+        except OSError:
+            pass
         self._init_db()
+        for suffix in ("", "-wal", "-shm"):
+            try:
+                os.chmod(db_path + suffix, 0o600)
+            except OSError:
+                pass
 
     def _get_connection(self):
         """Return a per-thread SQLite connection, reusing if still open."""

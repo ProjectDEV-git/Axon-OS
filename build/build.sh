@@ -20,8 +20,9 @@
 #   --cmd 'CMD'       Run a command inside the chroot (combine with --chroot)
 #
 # Environment:
-#   AXON_BUILD_DIR   Work directory (default: /tmp/axon-build)
-#   AXON_WINABI_AUTOLOAD  1 = auto-load the untested axon-winabi kernel module at boot (default: 0)
+#   AXON_BUILD_DIR   Work directory (default: /var/lib/axon-build; must be root-owned)
+#   AXON_WINABI_BUILD     1 = build the untested axon-winabi kernel module into the image (default: 0)
+#   AXON_WINABI_AUTOLOAD  1 = also auto-load it at boot (needs AXON_WINABI_BUILD=1; default: 0)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,7 +37,7 @@ MIRROR="https://us.archive.ubuntu.com/ubuntu/"
 ISO_NAME="axon-os-${VERSION}-${ARCH}.iso"
 VOLID="AXON_OS"
 
-WORK_DIR="${AXON_BUILD_DIR:-/tmp/axon-build}"
+WORK_DIR="${AXON_BUILD_DIR:-/var/lib/axon-build}"
 CHROOT="${WORK_DIR}/chroot"
 IMAGE="${WORK_DIR}/image"
 APT_CACHE="${WORK_DIR}/apt-cache"  # persistent .deb cache across builds
@@ -98,6 +99,18 @@ timer() {
 # Preflight
 # ---------------------------------------------------------------------------
 [[ ${EUID} -eq 0 ]] || die "This script must run as root (try: sudo bash build/build.sh)"
+
+# The build runs chroot/bash as root inside WORK_DIR and reuses any chroot or
+# base tarball it finds there, so the directory must not be writable by anyone
+# but root (a predictable path in /tmp could be pre-seeded by another user).
+secure_work_dir() {
+    mkdir -p -m 0755 "${WORK_DIR}"
+    local owner perms
+    owner="$(stat -c %u "${WORK_DIR}")"
+    perms="$(stat -c %a "${WORK_DIR}")"
+    [[ "${owner}" == "0" ]] || die "Work dir ${WORK_DIR} is not owned by root; refusing to use it"
+    (( (8#${perms} & 8#022) == 0 )) || die "Work dir ${WORK_DIR} is group/world-writable; refusing to use it"
+}
 
 check_deps() {
     local deps=(debootstrap mksquashfs xorriso grub-mkstandalone mkfs.vfat mmd mcopy rsync)
@@ -287,6 +300,7 @@ configure_chroot() {
     chroot "${CHROOT}" /usr/bin/env \
         AXON_VERSION="${VERSION}" \
         AXON_QUICK="${QUICK}" \
+        AXON_WINABI_BUILD="${AXON_WINABI_BUILD:-0}" \
         AXON_WINABI_AUTOLOAD="${AXON_WINABI_AUTOLOAD:-0}" \
         /bin/bash /opt/axon-src/build/config/chroot-setup.sh
     umount_chroot
@@ -550,7 +564,7 @@ main() {
 
     timer "Phase 1/4: Dependencies"
     check_deps
-    mkdir -p "${WORK_DIR}"
+    secure_work_dir
 
     timer "Phase 2/4: Bootstrap + configure root filesystem"
     bootstrap

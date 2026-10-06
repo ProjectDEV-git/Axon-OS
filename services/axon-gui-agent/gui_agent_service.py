@@ -17,6 +17,12 @@ import sys
 import threading
 from pathlib import Path
 
+# services/ must be importable before any local module: systemd runs this file
+# as a script, so only its own directory is on sys.path.
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 import dbus
 import dbus.mainloop.glib
 import dbus.service
@@ -50,7 +56,7 @@ You are the desktop automation planner for Axon OS (GNOME). Convert the
 user's request into a JSON array of operations. Allowed operation shapes:
 
   {"type": "gsettings_set", "schema": "<schema>", "key": "<key>", "value": <value>}
-  {"type": "launch_app", "app": "<desktop-file-or-executable-name>"}
+  {"type": "launch_app", "app": "<desktop-file-id>"}
   {"type": "notify", "message": "<text shown to the user>"}
 
 Useful schemas: org.gnome.desktop.interface (font-name, color-scheme,
@@ -155,8 +161,12 @@ class GuiAgentService(ServiceBase):
                 app = str(op["app"])
                 if not _validate_app_name(app):
                     return False, f"rejected: unsafe app name: {app!r}"
-                launcher = ["gtk-launch", app] if shutil.which("gtk-launch") else [app]
-                subprocess.Popen(launcher, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                # Desktop IDs only: never run an arbitrary binary named by the model
+                if not shutil.which("gtk-launch"):
+                    return False, "cannot launch apps: gtk-launch is missing"
+                subprocess.Popen(
+                    ["gtk-launch", app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
                 return True, f"launched {app}"
             if op_type == "notify":
                 self._notify("Axon", str(op["message"]))

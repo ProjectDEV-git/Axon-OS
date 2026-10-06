@@ -140,31 +140,17 @@ if command -v ollama &>/dev/null; then
 else
     if internet_available; then
         if prompt_yes_no "Use the internet now to install Ollama and download local AI models? [Y/n]"; then
-            info "Downloading and installing Ollama..."
-            ollama_installer="$(mktemp /tmp/ollama-install.XXXXXX.sh)"
-            trap 'rm -f "$ollama_installer"' EXIT
-            if curl -fsSL --retry 3 --retry-delay 5 -o "$ollama_installer" https://ollama.com/install.sh; then
-                # Validate: must be a shell script from Ollama, reasonable size (<100KB)
-                INSTALLER_SIZE=$(wc -c < "$ollama_installer")
-                if [[ "${INSTALLER_SIZE}" -gt 102400 ]]; then
-                    error "Downloaded installer is suspiciously large (${INSTALLER_SIZE} bytes) — refusing to execute"
-                    rm -f "$ollama_installer"
-                elif head -c 100 "$ollama_installer" | grep -q '#!'; then
-                    # Verify script starts with known Ollama installer header
-                    if head -c 500 "$ollama_installer" | grep -q 'ollama.com\|Ollama'; then
-                        sh "$ollama_installer"
-                        success "Ollama installed"
-                    else
-                        error "Downloaded script does not appear to be the Ollama installer — refusing to execute"
-                        rm -f "$ollama_installer"
-                    fi
-                else
-                    error "Downloaded Ollama installer does not appear to be a valid script"
-                fi
+            info "Installing the pinned, checksum-verified Ollama release..."
+            # Never `curl | sh`: install-ollama.sh verifies a pinned SHA-256
+            ollama_rc=0
+            sudo bash "${SCRIPT_DIR}/build/config/install-ollama.sh" || ollama_rc=$?
+            if [[ ${ollama_rc} -eq 0 ]]; then
+                success "Ollama installed"
+            elif [[ ${ollama_rc} -eq 3 ]]; then
+                warn "No Ollama release is pinned in build/config/ollama-release.env — skipping"
             else
-                error "Failed to download Ollama installer — check your internet connection"
+                error "Ollama install failed (download or checksum verification)"
             fi
-            rm -f "$ollama_installer"
         else
             warn "Skipping Ollama setup — you can install it later from the Welcome app or first boot"
         fi
@@ -317,20 +303,15 @@ for svc in "${SERVICES_DIR}"/*; do
 done
 info "D-Bus session service configs installed."
 
-# Register D-Bus session policies (may require sudo)
+# Session-bus policy files are no longer shipped (see build/config/chroot-setup.sh).
+# Older installs copied ones that blocked Brain's own methods; remove them.
 DBUS_POLICY_DIR="/usr/share/dbus-1/session.d"
-if [[ -d "${DBUS_POLICY_DIR}" ]]; then
-    for conf in "${SERVICES_DIR}"/*/*.conf; do
-        [ -e "${conf}" ] || continue
-        if [[ -w "${DBUS_POLICY_DIR}" ]]; then
-            cp "${conf}" "${DBUS_POLICY_DIR}/"
-        elif command -v sudo &>/dev/null; then
-            sudo cp "${conf}" "${DBUS_POLICY_DIR}/"
-        else
-            warn "Could not install ${conf} to ${DBUS_POLICY_DIR}: permission denied"
-        fi
-    done
-    info "D-Bus session policies installed (best-effort)."
+if compgen -G "${DBUS_POLICY_DIR}/org.axonos.*.conf" >/dev/null; then
+    if [[ -w "${DBUS_POLICY_DIR}" ]]; then
+        rm -f "${DBUS_POLICY_DIR}"/org.axonos.*.conf
+    else
+        warn "Remove the old Axon D-Bus policies with: sudo rm -f ${DBUS_POLICY_DIR}/org.axonos.*.conf"
+    fi
 fi
 
 # Register Systemd user units for available services

@@ -1,6 +1,10 @@
 #!/bin/sh
 # Axon OS — rollback menuentry booting the @axon-fallback factory snapshot.
 # Installed as /etc/grub.d/42_axon_rollback.
+#
+# The kernel and initrd must come from inside the snapshot: the running
+# system's newest kernel is usually newer than the one captured at install
+# time (daily upgrades), and that file does not exist under @axon-fallback.
 set -e
 
 if [ "$(grub-probe --target=fs / 2>/dev/null)" != "btrfs" ]; then
@@ -9,20 +13,36 @@ fi
 
 uuid="$(grub-probe --target=fs_uuid / 2>/dev/null)" || exit 0
 [ -n "${uuid}" ] || exit 0
+device="$(grub-probe --target=device / 2>/dev/null | head -n 1)" || exit 0
+[ -n "${device}" ] || exit 0
 
-kernel="$(ls -1 /boot/vmlinuz-* 2>/dev/null | sort -V | tail -n 1)"
-initrd="$(ls -1 /boot/initrd.img-* 2>/dev/null | sort -V | tail -n 1)"
+# Mount the btrfs top level read-only to look inside the snapshot
+mnt="$(mktemp -d)"
+cleanup() {
+    umount "${mnt}" 2>/dev/null || true
+    rmdir "${mnt}" 2>/dev/null || true
+}
+trap cleanup EXIT
+mount -o ro,subvolid=5 "${device}" "${mnt}" 2>/dev/null || exit 0
+
+snap_boot="${mnt}/@axon-fallback/boot"
+kernel="$(ls -1 "${snap_boot}"/vmlinuz-* 2>/dev/null | sort -V | tail -n 1)"
 [ -n "${kernel}" ] || exit 0
-
 kbase="$(basename "${kernel}")"
-cat <<EOF
+kver="${kbase#vmlinuz-}"
+initrd=""
+if [ -f "${snap_boot}/initrd.img-${kver}" ]; then
+    initrd="initrd.img-${kver}"
+fi
+
+cat <<ENTRY
 menuentry 'Axon OS — Recovery rollback (factory snapshot)' --class axon --class gnu-linux {
     insmod part_gpt
     insmod btrfs
     search --no-floppy --fs-uuid --set=root ${uuid}
     linux /@axon-fallback/boot/${kbase} root=UUID=${uuid} rootflags=subvol=@axon-fallback rw quiet splash axon.rollback=1
-EOF
+ENTRY
 if [ -n "${initrd}" ]; then
-    echo "    initrd /@axon-fallback/boot/$(basename "${initrd}")"
+    echo "    initrd /@axon-fallback/boot/${initrd}"
 fi
 echo "}"

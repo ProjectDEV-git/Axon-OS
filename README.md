@@ -93,7 +93,7 @@ sudo bash build/build.sh --keep-chroot
 sudo bash build/build.sh --quick --keep-chroot
 ```
 
-The output ISO is written to `/tmp/axon-build/axon-os-<version>-amd64.iso`.
+The output ISO is written to `/var/lib/axon-build/axon-os-<version>-amd64.iso`.
 
 Full build documentation — including custom installer, Plymouth splash, and CI details — is in [docs/building.md](docs/building.md).
 

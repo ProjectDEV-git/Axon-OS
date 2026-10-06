@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -22,7 +23,7 @@ from ..ollama_client import OllamaClient
 from ..spaces_manager import SpacesManager
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent / "services"))
-from service_utils import safe_exec
+from service_utils import confirm_and_exec
 
 try:
     import dbus
@@ -535,9 +536,10 @@ class IntentBarWindow(Adw.Window):
         if action_type == "open_app":
             app_name: str = action.get("app", "")
             safe_name = _validate_app_name(app_name)
-            if safe_name:
+            # Desktop IDs only: never run an arbitrary binary named by the model
+            if safe_name and shutil.which("gtk-launch"):
                 proc = subprocess.Popen(
-                    [safe_name],
+                    ["gtk-launch", safe_name],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
@@ -546,7 +548,8 @@ class IntentBarWindow(Adw.Window):
         elif action_type == "run_command":
             command: str = action.get("command", "")
             if command:
-                safe_exec(command)
+                # The confirmation dialog blocks, so keep it off the GTK thread
+                threading.Thread(target=confirm_and_exec, args=(command,), daemon=True).start()
 
     # ------------------------------------------------------------------
     # Semantic file search (org.axonos.Search)

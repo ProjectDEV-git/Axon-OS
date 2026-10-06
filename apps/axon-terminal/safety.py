@@ -6,12 +6,34 @@ whether a command should be run directly, allowed once, or sandboxed.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
-try:
-    import audit  # type: ignore
-except Exception:  # pragma: no cover - optional runtime dependency
-    audit = None
+
+def _import_audit():
+    """Import the sandbox's static auditor, which lives in services/axon-sandbox.
+
+    The services directory sits next to apps/ both in the repo and in the
+    image (/usr/lib/axon), and under ~/.local/share/axon-os for install.sh.
+    """
+    candidates = (
+        Path(__file__).resolve().parents[2] / "services" / "axon-sandbox",
+        Path.home() / ".local" / "share" / "axon-os" / "services" / "axon-sandbox",
+    )
+    for directory in candidates:
+        if (directory / "audit.py").is_file():
+            if str(directory) not in sys.path:
+                sys.path.append(str(directory))
+            break
+    try:
+        import audit as audit_module  # type: ignore
+    except Exception:  # pragma: no cover - optional runtime dependency
+        return None
+    return audit_module
+
+
+audit = _import_audit()
 
 
 @dataclass(frozen=True)
@@ -50,6 +72,17 @@ DANGEROUS_HINTS = (
     "dd if=",
     "> /dev/sd",
 )
+
+
+def is_insertable_suggestion(command: str) -> bool:
+    """True if an AI suggestion is a single plain line safe to type at the prompt.
+
+    Newlines would submit the command (or several), and control characters
+    can drive the terminal, so such suggestions are dropped.
+    """
+    if not command or not command.strip():
+        return False
+    return not any(ord(c) < 32 or ord(c) == 127 for c in command)
 
 
 def assess_command(command: str) -> SafetyDecision:

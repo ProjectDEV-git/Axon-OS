@@ -122,7 +122,8 @@ log "Adding flathub remote..."
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
 
 log "Installing Python AI libraries inside chroot..."
-pip3 install --no-cache-dir faster-whisper sqlite-vec --break-system-packages || log "WARNING: Python AI libraries failed to install"
+# Pinned versions: unpinned installs pulled whatever PyPI served at build time
+pip3 install --no-cache-dir "faster-whisper==1.2.1" "sqlite-vec==0.1.9" --break-system-packages || log "WARNING: Python AI libraries failed to install"
 
 
 # ---------------------------------------------------------------------------
@@ -158,9 +159,11 @@ for activation in "${SERVICES_DIR}"/*/org.axonos.*.service; do
     sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${activation}" \
         > "/usr/share/dbus-1/services/$(basename "${activation}")"
 done
-for buspolicy in "${SERVICES_DIR}"/*/org.axonos.*.conf; do
-    [[ -f "${buspolicy}" ]] && cp "${buspolicy}" /usr/share/dbus-1/session.d/
-done
+# No session-bus policy files: every caller on a session bus runs as the same
+# user, so <policy user=...> cannot tell clients apart, and the old files'
+# literal user="${user}" plus default-context denies blocked Brain's own
+# methods for the shell and apps. Remove copies left in reused chroots.
+rm -f /usr/share/dbus-1/session.d/org.axonos.*.conf
 
 # systemd user units, enabled globally for every user
 mkdir -p /usr/lib/systemd/user
@@ -315,14 +318,19 @@ EOF
 # the build host's kernel, and /lib/modules may still hold host-kernel dirs
 # left by older builds in a reused chroot.
 #
-# The module is not tested yet, so it is only auto-loaded at boot when the
-# build opts in with AXON_WINABI_AUTOLOAD=1 (sudo AXON_WINABI_AUTOLOAD=1 bash
-# build/build.sh). Failing to build it never fails the ISO build.
-log "Building Axon Windows ABI kernel module..."
+# The module is an untested prototype that parses untrusted PE files in the
+# kernel, so release images do not ship it. It is only built for development
+# images that opt in with AXON_WINABI_BUILD=1, and only auto-loaded at boot
+# when AXON_WINABI_AUTOLOAD=1 is also set. Failing to build it never fails the
+# ISO build.
 MODULE_BUILT=false
-# Drop the auto-load entry that older builds appended in reused chroots
+# Drop the auto-load entry and module that older builds left in reused chroots
 rm -f /etc/modules-load.d/axon-winabi.conf
-if [[ -d "${SRC}/kernel/axon-winabi" ]]; then
+if [[ "${AXON_WINABI_BUILD:-0}" != "1" ]]; then
+    log "Skipping Axon Windows ABI kernel module (set AXON_WINABI_BUILD=1 to build it)"
+    find /lib/modules -path '*/extra/axon-winabi.ko*' -delete 2>/dev/null || true
+elif [[ -d "${SRC}/kernel/axon-winabi" ]]; then
+    log "Building Axon Windows ABI kernel module (AXON_WINABI_BUILD=1)..."
     KSRC="${SRC}/kernel/axon-winabi"
     KVER="$(iso_kernel_version)"
     KDIR="/usr/src/linux-headers-${KVER}"
@@ -401,8 +409,9 @@ cp "${SRC}/data/applications/axon-winabi-run-exe.desktop" /usr/share/application
 cp "${SRC}/data/applications/axon-winabi-exe-handler.desktop" /usr/share/applications/
 update-desktop-database /usr/share/applications || true
 
-# Polkit policy
-cp "${SRC}/data/polkit/org.axonos.winabi.policy" /usr/share/polkit-1/actions/
+# No polkit policy: Windows apps run as the invoking user, never as root.
+# Remove the one older builds installed (it let any user run files as root).
+rm -f /usr/share/polkit-1/actions/org.axonos.winabi.policy
 
 # Create registry directory
 mkdir -p /var/lib/axon-winabi/registry
@@ -524,8 +533,9 @@ fi
 if [[ "${WHITESUR_SKIP}" == "false" ]]; then
     apt-get install -y sassc libglib2.0-dev-bin || log "WARNING: theme build deps failed"
     # Pinned commit hashes for reproducible builds — update these when bumping themes.
-    WHITESUR_GTK_COMMIT="${WHITESUR_GTK_COMMIT:-master}"
-    WHITESUR_ICON_COMMIT="${WHITESUR_ICON_COMMIT:-master}"
+    # Their install.sh runs as root in the image, so never track a branch.
+    WHITESUR_GTK_COMMIT="${WHITESUR_GTK_COMMIT:-d5782652d412137e26fb8ff55b55a5572e4c6995}"
+    WHITESUR_ICON_COMMIT="${WHITESUR_ICON_COMMIT:-73d8040da51a9ed74e47c7366e7e9ff437601a5c}"
     if git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git /tmp/wsg \
        && git -C /tmp/wsg checkout "${WHITESUR_GTK_COMMIT}" \
        && /tmp/wsg/install.sh -d /usr/share/themes -c Dark -N glassy; then
@@ -628,8 +638,11 @@ update-alternatives --set default.plymouth \
 log "Configuring the Axon Installer..."
 
 # Root-engine wrapper, referenced by the polkit policy so pkexec can grant it
+# Refuses to run outside the live session: the polkit policy grants it root
+# without a password, and the install engine strips both from the target.
 cat > /usr/local/bin/axon-install-engine <<EOF
 #!/bin/sh
+grep -qw boot=casper /proc/cmdline || { echo "axon-install-engine: live session only" >&2; exit 1; }
 exec /usr/bin/python3 ${APPS_DIR}/axon-installer/install_engine.py "\$@"
 EOF
 chmod 755 /usr/local/bin/axon-install-engine
@@ -641,6 +654,9 @@ cp "${SRC}/data/polkit/org.axonos.install-engine.policy" /usr/share/polkit-1/act
 # installed system's first online boot. The unit stays disabled in the image;
 # the install engine enables it on the target when the user opts in.
 install -Dm755 "${SRC}/build/config/ai-firstboot.sh" /usr/local/bin/axon-ai-firstboot
+# Hash-pinned Ollama installer used by first boot and axon-ollama-setup
+install -Dm755 "${SRC}/build/config/install-ollama.sh" /usr/lib/axon/ollama/install-ollama.sh
+install -Dm644 "${SRC}/build/config/ollama-release.env" /usr/lib/axon/ollama/ollama-release.env
 cat > /usr/lib/systemd/system/axon-ai-firstboot.service <<'EOF'
 [Unit]
 Description=Axon OS AI first-boot setup (Ollama install + model pull)

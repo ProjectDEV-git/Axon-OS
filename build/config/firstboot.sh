@@ -94,6 +94,8 @@ DATA_APPS_DIR="/usr/lib/axon/data/applications"
 if [[ -d "${DATA_APPS_DIR}" ]]; then
     echo "[axon-firstboot] Installing desktop application entry files..."
     for f in "${DATA_APPS_DIR}"/*.desktop; do
+        # The installer only belongs in the live session
+        [[ "$(basename "${f}")" == "install-axon-os.desktop" ]] && continue
         DEST_FILE="${HOME}/.local/share/applications/$(basename "${f}")"
         sed "s|AXON_APPS_DIR|${APPS_DEST}|g" "${f}" > "${DEST_FILE}"
         chmod +x "${DEST_FILE}" || true

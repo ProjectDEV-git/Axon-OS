@@ -24,7 +24,7 @@ DIST="noble"
 ARCH="amd64"
 MIRROR="https://us.archive.ubuntu.com/ubuntu/"
 
-WORK_DIR="${AXON_BUILD_DIR:-/tmp/axon-build}"
+WORK_DIR="${AXON_BUILD_DIR:-/var/lib/axon-build}"
 CHROOT="${WORK_DIR}/chroot"
 APT_CACHE="${WORK_DIR}/apt-cache"
 
@@ -53,6 +53,18 @@ done
 # Preflight
 # ---------------------------------------------------------------------------
 [[ ${EUID} -eq 0 ]] || die "This script must run as root (try: sudo bash scripts/keep-chroot.sh)"
+
+# The build runs chroot/bash as root inside WORK_DIR and reuses any chroot or
+# base tarball it finds there, so the directory must not be writable by anyone
+# but root (a predictable path in /tmp could be pre-seeded by another user).
+secure_work_dir() {
+    mkdir -p -m 0755 "${WORK_DIR}"
+    local owner perms
+    owner="$(stat -c %u "${WORK_DIR}")"
+    perms="$(stat -c %a "${WORK_DIR}")"
+    [[ "${owner}" == "0" ]] || die "Work dir ${WORK_DIR} is not owned by root; refusing to use it"
+    (( (8#${perms} & 8#022) == 0 )) || die "Work dir ${WORK_DIR} is group/world-writable; refusing to use it"
+}
 
 check_deps() {
     local deps=(debootstrap rsync)
@@ -181,6 +193,7 @@ main() {
     log "============================================"
 
     check_deps
+    secure_work_dir
     bootstrap
 
     if [[ "${SETUP}" == "true" ]]; then

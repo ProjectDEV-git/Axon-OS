@@ -15,6 +15,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+# services/ must be importable before any local module: systemd runs this file
+# as a script, so only its own directory is on sys.path.
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 import dbus
 import dbus.mainloop.glib
 import dbus.service
@@ -30,9 +36,6 @@ except ModuleNotFoundError:  # Python 3.10
 logger = configure_app_logger("axon-brain")
 
 # Ensure we can import hardware_profiler and conversation_store
-_parent = str(Path(__file__).resolve().parent.parent)
-if _parent not in sys.path:
-    sys.path.insert(0, _parent)
 _from_services = str(Path(__file__).resolve().parent)
 if _from_services not in sys.path:
     sys.path.insert(0, _from_services)
@@ -400,7 +403,9 @@ class BrainService(ServiceBase):
 
     @dbus.service.method("org.axonos.Brain", in_signature="sss", out_signature="b")
     def AddMessage(self, conversation_id, role, content):
-        if role not in ("user", "assistant", "system"):
+        # "system" is not accepted: any session client could otherwise plant
+        # persistent instructions in a conversation
+        if role not in ("user", "assistant"):
             role = "user"
         self.store.add_message(conversation_id, role, content)
         return True
@@ -674,18 +679,34 @@ class BrainService(ServiceBase):
             with self._streams_lock:
                 self._active_streams.pop(tx_id, None)
 
-    def _do_chat_sync(self, conv_id, context, model):
-        messages = self.store.get_messages(conv_id)
-        api_msgs = [{"role": m["role"], "content": m["content"]} for m in messages]
+    def _chat_messages(self, conv_id, context):
+        """Build the /api/chat message list, system prompt first.
+
+        Ollama's chat endpoint has no top-level "system" field (it is silently
+        ignored), so the safety rules and context must be a system message.
+        Stored messages with role "system" are dropped: only the service
+        decides what the system prompt says.
+        """
         system_prompt = CHAT_SYSTEM_PROMPT
+        conv_prompt = self.store.get_system_prompt(conv_id)
+        if conv_prompt:
+            system_prompt += f"\n\nConversation instructions:\n{_sanitize_context(str(conv_prompt))}"
         if context:
             system_prompt += f"\n\nHere is the user's current desktop context:\n{_sanitize_context(str(context))}"
+        history = [
+            {"role": m["role"], "content": m["content"]}
+            for m in self.store.get_messages(conv_id)
+            if m["role"] in ("user", "assistant")
+        ]
+        return [{"role": "system", "content": system_prompt}, *history]
+
+    def _do_chat_sync(self, conv_id, context, model):
+        api_msgs = self._chat_messages(conv_id, context)
         try:
             payload = {
                 "model": model,
                 "messages": api_msgs,
                 "stream": False,
-                "system": system_prompt,
             }
             with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as resp:
                 data = json.loads(resp.read().decode())
@@ -697,11 +718,7 @@ class BrainService(ServiceBase):
     def _do_chat_stream(self, tx_id, conv_id, context, model):
         with self._streams_lock:
             cancel_flag = self._active_streams.get(tx_id)
-        messages = self.store.get_messages(conv_id)
-        api_msgs = [{"role": m["role"], "content": m["content"]} for m in messages]
-        system_prompt = CHAT_SYSTEM_PROMPT
-        if context:
-            system_prompt += f"\n\nHere is the user's current desktop context:\n{_sanitize_context(str(context))}"
+        api_msgs = self._chat_messages(conv_id, context)
 
         accumulated = ""
         try:
@@ -709,7 +726,6 @@ class BrainService(ServiceBase):
                 "model": model,
                 "messages": api_msgs,
                 "stream": True,
-                "system": system_prompt,
             }
             with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as r:
                 # FIX 3: Set per-read timeout on the underlying socket

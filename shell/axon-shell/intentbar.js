@@ -6,6 +6,7 @@ import Gio from 'gi://Gio';
 import Atk from 'gi://Atk';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {confirmAndRun, launchAppById} from './ai-actions.js';
 
 function logError(error, message) {
     if (message) {
@@ -273,42 +274,13 @@ export default class IntentBar {
         this._setResponse(responseText.trim());
     }
 
-    _isCommandSafe(command) {
-        if (!command || typeof command !== 'string') return false;
-        const forbidden = ['|', ';', '&', '$', '`', '\\', '(', ')', '{', '}',
-                           '<', '>', '*', '?', '~', '#', '!', '\n', '\r'];
-        for (const ch of forbidden) {
-            if (command.includes(ch)) return false;
-        }
-        const allowedBinaries = [
-            'ls', 'cat', 'grep', 'find', 'echo', 'date', 'whoami', 'hostname',
-            'uname', 'df', 'du', 'free', 'uptime', 'ps', 'pwd', 'wc', 'head',
-            'tail', 'sort', 'uniq', 'diff', 'file', 'stat', 'xdg-open',
-            'gtk-launch', 'notify-send', 'zenity', 'apt', 'apt-get', 'git',
-            'make', 'systemctl', 'journalctl', 'nmcli', 'bluetoothctl', 'pactl',
-        ];
-        const parts = command.trim().split(/\s+/);
-        const binary = parts[0];
-        if (!binary) return false;
-        return allowedBinaries.includes(binary);
-    }
-
     _executeAction(action) {
         try {
             if (action.action === 'open_app' && action.app) {
                 const appName = String(action.app).trim();
-                if (!appName || /[;&$`\\(){}<>*?~#!]/.test(appName)) {
-                    this._setResponse('Blocked: unsafe app name.');
+                if (!launchAppById(appName)) {
+                    this._setResponse(`No installed app called "${appName}".`);
                     return;
-                }
-                try {
-                    let proc = new Gio.Subprocess({
-                        argv: ['gtk-launch', appName],
-                        flags: Gio.SubprocessFlags.NONE
-                    });
-                    proc.init(null);
-                } catch(e) {
-                    console.error(`Failed to launch ${appName}: ${e.message}`);
                 }
                 this._setResponse(`Opening ${appName}…`);
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
@@ -316,23 +288,11 @@ export default class IntentBar {
                     return GLib.SOURCE_REMOVE;
                 });
             } else if (action.action === 'run_command' && action.command) {
-                if (!this._isCommandSafe(action.command)) {
+                if (!confirmAndRun(action.command)) {
                     this._setResponse('Blocked: command not in allowlist or contains unsafe characters.');
                     return;
                 }
-                try {
-                    let [, argv] = GLib.shell_parse_argv(action.command);
-                    if (argv) {
-                        let proc = new Gio.Subprocess({
-                            argv: argv,
-                            flags: Gio.SubprocessFlags.NONE
-                        });
-                        proc.init(null);
-                    }
-                } catch(e) {
-                    console.error(`Failed to run command: ${e.message}`);
-                }
-                this._setResponse(`Running: ${action.command}`);
+                this._setResponse(`Asking before running: ${action.command}`);
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
                     this.hide();
                     return GLib.SOURCE_REMOVE;

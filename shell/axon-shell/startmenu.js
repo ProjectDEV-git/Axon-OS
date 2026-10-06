@@ -427,6 +427,15 @@ class StartMenuPopup extends St.BoxLayout {
         this._filesList.add_child(label);
     }
 
+    // Shell.AppSystem.get_installed() returns Gio.AppInfo objects, which have
+    // no create_icon_texture()/activate(); map them to Shell.App.
+    _installedApps() {
+        return this._appSystem.get_installed()
+            .filter(info => info.should_show())
+            .map(info => this._appSystem.lookup_app(info.get_id()))
+            .filter(app => app !== null);
+    }
+
     _onSearchChanged() {
         const text = this._searchEntry.get_text().toLowerCase().trim();
         if (!text) {
@@ -436,7 +445,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         // Filter apps
         this._appsGrid.destroy_all_children();
-        const apps = this._appSystem.get_installed();
+        const apps = this._installedApps();
         let count = 0;
         let row = new St.BoxLayout({ vertical: false, spacing: 10 });
         this._appsGrid.add_child(row);
@@ -522,7 +531,7 @@ class StartMenuPopup extends St.BoxLayout {
         if (!text) return;
 
         // If it matches an app name, run it
-        const apps = this._appSystem.get_installed();
+        const apps = this._installedApps();
         let matchedApp = null;
         for (const app of apps) {
             if (app.get_name().toLowerCase() === text.toLowerCase()) {

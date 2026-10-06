@@ -46,6 +46,12 @@ ESP_PARTTYPE_GUID = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
 USERNAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 HOSTNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$")
 
+# Live-session components that must never survive onto the installed system:
+# the polkit policy grants passwordless root to the engine wrapper below.
+ENGINE_WRAPPER = "/usr/local/bin/axon-install-engine"
+ENGINE_POLICY = "/usr/share/polkit-1/actions/org.axonos.install-engine.policy"
+INSTALLER_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
 KNOWN_PROVIDERS = ("ollama", "anthropic", "openai", "google", "openrouter")
 
 PROVIDER_DEFAULTS = {
@@ -120,8 +126,12 @@ def validate_config(cfg: dict) -> list:
         problems.append("user.full_name is required")
     if not USERNAME_RE.match(user.get("username", "")):
         problems.append("user.username must match ^[a-z][a-z0-9-]{0,31}$")
-    if len(user.get("password", "")) < 8:
+    password = user.get("password", "")
+    if len(password) < 8:
         problems.append("user.password must be at least 8 characters")
+    if any(c in password for c in "\n\r\0"):
+        # chpasswd reads "user:password" lines — a newline would inject another account
+        problems.append("user.password must not contain newlines or NUL characters")
     if not HOSTNAME_RE.match(user.get("hostname", "")):
         problems.append("user.hostname is not a valid hostname")
 
@@ -148,6 +158,15 @@ def part_node(disk: str, number: int) -> str:
 
 def is_uefi() -> bool:
     return os.path.isdir("/sys/firmware/efi")
+
+
+def is_live_session(cmdline_path: str = "/proc/cmdline") -> bool:
+    """True only when booted from the live ISO (casper)."""
+    try:
+        with open(cmdline_path) as f:
+            return "boot=casper" in f.read().split()
+    except OSError:
+        return False
 
 
 def live_medium_disk() -> str:
@@ -534,10 +553,14 @@ def strip_live_artifacts() -> None:
         "etc/xdg/autostart/axon-installer-live.desktop",
         "usr/share/applications/install-axon-os.desktop",
         "etc/sudoers.d/casper",
+        ENGINE_WRAPPER.lstrip("/"),
+        ENGINE_POLICY.lstrip("/"),
     ):
         full = f"{TARGET}/{path}"
-        if os.path.exists(full):
+        if os.path.lexists(full):
             os.remove(full)
+    # The installer itself has no business on an installed system
+    shutil.rmtree(f"{TARGET}{INSTALLER_APP_DIR}", ignore_errors=True)
     # Fresh machine identity on first boot
     Path(f"{TARGET}/etc/machine-id").write_text("")
 
@@ -720,6 +743,8 @@ def main() -> int:
         fail("usage: install_engine.py <config.json>")
     if os.geteuid() != 0:
         fail("the install engine must run as root")
+    if not is_live_session():
+        fail("the install engine only runs from the live installer session")
 
     try:
         config_path = sys.argv[1]

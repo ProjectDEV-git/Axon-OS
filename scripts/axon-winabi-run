@@ -46,11 +46,16 @@ if [[ ! -f "$EXE" ]]; then
     exit 1
 fi
 
-# Check if the kernel module is loaded
-if ! lsmod | grep -q axon_winabi; then
-    echo "Warning: axon-winabi kernel module not loaded" >&2
-    echo "Attempting to load..." >&2
-    sudo modprobe axon-winabi 2>/dev/null || true
+# Windows apps always run as the invoking user, never as root
+if [[ "$(id -u)" -eq 0 ]]; then
+    echo "Error: refusing to run Windows applications as root" >&2
+    exit 1
+fi
+
+# The experimental kernel module is never loaded from here: loading it needs
+# root and it is not shipped in release images.
+if ! lsmod 2>/dev/null | grep -q axon_winabi; then
+    echo "Warning: axon-winabi kernel module not loaded; Windows ABI support unavailable" >&2
 fi
 
 # Set up environment
@@ -95,7 +100,7 @@ if [[ "$SANDBOX_ENABLED" == "true" ]]; then
         --bind "$(dirname "$EXE")" "$(dirname "$EXE")" \
         --unshare-net \
         --die-with-parent \
-        -- "${WINEDRIVE}/${EXE_BASENAME}" "${EXE_ARGS[@]:-}"
+        -- "${WINEDRIVE}/${EXE_BASENAME}" ${EXE_ARGS[@]+"${EXE_ARGS[@]}"}
 else
-    exec "${WINEDRIVE}/${EXE_BASENAME}" "${EXE_ARGS[@]:-}"
+    exec "${WINEDRIVE}/${EXE_BASENAME}" ${EXE_ARGS[@]+"${EXE_ARGS[@]}"}
 fi

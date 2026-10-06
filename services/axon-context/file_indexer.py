@@ -2,18 +2,24 @@
 import json
 import os
 import sqlite3
+import sys
 import threading
 import time
 from array import array
 from pathlib import Path
 
+# services/ must be importable before any local module: systemd runs this file
+# as a script, so only its own directory is on sys.path.
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 import dbus
 import sqlite_vec
 from _log_helper import resolve_logger as configure_app_logger
+from constants import AXON_DIR
 
 logger = configure_app_logger("axon-file-indexer")
-
-from constants import AXON_DIR
 
 DB_PATH = AXON_DIR / "semantic_search.db"
 

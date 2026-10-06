@@ -7,6 +7,12 @@ import sys
 import threading
 from pathlib import Path
 
+# services/ must be importable before any local module: systemd runs this file
+# as a script, so only its own directory is on sys.path.
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 import dbus
 import dbus.mainloop.glib
 import dbus.service
@@ -16,9 +22,6 @@ from service_base import ServiceBase
 
 logger = configure_app_logger("axon-context")
 
-_parent = str(Path(__file__).resolve().parents[1])
-if _parent not in sys.path:
-    sys.path.insert(0, _parent)
 from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
 from service_utils import rate_limited
 
@@ -82,19 +85,28 @@ class ContextService(ServiceBase):
         """Called by GNOME shell extension when focus changes."""
         self.active_window_title = str(title)
         self.active_window_app = str(app_id)
-        self.ContextChanged(self.GetActiveContext())
+        self.ContextChanged(self._change_summary())
         return True
 
     @dbus.service.method("org.axonos.Context", in_signature="s", out_signature="b")
     def SetActiveSpace(self, space_name):
         """Called by GNOME shell extension when space changes."""
         self.active_space = str(space_name)
-        self.ContextChanged(self.GetActiveContext())
+        self.ContextChanged(self._change_summary())
         return True
 
     # ------------------------------------------------------------------
     # D-Bus Query Methods
     # ------------------------------------------------------------------
+
+    def _change_summary(self) -> str:
+        """Payload for the ContextChanged broadcast.
+
+        Signals reach every client on the session bus, so they carry only the
+        focused app and space. Clipboard history, shell history, stderr and
+        open files stay behind GetActiveContext().
+        """
+        return json.dumps({"active_app": self.active_window_app, "active_space": self.active_space})
 
     def _get_clipboard_snapshot(self) -> list[str]:
         """Return a thread-safe snapshot of the clipboard history."""
@@ -294,15 +306,26 @@ class ContextService(ServiceBase):
             data = os.read(fd, 4096)
             if data:
                 text = data.decode("utf-8", errors="replace").strip()
-                if text:
+                if text and not self._clipboard_is_secret():
                     added = self._clipboard_store.add(text)
                     if added:
                         with self._clipboard_lock:
                             self._clipboard_history = self._clipboard_store.to_deque()
-                        self.ContextChanged(self.GetActiveContext())
+                        self.ContextChanged(self._change_summary())
         except Exception as e:
             logger.debug("Clipboard data read error: %s", e)
         return True  # keep watching
+
+    @staticmethod
+    def _clipboard_is_secret() -> bool:
+        """True when a password manager marked the clipboard as sensitive."""
+        try:
+            result = subprocess.run(
+                ["wl-paste", "--list-types"], capture_output=True, text=True, timeout=1
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return "x-kde-passwordManagerHint" in result.stdout
 
     def _poll_xclip(self):
         """Polls xclip for clipboard changes (X11 fallback)."""
@@ -322,7 +345,7 @@ class ContextService(ServiceBase):
                 if added:
                     with self._clipboard_lock:
                         self._clipboard_history = self._clipboard_store.to_deque()
-                    self.ContextChanged(self.GetActiveContext())
+                    self.ContextChanged(self._change_summary())
         except Exception as e:
             logger.debug("xclip poll error: %s", e)
         return True  # keep polling

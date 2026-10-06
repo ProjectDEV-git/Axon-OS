@@ -16,39 +16,68 @@ axon_sandbox_trap() {
     if [[ "${AXON_IN_SANDBOX:-0}" -eq 1 || -z "${BASH_COMMAND:-}" ]]; then
         return 0
     fi
-    
+
     local cmd="$BASH_COMMAND"
-    local first_word
-    first_word=$(echo "$cmd" | awk '{print $1}')
-    
-    # We only intercept executable files in user paths (Downloads, Documents, Desktop, local path)
-    if [[ "$first_word" == ./* || "$first_word" == "$HOME/Downloads/"* || "$first_word" == "$HOME/Documents/"* || "$first_word" == "$HOME/Desktop/"* ]]; then
-        if [[ -f "$first_word" && -x "$first_word" ]]; then
-            local real_path
-            real_path=$(realpath "$first_word" 2>/dev/null)
-            
-            # Do not intercept if not found or system path
-            if [[ -z "$real_path" || "$real_path" == /usr/* || "$real_path" == /bin/* || "$real_path" == /sbin/* ]]; then
-                return 0
-            fi
-            
-            # Query decision via D-Bus org.axonos.Sandbox
-            local decision
-            # Bounded reply timeout: the default (25 s) freezes the shell when
-            # the sandbox service is slow to activate or waits on a GUI prompt.
-            decision=$(dbus-send --session --reply-timeout=5000 --dest=org.axonos.Sandbox --print-reply=literal /org/axonos/Sandbox org.axonos.Sandbox.AuditAndPrompt string:"$real_path" 2>/dev/null | xargs)
-            
-            if [[ "$decision" == "sandbox" ]]; then
-                echo -e "\n\e[1;35m⬡ Rogue Software Shield: Running inside secure read-only sandbox...\e[0m"
-                AXON_IN_SANDBOX=1 /usr/local/bin/axon-run "$cmd"
-                return 1 # Skip original command execution
-            elif [[ "$decision" == "block" ]]; then
-                echo -e "\n\e[1;31m⬡ Rogue Software Shield: Execution blocked.\e[0m"
-                return 1 # Skip original command execution
-            fi
-        fi
+    local -a words
+    read -r -a words <<< "$cmd" || true
+    local target="${words[0]:-}"
+    local via_interpreter=false
+
+    # `bash evil.sh`, `python3 evil.py` ...: audit the script argument
+    case "${target##*/}" in
+        bash|sh|dash|zsh|ksh|python|python3|perl|ruby|node)
+            local w
+            for w in "${words[@]:1}"; do
+                [[ "$w" == -* ]] && continue
+                target="$w"
+                via_interpreter=true
+                break
+            done
+            [[ "$via_interpreter" == true ]] || return 0
+            ;;
+    esac
+
+    # BASH_COMMAND is not tilde-expanded yet
+    target="${target/#\~/$HOME}"
+    [[ -f "$target" ]] || return 0
+    if [[ "$via_interpreter" == false && ! -x "$target" ]]; then
+        return 0
     fi
-    return 0
+
+    local real_path
+    real_path=$(realpath "$target" 2>/dev/null) || return 0
+
+    # Intercept user-writable locations where downloaded or dropped files land
+    case "$real_path" in
+        "$HOME"/*|/tmp/*|/var/tmp/*|/dev/shm/*) ;;
+        *) return 0 ;;
+    esac
+
+    # Query decision via D-Bus org.axonos.Sandbox. The service may wait for the
+    # user to answer a dialog, so allow time for that.
+    local decision
+    decision=$(dbus-send --session --reply-timeout=120000 --dest=org.axonos.Sandbox --print-reply=literal /org/axonos/Sandbox org.axonos.Sandbox.AuditAndPrompt string:"$real_path" 2>/dev/null | xargs)
+
+    case "$decision" in
+        allow)
+            return 0
+            ;;
+        sandbox)
+            echo -e "\n\e[1;35m⬡ Rogue Software Shield: Running inside secure sandbox (no network, empty home)...\e[0m"
+            AXON_IN_SANDBOX=1 /usr/local/bin/axon-run --file "$real_path" "$cmd"
+            return 1 # Skip original command execution
+            ;;
+        block)
+            echo -e "\n\e[1;31m⬡ Rogue Software Shield: Execution blocked.\e[0m"
+            return 1
+            ;;
+        *)
+            # Fail closed: no answer, a timeout, "deny" or anything unexpected
+            echo -e "\n\e[1;31m⬡ Rogue Software Shield: could not verify ${real_path}; not running it.\e[0m" >&2
+            echo "  To run it sandboxed anyway: axon-run --file '${real_path}' '${cmd//\'/}'" >&2
+            return 1
+            ;;
+    esac
 }
 
 # Enable extdebug to allow DEBUG trap to skip command execution

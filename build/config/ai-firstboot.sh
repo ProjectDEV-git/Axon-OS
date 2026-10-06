@@ -38,12 +38,15 @@ if ! curl -sf --max-time 5 https://ollama.com >/dev/null 2>&1; then
 fi
 
 echo "installing Ollama (idempotent — safe to re-run)..."
-# SECURITY: curl | sh executes remote code without integrity verification.
-# TODO: pin a SHA-256 hash of the installer and verify before execution.
-# See: https://cheatsheetseries.owasp.org/cheatsheets/Secure\_Command\_Execution\_Cheat\_Sheet.html
-if ! curl -fsSL https://ollama.com/install.sh | sh; then
-        echo "Ollama install failed — will retry on next boot"
-        exit 0
+# Pinned release verified by SHA-256 (never curl | sh as root)
+rc=0
+/usr/lib/axon/ollama/install-ollama.sh || rc=$?
+if [[ ${rc} -eq 3 ]]; then
+    echo "no pinned Ollama release in this image; leaving AI setup for later"
+    exit 0
+elif [[ ${rc} -ne 0 ]]; then
+    echo "Ollama install failed — will retry on next boot"
+    exit 0
 fi
 
 systemctl enable --now ollama.service 2>/dev/null || true

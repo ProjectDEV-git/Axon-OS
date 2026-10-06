@@ -13,6 +13,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import SpacesManager from './spaces.js';
 import IntentBar from './intentbar.js';
 import DockManager from './dock.js';
+import {confirmAndRun, launchAppById} from './ai-actions.js';
 
 // ─── AxonAIIndicator ──────────────────────────────────────────────────────────
 
@@ -442,60 +443,16 @@ export default class AxonShellExtension extends Extension {
         try {
             let action = JSON.parse(intentJson);
             if (action && action.action === 'run_command' && action.command) {
-                const cmdText = action.command.strip ? action.command.strip() : action.command.trim();
-                
-                const confirmProc = new Gio.Subprocess({
-                    argv: [
-                        'zenity',
-                        '--question',
-                        '--title=Voice Action Confirmation',
-                        '--text',
-                        `Do you want to run this voice command?\n\n"${transcription}"\n\nCommand: ${cmdText}`,
-                        '--no-wrap',
-                    ],
-                    flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
-                });
-                confirmProc.init(null);
-                confirmProc.wait_check_async(null, (proc, res) => {
-                    try {
-                        proc.wait_check_finish(res);
-                        if (!proc.get_successful()) return;
-
-                        const [ok, argv] = GLib.shell_parse_argv(cmdText);
-                        if (!ok || !argv || argv.length === 0) return;
-
-                        const runProc = new Gio.Subprocess({
-                            argv: argv,
-                            flags: Gio.SubprocessFlags.NONE,
-                        });
-                        runProc.init(null);
-                        runProc.wait_check_async(null, () => {});
-                    } catch (e) {
-                        console.error('AxonShell Voice: command execute failed:', e.message);
-                    }
-                });
+                confirmAndRun(action.command, `You said: "${transcription}"`);
             } else if (action && action.action === 'open_app' && action.app) {
-                let appSystem = Shell.AppSystem.get_default();
-                let app = appSystem.lookup_app(action.app) || appSystem.lookup_app(action.app + '.desktop');
-                if (app) {
-                    app.activate();
-                } else {
-                    const [ok, argv] = GLib.shell_parse_argv(action.app);
-                    if (ok && argv && argv.length > 0) {
-                        const launchProc = new Gio.Subprocess({
-                            argv: argv,
-                            flags: Gio.SubprocessFlags.NONE,
-                        });
-                        launchProc.init(null);
-                        launchProc.wait_check_async(null, () => {});
-                    }
-                }
+                launchAppById(String(action.app));
             } else {
                 // If it is just a plain text reply, display it
                 const infoProc = new Gio.Subprocess({
                     argv: [
                         'zenity',
                         '--info',
+                        '--no-markup',
                         '--title=Axon Assistant',
                         '--text',
                         `You said: "${transcription}"\n\nReply: ${intentJson}`,
