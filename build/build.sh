@@ -21,7 +21,8 @@
 #
 # Environment:
 #   AXON_BUILD_DIR   Work directory (default: /tmp/axon-build)
-#   AXON_WINABI_AUTOLOAD  1 = auto-load the untested axon-winabi kernel module at boot (default: 0)
+#   AXON_WINABI_BUILD     1 = build the untested axon-winabi kernel module into the image (default: 0)
+#   AXON_WINABI_AUTOLOAD  1 = also auto-load it at boot (needs AXON_WINABI_BUILD=1; default: 0)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -287,6 +288,7 @@ configure_chroot() {
     chroot "${CHROOT}" /usr/bin/env \
         AXON_VERSION="${VERSION}" \
         AXON_QUICK="${QUICK}" \
+        AXON_WINABI_BUILD="${AXON_WINABI_BUILD:-0}" \
         AXON_WINABI_AUTOLOAD="${AXON_WINABI_AUTOLOAD:-0}" \
         /bin/bash /opt/axon-src/build/config/chroot-setup.sh
     umount_chroot

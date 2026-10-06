@@ -315,14 +315,19 @@ EOF
 # the build host's kernel, and /lib/modules may still hold host-kernel dirs
 # left by older builds in a reused chroot.
 #
-# The module is not tested yet, so it is only auto-loaded at boot when the
-# build opts in with AXON_WINABI_AUTOLOAD=1 (sudo AXON_WINABI_AUTOLOAD=1 bash
-# build/build.sh). Failing to build it never fails the ISO build.
-log "Building Axon Windows ABI kernel module..."
+# The module is an untested prototype that parses untrusted PE files in the
+# kernel, so release images do not ship it. It is only built for development
+# images that opt in with AXON_WINABI_BUILD=1, and only auto-loaded at boot
+# when AXON_WINABI_AUTOLOAD=1 is also set. Failing to build it never fails the
+# ISO build.
 MODULE_BUILT=false
-# Drop the auto-load entry that older builds appended in reused chroots
+# Drop the auto-load entry and module that older builds left in reused chroots
 rm -f /etc/modules-load.d/axon-winabi.conf
-if [[ -d "${SRC}/kernel/axon-winabi" ]]; then
+if [[ "${AXON_WINABI_BUILD:-0}" != "1" ]]; then
+    log "Skipping Axon Windows ABI kernel module (set AXON_WINABI_BUILD=1 to build it)"
+    find /lib/modules -path '*/extra/axon-winabi.ko*' -delete 2>/dev/null || true
+elif [[ -d "${SRC}/kernel/axon-winabi" ]]; then
+    log "Building Axon Windows ABI kernel module (AXON_WINABI_BUILD=1)..."
     KSRC="${SRC}/kernel/axon-winabi"
     KVER="$(iso_kernel_version)"
     KDIR="/usr/src/linux-headers-${KVER}"
@@ -401,8 +406,9 @@ cp "${SRC}/data/applications/axon-winabi-run-exe.desktop" /usr/share/application
 cp "${SRC}/data/applications/axon-winabi-exe-handler.desktop" /usr/share/applications/
 update-desktop-database /usr/share/applications || true
 
-# Polkit policy
-cp "${SRC}/data/polkit/org.axonos.winabi.policy" /usr/share/polkit-1/actions/
+# No polkit policy: Windows apps run as the invoking user, never as root.
+# Remove the one older builds installed (it let any user run files as root).
+rm -f /usr/share/polkit-1/actions/org.axonos.winabi.policy
 
 # Create registry directory
 mkdir -p /var/lib/axon-winabi/registry
@@ -628,8 +634,11 @@ update-alternatives --set default.plymouth \
 log "Configuring the Axon Installer..."
 
 # Root-engine wrapper, referenced by the polkit policy so pkexec can grant it
+# Refuses to run outside the live session: the polkit policy grants it root
+# without a password, and the install engine strips both from the target.
 cat > /usr/local/bin/axon-install-engine <<EOF
 #!/bin/sh
+grep -qw boot=casper /proc/cmdline || { echo "axon-install-engine: live session only" >&2; exit 1; }
 exec /usr/bin/python3 ${APPS_DIR}/axon-installer/install_engine.py "\$@"
 EOF
 chmod 755 /usr/local/bin/axon-install-engine
