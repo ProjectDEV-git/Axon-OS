@@ -112,6 +112,10 @@ def ask_user(target: str, findings: list, ai_verdict: str) -> str:
     return "sandbox"
 
 
+# Where the sandbox mounts its private, empty tmpfs (bandit B108 flags it)
+_SANDBOX_TMP = "/tmp"  # nosec B108
+
+
 def sandbox_command(target_cmd: list, no_net: bool) -> list:
     """Wrap *target_cmd* in a bubblewrap jail.
 
@@ -132,7 +136,7 @@ def sandbox_command(target_cmd: list, no_net: bool) -> list:
         "--symlink", "usr/sbin", "/sbin",
         "--dev", "/dev",
         "--proc", "/proc",
-        "--tmpfs", "/tmp",
+        "--tmpfs", _SANDBOX_TMP,
         "--tmpfs", "/run",
         "--ro-bind",
         home,

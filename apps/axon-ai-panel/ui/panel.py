@@ -40,6 +40,7 @@ except ImportError:
     class OllamaClient:  # type: ignore[no-redef]
         """Minimal Ollama client used when intent-bar's module is absent."""
 
+        # Constant http:// URL, so the urlopen() calls below need no scheme check
         BASE_URL: str = "http://localhost:11434"
 
         def __init__(self, model: str = "llama3.2:3b") -> None:
@@ -47,7 +48,7 @@ except ImportError:
 
         def is_available(self) -> bool:
             try:
-                urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=2)
+                urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=2)  # nosec B310
                 return True
             except Exception:
                 return False
@@ -55,7 +56,9 @@ except ImportError:
         def list_models(self) -> list[str]:
             """Return list of locally available model names."""
             try:
-                with urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=5) as resp:
+                with urllib.request.urlopen(  # nosec B310
+                    f"{self.BASE_URL}/api/tags", timeout=5
+                ) as resp:
                     data = json.loads(resp.read().decode())
                     return [m["name"] for m in data.get("models", [])]
             except Exception:
@@ -82,7 +85,7 @@ except ImportError:
                 headers={"Content-Type": "application/json"},
             )
             try:
-                with urllib.request.urlopen(req, timeout=120) as resp:
+                with urllib.request.urlopen(req, timeout=120) as resp:  # nosec B310
                     for raw_line in resp:
                         line = raw_line.decode().strip()
                         if not line:

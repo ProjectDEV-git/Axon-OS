@@ -1,6 +1,5 @@
 """Tests for GUI Agent _validate_app_name security fix."""
 
-import re
 
 # Import the validation function directly since the module has D-Bus deps
 import sys

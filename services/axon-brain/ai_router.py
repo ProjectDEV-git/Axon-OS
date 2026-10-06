@@ -10,9 +10,7 @@ Integrates with hardware_profiler for resource-aware decisions.
 """
 
 import re
-import sys
 import threading
-from pathlib import Path
 
 from _log_helper import resolve_logger as configure_app_logger
 

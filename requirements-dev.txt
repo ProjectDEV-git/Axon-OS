@@ -8,7 +8,9 @@ pytest-timeout==2.2.0
 pytest-xdist==3.5.0
 
 # Linting & Code Quality
-ruff==0.2.0
+# Keep in sync with the ruff-pre-commit rev in .pre-commit-config.yaml;
+# build.yml installs the version pinned here.
+ruff==0.16.10
 ruff-lsp==0.0.53
 
 # Type checking
@@ -27,5 +29,5 @@ sphinx==7.2.6
 sphinx-rtd-theme==2.0.0
 
 # Security & Performance
-bandit==1.7.5
+bandit==1.9.4
 memory-profiler==0.61.0

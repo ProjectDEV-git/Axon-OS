@@ -34,10 +34,8 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 import dbus
-from gi.repository import GLib
-
 from _log_helper import resolve_logger as configure_app_logger
-
+from gi.repository import GLib
 
 logger = configure_app_logger("plugin-registry")
 

@@ -374,19 +374,23 @@ def format_and_mount(esp: str, root: str, esp_is_new: bool) -> str:
     return fs_type
 
 
+# rsync --exclude patterns, not temp-file paths (bandit B108 flags them)
+_TMP_EXCLUDE = "/tmp/*"  # nosec B108
+_VAR_TMP_EXCLUDE = "/var/tmp/*"  # nosec B108
+
 RSYNC_EXCLUDES = [
     "/dev/*",
     "/proc/*",
     "/sys/*",
     "/run/*",
-    "/tmp/*",
+    _TMP_EXCLUDE,
     "/mnt/*",
     "/media/*",
     "/cdrom",
     "/target",
     "/swapfile",
     "/var/crash/*",
-    "/var/tmp/*",
+    _VAR_TMP_EXCLUDE,
     "/lost+found",
     "/boot/efi/*",
     "/home/*/.cache/*",

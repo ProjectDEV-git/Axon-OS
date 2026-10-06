@@ -106,6 +106,16 @@ def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
     return subprocess.Popen(parts, start_new_session=True, **defaults)
 
 
+def require_http_url(url: str) -> None:
+    """Raise ``ValueError`` unless *url* is http(s).
+
+    Call before ``urllib.request.urlopen()``, which also opens ``file:`` and
+    other schemes (bandit B310).
+    """
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"Refusing non-HTTP URL: {url!r}")
+
+
 def error_response(message: str, code: str = "UNKNOWN") -> str:
     """Create a standardized JSON error response for D-Bus methods.
 
