@@ -20,7 +20,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
-gi.require_version("Vte", "2.91")
+gi.require_version("Vte", "3.91")  # GTK4 binding; Vte 2.91 is GTK3-only
 import sys
 import tempfile
 from pathlib import Path
@@ -389,12 +389,9 @@ class TerminalWidget(Gtk.Box):
         if exit_status != 0:
             # Try to extract recent terminal output for diagnosis
             try:
-                text_tuple = terminal.get_text()
-                # get_text() may return (text, attributes) or just text
-                if isinstance(text_tuple, tuple):
-                    recent_text = str(text_tuple[0]) if text_tuple[0] else ""
-                else:
-                    recent_text = str(text_tuple) if text_tuple else ""
+                # Vte 3.91's get_text() rejects the attributes array PyGObject
+                # passes (and is deprecated); get_text_format() returns a str.
+                recent_text = terminal.get_text_format(Vte.Format.TEXT) or ""
                 # Take the last ~40 lines for context
                 lines = recent_text.strip().split("\n")
                 stderr_snippet = "\n".join(lines[-40:])
@@ -615,4 +612,6 @@ class TerminalWidget(Gtk.Box):
         """Close the currently active terminal tab."""
         tab = self._get_active_tab()
         if tab is not None and tab.page is not None:
-            self._on_close_page(self._tab_view, tab.page)
+            # Emits close-page -> _on_close_page; calling close_page_finish()
+            # directly is rejected by Adw when no close is in progress.
+            self._tab_view.close_page(tab.page)

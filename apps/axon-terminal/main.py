@@ -79,7 +79,10 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
         root.append(self._terminal_widget)
 
         # ---- Keyboard shortcuts --------------------------------------------
+        # Capture phase: a focused Vte.Terminal consumes every key press, so a
+        # bubble-phase controller on the window would never see these.
         key_ctrl = Gtk.EventControllerKey()
+        key_ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_ctrl.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_ctrl)
 
