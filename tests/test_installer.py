@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "axon-installer"))
 
 import install_engine
@@ -90,3 +92,57 @@ def test_part_node_naming():
     assert install_engine.part_node("/dev/sda", 3) == "/dev/sda3"
     assert install_engine.part_node("/dev/nvme0n1", 2) == "/dev/nvme0n1p2"
     assert install_engine.part_node("/dev/mmcblk0", 1) == "/dev/mmcblk0p1"
+
+
+def test_rejects_newline_in_password():
+    cfg = _valid_config()
+    cfg["user"]["password"] = "hunter22\nroot:owned"
+    assert any("newline" in p for p in install_engine.validate_config(cfg))
+
+
+def test_is_live_session_reads_cmdline(tmp_path):
+    cmdline = tmp_path / "cmdline"
+    cmdline.write_text("BOOT_IMAGE=/casper/vmlinuz boot=casper quiet splash ---\n")
+    assert install_engine.is_live_session(str(cmdline)) is True
+    cmdline.write_text("BOOT_IMAGE=/boot/vmlinuz root=UUID=x ro quiet splash\n")
+    assert install_engine.is_live_session(str(cmdline)) is False
+    assert install_engine.is_live_session(str(tmp_path / "missing")) is False
+
+
+def test_engine_refuses_outside_live_session(tmp_path):
+    cfg_path = tmp_path / "cfg.json"
+    cfg_path.write_text("{}")
+    with (
+        patch("sys.argv", ["install_engine.py", str(cfg_path)]),
+        patch("os.geteuid", return_value=0),
+        patch.object(install_engine, "is_live_session", return_value=False),
+        patch.object(install_engine, "install") as mock_install,
+        pytest.raises(SystemExit),
+    ):
+        install_engine.main()
+    mock_install.assert_not_called()
+    assert cfg_path.exists()  # nothing was read or deleted
+
+
+def test_strip_live_artifacts_removes_root_helper(tmp_path):
+    target = tmp_path / "target"
+    for rel in (
+        install_engine.ENGINE_WRAPPER,
+        install_engine.ENGINE_POLICY,
+        "/etc/sudoers.d/casper",
+    ):
+        f = target / rel.lstrip("/")
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("x")
+    app_dir = target / install_engine.INSTALLER_APP_DIR.lstrip("/")
+    app_dir.mkdir(parents=True)
+    (app_dir / "main.py").write_text("x")
+    (target / "etc" / "machine-id").write_text("abc")
+    with (
+        patch.object(install_engine, "TARGET", str(target)),
+        patch.object(install_engine, "run_chroot"),
+    ):
+        install_engine.strip_live_artifacts()
+    assert not (target / install_engine.ENGINE_WRAPPER.lstrip("/")).exists()
+    assert not (target / install_engine.ENGINE_POLICY.lstrip("/")).exists()
+    assert not app_dir.exists()
