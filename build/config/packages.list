@@ -83,6 +83,7 @@ avahi-daemon
 git
 curl
 wget
+zstd
 nano
 less
 xdotool

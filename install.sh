@@ -126,6 +126,7 @@ apt_install_best_effort \
     python3-pip \
     python3-venv \
     bubblewrap \
+    zstd \
     ubuntu-drivers-common
 info "Installing Python packages (faster-whisper, webrtcvad, sqlite-vec) into user environment"
 pip3 install --user faster-whisper webrtcvad sqlite-vec || warn "pip install of AI extras failed — you can retry later"
