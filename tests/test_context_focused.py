@@ -1,10 +1,6 @@
 """Tests for context_service.py — sensitive path filtering, terminal cache, sys.path guards."""
 
-import os
-import sys
 from pathlib import Path
-
-import pytest
 
 
 class TestSensitivePathFilter:

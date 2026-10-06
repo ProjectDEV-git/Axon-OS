@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 from pathlib import Path
+from typing import ClassVar
 
 import dbus
 import dbus.mainloop.glib
@@ -29,7 +30,7 @@ class SandboxPromptDialog(Gtk.Window):
         self.set_title("Axon Rogue Shield")
         self.set_default_size(520, 360)
         self.set_decorated(True)
-        self.set_keep_above(True)
+        # GTK4 removed set_keep_above(); stacking is left to the compositor.
 
         # UI Styling
         self.add_css_class("sandbox-dialog")
@@ -79,9 +80,11 @@ class SandboxPromptDialog(Gtk.Window):
         """,
             -1,
         )
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        display = Gdk.Display.get_default()
+        if display is not None:
+            Gtk.StyleContext.add_provider_for_display(
+                display, css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
 
         # Main Layout
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -172,7 +175,7 @@ class SandboxManager(ServiceBase):
 
     # Directories from which scripts are allowed to be audited.
     # Override via environment variable AXON_SANDBOX_ALLOWED_DIRS (colon-separated).
-    _DEFAULT_ALLOWED_DIRS = [
+    _DEFAULT_ALLOWED_DIRS: ClassVar[list[Path]] = [
         Path.home() / ".local" / "share" / "axon",
         Path.home() / "Documents",
         Path.home() / "bin",

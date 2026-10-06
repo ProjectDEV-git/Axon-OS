@@ -1,17 +1,14 @@
 """Tests for ClipboardStore — connection pooling, close_all, and CRUD operations."""
 
+import importlib.util
 import os
-import sqlite3
+import sys
 import tempfile
 import threading
-import time
 import unittest
 from pathlib import Path
 
 # Load the module directly (hyphenated directory name)
-import importlib.util
-import sys
-
 SERVICES_DIR = Path(__file__).resolve().parent.parent / "services"
 CONTEXT_DIR = SERVICES_DIR / "axon-context"
 STORE_PATH = CONTEXT_DIR / "clipboard_store.py"
@@ -116,7 +113,7 @@ class TestClipboardStore(unittest.TestCase):
         store.add("Keep this")
         # Pin "Keep this" (last added, second in recent order)
         entries = store.get_recent(10)
-        keep_id = [e["id"] for e in entries if e["content"] == "Keep this"][0]
+        keep_id = next(e["id"] for e in entries if e["content"] == "Keep this")
         store.pin(keep_id)
         store.clear()
         remaining = store.get_recent(10)

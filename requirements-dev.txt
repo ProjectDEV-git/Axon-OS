@@ -28,4 +28,5 @@ sphinx-rtd-theme==2.0.0
 
 # Security & Performance
 bandit==1.7.5
+pbr>=6.0  # imported by bandit 1.7.5 at runtime, no longer pulled in transitively
 memory-profiler==0.61.0

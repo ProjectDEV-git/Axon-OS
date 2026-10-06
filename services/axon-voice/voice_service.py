@@ -30,10 +30,9 @@ from gi.repository import GLib
 _parent = str(Path(__file__).resolve().parent.parent)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
+from _log_helper import resolve_logger as configure_app_logger
 from constants import MAX_RECORD_SECONDS, WHISPER_DIR
 from service_utils import safe_exec
-
-from _log_helper import resolve_logger as configure_app_logger
 
 _this = str(Path(__file__).resolve().parent)
 if _this not in sys.path:

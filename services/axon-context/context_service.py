@@ -10,11 +10,8 @@ from pathlib import Path
 import dbus
 import dbus.mainloop.glib
 import dbus.service
-from gi.repository import GLib
-
 from _log_helper import resolve_logger as configure_app_logger
-
-
+from gi.repository import GLib
 from service_base import ServiceBase
 
 logger = configure_app_logger("axon-context")
@@ -177,7 +174,7 @@ class ContextService(ServiceBase):
             brain_interface = dbus.Interface(brain_obj, "org.axonos.Brain")
             emb_json = brain_interface.GetEmbeddings(query_text, "")
             emb = json.loads(emb_json)
-            if not emb or not isinstance(emb, list) or not isinstance(emb[0], (int, float)):
+            if not emb or not isinstance(emb, list) or not isinstance(emb[0], int | float):
                 return "[]"
 
             from constants import SEMANTIC_INDEX_DB
@@ -431,7 +428,7 @@ class ContextService(ServiceBase):
         self._terminal_cache_mtime[cache_key] = active_mtime
         # Prune: keep only the 5 most recently accessed entries
         if len(self._terminal_cache_mtime) > 5:
-            oldest = sorted(self._terminal_cache_mtime, key=self._terminal_cache_mtime.get)
+            oldest = sorted(self._terminal_cache_mtime, key=lambda k: self._terminal_cache_mtime[k])
             for k in oldest[:-5]:
                 self._terminal_cache_mtime.pop(k, None)
         return commands[-n:]

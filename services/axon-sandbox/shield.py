@@ -119,6 +119,8 @@ def sandbox_command(target_cmd: list, no_net: bool) -> list:
     writable /tmp and current directory untouched (also read-only).
     """
     home = str(Path.home())
+    # Mount point for a fresh private tmpfs inside the sandbox, not temp-file usage.
+    sandbox_tmp = "/tmp"  # nosec B108
     # FIX: Bind specific directories instead of entire root filesystem (--ro-bind / /)
     # to reduce attack surface. Sandboxed processes can only access system binaries,
     # libraries, config, and process/device info — not arbitrary root-level paths.
@@ -132,7 +134,7 @@ def sandbox_command(target_cmd: list, no_net: bool) -> list:
         "--symlink", "usr/sbin", "/sbin",
         "--dev", "/dev",
         "--proc", "/proc",
-        "--tmpfs", "/tmp",
+        "--tmpfs", sandbox_tmp,
         "--tmpfs", "/run",
         "--ro-bind",
         home,

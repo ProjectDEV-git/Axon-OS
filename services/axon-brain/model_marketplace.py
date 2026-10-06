@@ -17,9 +17,8 @@ from pathlib import Path
 import dbus
 import dbus.mainloop.glib
 import dbus.service
-from gi.repository import GLib
-
 from _log_helper import resolve_logger as configure_app_logger
+from gi.repository import GLib
 
 _this = str(Path(__file__).resolve().parent)
 if _this not in sys.path:
@@ -163,19 +162,27 @@ DEFAULT_CATALOG = [
 
 
 def _http_get(url, timeout=5.0):
+    if not url.startswith(("http://", "https://")):
+        log.debug("Refusing non-HTTP URL: %s", url)
+        return None
     req = urllib.request.Request(url)
     try:
-        return urllib.request.urlopen(req, timeout=timeout)
+        # Scheme restricted to http(s) above.
+        return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
     except Exception as exc:
         log.debug("HTTP GET %s failed: %s", url, exc)
         return None
 
 
 def _http_post(url, payload, timeout=10.0):
+    if not url.startswith(("http://", "https://")):
+        log.debug("Refusing non-HTTP URL: %s", url)
+        return None
     data = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
     try:
-        return urllib.request.urlopen(req, timeout=timeout)
+        # Scheme restricted to http(s) above.
+        return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
     except Exception as exc:
         log.debug("HTTP POST %s failed: %s", url, exc)
         return None
