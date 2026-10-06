@@ -58,17 +58,21 @@ ls -lh "$ISO"
    - 4GB+ RAM
    - 20GB+ disk (for installed system)
    - Boot from ISO (CD-ROM)
-   - For VirtualBox: use default VMSVGA display
+   - For VirtualBox: VMSVGA display, 128 MB video memory, 3D acceleration off,
+     View → Auto-resize Guest Display on
    - For QEMU: `-enable-kvm -m 4G -cdrom "$ISO"`
 
 2. Boot entries (in order of safety):
-   - **Default**: `quiet splash nomodeset console=tty0 vga=791`
-   - **Safe graphics**: `nomodeset console=tty0 vga=normal` (text mode)
-   - **NVIDIA**: `nouveau.modeset=0 nvidia-drm.modeset=1 console=tty0`
+   - **Default**: `quiet splash` (kernel modesetting; VirtualBox auto-resize works)
+   - **Safe graphics**: `nomodeset vga=normal` (Xorg `vesa`, fixed ~1024x768, no resize)
+   - **NVIDIA**: `quiet splash nouveau.modeset=0 nvidia-drm.modeset=1 console=tty0`
 
 ### Phase 4: Debug Boot Failures
 
-If the ISO doesn't boot, follow this diagnostic tree:
+If the ISO doesn't boot, follow this diagnostic tree. Whenever a console is
+reachable (Ctrl+Alt+F3, user `axon`), run `sudo axon-display-diag` first — it
+collects the GPU driver, Xorg driver choice/errors, GDM, gnome-shell and
+VBoxClient logs into one report.
 
 #### Symptom: GRUB doesn't appear
 - Check VM boot order (CD-ROM must be first)
@@ -83,7 +87,12 @@ If the ISO doesn't boot, follow this diagnostic tree:
 5. If still black: the kernel is panicking before console init
 
 **Common causes**:
-- Missing `nomodeset` for VM display adapters
+- Splash script parse error: Plymouth rejects the whole script (black screen)
+  if `axon.script` uses syntax it does not support, e.g. hex literals or
+  non-existent functions. `pytest tests/test_boot_display.py` checks this.
+- An Xorg `Driver` pinned for VMs (Ubuntu 24.04 has no `vboxvideo` X driver;
+  leave driver selection to Xorg autodetection)
+- VirtualBox 3D acceleration enabled (Mesa `svga` path)
 - Corrupted squashfs (rebuild ISO)
 - Missing casper hooks in initramfs
 
@@ -99,6 +108,10 @@ If the ISO doesn't boot, follow this diagnostic tree:
 #### Symptom: Plymouth splash appears then black screen
 - Plymouth crash during early boot. Remove `splash` parameter to bypass.
 - Check Plymouth theme: `/usr/share/plymouth/themes/axon/axon.plymouth`
+- Test the splash without booting (needs `plymouth-x11`):
+  `sudo plymouthd --debug --debug-file=/tmp/ply.log --no-daemon --tty=$(tty) --kernel-command-line="splash plymouth.ignore-serial-consoles" &`
+  then `sudo plymouth show-splash`, `sudo plymouth quit`, and look for
+  `Parser error` in `/tmp/ply.log`.
 
 ### Phase 5: Install & Test Installed System
 
