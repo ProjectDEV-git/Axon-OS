@@ -137,6 +137,15 @@ def _remove_class(widget: Gtk.Widget, css_class: str) -> None:
     widget.get_style_context().remove_class(css_class)
 
 
+def _scrollable(page: Gtk.Widget) -> Gtk.ScrolledWindow:
+    """Let a page scroll vertically instead of forcing the window to be taller
+    than small screens (e.g. 800x600 in VirtualBox safe graphics)."""
+    scroller = Gtk.ScrolledWindow()
+    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    scroller.set_child(page)
+    return scroller
+
+
 class WelcomeWindow(Adw.Window):
     _PAGE_NAMES = ["welcome", "setup", "preferences", "features", "ready"]  # noqa: RUF012
 
@@ -191,11 +200,11 @@ class WelcomeWindow(Adw.Window):
         indicator_row = self._build_indicator()
 
         # Build pages
-        self._stack.add_named(self._build_page_welcome(), "welcome")
-        self._stack.add_named(self._build_page_setup(), "setup")
-        self._stack.add_named(self._build_page_preferences(), "preferences")
-        self._stack.add_named(self._build_page_features(), "features")
-        self._stack.add_named(self._build_page_ready(), "ready")
+        self._stack.add_named(_scrollable(self._build_page_welcome()), "welcome")
+        self._stack.add_named(_scrollable(self._build_page_setup()), "setup")
+        self._stack.add_named(_scrollable(self._build_page_preferences()), "preferences")
+        self._stack.add_named(_scrollable(self._build_page_features()), "features")
+        self._stack.add_named(_scrollable(self._build_page_ready()), "ready")
 
         inner_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         inner_box.append(self._stack)
