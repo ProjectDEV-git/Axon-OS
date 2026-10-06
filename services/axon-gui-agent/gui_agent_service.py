@@ -17,6 +17,12 @@ import sys
 import threading
 from pathlib import Path
 
+# services/ must be importable before any local module: systemd runs this file
+# as a script, so only its own directory is on sys.path.
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 import dbus
 import dbus.mainloop.glib
 import dbus.service

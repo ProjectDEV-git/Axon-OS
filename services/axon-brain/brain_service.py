@@ -15,6 +15,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+# services/ must be importable before any local module: systemd runs this file
+# as a script, so only its own directory is on sys.path.
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 import dbus
 import dbus.mainloop.glib
 import dbus.service
@@ -30,9 +36,6 @@ except ModuleNotFoundError:  # Python 3.10
 logger = configure_app_logger("axon-brain")
 
 # Ensure we can import hardware_profiler and conversation_store
-_parent = str(Path(__file__).resolve().parent.parent)
-if _parent not in sys.path:
-    sys.path.insert(0, _parent)
 _from_services = str(Path(__file__).resolve().parent)
 if _from_services not in sys.path:
     sys.path.insert(0, _from_services)

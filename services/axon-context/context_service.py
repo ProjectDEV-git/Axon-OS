@@ -7,6 +7,12 @@ import sys
 import threading
 from pathlib import Path
 
+# services/ must be importable before any local module: systemd runs this file
+# as a script, so only its own directory is on sys.path.
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
+
 import dbus
 import dbus.mainloop.glib
 import dbus.service
@@ -16,9 +22,6 @@ from service_base import ServiceBase
 
 logger = configure_app_logger("axon-context")
 
-_parent = str(Path(__file__).resolve().parents[1])
-if _parent not in sys.path:
-    sys.path.insert(0, _parent)
 from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
 from service_utils import rate_limited
 
