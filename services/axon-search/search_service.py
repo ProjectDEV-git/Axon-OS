@@ -20,15 +20,13 @@ from pathlib import Path
 import dbus
 import dbus.mainloop.glib
 import dbus.service
-from gi.repository import GLib
 
 _parent = str(Path(__file__).resolve().parent.parent)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
+from _log_helper import resolve_logger as configure_app_logger
 from constants import AXON_DIR, EMBED_MODEL, RESCAN_INTERVAL, SEMANTIC_INDEX_DB
 from service_utils import rate_limited
-
-from _log_helper import resolve_logger as configure_app_logger
 
 _this = str(Path(__file__).resolve().parent)
 if _this not in sys.path:

@@ -3,8 +3,6 @@
 import sys
 from pathlib import Path
 
-import pytest
-
 # Ensure services/ is on sys.path
 _services_dir = str(Path(__file__).resolve().parent.parent / "services")
 if _services_dir not in sys.path:
@@ -30,7 +28,7 @@ sys.modules.setdefault("dbus.exceptions", dbus_mock.exceptions)
 sys.modules.setdefault("dbus.mainloop", dbus_mock.mainloop)
 sys.modules.setdefault("dbus.mainloop.glib", dbus_mock.mainloop.glib)
 
-from services.axon_gui_agent.plan import to_gvariant, validate_plan, _check_op
+from services.axon_gui_agent.plan import _check_op, to_gvariant, validate_plan
 
 
 class TestToGvariant:
@@ -122,7 +120,7 @@ class TestValidatePlan:
 
     def test_markdown_fence_stripped(self):
         plan = '```json\n[{"type": "launch_app", "app": "firefox"}]\n```'
-        ops, errors = validate_plan(plan)
+        ops, _errors = validate_plan(plan)
         assert len(ops) == 1
 
     def test_max_ops_limit(self):
