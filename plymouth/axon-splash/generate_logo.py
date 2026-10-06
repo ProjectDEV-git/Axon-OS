@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Generate axon.png — a 400x400 logo for the Axon OS Plymouth splash.
+Generate the Axon OS Plymouth splash images.
 
-Background: #0e0e10  (14, 14, 16)
-Circle:     #a78bfa  (167, 139, 250)  radius 60 px, centered
+axon.png — 400x400 logo.
+    Background: #0e0e10  (14, 14, 16)
+    Circle:     #60a5fa  (96, 165, 250)  radius 60 px, centered
+progress-track.png / progress-fill.png — 1x1 solid colours that axon.script
+    scales into the progress bar (Plymouth's script API can only draw images).
 """
 
 import os
@@ -35,8 +38,8 @@ def _make_png(pixels: list[list[tuple[int, int, int]]]) -> bytes:
     # IHDR
     ihdr_data = struct.pack(
         ">IIBBBBB",
-        WIDTH,   # width
-        HEIGHT,  # height
+        len(pixels[0]),  # width
+        len(pixels),     # height
         8,       # bit depth
         2,       # color type: RGB
         0,       # compression method
@@ -84,9 +87,15 @@ for y in range(HEIGHT):
 # Write PNG
 # ---------------------------------------------------------------------------
 
-out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "axon.png")
+out_dir = os.path.dirname(os.path.abspath(__file__))
+out_path = os.path.join(out_dir, "axon.png")
 with open(out_path, "wb") as f:
     f.write(_make_png(pixels))
+
+# Progress bar: track #1e1e23, fill #a78bfa (violet)
+for name, colour in (("progress-track.png", (30, 30, 35)), ("progress-fill.png", (167, 139, 250))):
+    with open(os.path.join(out_dir, name), "wb") as f:
+        f.write(_make_png([[colour]]))
 
 from axon_logger import configure_app_logger
 
