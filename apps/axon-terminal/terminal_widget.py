@@ -391,6 +391,11 @@ class TerminalWidget(Gtk.Box):
         We use VTE's text extraction to capture the most recent output
         and trigger AI diagnosis for failures.
         """
+        if tab not in self._tabs:
+            # Closed tab: _on_close_page untracks it and SIGHUPs the shell, so
+            # this non-zero exit is expected rather than a failure to diagnose.
+            return
+
         # In interactive shells, non-zero exit from the shell typically means
         # the user typed 'exit N' or the shell crashed. Individual command
         # failures are harder to detect without shell integration.
@@ -625,4 +630,6 @@ class TerminalWidget(Gtk.Box):
         """Close the currently active terminal tab."""
         tab = self._get_active_tab()
         if tab is not None and tab.page is not None:
-            self._on_close_page(self._tab_view, tab.page)
+            # Emits close-page -> _on_close_page; calling close_page_finish()
+            # directly is rejected by Adw when no close is in progress.
+            self._tab_view.close_page(tab.page)
