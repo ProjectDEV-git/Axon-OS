@@ -15,10 +15,23 @@ CODENAME="Pulse"
 
 log() { echo "[chroot-setup] $*"; }
 
-# QUICK mode: passed from build.sh via env var. Skips expensive non-essential
-# steps (theme rebuilds, kernel module rebuild, initramfs regen) to speed up
-# iterative development rebuilds. Set AXON_QUICK=1 to enable.
-QUICK="${AXON_QUICK:-0}"
+# Version of the kernel the ISO boots: the newest /boot/vmlinuz-*, which is
+# the one build.sh copies into casper/. Empty if no kernel is installed.
+iso_kernel_version() {
+    local k
+    k="$(find /boot -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' | sort -V | tail -1 || true)"
+    echo "${k#vmlinuz-}"
+}
+
+# QUICK mode: passed from build.sh via env var (build.sh --quick/--fast sets
+# AXON_QUICK=true; AXON_QUICK=1 also works). Skips expensive steps whose
+# results a reused chroot already has (WhiteSur theme build, unchanged kernel
+# module rebuild) and regenerates only the ISO kernel's initramfs, to speed up
+# iterative development rebuilds.
+case "${AXON_QUICK:-0}" in
+    1 | true) QUICK=1 ;;
+    *) QUICK=0 ;;
+esac
 [[ "${QUICK}" == "1" ]] && log "QUICK MODE enabled — skipping expensive non-essential steps"
 
 # ---------------------------------------------------------------------------
@@ -311,16 +324,18 @@ MODULE_BUILT=false
 rm -f /etc/modules-load.d/axon-winabi.conf
 if [[ -d "${SRC}/kernel/axon-winabi" ]]; then
     KSRC="${SRC}/kernel/axon-winabi"
-    KVER="$(find /boot -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' | sort -V | tail -1 || true)"
-    KVER="${KVER#vmlinuz-}"
+    KVER="$(iso_kernel_version)"
     KDIR="/usr/src/linux-headers-${KVER}"
     KMOD_DIR="/lib/modules/${KVER}/extra"
+    # .ko or .ko.zst (noble kernels compress modules on modules_install)
+    KMOD_FILE="$(compgen -G "${KMOD_DIR}/axon-winabi.ko*" | head -1 || true)"
 
     if [[ -z "${KVER}" ]]; then
         log "WARNING: no kernel found in /boot — Windows ABI module skipped"
-    elif [[ "${QUICK}" == "1" ]] && compgen -G "${KMOD_DIR}/axon-winabi.ko*" >/dev/null; then
-        # .ko or .ko.zst (noble kernels compress modules on modules_install)
-        log "Quick mode: Windows ABI module already built for ${KVER} — skipping rebuild"
+    elif [[ "${QUICK}" == "1" ]] && [[ -n "${KMOD_FILE}" ]] && \
+         [[ -z "$(find "${KSRC}" -type f -newer "${KMOD_FILE}" -print -quit)" ]]; then
+        # Like make: rebuild only when a source file is newer than the module
+        log "Quick mode: Windows ABI module up to date for ${KVER} — skipping rebuild"
         MODULE_BUILT=true
     else
         apt-get install -y "linux-headers-${KVER}" || \
@@ -771,7 +786,12 @@ EOF
 # 10. Regenerate initramfs (casper + plymouth hooks) and clean up
 # ---------------------------------------------------------------------------
 if [[ "${QUICK}" == "1" ]]; then
-    log "Quick mode: skipping initramfs regeneration"
+    # Not skippable: the casper and plymouth hooks copy /etc/casper.conf and
+    # the Plymouth theme written above into the initrd. Only the ISO kernel's
+    # initrd is shipped, so regenerate just that one.
+    ISO_KVER="$(iso_kernel_version)"
+    log "Quick mode: regenerating initramfs only for the ISO kernel ${ISO_KVER}"
+    update-initramfs -u -k "${ISO_KVER:-all}"
 else
     log "Regenerating initramfs..."
     update-initramfs -u -k all
