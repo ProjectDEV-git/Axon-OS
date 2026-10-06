@@ -1,38 +1,69 @@
 #!/usr/bin/env bash
 # Axon OS Rogue Software Shield - Bubblewrap Wrapper
 #
-# Runs commands in a secure sandbox with read-only system paths and $HOME.
+# Runs a command in a sandbox: system paths read-only, no network, and an
+# empty home directory, so secrets such as ~/.ssh, ~/.gnupg, browser profiles
+# and cloud credentials are not visible to the sandboxed program.
+#
+# Usage: axon-run [--net] [--file PATH]... <command>
+#   --net        allow network access (off by default)
+#   --file PATH  make PATH (e.g. the script being run) readable inside
+set -euo pipefail
 
-if [ $# -lt 1 ]; then
-    echo "Usage: axon-run <command>"
+usage() {
+    echo "Usage: axon-run [--net] [--file PATH]... <command>" >&2
     exit 1
-fi
+}
 
-# Find bwrap
+ALLOW_NET=false
+FILES=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --net) ALLOW_NET=true; shift ;;
+        --file) [[ $# -ge 2 ]] || usage; FILES+=("$2"); shift 2 ;;
+        --) shift; break ;;
+        *) break ;;
+    esac
+done
+[[ $# -ge 1 ]] || usage
+
 if ! command -v bwrap &>/dev/null; then
     echo "Error: bubblewrap (bwrap) is not installed." >&2
     exit 1
 fi
 
-# Resolve paths
 CUR_DIR="$(pwd)"
 USER_HOME="${HOME:-/home/axon}"
 
-# Run command inside bubblewrap container
-# System paths are mounted read-only, user home is read-only, /tmp is isolated.
-bwrap \
-  --ro-bind /usr /usr \
-  --ro-bind /etc /etc \
-  --symlink usr/lib /lib \
-  --symlink usr/lib64 /lib64 \
-  --symlink usr/bin /bin \
-  --symlink usr/sbin /sbin \
-  --dir /tmp \
-  --dir /var \
-  --proc /proc \
-  --dev /dev \
-  --unshare-all \
-  --share-net \
-  --ro-bind "${USER_HOME}" "${USER_HOME}" \
-  --chdir "${CUR_DIR}" \
-  /bin/bash -c "$*"
+ARGS=(
+    --ro-bind /usr /usr
+    --ro-bind /etc /etc
+    --symlink usr/lib /lib
+    --symlink usr/lib64 /lib64
+    --symlink usr/bin /bin
+    --symlink usr/sbin /sbin
+    --tmpfs /tmp
+    --dir /var
+    --proc /proc
+    --dev /dev
+    --unshare-all
+    --new-session
+    --die-with-parent
+    # Empty home: nothing in $HOME is visible unless bound explicitly below
+    --tmpfs "${USER_HOME}"
+)
+if [[ "${ALLOW_NET}" == "true" ]]; then
+    ARGS+=(--share-net)
+fi
+
+# A project directory inside $HOME (not $HOME itself) is visible read-only
+if [[ "${CUR_DIR}" == "${USER_HOME}/"* ]]; then
+    ARGS+=(--ro-bind "${CUR_DIR}" "${CUR_DIR}")
+else
+    ARGS+=(--dir "${CUR_DIR}")
+fi
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    [[ -e "$f" ]] && ARGS+=(--ro-bind "$f" "$f")
+done
+
+exec bwrap "${ARGS[@]}" --chdir "${CUR_DIR}" /bin/bash -c "$*"

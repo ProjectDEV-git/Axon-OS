@@ -32,7 +32,8 @@ _PATTERNS: list[tuple[re.Pattern, str, str]] = [
     ),
     (
         re.compile(
-            r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)[a-zA-Z]*\s+[\"']?(/|\$HOME|~)(\s|[\"']|$)"
+            r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)[a-zA-Z]*\s+[\"']?"
+            r"(/|\$HOME|~|/home(/[^/\s\"']+)?/?)(\s|[\"']|$)"
         ),
         "high",
         "Recursively force-deletes / or the home directory",
@@ -49,13 +50,28 @@ _PATTERNS: list[tuple[re.Pattern, str, str]] = [
         "Sets world-writable or setuid permissions",
     ),
     (
-        re.compile(r"(curl|wget)[^|\n]*\|\s*(sudo\s+)?(ba)?sh\b"),
+        re.compile(
+            r"(curl|wget)[^|\n]*\|\s*(sudo\s+)?(ba|z|da|k)?sh\b"
+            r"|(curl|wget)[^|\n]*\|\s*(sudo\s+)?(python[0-9.]*|perl|ruby|node)\b"
+        ),
         "high",
-        "Pipes a remote download straight into a shell",
+        "Pipes a remote download straight into a shell or interpreter",
+    ),
+    (
+        re.compile(r"\b(ba|z|da)?sh\s+(-c\s+)?[\"']?(<\(|\$\()\s*(curl|wget)\b"),
+        "high",
+        "Runs a remote download as a script (process/command substitution)",
+    ),
+    (
+        re.compile(r"\.(aws/credentials|kube/config|docker/config\.json|netrc|git-credentials)\b"),
+        "high",
+        "Reads cloud, container or git credentials",
     ),
     (
         re.compile(
-            r"\b(curl|wget|nc|ncat|socat)\b[^\n]*\b(-d|--data|--post-data|-F|--upload-file|-T)\b"
+            r"\b(curl|wget)\b[^\n]*(?<!\S)(-d|--data\S*|--post-data|--post-file|-F|--form"
+            r"|--upload-file|-T)(?=\s|=|@|$)"
+            r"|\|\s*(nc|ncat|socat|telnet)\b"
         ),
         "medium",
         "Uploads data to a remote host",

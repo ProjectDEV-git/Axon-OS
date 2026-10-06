@@ -11,6 +11,7 @@ Provides:
 
 from __future__ import annotations
 
+import logging
 import os
 import shlex
 import signal
@@ -29,7 +30,9 @@ safety_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(safety_dir))
 from ai_helper import AIHelper
 from gi.repository import Adw, Gdk, GLib, Gtk, Pango, Vte
-from safety import assess_command, format_findings
+from safety import assess_command, format_findings, is_insertable_suggestion
+
+log = logging.getLogger("axon-terminal")
 
 # ---------------------------------------------------------------------------
 # Colour palette
@@ -459,18 +462,28 @@ class TerminalWidget(Gtk.Box):
     def _on_suggestions_received(self, suggestions: list[str]) -> None:
         """Populate suggestion chips."""
         self._clear_suggestions()
-        for cmd in suggestions[:3]:
+        safe = [cmd for cmd in suggestions if is_insertable_suggestion(cmd)]
+        for cmd in safe[:3]:
             chip = Gtk.Button(label=cmd)
             chip.add_css_class("suggestion-chip")
             chip.add_css_class("flat")
-            chip.set_tooltip_text(f"Run: {cmd}")
+            chip.set_tooltip_text(f"Insert at prompt: {cmd}")
             chip.connect("clicked", self._on_suggestion_clicked, cmd)
             self._suggestion_box.append(chip)
 
     def _on_suggestion_clicked(self, button: Gtk.Button, command: str) -> None:
-        """Execute a suggested command via safety-assessed feed_command."""
+        """Type an AI suggestion at the prompt without running it.
+
+        Suggestions are built from terminal output and clipboard text, which
+        an attacker can influence, so the user reviews and presses Enter.
+        """
         self._hide_diagnosis()
-        self.feed_command(command)
+        if not is_insertable_suggestion(command):
+            return
+        tab = self._get_active_tab()
+        if tab is not None:
+            tab.terminal.feed_child(command.encode())
+            tab.terminal.grab_focus()
 
     def _clear_suggestions(self) -> None:
         """Remove all suggestion chip buttons."""
@@ -584,6 +597,7 @@ class TerminalWidget(Gtk.Box):
                 if response == "cancel":
                     return
                 if response == "ok":
+                    # Never fall through to an unsandboxed run if this fails
                     try:
                         tmp_fd, tmp_path = tempfile.mkstemp(prefix="axon-term-", suffix=".sh")
                         os.close(tmp_fd)
@@ -597,14 +611,16 @@ class TerminalWidget(Gtk.Box):
                             / "shield.py"
                         )
                         self.new_tab("Sandbox")
+                        quoted_tmp = shlex.quote(str(tmp))
                         self._tabs[-1].terminal.feed_child(
                             (
-                                f"python3 {shlex.quote(str(shield_script))} --yes-sandbox {shlex.quote(str(tmp))}\n"
+                                f"python3 {shlex.quote(str(shield_script))} --yes-sandbox {quoted_tmp}"
+                                f"; rm -f {quoted_tmp}\n"
                             ).encode()
                         )
-                        return
                     except Exception:
-                        pass
+                        log.exception("Could not start the sandboxed run")
+                    return
                 tab = self._get_active_tab()
                 if tab is not None:
                     tab.terminal.feed_child((command + "\n").encode())

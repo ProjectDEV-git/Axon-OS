@@ -84,6 +84,7 @@ def ask_user(target: str, findings: list, ai_verdict: str) -> str:
                     "--question",
                     "--title=Axon Rogue Shield",
                     "--icon=security-high",
+                    "--no-markup",
                     f"--text={body}",
                     "--ok-label=Run Sandboxed (read-only home)",
                     "--cancel-label=Block Execution",
@@ -112,11 +113,35 @@ def ask_user(target: str, findings: list, ai_verdict: str) -> str:
     return "sandbox"
 
 
-def sandbox_command(target_cmd: list, no_net: bool) -> list:
+# Masked with an empty tmpfs inside the sandbox
+SECRET_PATHS = (
+    ".ssh",
+    ".gnupg",
+    ".axon",
+    ".aws",
+    ".azure",
+    ".kube",
+    ".docker",
+    ".password-store",
+    ".mozilla",
+    ".thunderbird",
+    ".config/google-chrome",
+    ".config/chromium",
+    ".config/BraveSoftware",
+    ".config/gcloud",
+    ".local/share/keyrings",
+    "snap/firefox",
+)
+# Single files cannot be masked with tmpfs; they are hidden behind /dev/null
+SECRET_FILES = (".netrc", ".git-credentials", ".pgpass", ".bash_history")
+
+
+def sandbox_command(target_cmd: list, no_net: bool = True, extra_ro: tuple = ()) -> list:
     """Wrap *target_cmd* in a bubblewrap jail.
 
-    Read-only / and home, secrets directories masked with empty tmpfs,
-    writable /tmp and current directory untouched (also read-only).
+    Read-only system paths and home, secrets masked, private /tmp, and no
+    network unless *no_net* is False. *extra_ro* paths (e.g. the script being
+    run, which may live in the host /tmp) are bound read-only on top.
     """
     home = str(Path.home())
     # FIX: Bind specific directories instead of entire root filesystem (--ro-bind / /)
@@ -140,30 +165,32 @@ def sandbox_command(target_cmd: list, no_net: bool) -> list:
         "--die-with-parent",
         "--new-session",
     ]
-    for secret in (
-        ".ssh",
-        ".gnupg",
-        ".axon",
-        ".mozilla",
-        ".config/google-chrome",
-        ".config/chromium",
-        ".local/share/keyrings",
-    ):
+    for secret in SECRET_PATHS:
         p = Path(home) / secret
-        if p.exists():
+        if p.is_dir():
             cmd += ["--tmpfs", str(p)]
+    for secret in SECRET_FILES:
+        p = Path(home) / secret
+        if p.is_file():
+            cmd += ["--ro-bind", "/dev/null", str(p)]
+    for path in extra_ro:
+        cmd += ["--ro-bind", str(path), str(path)]
     if no_net:
+        # Also isolates abstract-namespace sockets such as the X11 display
         cmd += ["--unshare-net"]
     return [*cmd, "--", *target_cmd]
 
 
 def main(argv: list) -> int:
-    no_net = False
+    # Network is off in the sandbox unless --net is given (--no-net is the
+    # old spelling of the default and still accepted)
+    no_net = True
     force_sandbox = False
     args = list(argv)
-    while args and args[0] in ("--no-net", "--yes-sandbox"):
+    while args and args[0] in ("--net", "--no-net", "--yes-sandbox"):
         flag = args.pop(0)
-        no_net = no_net or flag == "--no-net"
+        if flag == "--net":
+            no_net = False
         force_sandbox = force_sandbox or flag == "--yes-sandbox"
     if not args:
         print(__doc__)  # noqa: T201
@@ -219,7 +246,7 @@ def main(argv: list) -> int:
             }
         )
     )
-    return subprocess.call(sandbox_command(target_cmd, no_net))
+    return subprocess.call(sandbox_command(target_cmd, no_net, extra_ro=(target_path,)))
 
 
 if __name__ == "__main__":
