@@ -51,6 +51,11 @@ def _ensure_namespace(name: str, path: Path) -> None:
     pkg = types.ModuleType(name)
     pkg.__path__ = [str(path)]  # marks it a package for the import machinery
     sys.modules[name] = pkg
+    # Bind it on the parent package like a real import does: Python 3.10's
+    # mock.patch() resolves "services.axon_brain.x" with getattr() per level.
+    parent, _, child = name.rpartition(".")
+    if parent:
+        setattr(sys.modules[parent], child, pkg)
 
 
 # 'services' is a real directory but ships no __init__.py; expose it as a

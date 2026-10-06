@@ -20,7 +20,9 @@ select = [
 # E501: long lines tolerated in UI/string-heavy GTK code
 # E402: gi.require_version() must precede `from gi.repository import ...`,
 #       so module-level imports legitimately appear after code
-ignore = ["E501", "E402", "RUF001", "RUF002"]
+# UP038: ruff later removed this rule (isinstance with X | Y is slower, not
+#        clearer); ignored so every pinned ruff version agrees
+ignore = ["E501", "E402", "RUF001", "RUF002", "UP038"]
 
 exclude = [
     ".git",

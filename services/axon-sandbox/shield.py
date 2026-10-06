@@ -132,7 +132,7 @@ def sandbox_command(target_cmd: list, no_net: bool) -> list:
         "--symlink", "usr/sbin", "/sbin",
         "--dev", "/dev",
         "--proc", "/proc",
-        "--tmpfs", "/tmp",
+        "--tmpfs", "/tmp",  # nosec B108 - private tmpfs inside the sandbox
         "--tmpfs", "/run",
         "--ro-bind",
         home,

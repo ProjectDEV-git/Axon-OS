@@ -1,8 +1,8 @@
 // Axon OS Plymouth Boot Splash
-// Dark background: #0d0d10
+// Dark background: #0e0e10 (matches the axon.png logo background)
 
-Window.SetBackgroundTopColor(0.05, 0.05, 0.06);
-Window.SetBackgroundBottomColor(0.05, 0.05, 0.06);
+Window.SetBackgroundTopColor(0.055, 0.055, 0.063);
+Window.SetBackgroundBottomColor(0.055, 0.055, 0.063);
 
 // --- Logo ---
 logo_image = Image("axon.png");
@@ -12,21 +12,22 @@ logo_sprite.SetY(Window.GetHeight() / 2 - logo_image.GetHeight() / 2);
 logo_sprite.SetOpacity(0);
 
 // --- Progress bar ---
+// Plymouth's script API has no rectangle primitive: scale 1x1 PNGs instead.
 bar_height    = 4;
 bar_y         = Window.GetHeight() - 48;
-bar_width_max = Window.GetWidth() * 0.5;
-bar_x         = (Window.GetWidth() - bar_width_max) / 2;
+bar_width_max = Math.Int(Window.GetWidth() * 0.5);
+bar_x         = Math.Int((Window.GetWidth() - bar_width_max) / 2);
 
-// Background track
-bar_bg_image = Image.CreateFilledRectangle(bar_width_max, bar_height, 0x1e, 0x1e, 0x23, 0xff);
+// Background track (#1e1e23)
+bar_bg_image = Image("progress-track.png").Scale(bar_width_max, bar_height);
 bar_bg_sprite = Sprite(bar_bg_image);
 bar_bg_sprite.SetX(bar_x);
 bar_bg_sprite.SetY(bar_y);
 bar_bg_sprite.SetOpacity(0);
 
-// Fill (violet #a78bfa -> 0.65, 0.54, 0.98)
-bar_fill_image = Image.CreateFilledRectangle(1, bar_height, 0xa7, 0x8b, 0xfa, 0xff);
-bar_fill_sprite = Sprite(bar_fill_image);
+// Fill (violet #a78bfa)
+bar_fill_source = Image("progress-fill.png");
+bar_fill_sprite = Sprite(bar_fill_source.Scale(1, bar_height));
 bar_fill_sprite.SetX(bar_x);
 bar_fill_sprite.SetY(bar_y);
 bar_fill_sprite.SetOpacity(0);
@@ -35,6 +36,7 @@ bar_fill_sprite.SetOpacity(0);
 progress      = 0.0;
 fade_opacity  = 0.0;
 fade_done     = 0;
+fill_width_shown = 1;
 
 // --- Callbacks ---
 fun refresh_callback() {
@@ -50,14 +52,15 @@ fun refresh_callback() {
         bar_fill_sprite.SetOpacity(fade_opacity);
     }
 
-    // Resize fill sprite according to current progress
+    // Resize the fill only when its width changes (refresh runs ~50x/s)
     fill_width = Math.Int(bar_width_max * progress);
     if (fill_width < 1) {
         fill_width = 1;
     }
-    bar_fill_sprite.SetImage(
-        Image.CreateFilledRectangle(fill_width, bar_height, 0xa7, 0x8b, 0xfa, 0xff)
-    );
+    if (fill_width != fill_width_shown) {
+        bar_fill_sprite.SetImage(bar_fill_source.Scale(fill_width, bar_height));
+        fill_width_shown = fill_width;
+    }
 }
 
 fun boot_progress_callback(duration, progress_value) {

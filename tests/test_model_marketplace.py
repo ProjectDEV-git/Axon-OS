@@ -77,3 +77,15 @@ class TestHttpHelpers:
         with patch("urllib.request.urlopen", side_effect=Exception("refused")):
             result = _http_post("http://localhost:11434/api/pull", {"name": "test"})
         assert result is None
+
+    def test_http_get_refuses_non_http_urls(self):
+        # urllib would happily read local files via file://
+        with patch("urllib.request.urlopen") as mock_open:
+            assert _http_get("file:///etc/passwd") is None
+            assert _http_get("ftp://example.com/x") is None
+        mock_open.assert_not_called()
+
+    def test_http_post_refuses_non_http_urls(self):
+        with patch("urllib.request.urlopen") as mock_open:
+            assert _http_post("file:///etc/passwd", {"name": "x"}) is None
+        mock_open.assert_not_called()

@@ -15,7 +15,6 @@ Usage::
 
 import json
 import platform
-import sys
 import threading
 import time
 from datetime import datetime, timezone

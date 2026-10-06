@@ -450,111 +450,56 @@ EOF
 systemctl enable NetworkManager.service || log "WARNING: could not enable NetworkManager"
 
 # ---------------------------------------------------------------------------
-# 6a. VM guest integration (auto-resize display in VirtualBox/VMware/QEMU)
+# 6a. VM guest display integration (VirtualBox / VMware / QEMU)
 # ---------------------------------------------------------------------------
-log "Configuring VM guest tools..."
-install -Dm755 /dev/stdin /usr/local/bin/axon-vm-guest-init <<'VMEOF'
-#!/bin/sh
-# Detect the virtualisation platform and start the appropriate guest tools
-# so the display auto-resizes to match the host window.
-case "$(systemd-detect-virt 2>/dev/null || echo none)" in
-    oracle)   # VirtualBox
-        VBoxClient --display    2>/dev/null || true
-        VBoxClient --vmsvga     2>/dev/null || true
-        VBoxClient --clipboard  2>/dev/null || true
-        VBoxClient --draganddrop 2>/dev/null || true
-        ;;
-    vmware)
-        /usr/bin/vmware-user-suid-wrapper 2>/dev/null || true
-        ;;
-    qemu|kvm)
-        spice-vdagent 2>/dev/null || true
-        ;;
-esac
-VMEOF
+# Display auto-resize, clipboard and drag-and-drop come from the guest
+# packages in packages.list — they start themselves in every X11 session:
+#   * VirtualBox: virtualbox-guest-x11 runs VBoxClient from
+#     /etc/X11/Xsession.d/98vboxadd-xclient. Its --vmsvga-session helper
+#     falls back to the X11 RandR resize agent (Ubuntu does not ship
+#     VBoxDRMClient). The service side is virtualbox-guest-utils.service.
+#   * VMware: open-vm-tools-desktop's /etc/xdg/autostart/vmware-user.desktop
+#   * QEMU/KVM: spice-vdagent's own autostart entry and system unit
+#
+# Do NOT pin an Xorg driver for VMs. Ubuntu 24.04 has no vboxvideo_drv.so,
+# and Xorg's autodetection already picks the right one: `vmware` for
+# VirtualBox's default VMSVGA adapter (VBoxClient needs its VMWARE_CTRL
+# extension for multi-monitor resize) and `modesetting` for VBoxVGA.
+log "Configuring VM guest display integration..."
 
-# XDG autostart (works for installed systems with a normal GNOME session)
-cat > /etc/xdg/autostart/axon-vm-guest.desktop <<'VMDESK'
-[Desktop Entry]
-Type=Application
-Name=Axon VM Guest Integration
-Comment=Starts guest display tools for VirtualBox/VMware/QEMU auto-resize
-Exec=/usr/local/bin/axon-vm-guest-init
-Terminal=false
-StartupNotify=false
-X-GNOME-Autostart-enabled=true
-X-GNOME-Autostart-Phase=Initialization
-VMDESK
+# Axon OS 1.0.7 shipped hand-rolled replacements for the above: a
+# 10-vboxvideo.conf that forced a non-existent X driver (pushing VMSVGA onto
+# modesetting) and a root system unit running VBoxClient without an X
+# display. build.sh reuses the chroot between builds, so remove them
+# explicitly rather than just no longer creating them.
+systemctl disable axon-vbox-xorg-setup.service axon-vm-guest.service 2>/dev/null || true
+rm -f /etc/systemd/system/axon-vbox-xorg-setup.service \
+      /etc/systemd/system/sysinit.target.wants/axon-vbox-xorg-setup.service \
+      /etc/systemd/system/axon-vm-guest.service \
+      /etc/systemd/system/graphical.target.wants/axon-vm-guest.service \
+      /usr/local/bin/axon-vbox-xorg-setup \
+      /usr/local/bin/axon-vm-guest-init \
+      /etc/xdg/autostart/axon-vm-guest.desktop \
+      /etc/X11/xorg.conf.d/10-vboxvideo.conf
 
-# systemd service (more reliable, especially in live sessions)
-cat > /etc/systemd/system/axon-vm-guest.service <<'VMUNIT'
-[Unit]
-Description=Axon VM guest display auto-resize (VirtualBox/VMware/QEMU)
-After=display-manager.service
-Wants=display-manager.service
+# VirtualBox's service unit on Ubuntu (there is no "vboxservice" unit). The
+# package already enables it; ConditionVirtualization=oracle keeps it inert
+# outside VirtualBox.
+systemctl enable virtualbox-guest-utils.service 2>/dev/null || \
+    log "WARNING: could not enable virtualbox-guest-utils.service"
 
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/axon-vm-guest-init
-RemainAfterExit=yes
+# VirtualBox's VMSVGA "3D acceleration" path (Mesa's svga driver) is a common
+# cause of black screens and frozen GNOME Shell sessions on 24.04 guests,
+# while booting with nomodeset (safe graphics) avoids it. Render with
+# llvmpipe inside VirtualBox instead. With 3D acceleration off (the
+# VirtualBox default) Mesa already uses llvmpipe, so this changes nothing.
+# A systemd user environment generator is evaluated at login, so it also
+# covers the GDM greeter, and does nothing on other hypervisors or hardware.
+install -Dm755 "${SRC}/build/config/axon-vm-graphics-env" \
+    /usr/lib/systemd/user-environment-generators/60-axon-vm-graphics
 
-[Install]
-WantedBy=graphical.target
-VMUNIT
-
-# Early-boot service: detect VirtualBox and inject the vboxvideo Xorg config
-# BEFORE the display manager starts. Without this, X falls back to vesa/fbdev.
-cat > /usr/local/bin/axon-vbox-xorg-setup <<'VBOXSETUP'
-#!/bin/sh
-# Only act inside VirtualBox
-VIRT=$(systemd-detect-virt 2>/dev/null || echo none)
-if [ "${VIRT}" != "oracle" ]; then
-    exit 0
-fi
-
-XCONF_DIR="/etc/X11/xorg.conf.d"
-XCONF_FILE="${XCONF_DIR}/10-vboxvideo.conf"
-
-# Write once; idempotent
-if [ -f "${XCONF_FILE}" ]; then
-    exit 0
-fi
-
-mkdir -p "${XCONF_DIR}"
-cat > "${XCONF_FILE}" <<'XVBOX'
-Section "Device"
-    Identifier  "VirtualBox Video"
-    Driver      "vboxvideo"
-EndSection
-XVBOX
-VBOXSETUP
-chmod 755 /usr/local/bin/axon-vbox-xorg-setup
-
-cat > /etc/systemd/system/axon-vbox-xorg-setup.service <<'VBOXSVC'
-[Unit]
-Description=Write vboxvideo Xorg config if running in VirtualBox
-Before=display-manager.service gdm.service
-DefaultDependencies=no
-After=local-fs.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/axon-vbox-xorg-setup
-RemainAfterExit=yes
-
-[Install]
-WantedBy=sysinit.target
-VBOXSVC
-
-systemctl enable axon-vbox-xorg-setup.service 2>/dev/null || true
-
-# Enable the vboxservice system service if present (VirtualBox's own
-# systemd unit that runs VBoxClient --vmsvga + clipboard + drag-and-drop).
-# This is the most reliable way to get auto-resize in VirtualBox.
-systemctl enable vboxservice 2>/dev/null || true
-
-# Also enable our custom unit as a safety net
-systemctl enable axon-vm-guest.service 2>/dev/null || true
+# One-shot log collector for black-screen / resolution bug reports.
+install -Dm755 "${SRC}/build/config/axon-display-diag" /usr/local/bin/axon-display-diag
 
 # ---------------------------------------------------------------------------
 # 6b. GNOME defaults (gschema overrides apply to every user, incl. live)
@@ -669,6 +614,8 @@ mkdir -p /usr/share/plymouth/themes/axon
 cp "${SRC}/plymouth/axon-splash/axon.plymouth" \
    "${SRC}/plymouth/axon-splash/axon.script" \
    "${SRC}/plymouth/axon-splash/axon.png" \
+   "${SRC}/plymouth/axon-splash/progress-track.png" \
+   "${SRC}/plymouth/axon-splash/progress-fill.png" \
    /usr/share/plymouth/themes/axon/
 update-alternatives --install /usr/share/plymouth/themes/default.plymouth \
     default.plymouth /usr/share/plymouth/themes/axon/axon.plymouth 200

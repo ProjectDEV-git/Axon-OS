@@ -15,7 +15,7 @@
    
    Note: On Ubuntu, some dependencies require system packages:
    ```bash
-   sudo apt-get install python3-dbus python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 python3-vte-2.91
+   sudo apt-get install python3-dbus python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-vte-3.91
    ```
 
 2. **Development dependencies:**

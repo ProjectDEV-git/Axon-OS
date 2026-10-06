@@ -13,14 +13,12 @@ Services subclass ServiceBase and implement their D-Bus methods on top.
 import sys
 import threading
 import time
-from pathlib import Path
 
 import dbus
 import dbus.mainloop.glib
 import dbus.service
-from gi.repository import GLib
-
 from _log_helper import resolve_logger as configure_app_logger
+from gi.repository import GLib
 
 
 class ServiceBase(dbus.service.Object):
@@ -139,7 +137,7 @@ class ServiceBase(dbus.service.Object):
         import signal
 
         loop = GLib.MainLoop()
-        service = cls()  # noqa: F841 — side effect: starts D-Bus service
+        service = cls()  # side effect: exports the service on the bus
 
         def _shutdown(signum, frame):
             service.logger.info("Received signal %d, shutting down...", signum)

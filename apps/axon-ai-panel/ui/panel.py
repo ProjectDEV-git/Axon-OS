@@ -47,7 +47,7 @@ except ImportError:
 
         def is_available(self) -> bool:
             try:
-                urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=2)
+                urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=2)  # nosec B310 - fixed http URL
                 return True
             except Exception:
                 return False
@@ -55,7 +55,7 @@ except ImportError:
         def list_models(self) -> list[str]:
             """Return list of locally available model names."""
             try:
-                with urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=5) as resp:
+                with urllib.request.urlopen(f"{self.BASE_URL}/api/tags", timeout=5) as resp:  # nosec B310
                     data = json.loads(resp.read().decode())
                     return [m["name"] for m in data.get("models", [])]
             except Exception:
@@ -82,7 +82,7 @@ except ImportError:
                 headers={"Content-Type": "application/json"},
             )
             try:
-                with urllib.request.urlopen(req, timeout=120) as resp:
+                with urllib.request.urlopen(req, timeout=120) as resp:  # nosec B310 - BASE_URL
                     for raw_line in resp:
                         line = raw_line.decode().strip()
                         if not line:

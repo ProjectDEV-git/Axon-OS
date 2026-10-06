@@ -27,9 +27,8 @@ from gi.repository import GLib
 _parent = str(Path(__file__).resolve().parent.parent)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
-from service_base import ServiceBase
-
 from _log_helper import resolve_logger as configure_app_logger
+from service_base import ServiceBase
 
 _this = str(Path(__file__).resolve().parent)
 if _this not in sys.path:

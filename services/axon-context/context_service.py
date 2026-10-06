@@ -10,11 +10,8 @@ from pathlib import Path
 import dbus
 import dbus.mainloop.glib
 import dbus.service
-from gi.repository import GLib
-
 from _log_helper import resolve_logger as configure_app_logger
-
-
+from gi.repository import GLib
 from service_base import ServiceBase
 
 logger = configure_app_logger("axon-context")
@@ -431,7 +428,8 @@ class ContextService(ServiceBase):
         self._terminal_cache_mtime[cache_key] = active_mtime
         # Prune: keep only the 5 most recently accessed entries
         if len(self._terminal_cache_mtime) > 5:
-            oldest = sorted(self._terminal_cache_mtime, key=self._terminal_cache_mtime.get)
+            mtimes = self._terminal_cache_mtime
+            oldest = sorted(mtimes, key=lambda k: mtimes[k])
             for k in oldest[:-5]:
                 self._terminal_cache_mtime.pop(k, None)
         return commands[-n:]

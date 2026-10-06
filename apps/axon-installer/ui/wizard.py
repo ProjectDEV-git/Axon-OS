@@ -181,6 +181,15 @@ def _label(text, *classes, halign=Gtk.Align.START, wrap=False):
     return lbl
 
 
+def _scrollable(page: Gtk.Widget) -> Gtk.ScrolledWindow:
+    """Let a wizard page scroll vertically instead of forcing the window to be
+    taller than small screens (e.g. 1024x768 in VirtualBox safe graphics)."""
+    scroller = Gtk.ScrolledWindow()
+    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    scroller.set_child(page)
+    return scroller
+
+
 def _human_size(num_bytes: int) -> str:
     gib = num_bytes / (1024**3)
     if gib >= 1000:
@@ -246,14 +255,14 @@ class InstallerWindow(Adw.Window):
         self._stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT)
         self._stack.set_hexpand(True)
         self._stack.set_vexpand(True)
-        self._stack.add_named(self._page_welcome(), "welcome")
-        self._stack.add_named(self._page_network(), "network")
-        self._stack.add_named(self._page_identity(), "identity")
-        self._stack.add_named(self._page_disk(), "disk")
-        self._stack.add_named(self._page_ai(), "ai")
-        self._stack.add_named(self._page_summary(), "summary")
-        self._stack.add_named(self._page_install(), "install")
-        self._stack.add_named(self._page_done(), "done")
+        self._stack.add_named(_scrollable(self._page_welcome()), "welcome")
+        self._stack.add_named(_scrollable(self._page_network()), "network")
+        self._stack.add_named(_scrollable(self._page_identity()), "identity")
+        self._stack.add_named(_scrollable(self._page_disk()), "disk")
+        self._stack.add_named(_scrollable(self._page_ai()), "ai")
+        self._stack.add_named(_scrollable(self._page_summary()), "summary")
+        self._stack.add_named(_scrollable(self._page_install()), "install")
+        self._stack.add_named(_scrollable(self._page_done()), "done")
         root.append(self._stack)
 
         self.set_content(root)
@@ -419,11 +428,17 @@ class InstallerWindow(Adw.Window):
             )
         )
 
-        chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        # 2x2 grid: a single row of four chips forced a 645 px minimum width
+        chips = Gtk.Grid()
+        chips.set_column_spacing(8)
+        chips.set_row_spacing(8)
+        chips.set_column_homogeneous(True)
         chips.set_halign(Gtk.Align.CENTER)
         chips.set_margin_top(18)
-        for text in ("⬡ AI-Centered", "🔒 100% Local Option", "☁ Any Provider", "🐧 GNOME Native"):
-            chips.append(_cls(Gtk.Label(label=text), "chip"))
+        for i, text in enumerate(
+            ("⬡ AI-Centered", "🔒 100% Local Option", "☁ Any Provider", "🐧 GNOME Native")
+        ):
+            chips.attach(_cls(Gtk.Label(label=text), "chip"), i % 2, i // 2, 1, 1)
         outer.append(chips)
 
         btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
@@ -1012,7 +1027,6 @@ class InstallerWindow(Adw.Window):
     def _page_install(self):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         outer.set_valign(Gtk.Align.CENTER)
-        outer.set_halign(Gtk.Align.CENTER)
         outer.set_margin_start(64)
         outer.set_margin_end(64)
 
@@ -1020,9 +1034,12 @@ class InstallerWindow(Adw.Window):
         self._install_pct = _label("0%", "install-percent", halign=Gtk.Align.CENTER)
         outer.append(self._install_pct)
 
+        # At most 460 px wide; shrinks with the window on narrow screens
+        bar_clamp = Adw.Clamp()
+        bar_clamp.set_maximum_size(460)
         self._install_bar = Gtk.ProgressBar()
-        self._install_bar.set_size_request(460, -1)
-        outer.append(self._install_bar)
+        bar_clamp.set_child(self._install_bar)
+        outer.append(bar_clamp)
 
         self._install_step = _label(
             "Starting installer…", "install-step", halign=Gtk.Align.CENTER, wrap=True
@@ -1033,7 +1050,8 @@ class InstallerWindow(Adw.Window):
             INSTALL_TIPS[0], "install-tip", halign=Gtk.Align.CENTER, wrap=True
         )
         self._install_tip.set_margin_top(22)
-        self._install_tip.set_size_request(480, -1)
+        self._install_tip.set_max_width_chars(60)
+        self._install_tip.set_justify(Gtk.Justification.CENTER)
         outer.append(self._install_tip)
 
         self._install_error_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)

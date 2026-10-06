@@ -379,14 +379,14 @@ RSYNC_EXCLUDES = [
     "/proc/*",
     "/sys/*",
     "/run/*",
-    "/tmp/*",
+    "/tmp/*",  # nosec B108 - rsync exclude pattern, not a temp file
     "/mnt/*",
     "/media/*",
     "/cdrom",
     "/target",
     "/swapfile",
     "/var/crash/*",
-    "/var/tmp/*",
+    "/var/tmp/*",  # nosec B108 - rsync exclude pattern
     "/lost+found",
     "/boot/efi/*",
     "/home/*/.cache/*",
