@@ -15,10 +15,23 @@ CODENAME="Pulse"
 
 log() { echo "[chroot-setup] $*"; }
 
-# QUICK mode: passed from build.sh via env var. Skips expensive non-essential
-# steps (theme rebuilds, kernel module rebuild, initramfs regen) to speed up
-# iterative development rebuilds. Set AXON_QUICK=1 to enable.
-QUICK="${AXON_QUICK:-0}"
+# Version of the kernel the ISO boots: the newest /boot/vmlinuz-*, which is
+# the one build.sh copies into casper/. Empty if no kernel is installed.
+iso_kernel_version() {
+    local k
+    k="$(find /boot -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' | sort -V | tail -1 || true)"
+    echo "${k#vmlinuz-}"
+}
+
+# QUICK mode: passed from build.sh via env var (build.sh --quick/--fast sets
+# AXON_QUICK=true; AXON_QUICK=1 also works). Skips expensive steps whose
+# results a reused chroot already has (WhiteSur theme build, unchanged kernel
+# module rebuild) and regenerates only the ISO kernel's initramfs, to speed up
+# iterative development rebuilds.
+case "${AXON_QUICK:-0}" in
+    1 | true) QUICK=1 ;;
+    *) QUICK=0 ;;
+esac
 [[ "${QUICK}" == "1" ]] && log "QUICK MODE enabled — skipping expensive non-essential steps"
 
 # ---------------------------------------------------------------------------
@@ -297,36 +310,57 @@ X-GNOME-Autostart-Phase=Applications
 EOF
 
 # ── 5a. Axon Windows ABI kernel module ──────────────────────────────────────
+# Built against the kernel the ISO boots: the newest /boot/vmlinuz-* in the
+# chroot, which is the one build.sh copies into casper/. `uname -r` would give
+# the build host's kernel, and /lib/modules may still hold host-kernel dirs
+# left by older builds in a reused chroot.
+#
+# The module is not tested yet, so it is only auto-loaded at boot when the
+# build opts in with AXON_WINABI_AUTOLOAD=1 (sudo AXON_WINABI_AUTOLOAD=1 bash
+# build/build.sh). Failing to build it never fails the ISO build.
 log "Building Axon Windows ABI kernel module..."
 MODULE_BUILT=false
+# Drop the auto-load entry that older builds appended in reused chroots
+rm -f /etc/modules-load.d/axon-winabi.conf
 if [[ -d "${SRC}/kernel/axon-winabi" ]]; then
-    # Check if module is already built (for --quick mode)
-    KMOD_DIR="/lib/modules/$(uname -r)/extra"
-    if [[ "${QUICK}" == "1" ]] && [[ -f "${KMOD_DIR}/axon-winabi.ko" ]]; then
-        log "Quick mode: Windows ABI module already built — skipping rebuild"
+    KSRC="${SRC}/kernel/axon-winabi"
+    KVER="$(iso_kernel_version)"
+    KDIR="/usr/src/linux-headers-${KVER}"
+    KMOD_DIR="/lib/modules/${KVER}/extra"
+    # .ko or .ko.zst (noble kernels compress modules on modules_install)
+    KMOD_FILE="$(compgen -G "${KMOD_DIR}/axon-winabi.ko*" | head -1 || true)"
+
+    if [[ -z "${KVER}" ]]; then
+        log "WARNING: no kernel found in /boot — Windows ABI module skipped"
+    elif [[ "${QUICK}" == "1" ]] && [[ -n "${KMOD_FILE}" ]] && \
+         [[ -z "$(find "${KSRC}" -type f -newer "${KMOD_FILE}" -print -quit)" ]]; then
+        # Like make: rebuild only when a source file is newer than the module
+        log "Quick mode: Windows ABI module up to date for ${KVER} — skipping rebuild"
         MODULE_BUILT=true
-    fi
+    else
+        apt-get install -y "linux-headers-${KVER}" || \
+            log "WARNING: could not install linux-headers-${KVER} — Windows ABI module skipped"
 
-    if [[ "${MODULE_BUILT}" == "false" ]]; then
-        # Install kernel headers if not already present
-        apt-get install -y linux-headers-$(uname -r) || \
-            apt-get install -y linux-headers-generic || \
-            log "WARNING: could not install kernel headers — Windows ABI module skipped"
-
-        if [[ -d /usr/src/linux-headers-$(uname -r) ]]; then
-            (cd "${SRC}/kernel/axon-winabi" && \
-             make KDIR=/usr/src/linux-headers-$(uname -r) && \
-             make KDIR=/usr/src/linux-headers-$(uname -r) install) || \
-                log "WARNING: Windows ABI kernel module build failed"
-
-            # Auto-load the module on boot
-            echo "axon-winabi" >> /etc/modules-load.d/axon-winabi.conf 2>/dev/null || \
-                echo "axon-winabi" > /etc/modules-load.d/axon-winabi.conf
+        if [[ -d "${KDIR}" ]]; then
+            # Not `make install`: its bare `depmod -a` targets `uname -r`
+            if (cd "${KSRC}" && \
+                make KDIR="${KDIR}" && \
+                make -C "${KDIR}" M="${KSRC}" modules_install && \
+                depmod -a "${KVER}"); then
+                MODULE_BUILT=true
+                log "Windows ABI module installed to ${KMOD_DIR}"
+            else
+                log "WARNING: Windows ABI kernel module build failed for ${KVER}"
+            fi
 
             # Configure binfmt_misc support
-            echo "binfmt_misc" >> /etc/modules-load.d/binfmt.conf 2>/dev/null || \
-                echo "binfmt_misc" > /etc/modules-load.d/binfmt.conf
+            echo "binfmt_misc" > /etc/modules-load.d/binfmt.conf
         fi
+    fi
+
+    if [[ "${MODULE_BUILT}" == "true" ]] && [[ "${AXON_WINABI_AUTOLOAD:-0}" == "1" ]]; then
+        log "AXON_WINABI_AUTOLOAD=1 — auto-loading untested axon-winabi module at boot"
+        echo "axon-winabi" > /etc/modules-load.d/axon-winabi.conf
     fi
 else
     log "Windows ABI module source not found — skipping"
@@ -699,7 +733,12 @@ EOF
 # 10. Regenerate initramfs (casper + plymouth hooks) and clean up
 # ---------------------------------------------------------------------------
 if [[ "${QUICK}" == "1" ]]; then
-    log "Quick mode: skipping initramfs regeneration"
+    # Not skippable: the casper and plymouth hooks copy /etc/casper.conf and
+    # the Plymouth theme written above into the initrd. Only the ISO kernel's
+    # initrd is shipped, so regenerate just that one.
+    ISO_KVER="$(iso_kernel_version)"
+    log "Quick mode: regenerating initramfs only for the ISO kernel ${ISO_KVER}"
+    update-initramfs -u -k "${ISO_KVER:-all}"
 else
     log "Regenerating initramfs..."
     update-initramfs -u -k all
