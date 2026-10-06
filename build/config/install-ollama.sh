@@ -31,6 +31,11 @@ if command -v ollama >/dev/null 2>&1; then
     exit 0
 fi
 
+if [[ "${OLLAMA_ASSET}" == *.tar.zst ]] && ! command -v zstd >/dev/null 2>&1; then
+    log "zstd is required to unpack ${OLLAMA_ASSET}; install it first (apt install zstd)"
+    exit 1
+fi
+
 url="https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}/${OLLAMA_ASSET}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
