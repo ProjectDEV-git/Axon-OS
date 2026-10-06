@@ -158,6 +158,15 @@ class ConversationStore:
             )
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_system_prompt(self, conversation_id):
+        """Return the conversation's own system prompt, or None."""
+        with self._lock:
+            conn = self._get_connection()
+            row = conn.execute(
+                "SELECT system_prompt FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+            return row[0] if row else None
+
     def list_conversations(self):
         with self._lock:
             conn = self._get_connection()

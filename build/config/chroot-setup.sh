@@ -158,9 +158,11 @@ for activation in "${SERVICES_DIR}"/*/org.axonos.*.service; do
     sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${activation}" \
         > "/usr/share/dbus-1/services/$(basename "${activation}")"
 done
-for buspolicy in "${SERVICES_DIR}"/*/org.axonos.*.conf; do
-    [[ -f "${buspolicy}" ]] && cp "${buspolicy}" /usr/share/dbus-1/session.d/
-done
+# No session-bus policy files: every caller on a session bus runs as the same
+# user, so <policy user=...> cannot tell clients apart, and the old files'
+# literal user="${user}" plus default-context denies blocked Brain's own
+# methods for the shell and apps. Remove copies left in reused chroots.
+rm -f /usr/share/dbus-1/session.d/org.axonos.*.conf
 
 # systemd user units, enabled globally for every user
 mkdir -p /usr/lib/systemd/user

@@ -248,3 +248,28 @@ class TestConnectionPooling(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_clipboard_db_is_owner_only(tmp_path):
+    import stat
+
+    from services.axon_context.clipboard_store import ClipboardStore
+
+    db = tmp_path / "clipboard.db"
+    store = ClipboardStore(db_path=str(db))
+    store.add("hunter2")
+    assert stat.S_IMODE(db.stat().st_mode) == 0o600
+    store.close_all()
+
+
+def test_context_changed_broadcast_omits_private_data():
+    import json
+
+    from services.axon_context.context_service import ContextService
+
+    service = ContextService.__new__(ContextService)
+    service.active_window_app = "firefox"
+    service.active_space = "Work"
+    service._clipboard_history = ["my-password"]
+    payload = json.loads(service._change_summary())
+    assert payload == {"active_app": "firefox", "active_space": "Work"}

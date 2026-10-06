@@ -317,20 +317,15 @@ for svc in "${SERVICES_DIR}"/*; do
 done
 info "D-Bus session service configs installed."
 
-# Register D-Bus session policies (may require sudo)
+# Session-bus policy files are no longer shipped (see build/config/chroot-setup.sh).
+# Older installs copied ones that blocked Brain's own methods; remove them.
 DBUS_POLICY_DIR="/usr/share/dbus-1/session.d"
-if [[ -d "${DBUS_POLICY_DIR}" ]]; then
-    for conf in "${SERVICES_DIR}"/*/*.conf; do
-        [ -e "${conf}" ] || continue
-        if [[ -w "${DBUS_POLICY_DIR}" ]]; then
-            cp "${conf}" "${DBUS_POLICY_DIR}/"
-        elif command -v sudo &>/dev/null; then
-            sudo cp "${conf}" "${DBUS_POLICY_DIR}/"
-        else
-            warn "Could not install ${conf} to ${DBUS_POLICY_DIR}: permission denied"
-        fi
-    done
-    info "D-Bus session policies installed (best-effort)."
+if compgen -G "${DBUS_POLICY_DIR}/org.axonos.*.conf" >/dev/null; then
+    if [[ -w "${DBUS_POLICY_DIR}" ]]; then
+        rm -f "${DBUS_POLICY_DIR}"/org.axonos.*.conf
+    else
+        warn "Remove the old Axon D-Bus policies with: sudo rm -f ${DBUS_POLICY_DIR}/org.axonos.*.conf"
+    fi
 fi
 
 # Register Systemd user units for available services
