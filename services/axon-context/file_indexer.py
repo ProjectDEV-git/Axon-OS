@@ -2,7 +2,6 @@
 import json
 import os
 import sqlite3
-import sys
 import threading
 import time
 from array import array
@@ -10,7 +9,6 @@ from pathlib import Path
 
 import dbus
 import sqlite_vec
-
 from _log_helper import resolve_logger as configure_app_logger
 
 logger = configure_app_logger("axon-file-indexer")

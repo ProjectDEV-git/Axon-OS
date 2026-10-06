@@ -14,9 +14,8 @@ from pathlib import Path
 import dbus
 import dbus.mainloop.glib
 import dbus.service
-from gi.repository import GLib
-
 from _log_helper import resolve_logger as configure_app_logger
+from gi.repository import GLib
 
 _this = str(Path(__file__).resolve().parent)
 if _this not in sys.path:

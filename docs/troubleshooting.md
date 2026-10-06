@@ -4,6 +4,7 @@ This guide helps diagnose and resolve common issues with Axon OS.
 
 ## Table of Contents
 - [Service Issues](#service-issues)
+- [Boot, Display & VirtualBox](#boot-display--virtualbox)
 - [GPU & Hardware](#gpu--hardware)
 - [Ollama Connection](#ollama-connection)
 - [D-Bus Communication](#d-bus-communication)
@@ -101,6 +102,83 @@ dbus-send --session --print-reply \
    # Check D-Bus permissions
    ls -la /etc/dbus-1/system.d/
    ```
+
+---
+
+## Boot, Display & VirtualBox
+
+### Collect a Display Report First
+
+`axon-display-diag` gathers the kernel graphics driver, Xorg driver choice and
+errors, GDM / gnome-shell / VBoxClient logs and failed units into one file:
+
+```bash
+sudo axon-display-diag              # current boot
+sudo axon-display-diag --previous   # also the previous boot (installed systems)
+```
+
+If the screen is black, press **Ctrl+Alt+F3**, log in (live session: user
+`axon`, no password) and run it from that console. Attach the file it prints
+to bug reports.
+
+### Normal Boot Shows a Black Screen, "Safe Graphics" Works
+
+**What the two entries do:** the normal entry boots with `quiet splash` and
+kernel modesetting (VirtualBox: `vmwgfx` for VMSVGA, `vboxvideo` for
+VBoxVGA). "Safe graphics" adds `nomodeset`, so no GPU driver loads and Xorg
+falls back to the generic `vesa` driver.
+
+**Fixed in this release** (all made the normal entry look dead):
+
+- The boot splash script did not parse (Plymouth rejects hex literals), so
+  every `splash` boot showed pure black until the desktop appeared.
+- A boot service forced an Xorg `vboxvideo` driver that Ubuntu 24.04 does not
+  ship. Xorg then skipped the `vmware` driver VirtualBox's VMSVGA adapter
+  needs, and VBoxClient lost the `VMWARE_CTRL` extension it uses for resizing.
+- VirtualBox's VMSVGA 3D path (Mesa `svga` driver) freezes or blanks GNOME
+  Shell on many hosts. Inside VirtualBox the desktop now renders with Mesa's
+  `llvmpipe` (`LIBGL_ALWAYS_SOFTWARE=1`, set by
+  `/usr/lib/systemd/user-environment-generators/60-axon-vm-graphics`). To
+  re-enable VirtualBox 3D: `sudo touch /etc/axon/vbox-3d` and log in again.
+
+**Recommended VirtualBox settings** (Settings → Display → Screen):
+
+| Setting | Value |
+|---------|-------|
+| Graphics Controller | **VMSVGA** (VBoxSVGA is for Windows guests) |
+| Video Memory | **128 MB** (16 MB caps the resolution) |
+| Enable 3D Acceleration | **Off** |
+| View → Auto-resize Guest Display | **On** |
+
+**Systems installed from Axon OS 1.0.7** keep the old boot service. Remove it
+once, then reboot:
+
+```bash
+sudo systemctl disable --now axon-vbox-xorg-setup.service axon-vm-guest.service
+sudo rm -f /etc/X11/xorg.conf.d/10-vboxvideo.conf \
+    /etc/systemd/system/axon-vbox-xorg-setup.service \
+    /etc/systemd/system/axon-vm-guest.service \
+    /etc/xdg/autostart/axon-vm-guest.desktop \
+    /usr/local/bin/axon-vbox-xorg-setup /usr/local/bin/axon-vm-guest-init
+sudo systemctl daemon-reload
+```
+
+### Low Resolution / Display Does Not Follow the Window
+
+- **In "safe graphics":** expected. With `nomodeset` there is no GPU driver,
+  so the resolution is fixed (usually 1024x768) and cannot auto-resize. Use
+  the normal entry for auto-resize.
+- **In a normal boot:** check the report for the Xorg driver (`vmware` on
+  VMSVGA) and that VBoxClient is running (`pgrep -a VBoxClient`). The
+  `virtualbox-guest-x11` package starts it in every X11 session via
+  `/etc/X11/Xsession.d/98vboxadd-xclient`. "Auto-resize Guest Display" must
+  be enabled in the VirtualBox View menu.
+
+### Windows Do Not Fit the Screen
+
+The installer and Welcome app fit screens down to 800x600 and scroll when
+content is taller. If another window is cut off, maximize it with
+**Super+Up** or double-click its title bar.
 
 ---
 

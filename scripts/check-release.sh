@@ -55,14 +55,16 @@ echo
 
 # --- Bash syntax (parse only; does not execute the scripts) ---
 for script in install.sh build/build.sh build/config/chroot-setup.sh \
-              build/config/firstboot.sh scripts/keep-chroot.sh; do
+              build/config/firstboot.sh build/config/axon-display-diag \
+              build/config/axon-vm-graphics-env scripts/keep-chroot.sh; do
     run_check "Bash syntax ($script)" bash -n "$script"
 done
 
 # --- Genuine static shell analysis (optional; respects .shellcheckrc) ---
 run_optional "ShellCheck (static analysis)" shellcheck \
     install.sh build/build.sh build/config/chroot-setup.sh \
-    build/config/firstboot.sh scripts/keep-chroot.sh
+    build/config/firstboot.sh build/config/axon-display-diag \
+    build/config/axon-vm-graphics-env scripts/keep-chroot.sh
 
 # --- Python syntax: compile() in-memory, no __pycache__ writes ---
 for pyfile in services/service_base.py services/plugin_registry.py services/plugin_deploy.py; do

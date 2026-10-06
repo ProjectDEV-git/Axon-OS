@@ -13,7 +13,7 @@ sudo apt-get install -y \
     python3-gi-cairo \
     gir1.2-gtk-4.0 \
     gir1.2-adw-1 \
-    python3-vte-2.91 \
+    gir1.2-vte-3.91 \
     build-essential \
     libffi-dev \
     libssl-dev \

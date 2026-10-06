@@ -65,10 +65,13 @@ run_check "Bash syntax (install.sh)"      bash -n install.sh
 run_check "Bash syntax (build.sh)"        bash -n build/build.sh
 run_check "Bash syntax (chroot-setup.sh)" bash -n build/config/chroot-setup.sh
 run_check "Bash syntax (firstboot.sh)"    bash -n build/config/firstboot.sh
+run_check "Bash syntax (axon-display-diag)" bash -n build/config/axon-display-diag
+run_check "Sh syntax (axon-vm-graphics-env)" sh -n build/config/axon-vm-graphics-env
 run_check "Bash syntax (keep-chroot.sh)"  bash -n scripts/keep-chroot.sh
 run_optional "ShellCheck (static analysis)" shellcheck \
     install.sh build/build.sh build/config/chroot-setup.sh \
-    build/config/firstboot.sh scripts/keep-chroot.sh
+    build/config/firstboot.sh build/config/axon-display-diag \
+    build/config/axon-vm-graphics-env scripts/keep-chroot.sh
 run_check "JSON validation"  python3 -c "import json; json.load(open('shell/axon-shell/metadata.json'))"
 run_check "Pre-commit hooks" pre-commit run --all-files
 

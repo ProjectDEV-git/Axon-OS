@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Test suite for Axon D-Bus services."""
 
-from unittest.mock import patch
-
 import threading
 import time
+from unittest.mock import patch
 
 import pytest
 
