@@ -31,8 +31,8 @@ ALLOWED_COMMANDS: set[str] = {
     "free",
     "uptime",
     "ps",
-    "top",
-    "htop",
+    # NOTE: top/htop removed — interactive, they never exit when spawned
+    # without a terminal.
     "pwd",
     "wc",
     "head",
@@ -51,34 +51,28 @@ ALLOWED_COMMANDS: set[str] = {
     # NOTE: apt/apt-get/dpkg/snap/flatpak/systemctl/g++/gcc/cargo/rustc/git
     # intentionally excluded — they can modify the system, install packages,
     # manage services, or compile arbitrary code.
-    "nmcli",
-    "bluetoothctl",
-    "pactl",
+    # NOTE: nmcli/bluetoothctl/pactl/xdg-open/gtk-launch/zenity removed —
+    # with free-form arguments they change network, Bluetooth and audio
+    # state (e.g. `pactl load-module module-native-protocol-tcp` exposes the
+    # microphone), and model output reaches this allowlist. Settings changes go
+    # through the settings executor; apps launch through gtk-launch directly.
     "paplay",
-    "xdg-open",
-    "gtk-launch",
     # NOTE: gio intentionally removed — can make arbitrary D-Bus calls
     # (see audit M2).
     "notify-send",
-    "zenity",
 }
 
 _SHELL_META_CHARS = frozenset("|;&$`\\(){}[]<>*?~!#\n\t\x00")
 
 
-def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
-    """Execute a command safely with whitelist validation.
-
-    Parses the command with shlex.split() and checks the binary against
-    ALLOWED_COMMANDS before executing. Refuses to run commands containing
-    shell metacharacters that could enable injection.
+def validate_command(command: str) -> list[str] | None:
+    """Parse a command and check it against the allowlist.
 
     Args:
-        command: Command string to execute.
-        **kwargs: Additional arguments passed to subprocess.Popen.
+        command: Command string to validate.
 
     Returns:
-        Popen object if command was allowed and started, None otherwise.
+        The argv list if the command is allowed, None otherwise.
     """
     if any(c in command for c in _SHELL_META_CHARS):
         logger.warning(
@@ -100,10 +94,85 @@ def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
     if binary not in ALLOWED_COMMANDS:
         logger.warning("safe_exec: blocked unwhitelisted command: %s", binary)
         return None
+    return parts
+
+
+def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
+    """Execute a command safely with whitelist validation.
+
+    Parses the command with shlex.split() and checks the binary against
+    ALLOWED_COMMANDS before executing. Refuses to run commands containing
+    shell metacharacters that could enable injection.
+
+    Args:
+        command: Command string to execute.
+        **kwargs: Additional arguments passed to subprocess.Popen.
+
+    Returns:
+        Popen object if command was allowed and started, None otherwise.
+    """
+    parts = validate_command(command)
+    if parts is None:
+        return None
 
     defaults: dict[str, Any] = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     defaults.update(kwargs)
     return subprocess.Popen(parts, start_new_session=True, **defaults)
+
+
+def confirm_command(command: str, timeout: int = 60) -> bool:
+    """Ask the user to approve a command proposed by the AI.
+
+    Blocks until the user answers, so call it off the GTK/GLib main thread.
+    Fails closed: no dialog, a timeout or any error counts as "no".
+
+    Args:
+        command: The command to show the user.
+        timeout: Seconds before the dialog gives up.
+
+    Returns:
+        True only if the user explicitly approved.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "zenity",
+                "--question",
+                "--no-markup",
+                "--title=Axon AI",
+                "--text",
+                f"Axon AI wants to run this command:\n\n{command}\n\nRun it?",
+                "--ok-label=Run",
+                "--cancel-label=Cancel",
+                f"--timeout={timeout}",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout + 5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("confirm_command: no confirmation dialog available: %s", exc)
+        return False
+    return result.returncode == 0
+
+
+def confirm_and_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
+    """Run an AI-proposed command only if it is allowlisted and the user approves.
+
+    Args:
+        command: Command string proposed by the model.
+        **kwargs: Additional arguments passed to subprocess.Popen.
+
+    Returns:
+        Popen object if the command ran, None if it was blocked or declined.
+    """
+    if validate_command(command) is None:
+        return None
+    if not confirm_command(command):
+        logger.info("confirm_and_exec: user declined: %s", command[:100])
+        return None
+    return safe_exec(command, **kwargs)
 
 
 def error_response(message: str, code: str = "UNKNOWN") -> str:

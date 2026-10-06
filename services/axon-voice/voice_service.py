@@ -32,7 +32,7 @@ if _parent not in sys.path:
     sys.path.insert(0, _parent)
 from _log_helper import resolve_logger as configure_app_logger
 from constants import MAX_RECORD_SECONDS, WHISPER_DIR
-from service_utils import safe_exec
+from service_utils import confirm_and_exec
 
 _this = str(Path(__file__).resolve().parent)
 if _this not in sys.path:
@@ -263,14 +263,24 @@ class VoiceService(ServiceBase):
         if kind == "open_app":
             safe_name = _validate_app_name(payload)
             if safe_name:
-                launcher = ["gtk-launch", safe_name] if shutil.which("gtk-launch") else [safe_name]
-                subprocess.Popen(launcher, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                GLib.idle_add(self._finish, f"Opening {safe_name}", "")
+                # Desktop IDs only: never run an arbitrary binary named by the model
+                if shutil.which("gtk-launch"):
+                    subprocess.Popen(
+                        ["gtk-launch", safe_name],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    GLib.idle_add(self._finish, f"Opening {safe_name}", "")
+                else:
+                    GLib.idle_add(self._finish, "", "Cannot open apps: gtk-launch is missing")
             else:
                 GLib.idle_add(self._finish, "", f"Refused to launch unsafe app name: {payload!r}")
         elif kind == "run_command":
-            safe_exec(payload)
-            GLib.idle_add(self._finish, f"Running: {payload}", "")
+            # Speech (including ambient audio) must never run a command unattended
+            if confirm_and_exec(payload):
+                GLib.idle_add(self._finish, f"Running: {payload}", "")
+            else:
+                GLib.idle_add(self._finish, "", f"Did not run: {payload}")
         else:
             spoken = payload if payload else "I don't have an answer for that."
             self._speak(spoken)
