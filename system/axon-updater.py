@@ -78,42 +78,63 @@ def _run_cmd_logged(cmd: list[str], extra_env: dict[str, str] | None = None) -> 
         return False
 
 
-def run_headless_update() -> int:
-    """Non-interactive update pipeline for the axon-update-auto systemd unit.
+UPDATER_PATH = "/usr/local/bin/axon-update"
+PROGRESS_PREFIX = "AXON-UPDATE:"
+ERROR_PREFIX = "AXON-UPDATE-ERROR:"
 
-    The systemd timer invokes ``axon-update --auto`` with no display; the GTK
-    window cannot (and should not) be shown there.
+
+def _print_progress(fraction: float, phase: str, message: str) -> None:
+    """Machine-readable progress for the GUI, which runs this pipeline via pkexec."""
+    print(f"{PROGRESS_PREFIX}{fraction:.2f}:{phase}:{message}", flush=True)  # noqa: T201
+
+
+def _print_error(message: str) -> None:
+    print(f"{ERROR_PREFIX}{message}", flush=True)  # noqa: T201
+
+
+def run_headless_update(report_progress: bool = False) -> int:
+    """Run the update pipeline as root.
+
+    Used by the axon-update-auto systemd unit (``--auto``) and by the GUI,
+    which starts ``pkexec axon-update --auto --progress`` so only this part
+    runs as root and the window stays with the user.
     """
     if os.geteuid() != 0:
         logger.error("axon-update --auto must run as root")
         return 1
 
-    logger.info("Auto-update: creating snapshot")
+    def progress(fraction: float, phase: str, message: str) -> None:
+        logger.info("Auto-update: %s", message)
+        if report_progress:
+            _print_progress(fraction, phase, message)
+
+    def error(message: str) -> int:
+        logger.error(message)
+        if report_progress:
+            _print_error(message)
+        return 1
+
+    progress(0.10, "Phase 1 / 4", "Creating Self-Healing Snapshot…")
     if not _run_cmd_logged(["timeshift", "--create", "--comments", "Axon OS Auto-Update Snapshot"]):
         logger.warning("Snapshot failed (Timeshift not configured?); proceeding")
 
-    logger.info("Auto-update: apt-get update")
+    progress(0.35, "Phase 2 / 4", "Updating System Packages (APT)…")
     if not _run_cmd_logged(["apt-get", "update"]):
-        logger.error("apt-get update failed; aborting auto-update")
-        return 1
+        return error("Failed to update package lists.")
 
-    logger.info("Auto-update: apt-get dist-upgrade")
-    if not _run_cmd_logged(
-        APT_UPGRADE_CMD,
-        extra_env={"DEBIAN_FRONTEND": "noninteractive"},
-    ):
-        logger.error("dist-upgrade failed")
-        return 1
+    progress(0.50, "Phase 2 / 4", "Installing System Upgrades…")
+    if not _run_cmd_logged(APT_UPGRADE_CMD, extra_env={"DEBIAN_FRONTEND": "noninteractive"}):
+        return error("System package update failed.")
 
-    logger.info("Auto-update: flatpak update")
+    progress(0.75, "Phase 3 / 4", "Updating Sandboxed Apps (Flatpak)…")
     if not _run_cmd_logged(["flatpak", "update", "-y", "--noninteractive"]):
         logger.warning("Flatpak update encountered an issue")
 
-    logger.info("Auto-update: update-grub")
+    progress(0.95, "Phase 4 / 4", "Updating Bootloader…")
     if not _run_cmd_logged(["update-grub"]):
         logger.error("update-grub failed — bootloader configuration may be stale")
 
-    logger.info("Auto-update complete")
+    progress(1.0, "", "Update complete")
     return 0
 
 
@@ -213,30 +234,6 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
     def _set_phase(self, text: str) -> None:
         GLib.idle_add(self._phase_label.set_text, text)
 
-    @staticmethod
-    def _run_cmd(cmd: list[str], extra_env: dict[str, str] | None = None) -> bool:
-        """Run a subprocess; returns True on success."""
-        try:
-            run_env = os.environ.copy()
-            if extra_env:
-                run_env.update(extra_env)
-            cmd_str = " ".join(cmd)
-            result = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                env=run_env,
-            )
-            if result.returncode != 0:
-                logger.error("Error running '%s':\n%s", cmd_str, result.stdout)
-                return False
-            return True
-        except Exception as exc:
-            cmd_str = " ".join(cmd)
-            logger.exception("Exception running '%s': %s", cmd_str, exc)
-            return False
-
     # ---- UI callbacks ---------------------------------------------------
 
     def _on_start_clicked(self, _btn: Gtk.Button) -> None:
@@ -247,63 +244,45 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
     # ---- update pipeline ------------------------------------------------
 
     def _update_process(self) -> None:
-        """Runs the four-phase update on a background thread."""
-
-        # Phase 1 — Snapshot
-        self._set_phase("Phase 1 / 4")
-        self._set_status("Creating Self-Healing Snapshot…", 0.10)
-        if not self._run_cmd(
-            ["timeshift", "--create", "--comments", "Axon OS Auto-Update Snapshot"]
-        ):
-            self._set_status(
-                "Warning: Failed to create snapshot (Timeshift not configured?). Proceeding…",
-                0.20,
+        """Runs the update pipeline as root via pkexec, following its progress."""
+        cmd = [UPDATER_PATH, "--auto", "--progress"]
+        if os.geteuid() != 0:
+            cmd = ["/usr/bin/pkexec", *cmd]
+        self._set_phase("")
+        self._set_status("Waiting for authentication…", 0.0)
+        error = ""
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
             )
-        else:
-            self._set_progress(0.30)
+            for line in proc.stdout or []:
+                line = line.rstrip("\n")
+                if line.startswith(PROGRESS_PREFIX):
+                    fraction, phase, message = line[len(PROGRESS_PREFIX) :].split(":", 2)
+                    self._set_phase(phase)
+                    self._set_status(message, float(fraction))
+                elif line.startswith(ERROR_PREFIX):
+                    error = line[len(ERROR_PREFIX) :]
+            returncode = proc.wait()
+        except OSError as exc:
+            logger.exception("Could not start the update: %s", exc)
+            returncode, error = 1, "Could not start the update."
 
-        # Phase 2 — APT
-        self._set_phase("Phase 2 / 4")
-        self._set_status("Updating System Packages (APT)…", 0.35)
-        if not self._run_cmd(["apt-get", "update"]):
-            self._set_status("Update Failed: apt-get update returned an error.", 0.0)
+        if returncode in (126, 127):  # pkexec: dialog dismissed / not authorized
+            self._set_status("Update cancelled. Administrator authentication is required.", 0.0)
             self._set_phase("")
-            self._progress_remove_add("error")
-            GLib.idle_add(
-                self._show_error_dialog, "Failed to update package lists. Check terminal logs."
-            )
             GLib.idle_add(self._btn.set_sensitive, True)
             return
-        self._set_progress(0.45)
-
-        self._set_status("Installing System Upgrades…", 0.50)
-        if not self._run_cmd(
-            APT_UPGRADE_CMD,
-            extra_env={"DEBIAN_FRONTEND": "noninteractive"},
-        ):
+        if returncode != 0:
             self._set_status("Update Failed.", 0.0)
             self._set_phase("")
             self._progress_remove_add("error")
             GLib.idle_add(
-                self._show_error_dialog, "System package update failed. Check terminal logs."
+                self._show_error_dialog,
+                f"{error or 'The update failed.'} See the journal for details.",
             )
             GLib.idle_add(self._btn.set_sensitive, True)
             return
-        self._set_progress(0.70)
-
-        # Phase 3 — Flatpak
-        self._set_phase("Phase 3 / 4")
-        self._set_status("Updating Sandboxed Apps (Flatpak)…", 0.75)
-        if not self._run_cmd(["flatpak", "update", "-y"]):
-            self._set_status("Warning: Flatpak update encountered an issue.", 0.85)
-        else:
-            self._set_progress(0.90)
-
-        # Phase 4 — GRUB
-        self._set_phase("Phase 4 / 4")
-        self._set_status("Updating Bootloader…", 0.95)
-        if not self._run_cmd(["update-grub"]):
-            logger.error("update-grub failed — bootloader configuration may be stale")
 
         # Done
         self._set_progress(1.0)
@@ -359,31 +338,9 @@ class AxonUpdaterApp(Adw.Application):
         self._window: AxonUpdaterWindow | None = None
 
     def do_activate(self) -> None:
-        # Root-check on first activation
-        if os.geteuid() != 0:
-            self._show_permission_error()
-            return
-
         if self._window is None:
             self._window = AxonUpdaterWindow(application=self)
         self._window.present()
-
-    def _show_permission_error(self) -> None:
-        """Show a dialog then quit when the user is not root."""
-        # Need a transient parent — create an invisible window
-        win = Adw.ApplicationWindow(application=self)
-        win.set_default_size(1, 1)
-        win.present()
-
-        dialog = Adw.MessageDialog(
-            transient_for=win,
-            heading="Permission Denied",
-            body="Axon Updater requires administrative privileges.\nPlease run via sudo or pkexec.",
-        )
-        dialog.add_response("quit", "Quit")
-        dialog.set_default_response("quit")
-        dialog.connect("response", lambda _d, _r: self.quit())
-        dialog.present()
 
 
 # ---------------------------------------------------------------------------
@@ -393,7 +350,7 @@ def main() -> int:
     # Headless mode for the axon-update-auto.service systemd unit: no display
     # is available there, and GTK would reject the unknown --auto option.
     if "--auto" in sys.argv:
-        return run_headless_update()
+        return run_headless_update(report_progress="--progress" in sys.argv)
     app = AxonUpdaterApp()
     return app.run(sys.argv)
 
