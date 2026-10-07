@@ -11,12 +11,9 @@ Restart=on-failure
 RestartSec=3
 Nice=10
 IOSchedulingClass=idle
+# Only NoNewPrivileges: PrivateTmp/Protect* need user namespaces in a user
+# manager, which Ubuntu 24.04 restricts, so they fail with 218/CAPABILITIES.
 NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ProtectKernelTunables=true
-ProtectKernelModules=true
-ProtectControlGroups=true
 
 [Install]
 WantedBy=default.target

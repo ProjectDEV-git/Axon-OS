@@ -1,3 +1,5 @@
 [D-BUS Service]
 Name=org.axonos.Sandbox
 Exec=/usr/bin/python3 AXON_SERVICES_DIR/axon-sandbox/sandbox_manager.py
+# Activate through systemd so D-Bus and systemd never run two copies
+SystemdService=axon-sandbox.service
