@@ -38,7 +38,8 @@ five versions, and each package is also attached to its GitHub release.
    rm -rf "${GNUPGHOME}"
    ```
 
-   Commit `packaging/axon-os-archive-keyring.asc`. Every installed system
+   Commit `packaging/axon-os-archive-keyring.asc`. (Done on 2026-10-07: key
+   `20D7784AF91A03B7668F28DB65A4FEB86DD57517`.) Every installed system
    trusts this key, so rotating it later means shipping the new public key in
    a release signed with the old one first.
 
