@@ -363,8 +363,9 @@ def partition_alongside(disk: str):
 def format_and_mount(esp: str, root: str, esp_is_new: bool) -> str:
     """Create filesystems and mount the target. Returns the root fs type.
 
-    Root is BTRFS with @ / @home subvolumes so the boot watchdog can roll
-    back to a factory snapshot; falls back to ext4 when mkfs.btrfs is
+    Root is BTRFS with @ / @home / @swap subvolumes so the boot watchdog can
+    roll back to a factory snapshot (the swapfile lives in @swap because a
+    snapshot of @ would pin it, and the kernel refuses to swap on it); falls back to ext4 when mkfs.btrfs is
     unavailable in the live environment.
     """
     fs_type = "btrfs" if shutil.which("mkfs.btrfs") else "ext4"
@@ -376,10 +377,13 @@ def format_and_mount(esp: str, root: str, esp_is_new: bool) -> str:
         run(["mount", root, TARGET])
         run(["btrfs", "subvolume", "create", f"{TARGET}/@"])
         run(["btrfs", "subvolume", "create", f"{TARGET}/@home"])
+        run(["btrfs", "subvolume", "create", f"{TARGET}/@swap"])
         run(["umount", TARGET])
         run(["mount", "-o", "subvol=@,compress=zstd:1", root, TARGET])
         os.makedirs(f"{TARGET}/home", exist_ok=True)
         run(["mount", "-o", "subvol=@home,compress=zstd:1", root, f"{TARGET}/home"])
+        os.makedirs(f"{TARGET}/swap", exist_ok=True)
+        run(["mount", "-o", "subvol=@swap", root, f"{TARGET}/swap"])
     else:
         run(["mkfs.ext4", "-F", "-L", "AxonOS", root])
         run(["mount", root, TARGET])
@@ -465,6 +469,7 @@ def unmount_all() -> None:
         f"{TARGET}/sys",
         f"{TARGET}/boot/efi",
         f"{TARGET}/home",
+        f"{TARGET}/swap",
         TARGET,
     ):
         run(["umount", "-lf", mp], check=False)
@@ -476,6 +481,8 @@ def fstab_lines(root_uuid: str, esp_uuid: str, fs_type: str, swap_ok: bool) -> l
     if fs_type == "btrfs":
         lines.append(f"UUID={root_uuid} / btrfs subvol=@,compress=zstd:1 0 1")
         lines.append(f"UUID={root_uuid} /home btrfs subvol=@home,compress=zstd:1 0 2")
+        if swap_ok:
+            lines.append(f"UUID={root_uuid} /swap btrfs subvol=@swap 0 0")
     else:
         lines.append(f"UUID={root_uuid} / ext4 errors=remount-ro 0 1")
     if esp_uuid:
