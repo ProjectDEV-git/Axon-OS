@@ -40,10 +40,10 @@ Run the test suite:
 pytest tests/ -v
 ```
 
-Run tests with coverage:
+Run tests with coverage (matches CI threshold):
 
 ```bash
-pytest tests/ --cov=apps --cov=services --cov-report=term-missing
+pytest tests/ -v --tb=short --cov=apps --cov=services --cov-report=term-missing --cov-fail-under=40
 ```
 
 ## Code Quality
@@ -70,12 +70,12 @@ Run type checks:
 mypy apps/ services/ --ignore-missing-imports
 ```
 
-### Format Code with Black
+### Format Code with Ruff
 
 Format Python code:
 
 ```bash
-black apps/ services/ tests/ installer/
+ruff format apps/ services/ tests/ installer/
 ```
 
 ## Project Structure
@@ -134,7 +134,7 @@ Some D-Bus and GTK types may not have stubs. Use `--ignore-missing-imports` flag
 
 1. Create a feature branch: `git checkout -b feature/your-feature`
 2. Make changes and run tests: `pytest tests/`
-3. Lint and format: `ruff check --fix` and `black .`
+3. Lint and format: `ruff check --fix .` and `ruff format .`
 4. Commit with clear message: `git commit -m "feat: description"`
 5. Push and open a pull request
 
@@ -231,12 +231,11 @@ pre-commit run ruff --all-files
 ```
 
 Configured hooks:
-- **Black**: Code formatting
-- **isort**: Import sorting
-- **Ruff**: Fast linting with fixes
+- **Ruff (`--fix`)**: Fast linting with automatic fixes
+- **Ruff format**: Code formatting
 - **Mypy**: Type checking
 - **Bandit**: Security scanning
-- **YAML/JSON validation**: Config file syntax
+- **Pre-commit hooks**: Trailing whitespace, EOF fixer, YAML syntax, large file guard
 
 ### Type Checking (Strict Mode)
 
