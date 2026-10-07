@@ -121,6 +121,65 @@ done
 log "Adding flathub remote..."
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
 
+# ── Web browser: Brave (official apt repo, signing key pinned) ───────────────
+# Falls back to GNOME Web (Epiphany) so the image always has a browser.
+BRAVE_KEY_FPR="D8BAD4DE7EE17AF52A834B2D0BB75829C2D4E821"
+BRAVE_KEYRING="/usr/share/keyrings/brave-browser-archive-keyring.gpg"
+BROWSER_DESKTOP="brave-browser.desktop"
+log "Installing Brave browser..."
+install_brave() {
+    apt-get install -y gnupg || return 1
+    curl -fsSL --retry 3 -o "${BRAVE_KEYRING}.new" \
+        https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg || return 1
+    local gnupghome fprs
+    gnupghome="$(mktemp -d)"
+    fprs="$(GNUPGHOME="${gnupghome}" gpg --show-keys --with-colons "${BRAVE_KEYRING}.new" 2>/dev/null || true)"
+    rm -rf "${gnupghome}"
+    if ! grep -q "^fpr:::::::::${BRAVE_KEY_FPR}:" <<<"${fprs}"; then
+        log "WARNING: Brave signing key fingerprint mismatch; not adding its repository"
+        rm -f "${BRAVE_KEYRING}.new"
+        return 1
+    fi
+    mv "${BRAVE_KEYRING}.new" "${BRAVE_KEYRING}"
+    cat > /etc/apt/sources.list.d/brave-browser-release.sources <<BRAVEEOF
+Types: deb
+URIs: https://brave-browser-apt-release.s3.brave.com/
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: ${BRAVE_KEYRING}
+BRAVEEOF
+    apt-get update && apt-get install -y brave-browser
+}
+if install_brave; then
+    apt-get purge -y epiphany-browser 2>/dev/null || true
+else
+    log "WARNING: Brave install failed — falling back to GNOME Web"
+    rm -f /etc/apt/sources.list.d/brave-browser-release.sources
+    apt-get install -y epiphany-browser || log "WARNING: epiphany-browser failed to install"
+    BROWSER_DESKTOP="org.gnome.Epiphany.desktop"
+fi
+# Default browser for every user (GNOME reads /etc/xdg/mimeapps.list)
+cat > /etc/xdg/mimeapps.list <<MIMEEOF
+[Default Applications]
+text/html=${BROWSER_DESKTOP}
+x-scheme-handler/http=${BROWSER_DESKTOP}
+x-scheme-handler/https=${BROWSER_DESKTOP}
+x-scheme-handler/about=${BROWSER_DESKTOP}
+x-scheme-handler/unknown=${BROWSER_DESKTOP}
+MIMEEOF
+
+# ── System monitor: Mission Center (Flathub, GPL-3.0) ───────────────────────
+# Not packaged for Ubuntu 24.04, so it ships as a system-wide Flatpak. Keeps
+# GNOME System Monitor only if the Flatpak cannot be installed.
+log "Installing Mission Center..."
+if flatpak install --system --noninteractive -y flathub io.missioncenter.MissionCenter; then
+    apt-get purge -y gnome-system-monitor 2>/dev/null || true
+else
+    log "WARNING: Mission Center install failed — keeping GNOME System Monitor"
+    apt-get install -y gnome-system-monitor || true
+fi
+
 log "Installing Python AI libraries inside chroot..."
 # Pinned versions: unpinned installs pulled whatever PyPI served at build time
 pip3 install --no-cache-dir "faster-whisper==1.2.1" "sqlite-vec==0.1.9" --break-system-packages || log "WARNING: Python AI libraries failed to install"
@@ -466,6 +525,17 @@ EOF
 
 systemctl enable NetworkManager.service || log "WARNING: could not enable NetworkManager"
 
+# Boot time: nothing on a desktop should hold boot until the network is up.
+# docker.service Wants=network-online.target, which pulls in
+# NetworkManager-wait-online (up to 30 s with no cable/Wi-Fi). Docker starts
+# on first use through its socket instead, and the wait-online units are
+# disabled; services that need the network (axon-ai-firstboot, Ollama) wait
+# for it themselves.
+systemctl disable NetworkManager-wait-online.service \
+    systemd-networkd-wait-online.service 2>/dev/null || true
+systemctl disable docker.service containerd.service 2>/dev/null || true
+systemctl enable docker.socket 2>/dev/null || log "WARNING: could not enable docker.socket"
+
 # ---------------------------------------------------------------------------
 # 6a. VM guest display integration (VirtualBox / VMware / QEMU)
 # ---------------------------------------------------------------------------
@@ -521,19 +591,23 @@ install -Dm755 "${SRC}/build/config/axon-display-diag" /usr/local/bin/axon-displ
 # ---------------------------------------------------------------------------
 # 6b. GNOME defaults (gschema overrides apply to every user, incl. live)
 # ---------------------------------------------------------------------------
-# macOS-style look: WhiteSur GTK + Shell + icon themes (built from source at
+# Window/shell look: WhiteSur GTK + Shell theme (MIT, built from source at
 # image-build time; falls back to the Axon dark theme if anything fails).
-log "Installing WhiteSur (macOS-style) themes..."
+# Icons: Papirus (GPL-3.0, from the Ubuntu archive). The WhiteSur icon theme
+# redraws Apple's app icons, so it is no longer shipped. See
+# docs/THIRD-PARTY.md for every bundled theme and app and its license.
+log "Installing WhiteSur GTK/Shell theme..."
 GTK_THEME_NAME='axon-gtk'
 ICON_THEME_NAME='Papirus-Dark'
 SHELL_THEME_NAME=''
+# Drop the WhiteSur icon theme that older builds left in reused chroots
+rm -rf /usr/share/icons/WhiteSur /usr/share/icons/WhiteSur-dark /usr/share/icons/WhiteSur-light
 
 # In quick mode, skip theme rebuild if themes are already installed
 WHITESUR_SKIP=false
-if [[ "${QUICK}" == "1" ]] && [[ -d /usr/share/themes/WhiteSur-Dark ]] && [[ -d /usr/share/icons/WhiteSur-dark ]]; then
-    log "Quick mode: WhiteSur themes already installed — skipping rebuild"
+if [[ "${QUICK}" == "1" ]] && [[ -d /usr/share/themes/WhiteSur-Dark ]]; then
+    log "Quick mode: WhiteSur theme already installed — skipping rebuild"
     GTK_THEME_NAME='WhiteSur-Dark'
-    ICON_THEME_NAME='WhiteSur-dark'
     SHELL_THEME_NAME='WhiteSur-Dark'
     WHITESUR_SKIP=true
 fi
@@ -543,7 +617,6 @@ if [[ "${WHITESUR_SKIP}" == "false" ]]; then
     # Pinned commit hashes for reproducible builds — update these when bumping themes.
     # Their install.sh runs as root in the image, so never track a branch.
     WHITESUR_GTK_COMMIT="${WHITESUR_GTK_COMMIT:-d5782652d412137e26fb8ff55b55a5572e4c6995}"
-    WHITESUR_ICON_COMMIT="${WHITESUR_ICON_COMMIT:-73d8040da51a9ed74e47c7366e7e9ff437601a5c}"
     if git clone https://github.com/vinceliuice/WhiteSur-gtk-theme.git /tmp/wsg \
        && git -C /tmp/wsg checkout "${WHITESUR_GTK_COMMIT}" \
        && /tmp/wsg/install.sh -d /usr/share/themes -c Dark -N glassy; then
@@ -552,14 +625,7 @@ if [[ "${WHITESUR_SKIP}" == "false" ]]; then
     else
         log "WARNING: WhiteSur GTK theme install failed — keeping axon-gtk"
     fi
-    if git clone https://github.com/vinceliuice/WhiteSur-icon-theme.git /tmp/wsi \
-       && git -C /tmp/wsi checkout "${WHITESUR_ICON_COMMIT}" \
-       && /tmp/wsi/install.sh -d /usr/share/icons; then
-        ICON_THEME_NAME='WhiteSur-dark'
-    else
-        log "WARNING: WhiteSur icon theme install failed — keeping Papirus-Dark"
-    fi
-    rm -rf /tmp/wsg /tmp/wsi
+    rm -rf /tmp/wsg
 fi
 
 # The user-theme extension schema lives outside the default schema dir; copy
@@ -612,7 +678,7 @@ binding='<Super>v'
 
 [org.gnome.shell]
 enabled-extensions=['axon-shell@axon-os', '${USER_THEME_EXT}']
-favorite-apps=['axon-welcome.desktop', 'install-axon-os.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Epiphany.desktop', 'axon-terminal.desktop', 'axon-ai-panel.desktop', 'axon-settings.desktop']
+favorite-apps=['axon-welcome.desktop', 'install-axon-os.desktop', 'org.gnome.Nautilus.desktop', '${BROWSER_DESKTOP}', 'axon-terminal.desktop', 'axon-ai-panel.desktop', 'axon-settings.desktop']
 EOF
 
 if [[ -n "${SHELL_THEME_NAME}" && -f /usr/share/glib-2.0/schemas/org.gnome.shell.extensions.user-theme.gschema.xml ]]; then
@@ -668,14 +734,20 @@ install -Dm644 "${SRC}/build/config/ollama-release.env" /usr/lib/axon/ollama/oll
 cat > /usr/lib/systemd/system/axon-ai-firstboot.service <<'EOF'
 [Unit]
 Description=Axon OS AI first-boot setup (Ollama install + model pull)
-Wants=network-online.target
-After=network-online.target NetworkManager-wait-online.service
+After=network.target NetworkManager.service
 ConditionPathExists=/etc/axon/ai-setup.json
+StartLimitIntervalSec=0
 
+# Type=exec, not oneshot: a multi-GB download must not hold up boot. The
+# script waits for the network itself and exits 75 to be retried.
 [Service]
-Type=oneshot
+Type=exec
 ExecStart=/usr/local/bin/axon-ai-firstboot
-TimeoutStartSec=0
+Environment=HOME=/root
+Restart=on-failure
+RestartSec=60
+Nice=10
+IOSchedulingClass=idle
 
 [Install]
 WantedBy=multi-user.target
