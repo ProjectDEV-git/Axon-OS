@@ -18,6 +18,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
 # Sibling import resolution
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ai_models import AIModelsWindow
 from settings_executor import SettingsExecutor
 
 
@@ -49,6 +50,10 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         # Header Bar
         header = Adw.HeaderBar()
         header.add_css_class("settings-header")
+        models_btn = Gtk.Button(label="AI Models")
+        models_btn.set_tooltip_text("Choose AI models and providers")
+        models_btn.connect("clicked", lambda _b: self.open_ai_models())
+        header.pack_end(models_btn)
         root.append(header)
 
         # Content Container
@@ -180,6 +185,9 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
 
         self._entry.grab_focus()
 
+    def open_ai_models(self) -> None:
+        AIModelsWindow(transient_for=self, application=self.get_application()).present()
+
     def _on_entry_activated(self, entry: Gtk.Entry) -> None:
         text = entry.get_text().strip()
         if not text:
@@ -233,11 +241,14 @@ class AxonSettingsApp(Adw.Application):
         if self._window is None:
             self._window = AxonSettingsWindow(application=self)
         self._window.present()
+        if "--ai-models" in sys.argv:
+            self._window.open_ai_models()
 
 
 def main() -> int:
     app = AxonSettingsApp()
-    return app.run(sys.argv)
+    # GApplication rejects unknown options; --ai-models is read in do_activate
+    return app.run([arg for arg in sys.argv if arg != "--ai-models"])
 
 
 if __name__ == "__main__":

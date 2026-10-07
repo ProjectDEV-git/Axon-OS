@@ -205,7 +205,7 @@ Package: ${PKG_NAME}
 Version: ${VERSION}
 Architecture: all
 Maintainer: Axon OS <axon-os@users.noreply.github.com>
-Depends: python3 (>= 3.10), python3-gi, init-system-helpers (>= 1.60)
+Depends: python3 (>= 3.10), python3-gi, gir1.2-secret-1, init-system-helpers (>= 1.60)
 Section: misc
 Priority: optional
 Homepage: https://github.com/ProjectDEV-git/Axon-OS
