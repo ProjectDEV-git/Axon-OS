@@ -1,107 +1,108 @@
 name: Release
 
+# One click per release: Actions → Release → Run workflow → enter the version.
+#
+#  1. Checks the version is new and higher than pyproject.toml's
+#  2. Bumps pyproject.toml, commits to main and tags vX.Y.Z
+#  3. Creates the GitHub release with generated notes
+#  4. Publishes the axon-os package to the apt repo (installed systems update)
+#  5. Starts Build ISO for the tag, which attaches the ISO to the release
+#
+# Tags pushed with GITHUB_TOKEN don't trigger other workflows, so steps 4 and 5
+# are started from here instead of relying on the tag push.
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'New semver version (e.g. 0.2.1)'
+        description: "New version, e.g. 1.2.0"
         required: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Bump version
+      - name: Check version
+        id: version
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          python scripts/bump_version.py ${{ github.event.inputs.version }}
+          set -euo pipefail
+          VERSION="${VERSION#v}"
+          if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must look like 1.2.0, got '${VERSION}'"
+            exit 1
+          fi
+          current="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' pyproject.toml | head -1)"
+          if [ "$(printf '%s\n%s\n' "${current}" "${VERSION}" | sort -V | tail -1)" != "${VERSION}" ] \
+             || [ "${current}" = "${VERSION}" ]; then
+            echo "::error::Version ${VERSION} must be higher than the current ${current}"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "::error::Tag v${VERSION} already exists"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "tag=v${VERSION}" >> "${GITHUB_OUTPUT}"
 
-      - name: Commit version bump
+      - name: Bump version, commit and tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -euo pipefail
+          python3 scripts/bump_version.py "${VERSION}"
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add pyproject.toml DEVELOPING.md || true
-          git commit -m "chore(release): bump version to ${{ github.event.inputs.version }}" || echo "No changes to commit"
-
-      - name: Create tag and push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git tag -a v${{ github.event.inputs.version }} -m "Release ${{ github.event.inputs.version }}"
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git add pyproject.toml DEVELOPING.md
+          git commit -m "chore(release): bump version to ${VERSION}"
+          git tag -a "v${VERSION}" -m "Axon OS ${VERSION}"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin HEAD:main
-          git push origin --tags
+          git push origin "v${VERSION}"
 
-      - name: Import GPG key
-        if: env.GPG_PRIVATE_KEY != ''
+      - name: Create GitHub release
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
-          echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
-          gpgconf --kill gpg-agent
-          gpgconf --launch gpg-agent
+          gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --title "Axon OS ${TAG}" --generate-notes \
+            --notes "The ISO is attached once the Build ISO run for this tag finishes.
+          Installed systems get this release through the Axon OS Updater."
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: v${{ github.event.inputs.version }}
-          body: |
-            ## Axon OS v${{ github.event.inputs.version }}
-
-            ### Installation
-            ```bash
-            # Verify the ISO signature (if GPG key is configured)
-            gpg --verify axon-os-${{ github.event.inputs.version }}-amd64.iso.sig
-
-            # Verify the SHA-256 checksum
-            sha256sum -c axon-os-${{ github.event.inputs.version }}-amd64.iso.sha256
-            ```
-
-            ### Changes
-            - Automated release for version ${{ github.event.inputs.version }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate SBOM
-        run: |
-          pip install cyclonedx-bom
-          cyclonedx-py -o sbom.json --from pyproject.toml
-          # Also generate system package SBOM if available
-          if command -v dpkg-query &> /dev/null; then
-            dpkg-query -W -f='${Package} ${Version}\n' | \
-              awk '{printf "{\"name\":\"%s\",\"version\":\"%s\"},\n", $1, $2}' | \
-              sed '$ s/,$//' > /tmp/system-packages.json
-          fi
-
-      - name: Upload SBOM
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ github.event.inputs.version }}
-          files: sbom.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Publish the axon-os package so installed systems can update to this release.
   publish-apt:
     needs: release
     permissions:
       contents: write
     uses: ./.github/workflows/publish-apt.yml
     with:
-      ref: v${{ github.event.inputs.version }}
+      ref: ${{ needs.release.outputs.tag }}
     secrets: inherit
+
+  build-iso:
+    needs: release
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Start Build ISO for the tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: gh workflow run build-iso.yml --repo "${GITHUB_REPOSITORY}" --ref "${TAG}"

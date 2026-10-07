@@ -20,11 +20,20 @@ built. Changes there still need a new ISO.
 
 ## Publishing a release
 
-Run the **Release** workflow with the new version. After it tags the release,
-it calls **Publish apt repo**, which builds the package, signs the repository
-with the `APT_SIGNING_KEY` secret and pushes it to the `gh-pages` branch.
-Pushing a `v*` tag yourself also publishes. The repository keeps the newest
-five versions, and each package is also attached to its GitHub release.
+Actions → **Release** → Run workflow, and enter the new version (e.g. `1.2.0`).
+It refuses a version that isn't higher than the one in `pyproject.toml` or
+whose tag exists, then:
+
+1. bumps `pyproject.toml`, commits to `main` and tags `vX.Y.Z`;
+2. creates the GitHub release with generated notes;
+3. runs **Publish apt repo**, which builds the package, signs the repository
+   with the `APT_SIGNING_KEY` secret, pushes it to `gh-pages` and attaches the
+   `.deb` to the release (the newest five versions stay in the repo);
+4. starts **Build ISO** for the tag. The ISO is attached to the release when
+   it fits GitHub's 2 GiB asset limit; otherwise it is the run's artifact.
+
+Pushing a `v*` tag yourself also publishes the package, but the tag must match
+the version in `pyproject.toml`.
 
 ## One-time setup
 

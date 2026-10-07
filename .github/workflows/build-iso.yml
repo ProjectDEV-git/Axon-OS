@@ -119,7 +119,8 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             --title "Axon OS ${GITHUB_REF_NAME}" \
-            --generate-notes dist/*.sha256 || true
+            --generate-notes || true
+          gh release upload "${GITHUB_REF_NAME}" dist/*.sha256 --clobber
           # Release assets are capped at 2 GiB; upload the ISO only if it fits
           ISO=$(ls dist/*.iso)
           if [ "$(stat -c%s "$ISO")" -lt 2147000000 ]; then
