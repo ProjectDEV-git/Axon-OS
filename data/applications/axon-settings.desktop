@@ -9,10 +9,14 @@ Icon=org.gnome.Settings
 Terminal=false
 StartupNotify=true
 Categories=System;Settings;Core;
-Keywords=axon;settings;assistant;control;configuration;wifi;brightness;volume;theme;ai;model;openai;anthropic;gemini;ollama;
+Keywords=axon;settings;assistant;control;configuration;wifi;brightness;volume;theme;ai;model;openai;anthropic;gemini;ollama;diagnostics;troubleshoot;health;
 X-GNOME-Autostart-enabled=false
-Actions=ai-models;
+Actions=ai-models;diagnostics;
 
 [Desktop Action ai-models]
 Name=AI Models
 Exec=python3 AXON_APPS_DIR/axon-settings/main.py --ai-models
+
+[Desktop Action diagnostics]
+Name=Diagnostics
+Exec=python3 AXON_APPS_DIR/axon-settings/main.py --diagnostics

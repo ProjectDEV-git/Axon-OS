@@ -102,6 +102,11 @@ cat > "${B}/axon-shield" <<EOF
 exec /usr/bin/python3 ${SERVICES_DIR}/axon-sandbox/shield.py "\$@"
 EOF
 chmod 755 "${B}/axon-shield"
+cat > "${B}/axon-diagnose" <<EOF
+#!/bin/sh
+exec /usr/bin/python3 ${SERVICES_DIR}/diagnostics.py "\$@"
+EOF
+chmod 755 "${B}/axon-diagnose"
 
 # Lets the Updater window run the update as root after one password prompt
 install -Dm644 "${SRC}/data/polkit/org.axonos.update.policy" \
