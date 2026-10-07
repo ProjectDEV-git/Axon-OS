@@ -123,7 +123,14 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 
 # ── Web browser: Brave (official apt repo, signing key pinned) ───────────────
 # Falls back to GNOME Web (Epiphany) so the image always has a browser.
-BRAVE_KEY_FPR="D8BAD4DE7EE17AF52A834B2D0BB75829C2D4E821"
+# Brave's release keyring holds several keys and Brave signs with one of them
+# (DBF1A116... as of 2026-10). All three are listed on https://brave.com/signing-keys/.
+# Every primary key in the downloaded keyring must be one of these.
+BRAVE_KEY_FPRS=(
+    "DBF1A116C220B8C7164F98230686B78420038257"
+    "47D32A74E9A9E013A4B4926C68D513D36A73CD96"
+    "B2A3DCA350E67256740DF904DE4EC67BE4B0DCA0"
+)
 BRAVE_KEYRING="/usr/share/keyrings/brave-browser-archive-keyring.gpg"
 BROWSER_DESKTOP="brave-browser.desktop"
 log "Installing Brave browser..."
@@ -135,11 +142,20 @@ install_brave() {
     gnupghome="$(mktemp -d)"
     fprs="$(GNUPGHOME="${gnupghome}" gpg --show-keys --with-colons "${BRAVE_KEYRING}.new" 2>/dev/null || true)"
     rm -rf "${gnupghome}"
-    if ! grep -q "^fpr:::::::::${BRAVE_KEY_FPR}:" <<<"${fprs}"; then
-        log "WARNING: Brave signing key fingerprint mismatch; not adding its repository"
+    local pub_fprs fpr
+    pub_fprs="$(awk -F: '/^pub:/{p=1;next} /^fpr:/&&p{print $10;p=0}' <<<"${fprs}")"
+    if [ -z "${pub_fprs}" ]; then
+        log "WARNING: Brave keyring has no keys; not adding its repository"
         rm -f "${BRAVE_KEYRING}.new"
         return 1
     fi
+    for fpr in ${pub_fprs}; do
+        if ! printf '%s\n' "${BRAVE_KEY_FPRS[@]}" | grep -qx "${fpr}"; then
+            log "WARNING: Brave signing key fingerprint mismatch (${fpr}); not adding its repository"
+            rm -f "${BRAVE_KEYRING}.new"
+            return 1
+        fi
+    done
     mv "${BRAVE_KEYRING}.new" "${BRAVE_KEYRING}"
     cat > /etc/apt/sources.list.d/brave-browser-release.sources <<BRAVEEOF
 Types: deb
