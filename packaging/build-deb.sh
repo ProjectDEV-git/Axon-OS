@@ -13,6 +13,7 @@
 # Usage: packaging/build-deb.sh [OUTPUT_DIR]   (default: dist/)
 # Needs: dpkg-deb, glib-compile-schemas, gpg (only if a keyring is committed)
 set -euo pipefail
+umask 022
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${1:-${SRC}/dist}"
