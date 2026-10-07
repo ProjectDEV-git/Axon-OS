@@ -290,9 +290,17 @@ cp /usr/share/grub/unicode.pf2 /boot/grub/themes/axon/unicode.pf2 || true
 
 if [[ -f /etc/default/grub ]]; then
     log "Configuring system GRUB default settings..."
-    # Ensure timeout style is menu and timeout is 5 seconds
-    sed -i 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=menu/' /etc/default/grub
-    sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub
+    # Boot straight through: the menu stays hidden for 1 second (hold Shift or
+    # press Esc to show it). The installer switches back to a visible menu
+    # when installing alongside another OS, and the boot watchdog shows it
+    # itself when it picks the rollback entry. GRUB cannot write its env on
+    # btrfs, so cap the recordfail timeout too (Ubuntu's default is 30 s).
+    sed -i '/^GRUB_TIMEOUT_STYLE=/d; /^GRUB_TIMEOUT=/d; /^GRUB_RECORDFAIL_TIMEOUT=/d' /etc/default/grub
+    {
+        echo 'GRUB_TIMEOUT_STYLE=hidden'
+        echo 'GRUB_TIMEOUT=1'
+        echo 'GRUB_RECORDFAIL_TIMEOUT=5'
+    } >> /etc/default/grub
     
     # Remove existing GRUB_THEME setting if any and append the custom one
     sed -i '/^GRUB_THEME=/d' /etc/default/grub

@@ -29,6 +29,7 @@ if search --no-floppy --label --set=axon_esp AXONESP; then
         save_env --file (${axon_esp})/axon/grubenv boot_attempts
         if [ "${boot_attempts}" = "3" ]; then
             set default='Axon OS — Recovery rollback (factory snapshot)'
+            set timeout_style=menu
             set timeout=3
         fi
     fi

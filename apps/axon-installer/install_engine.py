@@ -570,8 +570,11 @@ def install_bootloader(disk: str, mode: str) -> None:
     if mode == "alongside" and os.path.exists(default_grub):
         with open(default_grub) as f:
             content = f.read()
-        content = re.sub(r"^GRUB_DISABLE_OS_PROBER=.*$", "", content, flags=re.M)
-        content += "\nGRUB_DISABLE_OS_PROBER=false\n"
+        content = re.sub(
+            r"^GRUB_(DISABLE_OS_PROBER|TIMEOUT_STYLE|TIMEOUT)=.*$", "", content, flags=re.M
+        )
+        # The image hides the menu for a fast boot; dual-boot users need it
+        content += "\nGRUB_DISABLE_OS_PROBER=false\nGRUB_TIMEOUT_STYLE=menu\nGRUB_TIMEOUT=5\n"
         with open(default_grub, "w") as f:
             f.write(content)
 
