@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Build & Lint](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build.yml/badge.svg)](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build.yml)
 
-Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 24.04 LTS. Every AI capability runs entirely on-device through Ollama — no cloud accounts, no API keys, no data leaving your machine.
+Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 24.04 LTS. Every AI capability runs entirely on-device through Ollama by default — no cloud accounts, no API keys, no data leaving your machine. If you want, you can also pick any cloud or company model (OpenAI, Anthropic, Gemini, OpenRouter, any OpenAI-compatible endpoint) with an API key or sign-in; see [docs/ai-providers.md](docs/ai-providers.md).
 
 The operating system is built around two centralized D-Bus services — **Axon Brain** (AI inference, model management, conversation history) and **Axon Context** (ambient desktop awareness) — that power a purpose-built GNOME Shell environment with named workspaces, an intent-driven command bar, a persistent AI side panel, and AI-native applications.
 
@@ -13,7 +13,7 @@ The operating system is built around two centralized D-Bus services — **Axon B
 
 ## Features
 
-- **Axon Brain (`org.axonos.Brain`)** — A centralized D-Bus AI gateway that handles Ollama communication, model lifecycle, task-to-model routing (Speed / General / Deep tiers), conversation persistence in SQLite, and streaming token generation — accessible to every app on the system.
+- **Axon Brain (`org.axonos.Brain`)** — A centralized D-Bus AI gateway that handles Ollama and optional cloud-provider communication, model lifecycle, task-to-model routing (Speed / General / Deep tiers), conversation persistence in SQLite, and streaming token generation — accessible to every app on the system.
 - **Axon Context (`org.axonos.Context`)** — An ambient context engine that tracks the active window, workspace, clipboard, open files, and terminal history, then feeds this context into AI queries for situationally-aware responses.
 - **Hardware Profiler** — Automatically scans your system RAM, GPU vendor (NVIDIA / AMD / Intel), and VRAM to recommend three local models: a **Speed** tier for instant responses, a **General** tier for daily use, and a **Deep** tier for complex reasoning and coding.
 - **Spaces (Super+1-9)** — Named workspaces with AI-powered window auto-routing. Open a terminal and it routes to the "Terminal" space; open VS Code and it goes to "Code". Each space carries its own context.

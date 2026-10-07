@@ -81,7 +81,15 @@ class OllamaClient:
             return False
 
     def list_models(self) -> list[str]:
-        """Return the names of locally available models."""
+        """Return every usable model: local Ollama names and ``@provider/model`` refs."""
+        try:
+            brain = self._get_brain()
+            data = json.loads(brain.ListAllModels(False))
+            ids = [m["id"] for m in data.get("models", [])]
+            if ids:
+                return ids
+        except Exception:
+            pass  # older Brain without providers: fall back to Ollama only
         try:
             brain = self._get_brain()
             models_json = brain.ListModels()

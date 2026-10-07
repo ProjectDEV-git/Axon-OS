@@ -41,6 +41,7 @@ if _from_services not in sys.path:
     sys.path.insert(0, _from_services)
 
 import hardware_profiler
+import oauth
 from ai_router import AIRouter
 from constants import (
     AXON_DIR,
@@ -49,10 +50,19 @@ from constants import (
     OLLAMA_BASE_URL,
 )
 from conversation_store import ConversationStore
+from credentials import CredentialError, CredentialStore
 from prompts import CHAT_SYSTEM_PROMPT
+from providers import (
+    OLLAMA_ID,
+    ProviderError,
+    ProviderRegistry,
+    parse_model_ref,
+)
 from service_utils import rate_limited
 
 CONFIG_FILE = AXON_DIR / "config.toml"
+PROVIDERS_FILE = AXON_DIR / "providers.json"
+MODEL_TIERS = ("speed_model", "general_model", "deep_model")
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 _MAX_CONTEXT_LEN = 500
@@ -162,6 +172,9 @@ class BrainService(ServiceBase):
         self.store = ConversationStore()
         self.load_config()
         self.router = AIRouter(self.config)
+        self.providers = ProviderRegistry(PROVIDERS_FILE, CredentialStore(), OLLAMA_BASE_URL)
+        self._oauth_lock = threading.Lock()
+        self._oauth_sessions: dict[str, dict[str, Any]] = {}
         # FIX 4: Transaction registry for stream cancellation
         self._streams_lock = threading.Lock()
         self._active_streams: dict[str, threading.Event] = {}
@@ -278,12 +291,30 @@ class BrainService(ServiceBase):
 
     @staticmethod
     def _validate_model_name(name):
-        """True if name is a safe Ollama model tag (no shell/path injection)."""
+        """True if name is a safe model reference (no shell/path injection).
+
+        Accepts Ollama tags and ``@provider/model`` references to cloud models.
+        """
         if not isinstance(name, str) or not name:
             return False
         if len(name) > BrainService._MAX_MODEL_NAME_LEN or ".." in name:
             return False
-        return bool(BrainService._MODEL_NAME_RE.match(name))
+        try:
+            _provider, model = parse_model_ref(name)
+        except ValueError:
+            return False
+        return bool(BrainService._MODEL_NAME_RE.match(model))
+
+    @staticmethod
+    def _is_cloud(model: str) -> bool:
+        """True if *model* is served by a configured provider rather than Ollama."""
+        return parse_model_ref(model)[0] != OLLAMA_ID
+
+    @staticmethod
+    def _local_name(model: str) -> str:
+        """``@ollama/x`` and ``x`` both name the local Ollama model ``x``."""
+        provider, name = parse_model_ref(model)
+        return name if provider == OLLAMA_ID else model
 
     @staticmethod
     def _validate_prompt(prompt):
@@ -357,6 +388,7 @@ class BrainService(ServiceBase):
             return json.dumps({"error": f"invalid model name: {model!r}"})
         if not model:
             model, _reason = self.router.select_model(str(prompt), str(context))
+        model = self._local_name(str(model))
 
         system_prompt = ""
         if context:
@@ -434,10 +466,13 @@ class BrainService(ServiceBase):
     @rate_limited(rate=100, window_seconds=60)
     def SendMessage(self, conversation_id, message, context, model, stream):
         """Persists user message and streams or blocks assistant reply with ambient context."""
+        if model and not self._validate_model_name(str(model)):
+            return json.dumps({"error": f"invalid model name: {model!r}"})
         self.store.add_message(conversation_id, "user", message)
 
         if not model:
             model, _reason = self.router.select_model(str(message), str(context))
+        model = self._local_name(str(model))
 
         if stream:
             tx_id = str(uuid.uuid4())
@@ -467,31 +502,22 @@ class BrainService(ServiceBase):
             "Respond with ONLY the exact space name (one word, capitalised, e.g., 'Code' or 'Web'). No other text or markdown."
         )
         try:
-            payload = {
-                "model": model,
-                "prompt": prompt,
-                "system": system_prompt,
-                "stream": False,
-                "options": {"temperature": 0.1},
-            }
-            with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload, timeout=5.0) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode())
-                    result = data.get("response", "").strip().replace('"', "").replace("'", "")
-                    valid_spaces = [
-                        "Code",
-                        "Web",
-                        "Chat",
-                        "Files",
-                        "Media",
-                        "Work",
-                        "Personal",
-                        "Terminal",
-                        "Notes",
-                    ]
-                    for s in valid_spaces:
-                        if s.lower() in result.lower():
-                            return s
+            raw = self._complete(model, system_prompt, prompt, temperature=0.1, timeout=5.0)
+            result = raw.strip().replace('"', "").replace("'", "")
+            valid_spaces = [
+                "Code",
+                "Web",
+                "Chat",
+                "Files",
+                "Media",
+                "Work",
+                "Personal",
+                "Terminal",
+                "Notes",
+            ]
+            for s in valid_spaces:
+                if s.lower() in result.lower():
+                    return s
         except Exception as e:
             logger.debug("Window classification failed: %s", e)
         return "Default"
@@ -509,51 +535,30 @@ class BrainService(ServiceBase):
             "Respond ONLY with valid JSON if action, otherwise plain text. Keep it brief."
         )
         try:
-            payload = {
-                "model": model,
-                "prompt": text,
-                "system": system_prompt,
-                "stream": False,
-                "options": {"temperature": 0.1},
-            }
-            with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload, timeout=10.0) as resp:
-                if resp.status == 200:
-                    result_data = json.loads(resp.read().decode())
-                    result = result_data.get("response", "").strip()
-
-                    if result.startswith("{"):
-                        try:
-                            parsed = json.loads(result)
-                            if (
-                                isinstance(parsed, dict)
-                                and parsed.get("action") == "run_command"
-                                and isinstance(parsed.get("command"), str)
-                            ):
-                                return json.dumps(
-                                    {
-                                        "action": "run_command",
-                                        "command": parsed["command"],
-                                    }
-                                )
-                            if (
-                                isinstance(parsed, dict)
-                                and parsed.get("action") == "open_app"
-                                and isinstance(parsed.get("app"), str)
-                            ):
-                                return json.dumps(
-                                    {
-                                        "action": "open_app",
-                                        "app": parsed["app"],
-                                    }
-                                )
-                        except json.JSONDecodeError:
-                            pass
-                        return text
-                    return result
+            result = self._complete(model, system_prompt, text, temperature=0.1, timeout=10.0)
         except Exception as e:
             logger.debug("ClassifyIntent failed: %s", e)
             return '{"action": "error", "message": "AI classification unavailable"}'
-        return text
+        result = result.strip()
+        if result.startswith("{"):
+            try:
+                parsed = json.loads(result)
+                if (
+                    isinstance(parsed, dict)
+                    and parsed.get("action") == "run_command"
+                    and isinstance(parsed.get("command"), str)
+                ):
+                    return json.dumps({"action": "run_command", "command": parsed["command"]})
+                if (
+                    isinstance(parsed, dict)
+                    and parsed.get("action") == "open_app"
+                    and isinstance(parsed.get("app"), str)
+                ):
+                    return json.dumps({"action": "open_app", "app": parsed["app"]})
+            except json.JSONDecodeError:
+                pass
+            return text
+        return result
 
     @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
     def GetEmbeddings(self, prompt, model):
@@ -590,6 +595,173 @@ class BrainService(ServiceBase):
         return "[]"
 
     # ------------------------------------------------------------------
+    # Providers: any model, API keys and OAuth sign-in
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _json_error(message: str) -> str:
+        return json.dumps({"ok": False, "error": message})
+
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="s")
+    def ListProviders(self):
+        """Providers with sign-in state. Never includes keys or tokens."""
+        return json.dumps(
+            {
+                "providers": self.providers.describe(),
+                "keyring_available": self.providers.keyring_available,
+            }
+        )
+
+    @dbus.service.method("org.axonos.Brain", in_signature="b", out_signature="s")
+    def ListAllModels(self, refresh):
+        """Every usable model across local and cloud providers.
+
+        Returns ``{"models": [{"id", "name", "provider", "provider_label"}],
+        "errors": {provider: message}}``; pass ``id`` as the model argument
+        of Generate or SendMessage.
+        """
+        return json.dumps(self.providers.list_models(refresh=bool(refresh)))
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="s")
+    @rate_limited(rate=20, window_seconds=60)
+    def SaveProvider(self, provider_json):
+        """Add or update a provider from JSON (see providers.ProviderConfig)."""
+        try:
+            data = json.loads(str(provider_json))
+            if not isinstance(data, dict):
+                raise ValueError("expected a JSON object")
+            cfg = self.providers.upsert(data)
+        except (ValueError, KeyError, TypeError, ProviderError) as e:
+            return self._json_error(str(e))
+        return json.dumps({"ok": True, "id": cfg.id})
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="s")
+    def RemoveProvider(self, provider_id):
+        """Delete a custom provider or reset a built-in one, forgetting its credentials."""
+        try:
+            self.providers.remove(str(provider_id))
+        except ProviderError as e:
+            return self._json_error(str(e))
+        return json.dumps({"ok": True})
+
+    @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
+    @rate_limited(rate=20, window_seconds=60)
+    def SetApiKey(self, provider_id, api_key):
+        """Store (or with an empty key, forget) a provider API key in the keyring."""
+        try:
+            self.providers.set_api_key(str(provider_id), str(api_key))
+        except (ProviderError, CredentialError) as e:
+            return self._json_error(str(e))
+        return json.dumps({"ok": True})
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="s")
+    def SignOut(self, provider_id):
+        """Forget a provider's OAuth tokens (API keys are kept)."""
+        try:
+            self.providers.get(str(provider_id))
+            self.providers.sign_out(str(provider_id))
+        except (ProviderError, CredentialError) as e:
+            return self._json_error(str(e))
+        return json.dumps({"ok": True})
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="s")
+    @rate_limited(rate=10, window_seconds=60)
+    def StartSignIn(self, provider_id):
+        """Begin OAuth sign-in in the background.
+
+        Progress is reported by the SignInStatus signal and GetSignInStatus:
+        ``awaiting_user`` carries ``auth_url`` (open it in a browser) or
+        ``verification_uri`` + ``user_code`` (show them), then ``done`` or
+        ``error``.
+        """
+        pid = str(provider_id)
+        try:
+            cfg = self.providers.get(pid)
+        except ProviderError as e:
+            return self._json_error(str(e))
+        if not cfg.oauth or not cfg.oauth.ready():
+            return self._json_error(f"{cfg.label} has no sign-in configured")
+        if not self.providers.keyring_available:
+            return self._json_error("no system keyring is available to keep the sign-in")
+        with self._oauth_lock:
+            old = self._oauth_sessions.get(pid)
+            if old and old["state"] in ("starting", "awaiting_user"):
+                old["cancel"].set()
+            session = {"state": "starting", "info": {}, "cancel": threading.Event()}
+            self._oauth_sessions[pid] = session
+        threading.Thread(target=self._do_sign_in, args=(pid, session), daemon=True).start()
+        return json.dumps({"ok": True})
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="s")
+    def GetSignInStatus(self, provider_id):
+        with self._oauth_lock:
+            session = self._oauth_sessions.get(str(provider_id))
+            if session is None:
+                return json.dumps({"state": "idle"})
+            return json.dumps({"state": session["state"], **session["info"]})
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="b")
+    def CancelSignIn(self, provider_id):
+        with self._oauth_lock:
+            session = self._oauth_sessions.get(str(provider_id))
+        if session is None:
+            return False
+        session["cancel"].set()
+        return True
+
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="s")
+    def GetModelSettings(self):
+        """The model chosen for each routing tier (no network calls, unlike GetStatus)."""
+        with self._config_lock:
+            return json.dumps({k: self.config.get(k, "") for k in MODEL_TIERS})
+
+    @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
+    def SetModel(self, tier, model):
+        """Choose the model for a routing tier: speed, general, deep, or all.
+
+        *model* is any reference from ListAllModels, e.g. ``qwen2.5:7b`` or
+        ``@anthropic/claude-sonnet-4-5``.
+        """
+        tier = str(tier)
+        model = str(model)
+        keys = list(MODEL_TIERS) if tier == "all" else [f"{tier}_model"]
+        if any(k not in MODEL_TIERS for k in keys):
+            return self._json_error(f"unknown tier {tier!r}")
+        if not self._validate_model_name(model):
+            return self._json_error(f"invalid model name: {model!r}")
+        model = self._local_name(model)
+        try:
+            self.providers.get(parse_model_ref(model)[0])
+        except ProviderError as e:
+            return self._json_error(str(e))
+        with self._config_lock:
+            for k in keys:
+                self.config[k] = model
+            self.save_config()
+            self.router = AIRouter(self.config)
+        return json.dumps({"ok": True, "models": {k: self.config[k] for k in MODEL_TIERS}})
+
+    def _do_sign_in(self, provider_id: str, session: dict[str, Any]) -> None:
+        cfg = self.providers.get(provider_id)
+        assert cfg.oauth is not None
+
+        def publish(state: str, info: dict[str, Any]) -> None:
+            with self._oauth_lock:
+                session["state"] = state
+                session["info"] = info
+            GLib.idle_add(self.SignInStatus, provider_id, state, json.dumps(info))
+
+        try:
+            tokens = oauth.run_flow(
+                cfg.oauth, lambda info: publish("awaiting_user", info), session["cancel"]
+            )
+            self.providers.store_tokens(provider_id, tokens)
+            publish("done", {})
+        except Exception as e:
+            logger.info("Sign-in to %s failed: %s", provider_id, e)
+            publish("error", {"error": str(e)})
+
+    # ------------------------------------------------------------------
     # D-Bus Signals
     # ------------------------------------------------------------------
 
@@ -601,6 +773,11 @@ class BrainService(ServiceBase):
     @dbus.service.signal("org.axonos.Brain", signature="sbs")
     def GenerationCompleted(self, transaction_id, success, error_msg):
         """Fires when stream finishes."""
+        pass
+
+    @dbus.service.signal("org.axonos.Brain", signature="sss")
+    def SignInStatus(self, provider_id, state, info_json):
+        """Fires as OAuth sign-in progresses (awaiting_user, done, error)."""
         pass
 
     @dbus.service.signal("org.axonos.Brain", signature="sxxs")
@@ -629,55 +806,116 @@ class BrainService(ServiceBase):
             logger.debug("Pull failed for %s: %s", model_name, e)
             GLib.idle_add(self.PullProgress, model_name, 0, 0, "Pull failed")
 
+    def _complete(
+        self,
+        model: str,
+        system: str,
+        prompt: str,
+        temperature: float | None = None,
+        timeout: float = 60.0,
+    ) -> str:
+        """Return one non-streamed completion from any model. Raises on failure."""
+        model = self._local_name(model)
+        if self._is_cloud(model):
+            msgs = [{"role": "system", "content": system}] if system else []
+            msgs.append({"role": "user", "content": prompt})
+            chunks = self.providers.chat(
+                model, msgs, stream=False, temperature=temperature, timeout=timeout
+            )
+            return _sanitize_output("".join(chunks))
+        payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
+        if system:
+            payload["system"] = system
+        if temperature is not None:
+            payload["options"] = {"temperature": temperature}
+        with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode())
+            return _sanitize_output(data.get("response", ""))
+
+    def _ollama_stream(self, path, payload, extract):
+        """Yield tokens from an Ollama NDJSON streaming endpoint."""
+        with self._http_post(f"{OLLAMA_BASE_URL}{path}", payload) as r:
+            # FIX 3: Set per-read timeout on the underlying socket
+            self._set_stream_timeout(r)
+            for raw_line in r:
+                line = raw_line.decode().strip()
+                if not line:
+                    continue
+                token = extract(json.loads(line))
+                if token:
+                    yield token
+
+    def _run_stream(self, tx_id, tokens, label, on_done=None):
+        """Pump *tokens* to TokenGenerated signals, honouring cancellation.
+
+        Args:
+            tx_id: Transaction id registered in ``_active_streams``.
+            tokens: Iterator of raw text chunks from Ollama or a provider.
+            label: "Generate" or "Chat", for logs and error messages.
+            on_done: Called with the full text after a successful stream.
+        """
+        with self._streams_lock:
+            cancel_flag = self._active_streams.get(tx_id)
+        accumulated = ""
+        try:
+            try:
+                for token in tokens:
+                    # FIX 4: Check cancellation before processing
+                    if cancel_flag is not None and cancel_flag.is_set():
+                        logger.debug("%s stream %s cancelled by client", label, tx_id)
+                        break
+                    token = _sanitize_output(token)
+                    accumulated += token
+                    # FIX 5: Use token buffer for backpressure
+                    self._token_buffer.add(token, tx_id)
+            finally:
+                # closes the HTTP response when a generator is abandoned mid-stream
+                close = getattr(tokens, "close", None)
+                if close is not None:
+                    close()
+            # Flush any remaining buffered tokens
+            self._token_buffer.flush()
+            if on_done is not None:
+                on_done(accumulated)
+            GLib.idle_add(self.GenerationCompleted, tx_id, True, "")
+        except TimeoutError:
+            logger.warning("%s stream %s timed out (model hung)", label, tx_id)
+            self._token_buffer.flush()
+            GLib.idle_add(self.GenerationCompleted, tx_id, False, f"{label} timed out")
+        except ProviderError as e:
+            logger.info("%s stream %s failed: %s", label, tx_id, e)
+            self._token_buffer.flush()
+            GLib.idle_add(self.GenerationCompleted, tx_id, False, str(e))
+        except Exception as e:
+            logger.debug("%s stream failed: %s", label, e)
+            self._token_buffer.flush()
+            GLib.idle_add(self.GenerationCompleted, tx_id, False, f"{label} failed")
+        finally:
+            with self._streams_lock:
+                self._active_streams.pop(tx_id, None)
+
     def _do_generate_sync(self, prompt, system, model):
         try:
-            payload = {"model": model, "prompt": prompt, "stream": False}
-            if system:
-                payload["system"] = system
-            with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload) as resp:
-                data = json.loads(resp.read().decode())
-                return _sanitize_output(data.get("response", ""))
+            return self._complete(model, system, prompt)
+        except ProviderError as e:
+            return f"[Error: {e}]"
         except Exception as e:
             logger.debug("Generate failed: %s", e)
             return "[Error: AI generation unavailable]"
 
     def _do_generate_stream(self, tx_id, prompt, system, model):
-        with self._streams_lock:
-            cancel_flag = self._active_streams.get(tx_id)
-        try:
+        if self._is_cloud(model):
+            msgs = [{"role": "system", "content": system}] if system else []
+            msgs.append({"role": "user", "content": prompt})
+            tokens = self.providers.chat(model, msgs, stream=True)
+        else:
             payload = {"model": model, "prompt": prompt, "stream": True}
             if system:
                 payload["system"] = system
-            with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload) as r:
-                # FIX 3: Set per-read timeout on the underlying socket
-                self._set_stream_timeout(r)
-                for raw_line in r:
-                    # FIX 4: Check cancellation before processing
-                    if cancel_flag is not None and cancel_flag.is_set():
-                        logger.debug("Generate stream %s cancelled by client", tx_id)
-                        break
-                    line = raw_line.decode().strip()
-                    if not line:
-                        continue
-                    chunk = json.loads(line)
-                    token = chunk.get("response", "")
-                    if token:
-                        # FIX 5: Use token buffer for backpressure
-                        self._token_buffer.add(_sanitize_output(token), tx_id)
-            # Flush any remaining buffered tokens
-            self._token_buffer.flush()
-            GLib.idle_add(self.GenerationCompleted, tx_id, True, "")
-        except TimeoutError:
-            logger.warning("Generate stream %s timed out (Ollama hung)", tx_id)
-            self._token_buffer.flush()
-            GLib.idle_add(self.GenerationCompleted, tx_id, False, "Generation timed out")
-        except Exception as e:
-            logger.debug("Generate stream failed: %s", e)
-            self._token_buffer.flush()
-            GLib.idle_add(self.GenerationCompleted, tx_id, False, "Generation failed")
-        finally:
-            with self._streams_lock:
-                self._active_streams.pop(tx_id, None)
+            tokens = self._ollama_stream(
+                "/api/generate", payload, lambda chunk: chunk.get("response", "")
+            )
+        self._run_stream(tx_id, tokens, "Generation")
 
     def _chat_messages(self, conv_id, context):
         """Build the /api/chat message list, system prompt first.
@@ -703,6 +941,8 @@ class BrainService(ServiceBase):
     def _do_chat_sync(self, conv_id, context, model):
         api_msgs = self._chat_messages(conv_id, context)
         try:
+            if self._is_cloud(model):
+                return _sanitize_output("".join(self.providers.chat(model, api_msgs, stream=False)))
             payload = {
                 "model": model,
                 "messages": api_msgs,
@@ -711,56 +951,27 @@ class BrainService(ServiceBase):
             with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as resp:
                 data = json.loads(resp.read().decode())
                 return _sanitize_output(data.get("message", {}).get("content", ""))
+        except ProviderError as e:
+            return f"[Error: {e}]"
         except Exception as e:
             logger.debug("Chat failed: %s", e)
             return "[Error: AI chat unavailable]"
 
     def _do_chat_stream(self, tx_id, conv_id, context, model):
-        with self._streams_lock:
-            cancel_flag = self._active_streams.get(tx_id)
         api_msgs = self._chat_messages(conv_id, context)
-
-        accumulated = ""
-        try:
-            payload = {
-                "model": model,
-                "messages": api_msgs,
-                "stream": True,
-            }
-            with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as r:
-                # FIX 3: Set per-read timeout on the underlying socket
-                self._set_stream_timeout(r)
-                for raw_line in r:
-                    # FIX 4: Check cancellation before processing
-                    if cancel_flag is not None and cancel_flag.is_set():
-                        logger.debug("Chat stream %s cancelled by client", tx_id)
-                        break
-                    line = raw_line.decode().strip()
-                    if not line:
-                        continue
-                    chunk = json.loads(line)
-                    token = chunk.get("message", {}).get("content", "")
-                    if token:
-                        token = _sanitize_output(token)
-                        accumulated += token
-                        # FIX 5: Use token buffer for backpressure
-                        self._token_buffer.add(token, tx_id)
-            # Flush any remaining buffered tokens
-            self._token_buffer.flush()
-            # Save final response
-            self.store.add_message(conv_id, "assistant", accumulated)
-            GLib.idle_add(self.GenerationCompleted, tx_id, True, "")
-        except TimeoutError:
-            logger.warning("Chat stream %s timed out (Ollama hung)", tx_id)
-            self._token_buffer.flush()
-            GLib.idle_add(self.GenerationCompleted, tx_id, False, "Chat timed out")
-        except Exception as e:
-            logger.debug("Chat stream failed: %s", e)
-            self._token_buffer.flush()
-            GLib.idle_add(self.GenerationCompleted, tx_id, False, "Chat failed")
-        finally:
-            with self._streams_lock:
-                self._active_streams.pop(tx_id, None)
+        if self._is_cloud(model):
+            tokens = self.providers.chat(model, api_msgs, stream=True)
+        else:
+            payload = {"model": model, "messages": api_msgs, "stream": True}
+            tokens = self._ollama_stream(
+                "/api/chat", payload, lambda chunk: chunk.get("message", {}).get("content", "")
+            )
+        self._run_stream(
+            tx_id,
+            tokens,
+            "Chat",
+            on_done=lambda text: self.store.add_message(conv_id, "assistant", text),
+        )
 
 
 if __name__ == "__main__":
