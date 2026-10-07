@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
+import urllib.request
 from pathlib import Path
 
 import gi
@@ -22,6 +24,10 @@ try:
     import hardware_profiler
 except ImportError:
     hardware_profiler = None
+
+# Hash-pinned Ollama installer shipped in the image (see build/config/install-ollama.sh)
+OLLAMA_INSTALLER = "/usr/lib/axon/ollama/install-ollama.sh"
+OLLAMA_URL = "http://127.0.0.1:11434"
 
 # ---------------------------------------------------------------------------
 # Embedded CSS
@@ -539,6 +545,57 @@ class WelcomeWindow(Adw.Window):
     # Pull model action
     # ------------------------------------------------------------------
 
+    def _ensure_ollama(self) -> bool:
+        """Make sure the Ollama runtime is installed and its API is up.
+
+        Runs on a worker thread. Returns False after reporting an error.
+        """
+
+        def _status(text: str) -> None:
+            GLib.idle_add(self._update_pull_progress, 0, 0, text)
+
+        def _firstboot_running() -> bool:
+            # "activating" covers the unit waiting to retry a failed download
+            state = subprocess.run(
+                ["systemctl", "is-active", "axon-ai-firstboot.service"],
+                capture_output=True,
+                text=True,
+                check=False,
+            ).stdout.strip()
+            return state in ("active", "activating")
+
+        # The installed system's first boot downloads Ollama in the background;
+        # starting a second download would only slow both down.
+        deadline = time.monotonic() + 45 * 60
+        while shutil.which("ollama") is None and _firstboot_running():
+            if time.monotonic() > deadline:
+                break
+            _status("Ollama is still being installed in the background...")
+            time.sleep(5)
+
+        if shutil.which("ollama") is None:
+            _status("Installing Ollama runtime (a few minutes)...")
+            try:
+                subprocess.run(
+                    ["pkexec", OLLAMA_INSTALLER],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=True,
+                )
+            except (OSError, subprocess.CalledProcessError):
+                _status("error: Ollama install failed — check your internet connection")
+                return False
+
+        _status("Starting Ollama...")
+        for _ in range(30):
+            try:
+                with urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=2):  # nosec B310
+                    return True
+            except OSError:
+                time.sleep(2)
+        _status("error: Ollama did not start — try again in a moment")
+        return False
+
     def _on_pull_clicked(self, _btn: Gtk.Button) -> None:
         model = self._selected_model
         self._downloading_model = model
@@ -549,33 +606,11 @@ class WelcomeWindow(Adw.Window):
 
         # Fire D-Bus pull request
         def _trigger_dbus_pull():
-            # No Ollama runtime yet (e.g. fresh live session/install): bootstrap
-            # it with the bundled setup script, which also pulls the model.
-            if shutil.which("ollama") is None:
-                setup = "/usr/local/bin/axon-ollama-setup"
-                if os.path.exists(setup):
-                    GLib.idle_add(
-                        self._update_pull_progress,
-                        0,
-                        0,
-                        "Installing Ollama runtime (a few minutes)...",
-                    )
-                    try:
-                        subprocess.run(
-                            [setup, model],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            check=True,
-                        )
-                        GLib.idle_add(self._update_pull_progress, 1, 1, "success")
-                    except Exception:
-                        GLib.idle_add(
-                            self._update_pull_progress,
-                            0,
-                            0,
-                            "error: Ollama install failed — check your internet connection",
-                        )
-                    return
+            # No Ollama runtime yet: wait for the first-boot installer if it is
+            # still running, otherwise install it now (asks for the admin
+            # password). The model itself is then pulled as usual below.
+            if not self._ensure_ollama():
+                return
 
             if self.brain is None:
                 try:
