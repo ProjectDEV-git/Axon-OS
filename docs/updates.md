@@ -29,8 +29,11 @@ whose tag exists, then:
 3. runs **Publish apt repo**, which builds the package, signs the repository
    with the `APT_SIGNING_KEY` secret, pushes it to `gh-pages` and attaches the
    `.deb` to the release (the newest five versions stay in the repo);
-4. starts **Build ISO** for the tag. The ISO is attached to the release when
-   it fits GitHub's 2 GiB asset limit; otherwise it is the run's artifact.
+4. starts **Build ISO** for the tag, which attaches the ISO to the release.
+   GitHub caps release files at 2 GiB, so a larger ISO goes up in
+   `.partNN` pieces and the release notes say how to join them
+   (`cat axon-os-*.iso.part* > axon-os-X.Y.Z-amd64.iso`, then check the
+   `.sha256`).
 
 Pushing a `v*` tag yourself also publishes the package, but the tag must match
 the version in `pyproject.toml`.
