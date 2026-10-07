@@ -198,6 +198,10 @@ fi
 
 log "Installing Python AI libraries inside chroot..."
 # Pinned versions: unpinned installs pulled whatever PyPI served at build time
+# pip can't upgrade Debian's typing_extensions in place (no RECORD file), so put a
+# newer copy in /usr/local first; it shadows the Debian one on sys.path.
+pip3 install --no-cache-dir --ignore-installed typing_extensions --break-system-packages \
+    || log "WARNING: typing_extensions upgrade failed"
 pip3 install --no-cache-dir "faster-whisper==1.2.1" "sqlite-vec==0.1.9" --break-system-packages || log "WARNING: Python AI libraries failed to install"
 
 
