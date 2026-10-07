@@ -63,6 +63,9 @@ APT::Acquire::QueueMode "acquire";
 APTEOF
 
 dpkg --add-architecture i386
+# A reused chroot already has the axon-os package's apt source; the package
+# is built from this checkout, so the build never needs that repo.
+rm -f /etc/apt/sources.list.d/axon-os.sources
 apt-get update
 
 # ---------------------------------------------------------------------------
@@ -198,164 +201,47 @@ fi
 
 log "Installing Python AI libraries inside chroot..."
 # Pinned versions: unpinned installs pulled whatever PyPI served at build time
+# pip can't upgrade Debian's typing_extensions in place (no RECORD file), so put a
+# newer copy in /usr/local first; it shadows the Debian one on sys.path.
+pip3 install --no-cache-dir --ignore-installed typing_extensions --break-system-packages \
+    || log "WARNING: typing_extensions upgrade failed"
 pip3 install --no-cache-dir "faster-whisper==1.2.1" "sqlite-vec==0.1.9" --break-system-packages || log "WARNING: Python AI libraries failed to install"
 
 
 # ---------------------------------------------------------------------------
 # 5. Axon OS components (system-wide)
 # ---------------------------------------------------------------------------
-log "Installing Axon OS components..."
+log "Installing Axon OS components (axon-os package)..."
 
 AXON_LIB="/usr/lib/axon"
 APPS_DIR="${AXON_LIB}/apps"
 SERVICES_DIR="${AXON_LIB}/services"
 
+# Everything Axon ships that changes between releases is one package, so
+# installed systems update it from the Axon apt repo via axon-update.
+# packaging/build-deb.sh lists what goes in it.
+rm -rf /tmp/axon-deb
+bash "${SRC}/packaging/build-deb.sh" /tmp/axon-deb
+# force-confmiss: restores the apt source removed above on reused chroots
+apt-get install -y --reinstall -o Dpkg::Options::=--force-confmiss /tmp/axon-deb/axon-os_*_all.deb
+rm -rf /tmp/axon-deb
+
+# The live-session installer stays out of the package: the install engine
+# deletes it from installed systems and an upgrade must not bring it back.
 mkdir -p "${APPS_DIR}"
-mkdir -p "${SERVICES_DIR}"
-mkdir -p "${AXON_LIB}/shell"
-mkdir -p "${AXON_LIB}/data/applications"
-cp -r "${SRC}/apps/." "${APPS_DIR}/"
-cp -r "${SRC}/services/." "${SERVICES_DIR}/"
-cp -r "${SRC}/shell/." "${AXON_LIB}/shell/"
-cp -r "${SRC}/data/applications/." "${AXON_LIB}/data/applications/"
-find "${AXON_LIB}" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-
-# Desktop entries -> /usr/share/applications (resolve AXON_APPS_DIR)
-for f in "${SRC}/data/applications/"*.desktop; do
-    sed "s|AXON_APPS_DIR|${APPS_DIR}|g" "${f}" \
-        > "/usr/share/applications/$(basename "${f}")"
-done
-
-# D-Bus session activation files (resolve AXON_SERVICES_DIR) — every
-# service directory that ships org.axonos.*.service / *.conf is registered.
-mkdir -p /usr/share/dbus-1/services /usr/share/dbus-1/session.d
-for activation in "${SERVICES_DIR}"/*/org.axonos.*.service; do
-    [[ -f "${activation}" ]] || continue
-    sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${activation}" \
-        > "/usr/share/dbus-1/services/$(basename "${activation}")"
-done
-# No session-bus policy files: every caller on a session bus runs as the same
-# user, so <policy user=...> cannot tell clients apart, and the old files'
-# literal user="${user}" plus default-context denies blocked Brain's own
-# methods for the shell and apps. Remove copies left in reused chroots.
-rm -f /usr/share/dbus-1/session.d/org.axonos.*.conf
-
-# systemd user units, enabled globally for every user
-mkdir -p /usr/lib/systemd/user
-AXON_USER_UNITS=()
-for unit in "${SERVICES_DIR}"/*/axon-*.service; do
-    [[ -f "${unit}" ]] || continue
-    sed "s|AXON_SERVICES_DIR|${SERVICES_DIR}|g" "${unit}" \
-        > "/usr/lib/systemd/user/$(basename "${unit}")"
-    AXON_USER_UNITS+=("$(basename "${unit}")")
-done
-if [[ ${#AXON_USER_UNITS[@]} -gt 0 ]]; then
-    systemctl --global enable "${AXON_USER_UNITS[@]}"
-else
-    log "WARNING: no systemd user units found to enable"
-fi
-
-# GNOME Shell extension, system-wide
-EXT_DIR="/usr/share/gnome-shell/extensions/axon-shell@axon-os"
-mkdir -p "${EXT_DIR}"
-cp -r "${SRC}/shell/axon-shell/." "${EXT_DIR}/"
-glib-compile-schemas "${EXT_DIR}/schemas/"
-
-# GTK theme
-mkdir -p /usr/share/themes/axon-gtk/gtk-4.0
-cp "${SRC}/theme/axon-gtk/gtk-dark.css" /usr/share/themes/axon-gtk/gtk-4.0/gtk.css
-cp "${SRC}/theme/axon-gtk/index.theme" /usr/share/themes/axon-gtk/
-
-# Wallpaper
-mkdir -p /usr/share/backgrounds/axon
-if [[ -f "${SRC}/theme/wallpapers/axon-aurora.png" ]]; then
-    cp "${SRC}/theme/wallpapers/axon-aurora.png" /usr/share/backgrounds/axon/
-fi
-
-# First-boot + ollama helper scripts
-install -Dm755 "${SRC}/build/config/firstboot.sh" /usr/local/bin/axon-firstboot
-install -Dm755 "${SRC}/build/config/ollama-setup.sh" /usr/local/bin/axon-ollama-setup
-install -Dm755 "${SRC}/system/axon-updater.py" /usr/local/bin/axon-update
-
-# Install Axon Voice overlay & Sandbox / Watchdog helpers
-mkdir -p /usr/lib/axon/apps/axon-voice-overlay
-install -Dm755 "${SRC}/apps/axon-voice-overlay/main.py" /usr/lib/axon/apps/axon-voice-overlay/main.py
-install -Dm755 "${SRC}/services/axon-sandbox/axon-run" /usr/local/bin/axon-run
-install -Dm755 "${SRC}/system/boot_watchdog.py" /usr/local/bin/axon-boot-watchdog
-install -Dm644 "${SRC}/system/axon-boot-watchdog.service" /lib/systemd/system/axon-boot-watchdog.service
-systemctl enable axon-boot-watchdog.service || log "WARNING: could not enable axon-boot-watchdog"
-
-# Shell environment interceptor for interactive shells
-install -Dm644 "${SRC}/services/axon-sandbox/axon-sandbox-env.sh" /etc/profile.d/axon-sandbox.sh
-
-# Python global logger path helper (copying to python standard dist-packages)
-cp "${SRC}/axon_logger.py" /usr/lib/python3/dist-packages/ || true
+rm -rf "${APPS_DIR}/axon-installer"
+cp -r "${SRC}/apps/axon-installer" "${APPS_DIR}/"
+find "${APPS_DIR}/axon-installer" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+sed "s|AXON_APPS_DIR|${APPS_DIR}|g" "${SRC}/data/applications/install-axon-os.desktop" \
+    > /usr/share/applications/install-axon-os.desktop
 
 # NOTE: the boot-attempts watchdog lives in /etc/grub.d/06_axon_watchdog
-# (installed further below) and counts in a grubenv file on the ESP, which
+# (shipped by the package) and counts in a grubenv file on the ESP, which
 # GRUB can actually write. Do NOT append watchdog logic to 00_header:
 # appended lines execute as *bash* while update-grub runs (they are not
 # emitted into grub.cfg), where save_env does not exist — under 00_header's
 # `set -e` that aborts grub-mkconfig and leaves the system with a stale or
 # missing grub.cfg (boot error / blank screen).
-
-cat > /usr/share/applications/axon-update.desktop <<'EOF'
-[Desktop Entry]
-Type=Application
-Name=Axon OS Updater
-Comment=Check for and apply the latest Axon OS updates
-Exec=/usr/local/bin/axon-update
-Icon=software-update-available
-Terminal=false
-StartupNotify=true
-Categories=System;Settings;
-EOF
-
-cat > /usr/lib/systemd/system/axon-update-auto.service <<'EOF'
-[Unit]
-Description=Axon OS automatic update check and apply
-Wants=network-online.target
-After=network-online.target NetworkManager-wait-online.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/axon-update --auto
-EOF
-
-cat > /usr/lib/systemd/system/axon-update-auto.timer <<'EOF'
-[Unit]
-Description=Run Axon OS automatic updates daily
-
-[Timer]
-OnBootSec=30min
-OnUnitActiveSec=1d
-RandomizedDelaySec=2h
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-systemctl enable axon-update-auto.timer || log "WARNING: could not enable axon-update-auto.timer"
-
-# Voice push-to-talk toggle (bound to Super+V via the gschema override)
-install -Dm755 "${SRC}/build/config/axon-voice-toggle" /usr/local/bin/axon-voice-toggle
-
-# Rogue Software Shield CLI wrapper
-cat > /usr/local/bin/axon-shield <<EOF
-#!/bin/sh
-exec /usr/bin/python3 ${SERVICES_DIR}/axon-sandbox/shield.py "\$@"
-EOF
-chmod 755 /usr/local/bin/axon-shield
-
-# Self-healing boot watchdog: GRUB counter + rollback entry + reset unit.
-# The grub.d scripts only emit anything on installed btrfs systems.
-install -Dm755 "${SRC}/build/config/axon-boot-ok.sh" /usr/local/bin/axon-boot-ok
-install -Dm644 "${SRC}/build/config/axon-boot-ok.service" \
-    /etc/systemd/system/axon-boot-ok.service
-systemctl enable axon-boot-ok.service || log "WARNING: could not enable axon-boot-ok"
-install -Dm755 "${SRC}/build/config/grub.d-06_axon_watchdog" /etc/grub.d/06_axon_watchdog
-install -Dm755 "${SRC}/build/config/grub.d-42_axon_rollback" /etc/grub.d/42_axon_rollback
 
 # Copy and configure polished GRUB theme for installed system
 log "Installing polished GRUB theme..."
@@ -740,34 +626,8 @@ chmod 755 /usr/local/bin/axon-install-engine
 mkdir -p /usr/share/polkit-1/actions
 cp "${SRC}/data/polkit/org.axonos.install-engine.policy" /usr/share/polkit-1/actions/
 
-# AI first-boot provisioner: installs Ollama + pulls the chosen model on the
-# installed system's first online boot. The unit stays disabled in the image;
-# the install engine enables it on the target when the user opts in.
-install -Dm755 "${SRC}/build/config/ai-firstboot.sh" /usr/local/bin/axon-ai-firstboot
-# Hash-pinned Ollama installer used by first boot and axon-ollama-setup
-install -Dm755 "${SRC}/build/config/install-ollama.sh" /usr/lib/axon/ollama/install-ollama.sh
-install -Dm644 "${SRC}/build/config/ollama-release.env" /usr/lib/axon/ollama/ollama-release.env
-cat > /usr/lib/systemd/system/axon-ai-firstboot.service <<'EOF'
-[Unit]
-Description=Axon OS AI first-boot setup (Ollama install + model pull)
-After=network.target NetworkManager.service
-ConditionPathExists=/etc/axon/ai-setup.json
-StartLimitIntervalSec=0
-
-# Type=exec, not oneshot: a multi-GB download must not hold up boot. The
-# script waits for the network itself and exits 75 to be retried.
-[Service]
-Type=exec
-ExecStart=/usr/local/bin/axon-ai-firstboot
-Environment=HOME=/root
-Restart=on-failure
-RestartSec=60
-Nice=10
-IOSchedulingClass=idle
-
-[Install]
-WantedBy=multi-user.target
-EOF
+# The AI first-boot provisioner (axon-ai-firstboot + its unit) comes from the
+# axon-os package; its unit stays disabled until the install engine enables it.
 
 # Auto-launch the installer wizard in the live session only (boot=casper)
 mkdir -p /etc/xdg/autostart

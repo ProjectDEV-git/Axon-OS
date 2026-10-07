@@ -42,6 +42,20 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Shared update pipeline helpers
 # ---------------------------------------------------------------------------
+# Unattended: keep the user's edited config files instead of stopping at
+# dpkg's "configuration file modified" prompt, which has no one to answer it.
+APT_UPGRADE_CMD = [
+    "apt-get",
+    "dist-upgrade",
+    "-y",
+    "-q",
+    "-o",
+    "Dpkg::Options::=--force-confdef",
+    "-o",
+    "Dpkg::Options::=--force-confold",
+]
+
+
 def _run_cmd_logged(cmd: list[str], extra_env: dict[str, str] | None = None) -> bool:
     """Run a subprocess; returns True on success. Logs output on failure."""
     try:
@@ -85,7 +99,7 @@ def run_headless_update() -> int:
 
     logger.info("Auto-update: apt-get dist-upgrade")
     if not _run_cmd_logged(
-        ["apt-get", "dist-upgrade", "-y", "-q"],
+        APT_UPGRADE_CMD,
         extra_env={"DEBIAN_FRONTEND": "noninteractive"},
     ):
         logger.error("dist-upgrade failed")
@@ -264,7 +278,7 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
 
         self._set_status("Installing System Upgrades…", 0.50)
         if not self._run_cmd(
-            ["apt-get", "dist-upgrade", "-y", "-q"],
+            APT_UPGRADE_CMD,
             extra_env={"DEBIAN_FRONTEND": "noninteractive"},
         ):
             self._set_status("Update Failed.", 0.0)

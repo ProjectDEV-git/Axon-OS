@@ -1,0 +1,152 @@
+name: Publish apt repo
+
+# Builds the axon-os .deb and publishes it to the signed apt repository on
+# GitHub Pages (gh-pages branch, served at
+# https://projectdev-git.github.io/Axon-OS/apt). Installed systems pick it up
+# through axon-update.
+#
+# Runs for pushed v* tags, from release.yml (tags pushed with GITHUB_TOKEN do
+# not trigger other workflows), or by hand.
+#
+# Needs the APT_SIGNING_KEY secret: the ASCII-armored private key whose public
+# half is packaging/axon-os-archive-keyring.asc.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag or branch to publish (default: the selected ref)"
+        required: false
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+    secrets:
+      APT_SIGNING_KEY:
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-apt
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      KEEP_VERSIONS: 5
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          path: src
+          persist-credentials: false
+
+      - name: Check signing key
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          if [ -z "${APT_SIGNING_KEY}" ]; then
+            echo "::error::APT_SIGNING_KEY secret is not set"
+            exit 1
+          fi
+          if [ ! -f src/packaging/axon-os-archive-keyring.asc ]; then
+            echo "::error::packaging/axon-os-archive-keyring.asc is missing"
+            exit 1
+          fi
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y apt-utils libglib2.0-bin
+
+      - name: Build package
+        run: bash src/packaging/build-deb.sh "${GITHUB_WORKSPACE}/out"
+
+      - name: Import signing key
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          export GNUPGHOME="${RUNNER_TEMP}/gnupg"
+          install -d -m 700 "${GNUPGHOME}"
+          echo "${APT_SIGNING_KEY}" | gpg --batch --import
+          # The secret must match the public key every installed system trusts.
+          want="$(gpg --batch --with-colons --show-keys src/packaging/axon-os-archive-keyring.asc | awk -F: '/^fpr:/{print $10; exit}')"
+          if ! gpg --batch --with-colons --list-secret-keys "${want}" >/dev/null 2>&1; then
+            echo "::error::APT_SIGNING_KEY does not match packaging/axon-os-archive-keyring.asc (${want})"
+            exit 1
+          fi
+          echo "GNUPGHOME=${GNUPGHOME}" >> "${GITHUB_ENV}"
+          echo "SIGNING_FPR=${want}" >> "${GITHUB_ENV}"
+
+      - name: Check out gh-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "${url}" gh-pages >/dev/null; then
+            git clone --depth 1 --branch gh-pages "${url}" site
+          else
+            git init -b gh-pages site
+            git -C site remote add origin "${url}"
+            touch site/.nojekyll
+          fi
+
+      - name: Update repository
+        working-directory: site
+        run: |
+          set -euo pipefail
+          pool=apt/pool/main
+          mkdir -p "${pool}"
+          cp "${GITHUB_WORKSPACE}"/out/axon-os_*_all.deb "${pool}/"
+
+          # Keep the newest KEEP_VERSIONS packages
+          ls "${pool}"/axon-os_*_all.deb | sort -V | head -n -"${KEEP_VERSIONS}" | xargs -r rm -f
+
+          cd apt
+          rm -rf dists
+          for arch in amd64 all; do
+            d="dists/stable/main/binary-${arch}"
+            mkdir -p "${d}"
+            apt-ftparchive packages pool > "${d}/Packages"
+            gzip -9kn "${d}/Packages"
+          done
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin="Axon OS" \
+            -o APT::FTPArchive::Release::Label="Axon OS" \
+            -o APT::FTPArchive::Release::Suite=stable \
+            -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Architectures="amd64 all" \
+            -o APT::FTPArchive::Release::Components=main \
+            release dists/stable > dists/stable/Release
+          gpg --batch --yes --local-user "${SIGNING_FPR}" --clearsign \
+            -o dists/stable/InRelease dists/stable/Release
+          gpg --batch --yes --local-user "${SIGNING_FPR}" --armor --detach-sign \
+            -o dists/stable/Release.gpg dists/stable/Release
+          cp "${GITHUB_WORKSPACE}/src/packaging/axon-os-archive-keyring.asc" axon-os-archive-keyring.asc
+
+      - name: Attach package to the GitHub release
+        if: startsWith(inputs.ref || github.ref, 'v') || startsWith(inputs.ref || github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF: ${{ inputs.ref || github.ref }}
+        run: |
+          tag="${REF#refs/tags/}"
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${tag}" "${GITHUB_WORKSPACE}"/out/axon-os_*_all.deb \
+              --repo "${GITHUB_REPOSITORY}" --clobber
+          fi
+
+      - name: Push gh-pages
+        working-directory: site
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "apt: publish $(ls apt/pool/main | sort -V | tail -1)" || { echo "Nothing to publish"; exit 0; }
+          git push origin gh-pages

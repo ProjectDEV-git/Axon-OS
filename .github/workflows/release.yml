@@ -95,3 +95,13 @@ jobs:
           files: sbom.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish the axon-os package so installed systems can update to this release.
+  publish-apt:
+    needs: release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/publish-apt.yml
+    with:
+      ref: v${{ github.event.inputs.version }}
+    secrets: inherit
