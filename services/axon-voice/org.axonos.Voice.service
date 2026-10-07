@@ -1,3 +1,5 @@
 [D-BUS Service]
 Name=org.axonos.Voice
 Exec=/usr/bin/python3 AXON_SERVICES_DIR/axon-voice/voice_service.py
+# Activate through systemd so D-Bus and systemd never run two copies
+SystemdService=axon-voice.service

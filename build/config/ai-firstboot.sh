@@ -6,6 +6,14 @@
 # and pulls the chosen default model, then removes the marker file.
 set -euo pipefail
 
+# systemd runs this without $HOME, and the ollama client panics without one
+# ("$HOME is not defined") before it can talk to the server.
+export HOME="${HOME:-/root}"
+
+# Exit status 75 (EX_TEMPFAIL) means "not done yet": the unit restarts this
+# script after a delay, so a dropped connection never waits for a reboot.
+RETRY=75
+
 SETUP_JSON="/etc/axon/ai-setup.json"
 LOG="/var/log/axon-ai-firstboot.log"
 
@@ -23,8 +31,8 @@ if [[ "${INSTALL_OLLAMA}" != "True" ]]; then
     exit 0
 fi
 
-# Wait for the network (up to 5 minutes); leave the marker in place so a
-# later boot retries if we never get online.
+# Wait for the network (up to 5 minutes); leave the marker in place and let
+# systemd retry if we never get online.
 echo "waiting for network..."
 for _ in $(seq 1 60); do
     if curl -sf --max-time 5 https://ollama.com >/dev/null 2>&1; then
@@ -33,8 +41,8 @@ for _ in $(seq 1 60); do
     sleep 5
 done
 if ! curl -sf --max-time 5 https://ollama.com >/dev/null 2>&1; then
-    echo "still offline — will retry on next boot"
-    exit 0
+    echo "still offline — will retry"
+    exit "${RETRY}"
 fi
 
 echo "installing Ollama (idempotent — safe to re-run)..."
@@ -45,8 +53,8 @@ if [[ ${rc} -eq 3 ]]; then
     echo "no pinned Ollama release in this image; leaving AI setup for later"
     exit 0
 elif [[ ${rc} -ne 0 ]]; then
-    echo "Ollama install failed — will retry on next boot"
-    exit 0
+    echo "Ollama install failed — will retry"
+    exit "${RETRY}"
 fi
 
 systemctl enable --now ollama.service 2>/dev/null || true
@@ -67,5 +75,5 @@ for _ in 1 2 3; do
     sleep 10
 done
 
-echo "model pull failed — will retry on next boot"
-exit 0
+echo "model pull failed — will retry"
+exit "${RETRY}"

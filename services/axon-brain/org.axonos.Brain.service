@@ -1,3 +1,5 @@
 [D-BUS Service]
 Name=org.axonos.Brain
 Exec=/usr/bin/python3 AXON_SERVICES_DIR/axon-brain/brain_service.py
+# Activate through systemd so D-Bus and systemd never run two copies
+SystemdService=axon-brain.service

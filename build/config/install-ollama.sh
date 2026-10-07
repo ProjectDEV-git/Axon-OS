@@ -26,8 +26,18 @@ if [[ -z "${OLLAMA_VERSION:-}" || -z "${OLLAMA_SHA256:-}" || -z "${OLLAMA_ASSET:
     exit 3
 fi
 
+# Enable and start the service when running on a booted system (not in a
+# chroot), so the API is up as soon as this script returns.
+start_service() {
+    if [[ -d /run/systemd/system ]] && [[ -f /etc/systemd/system/ollama.service ]]; then
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable --now ollama.service 2>/dev/null || log "WARNING: could not start ollama.service"
+    fi
+}
+
 if command -v ollama >/dev/null 2>&1; then
     log "ollama already installed at $(command -v ollama)"
+    start_service
     exit 0
 fi
 
@@ -41,7 +51,11 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "${tmp}"' EXIT
 
 log "downloading ${url}"
-curl -fL --retry 3 --retry-delay 5 -o "${tmp}/${OLLAMA_ASSET}" "${url}"
+# Resume after dropped transfers, and give up on a stalled connection
+# (under 1 KB/s for a minute) so the retry reconnects instead of hanging.
+curl -fL --retry 10 --retry-delay 5 --retry-all-errors -C - \
+    --speed-limit 1024 --speed-time 60 \
+    -o "${tmp}/${OLLAMA_ASSET}" "${url}"
 
 log "verifying SHA-256"
 if ! echo "${OLLAMA_SHA256}  ${tmp}/${OLLAMA_ASSET}" | sha256sum -c --status -; then
@@ -77,5 +91,5 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 WantedBy=multi-user.target
 UNIT
 
-systemctl daemon-reload 2>/dev/null || true
+start_service
 log "installed Ollama ${OLLAMA_VERSION}"

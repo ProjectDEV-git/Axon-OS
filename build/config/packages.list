@@ -17,7 +17,7 @@ gedit
 eog
 evince
 gnome-calculator
-gnome-system-monitor
+# System monitor: Mission Center (Flatpak) is installed by chroot-setup.sh
 gnome-disk-utility
 gnome-keyring
 xdg-user-dirs
@@ -30,8 +30,9 @@ pipewire
 pipewire-pulse
 wireplumber
 
-# ── Web browser (deb-packaged; firefox is snap-only on noble) ─────────────────
-epiphany-browser
+# ── Web browser ──────────────────────────────────────────────────────────────
+# Brave is installed from its own apt repo by chroot-setup.sh (firefox and
+# chromium are snap-only on noble); GNOME Web is the fallback there.
 
 # ── Axon UI dependencies ──────────────────────────────────────────────────────
 python3

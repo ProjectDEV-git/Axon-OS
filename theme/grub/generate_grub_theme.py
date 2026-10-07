@@ -108,9 +108,9 @@ print("Menu icons generated.")
 # 3. Write theme.txt file
 theme_txt_content = """# Axon OS Zorin-Style GRUB Theme
 title-text: ""
-desktop-image: ""
+# No desktop-image or terminal-box: GRUB resolves an empty value to the theme
+# directory itself and fails with "bitmap file ... is of unsupported format".
 desktop-color: "#000000"
-terminal-box: ""
 terminal-font: "Sans 12"
 
 + boot_menu {

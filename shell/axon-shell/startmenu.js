@@ -273,7 +273,9 @@ class StartMenuPopup extends St.BoxLayout {
             'axon-terminal.desktop',
             'axon-files.desktop',
             'axon-settings.desktop',
+            'brave-browser.desktop',
             'org.gnome.Epiphany.desktop',
+            'io.missioncenter.MissionCenter.desktop',
         ];
 
         let row = new St.BoxLayout({ vertical: false, spacing: 10 });

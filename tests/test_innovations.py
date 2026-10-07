@@ -197,6 +197,7 @@ class TestFstab:
         assert "UUID=RU / btrfs subvol=@,compress=zstd:1 0 1" in joined
         assert "UUID=RU /home btrfs subvol=@home" in joined
         assert "UUID=EU /boot/efi vfat" in joined
+        assert "UUID=RU /swap btrfs subvol=@swap 0 0" in joined
         assert "/swap/swapfile none swap sw 0 0" in joined
 
     def test_ext4_layout(self):
