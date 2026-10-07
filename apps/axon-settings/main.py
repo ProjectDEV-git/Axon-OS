@@ -18,6 +18,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
 # Sibling import resolution
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ai_models import AIModelsWindow
 from diagnostics_window import DiagnosticsWindow
 from settings_executor import SettingsExecutor
 
@@ -54,6 +55,10 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         diagnostics_btn.set_tooltip_text("Diagnostics: check that everything is working")
         diagnostics_btn.connect("clicked", lambda _b: self.open_diagnostics())
         header.pack_start(diagnostics_btn)
+        models_btn = Gtk.Button(label="AI Models")
+        models_btn.set_tooltip_text("Choose AI models and providers")
+        models_btn.connect("clicked", lambda _b: self.open_ai_models())
+        header.pack_end(models_btn)
         root.append(header)
 
         # Content Container
@@ -188,6 +193,9 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
     def open_diagnostics(self) -> None:
         DiagnosticsWindow(transient_for=self, application=self.get_application()).present()
 
+    def open_ai_models(self) -> None:
+        AIModelsWindow(transient_for=self, application=self.get_application()).present()
+
     def _on_entry_activated(self, entry: Gtk.Entry) -> None:
         text = entry.get_text().strip()
         if not text:
@@ -243,12 +251,14 @@ class AxonSettingsApp(Adw.Application):
         self._window.present()
         if "--diagnostics" in sys.argv:
             self._window.open_diagnostics()
+        if "--ai-models" in sys.argv:
+            self._window.open_ai_models()
 
 
 def main() -> int:
     app = AxonSettingsApp()
-    # GApplication rejects unknown options; --diagnostics is read in do_activate
-    return app.run([arg for arg in sys.argv if arg != "--diagnostics"])
+    # GApplication rejects unknown options; --ai-models and --diagnostics are read in do_activate
+    return app.run([arg for arg in sys.argv if arg not in ("--ai-models", "--diagnostics")])
 
 
 if __name__ == "__main__":

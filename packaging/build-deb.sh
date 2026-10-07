@@ -108,6 +108,10 @@ exec /usr/bin/python3 ${SERVICES_DIR}/diagnostics.py "\$@"
 EOF
 chmod 755 "${B}/axon-diagnose"
 
+# Lets the Updater window run the update as root after one password prompt
+install -Dm644 "${SRC}/data/polkit/org.axonos.update.policy" \
+    "${R}/usr/share/polkit-1/actions/org.axonos.update.policy"
+
 # Hash-pinned Ollama installer used by first boot and axon-ollama-setup
 install -Dm755 "${SRC}/build/config/install-ollama.sh" "${R}${AXON_LIB}/ollama/install-ollama.sh"
 install -Dm644 "${SRC}/build/config/ollama-release.env" "${R}${AXON_LIB}/ollama/ollama-release.env"
@@ -210,7 +214,7 @@ Package: ${PKG_NAME}
 Version: ${VERSION}
 Architecture: all
 Maintainer: Axon OS <axon-os@users.noreply.github.com>
-Depends: python3 (>= 3.10), python3-gi, init-system-helpers (>= 1.60)
+Depends: python3 (>= 3.10), python3-gi, gir1.2-secret-1, init-system-helpers (>= 1.60)
 Section: misc
 Priority: optional
 Homepage: https://github.com/ProjectDEV-git/Axon-OS
