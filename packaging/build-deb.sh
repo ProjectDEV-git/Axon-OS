@@ -102,6 +102,11 @@ cat > "${B}/axon-shield" <<EOF
 exec /usr/bin/python3 ${SERVICES_DIR}/axon-sandbox/shield.py "\$@"
 EOF
 chmod 755 "${B}/axon-shield"
+cat > "${B}/axon-diagnose" <<EOF
+#!/bin/sh
+exec /usr/bin/python3 ${SERVICES_DIR}/diagnostics.py "\$@"
+EOF
+chmod 755 "${B}/axon-diagnose"
 
 # Hash-pinned Ollama installer used by first boot and axon-ollama-setup
 install -Dm755 "${SRC}/build/config/install-ollama.sh" "${R}${AXON_LIB}/ollama/install-ollama.sh"

@@ -18,6 +18,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 
 # Sibling import resolution
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from diagnostics_window import DiagnosticsWindow
 from settings_executor import SettingsExecutor
 
 
@@ -49,6 +50,10 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         # Header Bar
         header = Adw.HeaderBar()
         header.add_css_class("settings-header")
+        diagnostics_btn = Gtk.Button(icon_name="utilities-system-monitor-symbolic")
+        diagnostics_btn.set_tooltip_text("Diagnostics: check that everything is working")
+        diagnostics_btn.connect("clicked", lambda _b: self.open_diagnostics())
+        header.pack_start(diagnostics_btn)
         root.append(header)
 
         # Content Container
@@ -180,6 +185,9 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
 
         self._entry.grab_focus()
 
+    def open_diagnostics(self) -> None:
+        DiagnosticsWindow(transient_for=self, application=self.get_application()).present()
+
     def _on_entry_activated(self, entry: Gtk.Entry) -> None:
         text = entry.get_text().strip()
         if not text:
@@ -233,11 +241,14 @@ class AxonSettingsApp(Adw.Application):
         if self._window is None:
             self._window = AxonSettingsWindow(application=self)
         self._window.present()
+        if "--diagnostics" in sys.argv:
+            self._window.open_diagnostics()
 
 
 def main() -> int:
     app = AxonSettingsApp()
-    return app.run(sys.argv)
+    # GApplication rejects unknown options; --diagnostics is read in do_activate
+    return app.run([arg for arg in sys.argv if arg != "--diagnostics"])
 
 
 if __name__ == "__main__":

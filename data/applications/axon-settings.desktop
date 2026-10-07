@@ -9,5 +9,10 @@ Icon=org.gnome.Settings
 Terminal=false
 StartupNotify=true
 Categories=System;Settings;Core;
-Keywords=axon;settings;assistant;control;configuration;wifi;brightness;volume;theme;
+Keywords=axon;settings;assistant;control;configuration;wifi;brightness;volume;theme;diagnostics;troubleshoot;health;
 X-GNOME-Autostart-enabled=false
+Actions=diagnostics;
+
+[Desktop Action diagnostics]
+Name=Diagnostics
+Exec=python3 AXON_APPS_DIR/axon-settings/main.py --diagnostics
