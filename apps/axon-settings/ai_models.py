@@ -88,6 +88,19 @@ def open_uri(parent: Gtk.Window, uri: str) -> None:
         Gio.AppInfo.launch_default_for_uri(uri, None)
 
 
+def _model_facts(m: dict[str, Any]) -> str:
+    """ "4.7 GB · 7.6B · Q4_K_M" from an Ollama /api/tags entry."""
+    facts = []
+    size = m.get("size")
+    if isinstance(size, (int, float)) and size > 0:
+        facts.append(f"{size / 1e9:.1f} GB")
+    details = m.get("details") or {}
+    for key in ("parameter_size", "quantization_level"):
+        if details.get(key):
+            facts.append(str(details[key]))
+    return "  ·  ".join(facts)
+
+
 def _combo(options: tuple[tuple[str, str], ...], selected: str) -> Adw.ComboRow:
     row = Adw.ComboRow()
     row.set_model(Gtk.StringList.new([label for _key, label in options]))
@@ -240,6 +253,7 @@ class AIModelsWindow(Adw.PreferencesWindow):
         self._poll_ids: dict[str, int] = {}
         self._code_dialogs: dict[str, Adw.MessageDialog] = {}
         self._models: list[dict[str, Any]] = []
+        self._installed: list[dict[str, Any]] = []
         self._model_settings: dict[str, str] = {}
         self.connect("close-request", self._on_close)
 
@@ -256,11 +270,17 @@ class AIModelsWindow(Adw.PreferencesWindow):
     # -- data --------------------------------------------------------
 
     def refresh(self, refresh_models: bool = False) -> None:
-        def load() -> tuple[Any, Any, Any]:
+        def load() -> tuple[Any, Any, Any, Any]:
+            models = self._client.call("ListAllModels", refresh_models)
+            installed: Any = []
+            if "ollama" not in models.get("errors", {}):
+                # sizes and quantization come only from Ollama's own listing
+                installed = self._client.call("ListModels")
             return (
                 self._client.call("ListProviders"),
-                self._client.call("ListAllModels", refresh_models),
+                models,
                 self._client.call("GetModelSettings"),
+                installed if isinstance(installed, list) else [],
             )
 
         run_async(load, self._on_loaded)
@@ -269,9 +289,10 @@ class AIModelsWindow(Adw.PreferencesWindow):
         if error is not None:
             self._show_offline(error)
             return
-        providers, models, tiers = result
+        providers, models, tiers, installed = result
         self._models = models.get("models", [])
         self._model_settings = tiers
+        self._installed = installed
         self._build_models_page(models.get("errors", {}), providers.get("providers", []))
         self._build_providers_page(providers)
 
@@ -334,6 +355,8 @@ class AIModelsWindow(Adw.PreferencesWindow):
             row.connect("notify::selected", self._on_tier_selected, tier, tier_ids)
             group.add(row)
 
+        self._build_installed_group(ollama_down="ollama" in errors)
+
         labels_by_id = {p["id"]: p["label"] for p in providers}
         if errors:
             problems = self._add_group(
@@ -346,6 +369,49 @@ class AIModelsWindow(Adw.PreferencesWindow):
                 row.set_subtitle_lines(3)
                 row.add_prefix(Gtk.Image.new_from_icon_name("dialog-warning-symbolic"))
                 problems.add(row)
+
+    def _build_installed_group(self, ollama_down: bool) -> None:
+        """List local Ollama models with size and which roles use them."""
+        group = self._add_group(
+            self._models_page,
+            self._models_groups,
+            title="Installed on this computer",
+            description="Ollama is not running, so installed models can't be listed."
+            if ollama_down
+            else "Local models run privately on this computer. Use sets one for every role.",
+        )
+        if ollama_down:
+            return
+        if not self._installed:
+            group.add(Adw.ActionRow(title="No local models installed yet"))
+            return
+        tier_titles = {f"{tier}_model": title for tier, title, _sub in TIERS}
+        for m in sorted(self._installed, key=lambda m: str(m.get("name", ""))):
+            name = str(m.get("name", ""))
+            if not name:
+                continue
+            row = Adw.ActionRow(title=name, subtitle=_model_facts(m), use_markup=False)
+            roles = [t for key, t in tier_titles.items() if self._model_settings.get(key) == name]
+            if roles:
+                used = Gtk.Label(label="Used as: " + ", ".join(r.split()[0] for r in roles))
+                used.add_css_class("dim-label")
+                row.add_suffix(used)
+            if len(roles) < len(TIERS):
+                use = Gtk.Button(label="Use", valign=Gtk.Align.CENTER)
+                use.set_tooltip_text(f"Use {name} for everything")
+                use.connect("clicked", lambda _b, n=name: self._use_everywhere(n))
+                row.add_suffix(use)
+            group.add(row)
+
+    def _use_everywhere(self, model: str) -> None:
+        def done(result: Any, error: Exception | None) -> None:
+            if error is not None or not result.get("ok"):
+                self._toast(f"Could not switch model: {error or result.get('error')}")
+                return
+            self._toast(f"Now using {model} for everything")
+            self.refresh()
+
+        run_async(lambda: self._client.call("SetModel", "all", model), done)
 
     def _on_tier_selected(self, row: Adw.ComboRow, _pspec: Any, tier: str, ids: list[str]) -> None:
         index = row.get_selected()

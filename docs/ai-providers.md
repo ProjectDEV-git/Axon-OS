@@ -10,6 +10,9 @@ Open **Axon Settings → AI Models** (or run `axon-settings --ai-models`).
 - **Models** picks the model for each tier: *Everyday* (chat), *Fast*
   (commands, window sorting) and *Deep* (code, long reasoning). The list shows
   every model from every provider that is set up.
+  Below it, **Installed on this computer** lists your local Ollama models with
+  size, parameter count and quantization, shows which roles use each one, and
+  has a **Use** button that switches every role to that model.
 - **Providers** is where you paste an API key, sign in, or add your own
   endpoint with the **+** button.
 
