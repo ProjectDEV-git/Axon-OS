@@ -119,11 +119,20 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             --title "Axon OS ${GITHUB_REF_NAME}" \
-            --generate-notes dist/*.sha256 || true
-          # Release assets are capped at 2 GiB; upload the ISO only if it fits
-          ISO=$(ls dist/*.iso)
-          if [ "$(stat -c%s "$ISO")" -lt 2147000000 ]; then
-            gh release upload "${GITHUB_REF_NAME}" "$ISO" --clobber
+            --generate-notes || true
+          gh release upload "${GITHUB_REF_NAME}" dist/*.sha256 --clobber
+          # Release assets are capped at 2 GiB, so a larger ISO is attached in
+          # parts; `cat` joins them back and the .sha256 checks the result.
+          ISO="$(ls dist/*.iso)"
+          NAME="$(basename "${ISO}")"
+          if [ "$(stat -c%s "${ISO}")" -lt 2147000000 ]; then
+            gh release upload "${GITHUB_REF_NAME}" "${ISO}" --clobber
           else
-            echo "ISO exceeds the 2 GiB release-asset limit; download it from the workflow artifact instead."
+            split -b 1900M -d -a 2 "${ISO}" "${ISO}.part"
+            rm -f "${ISO}"
+            gh release upload "${GITHUB_REF_NAME}" "${ISO}".part* --clobber
+            NOTES="$(gh release view "${GITHUB_REF_NAME}" --json body --jq .body)"
+            printf '%s\n\n### Download the ISO\n\nThe ISO is split into parts because GitHub caps release files at 2 GB. Download every `%s.partNN` file and the `.sha256` into one folder, then run:\n\n```bash\ncat %s.part* > %s && sha256sum -c %s.sha256\n```\n' \
+              "${NOTES}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" > notes.md
+            gh release edit "${GITHUB_REF_NAME}" --notes-file notes.md
           fi
