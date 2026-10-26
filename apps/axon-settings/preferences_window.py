@@ -23,15 +23,28 @@ from axon_gtk_utils import fit_default_size
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shell_settings import describe_rule, load_shell_settings
 
+# services/ is beside apps/ (source tree, .deb) or inside the install dir.
+for _base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().parents[1]):
+    if (_base / "services").is_dir():
+        sys.path.insert(0, str(_base / "services"))
+        break
+import context_settings
+
 
 class PreferencesWindow(Adw.ApplicationWindow):
     """Axon preferences: Spaces (and, later, privacy and command approvals)."""
 
-    def __init__(self, shell_settings: Gio.Settings | None = None, **kwargs: object) -> None:
+    def __init__(
+        self,
+        shell_settings: Gio.Settings | None = None,
+        context_path: Path | None = None,
+        **kwargs: object,
+    ) -> None:
         super().__init__(**kwargs)
         self.set_title("Axon Preferences")
         fit_default_size(self, 560, 620)
         self._shell = shell_settings if shell_settings is not None else load_shell_settings()
+        self._context_path = context_path or context_settings.CONFIG_PATH
 
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(Adw.HeaderBar())
@@ -39,7 +52,51 @@ class PreferencesWindow(Adw.ApplicationWindow):
 
         self._page = Adw.PreferencesPage()
         toolbar.set_content(self._page)
+        self._page.add(self._build_privacy_group())
         self._page.add(self._build_spaces_group())
+
+    # -- Privacy: what context the AI receives ------------------------------
+
+    _CONTEXT_ROWS = (  # (settings field, title, subtitle)
+        ("share_active_app", "Active app", "The focused window's title and the current Space"),
+        ("share_open_files", "Open files", "Names of files open in editors"),
+        ("share_terminal_history", "Terminal history", "Recent commands and the last error"),
+        ("share_clipboard", "Clipboard", "Recent clipboard entries"),
+    )
+
+    def _build_privacy_group(self) -> Adw.PreferencesGroup:
+        group = Adw.PreferencesGroup(
+            title="Context sent to the AI",
+            description="Desktop context helps answers fit what you are doing. With a cloud "
+            "model it leaves this computer, and Axon asks before the first time.",
+        )
+        settings = context_settings.load_settings(self._context_path)
+        self._context_master = Adw.SwitchRow(title="Send desktop context")
+        self._context_master.set_active(settings.share_context)
+        group.add(self._context_master)
+        self._context_switches: dict[str, Adw.SwitchRow] = {}
+        for field, title, subtitle in self._CONTEXT_ROWS:
+            row = Adw.SwitchRow(title=title, subtitle=subtitle)
+            row.set_active(bool(getattr(settings, field)))
+            row.set_sensitive(settings.share_context)
+            row.connect("notify::active", self._on_context_changed)
+            group.add(row)
+            self._context_switches[field] = row
+        self._context_master.connect("notify::active", self._on_context_changed)
+        return group
+
+    def _on_context_changed(self, *_args: object) -> None:
+        master = self._context_master.get_active()
+        for row in self._context_switches.values():
+            row.set_sensitive(master)
+        values = {f: row.get_active() for f, row in self._context_switches.items()}
+        try:
+            context_settings.save_settings(
+                context_settings.ContextSettings(share_context=master, **values),
+                self._context_path,
+            )
+        except OSError:
+            pass  # read-only home: the switches still show the choice
 
     # -- Spaces ------------------------------------------------------------
 

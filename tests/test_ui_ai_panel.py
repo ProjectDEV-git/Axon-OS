@@ -253,3 +253,116 @@ def test_origin_label_never_claims_local_for_cloud(monkeypatch: pytest.MonkeyPat
     win._model_dropdown.set_selected(0)
     assert client.model == ""
     win.destroy()
+
+
+class SnapshotContext:
+    """A context reader with the per-message API."""
+
+    SNAP = {  # noqa: RUF012
+        "active_window": {"title": "main.py", "app": "Code"},
+        "active_space": "Code",
+        "open_files": ["/p/main.py"],
+        "clipboard_history": ["token"],
+    }
+
+    def __init__(self) -> None:
+        import context_settings
+
+        self.cs = context_settings
+        self.calls: list[tuple[frozenset[str], Any]] = []
+
+    def snapshot(self) -> dict[str, Any]:
+        return dict(self.SNAP)
+
+    def settings(self) -> Any:
+        return self.cs.ContextSettings()
+
+    def context_items(self, snapshot: dict[str, Any] | None = None) -> list[tuple[str, str]]:
+        return self.cs.available_items(snapshot or self.SNAP, self.settings())
+
+    def build_context_string(self, exclude: Any = frozenset(), snapshot: Any = None) -> str:
+        self.calls.append((frozenset(exclude), snapshot))
+        return self.cs.format_context(snapshot or self.SNAP, self.settings(), exclude)
+
+
+def make_ctx_window(monkeypatch: pytest.MonkeyPatch, client: Any) -> tuple[Any, Any, Any]:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    reader = SnapshotContext()
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=reader)
+    rec.join()
+    pump(GLib)
+    return win, reader, rec
+
+
+def chip_labels(win: Any) -> list[str]:
+    out = []
+    child = win._ctx_flow.get_first_child()
+    while child is not None:
+        btn = child.get_child()
+        out.append(btn.get_child().get_first_child().get_label())
+        child = child.get_next_sibling()
+    return out
+
+
+def test_context_row_lists_and_removes_items(monkeypatch: pytest.MonkeyPatch) -> None:
+    win, reader, rec = make_ctx_window(monkeypatch, FakeClient())
+    assert chip_labels(win) == ["Code", "main.py", "clipboard"]
+    win._exclude_context("clipboard")
+    assert chip_labels(win) == ["Code", "main.py"]
+    win._send_message("hi")  # local model: no warning
+    rec.join()
+    pump(GLib)
+    exclude, _snap = reader.calls[-1]
+    assert exclude == frozenset({"clipboard"})
+    assert win._ctx_excluded == set()  # removal applied to one message only
+    win.destroy()
+
+
+class CloudModelClient(CloudClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = "@openai/gpt-4.1"
+
+
+def test_cloud_warning_before_first_sensitive_send(monkeypatch: pytest.MonkeyPatch) -> None:
+    win, reader, rec = make_ctx_window(monkeypatch, CloudModelClient())
+    assert win.current_origin().leaves_computer
+    asked: list[str] = []
+    monkeypatch.setattr(win, "_confirm_cloud_send", asked.append)
+    win._send_message("summarize")
+    assert asked == ["summarize"]
+    assert win._client.sent == []  # nothing sent before the user answers
+
+    # Closing / cancelling the dialog sends nothing
+    win._on_cloud_response(None, "cancel", "summarize")
+    assert win._client.sent == []
+
+    # "Send without it" strips clipboard/files/terminal for this message
+    win._on_cloud_response(None, "without", "summarize")
+    rec.join()
+    pump(GLib)
+    assert reader.calls[-1][0] >= {"clipboard", "open_files", "terminal_history"}
+    assert win._needs_cloud_warning()  # still asks next time
+
+    # "Send" remembers the answer for this conversation
+    win._on_cloud_response(None, "send", "again")
+    rec.join()
+    pump(GLib)
+    assert reader.calls[-1][0] == frozenset()
+    assert not win._needs_cloud_warning()
+    win.destroy()
+
+
+def test_cloud_dialog_builds_and_defaults_to_cancel(monkeypatch: pytest.MonkeyPatch) -> None:
+    win, _reader, _rec = make_ctx_window(monkeypatch, CloudModelClient())
+    shown: list[Any] = []
+    monkeypatch.setattr(panel_mod.Adw.MessageDialog, "present", lambda d: shown.append(d))
+    win._confirm_cloud_send("hi")
+    dialog = shown[0]
+    assert dialog.get_close_response() == "cancel"
+    assert dialog.get_default_response() == "cancel"
+    assert "clipboard" in dialog.get_body() and "OpenAI" in dialog.get_body()
+    dialog.destroy()
+    win.destroy()

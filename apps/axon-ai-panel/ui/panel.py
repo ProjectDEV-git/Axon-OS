@@ -48,6 +48,7 @@ from ui_logic import (
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
 from axon_gtk_utils import fit_default_size
+from context_settings import ITEM_LABELS, SENSITIVE_ITEMS, sends_sensitive
 
 try:
     from ollama_client import OllamaClient  # type: ignore[import]
@@ -334,6 +335,15 @@ class AIPanelWindow(Adw.Window):
         font-size: 11px;
         margin-bottom: 4px;
     }
+    .context-title {
+        color: #9090b8;
+        font-size: 11px;
+    }
+    .context-chip {
+        font-size: 11px;
+        padding: 0 6px;
+        min-height: 22px;
+    }
     .thinking-label {
         color: #8b5cf6;
         font-size: 13px;
@@ -539,6 +549,35 @@ class AIPanelWindow(Adw.Window):
         self._spinner.set_margin_bottom(4)
         root.append(self._spinner)
 
+        # ---- Context row: what goes with the next message -----------------
+        ctx_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        ctx_row.add_css_class("context-row")
+        ctx_row.set_margin_start(12)
+        ctx_row.set_margin_end(12)
+        self._ctx_title = Gtk.Label(label="Context: checking…", xalign=0.0)
+        self._ctx_title.add_css_class("context-title")
+        self._ctx_title.set_valign(Gtk.Align.CENTER)
+        ctx_row.append(self._ctx_title)
+        self._ctx_flow = Gtk.FlowBox()
+        self._ctx_flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._ctx_flow.set_hexpand(True)
+        self._ctx_flow.set_max_children_per_line(6)
+        ctx_row.append(self._ctx_flow)
+        ctx_settings_btn = Gtk.Button(label="Settings")
+        ctx_settings_btn.add_css_class("flat")
+        ctx_settings_btn.set_valign(Gtk.Align.CENTER)
+        ctx_settings_btn.set_tooltip_text("Choose what context Axon may send")
+        ctx_settings_btn.connect("clicked", lambda _b: self._open_settings_action("preferences"))
+        ctx_row.append(ctx_settings_btn)
+        root.append(ctx_row)
+        self._ctx_snapshot: dict[str, Any] | None = None
+        self._ctx_items: list[tuple[str, str]] = []
+        self._ctx_excluded: set[str] = set()  # removed for the next message only
+        self._ctx_enabled = True
+        # Conversation in which the user accepted sending sensitive context to
+        # a model that leaves this computer
+        self._cloud_ack_conv = ""
+
         # ---- Input area ----------------------------------------------------
         input_area = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         input_area.add_css_class("panel-input-area")
@@ -577,6 +616,7 @@ class AIPanelWindow(Adw.Window):
 
         # Initialize D-Bus conversation session
         self._init_conversation()
+        self._refresh_context()
 
     # ------------------------------------------------------------------
     # Model management
@@ -757,7 +797,12 @@ class AIPanelWindow(Adw.Window):
         text = text.strip()
         if not text or self._streaming:
             return
+        if self._needs_cloud_warning():
+            self._confirm_cloud_send(text)
+            return
+        self._submit(text)
 
+    def _submit(self, text: str) -> None:
         self._entry.set_text("")
         self._add_bubble("user", text)
         self._start_request(text)
@@ -769,15 +814,118 @@ class AIPanelWindow(Adw.Window):
         self._stream_prompt = text
         self._stream_bubble = self._add_bubble("assistant", "")
 
+        exclude = set(self._ctx_excluded)
+        if self.current_origin().leaves_computer and self._cloud_ack_conv != self._conv_id:
+            # Not warned in this conversation: send no sensitive context
+            exclude |= SENSITIVE_ITEMS
+        snapshot = self._ctx_snapshot
+        self._ctx_excluded = set()  # removals apply to one message
+
         # The availability check and context lookup are D-Bus/HTTP calls:
         # they run in the worker so the panel never freezes.
         model = self._client.model
         thread = threading.Thread(
             target=self._stream_response,
-            args=(text, model, request_id),
+            args=(text, model, request_id, frozenset(exclude), snapshot),
             daemon=True,
         )
         thread.start()
+
+    # ------------------------------------------------------------------
+    # Context row and cloud warning
+    # ------------------------------------------------------------------
+
+    def _refresh_context(self) -> None:
+        """Reload what context would be sent (D-Bus, so in a worker)."""
+        if not hasattr(self._ctx_reader, "snapshot"):
+            self._show_context(None, [], True)
+            return
+        threading.Thread(target=self._load_context_worker, daemon=True).start()
+
+    def _load_context_worker(self) -> None:
+        try:
+            snapshot = self._ctx_reader.snapshot()
+            items = self._ctx_reader.context_items(snapshot)
+            enabled = self._ctx_reader.settings().share_context
+        except Exception:
+            snapshot, items, enabled = None, [], True
+        GLib.idle_add(self._show_context, snapshot, items, enabled)
+
+    def _show_context(
+        self, snapshot: dict[str, Any] | None, items: list[tuple[str, str]], enabled: bool
+    ) -> bool:
+        self._ctx_snapshot = snapshot
+        self._ctx_items = items
+        self._ctx_enabled = enabled
+        self._render_context()
+        return False
+
+    def _render_context(self) -> None:
+        self._ctx_flow.remove_all()
+        shown = [(k, d) for k, d in self._ctx_items if k not in self._ctx_excluded]
+        if not self._ctx_enabled:
+            self._ctx_title.set_text("Context: off")
+        elif not shown:
+            self._ctx_title.set_text("Context: none")
+        else:
+            self._ctx_title.set_text("Context:")
+        for key, desc in shown:
+            chip = Gtk.Button()
+            chip.add_css_class("context-chip")
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            box.append(Gtk.Label(label=desc))
+            box.append(Gtk.Image.new_from_icon_name("window-close-symbolic"))
+            chip.set_child(box)
+            what = ITEM_LABELS.get(key, key).lower()
+            chip.set_tooltip_text(f"Don't send {what} with this message")
+            chip.update_property([Gtk.AccessibleProperty.LABEL], [f"Don't send {desc}"])
+            chip.connect("clicked", lambda _b, k=key: self._exclude_context(k))
+            self._ctx_flow.append(chip)
+
+    def _exclude_context(self, key: str) -> None:
+        self._ctx_excluded.add(key)
+        self._render_context()
+
+    def _needs_cloud_warning(self) -> bool:
+        """Warn once per conversation before sensitive context leaves the computer."""
+        return (
+            self.current_origin().leaves_computer
+            and self._cloud_ack_conv != self._conv_id
+            and sends_sensitive(self._ctx_items, self._ctx_excluded)
+        )
+
+    def _confirm_cloud_send(self, text: str) -> None:
+        origin = self.current_origin()
+        labels = [
+            ITEM_LABELS[k].lower()
+            for k, _d in self._ctx_items
+            if k in SENSITIVE_ITEMS and k not in self._ctx_excluded
+        ]
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="Send desktop context to the cloud?",
+            body=(
+                f"{origin_tooltip(origin)} This message would include your "
+                f"{', '.join(labels)}. You won't be asked again in this conversation."
+            ),
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("without", "Send Without It")
+        dialog.add_response("send", "Send")
+        dialog.set_response_appearance("send", Adw.ResponseAppearance.DESTRUCTIVE)
+        # Closing the dialog sends nothing
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_cloud_response, text)
+        dialog.present()
+
+    def _on_cloud_response(self, _dialog: Adw.MessageDialog, response: str, text: str) -> None:
+        if response == "send":
+            self._cloud_ack_conv = self._conv_id
+            self._submit(text)
+        elif response == "without":
+            self._ctx_excluded |= SENSITIVE_ITEMS
+            self._submit(text)
 
     def _set_streaming(self, active: bool) -> None:
         self._streaming = active
@@ -805,11 +953,21 @@ class AIPanelWindow(Adw.Window):
         if cancel is not None:
             threading.Thread(target=cancel, daemon=True).start()
 
-    def _stream_response(self, text: str, model: str, request_id: int) -> None:
+    def _stream_response(
+        self,
+        text: str,
+        model: str,
+        request_id: int,
+        exclude: frozenset[str] = frozenset(),
+        snapshot: dict[str, Any] | None = None,
+    ) -> None:
         if not self._client.is_available():
             GLib.idle_add(self._on_ai_unavailable, request_id)
             return
-        ctx = self._ctx_reader.build_context_string()
+        if hasattr(self._ctx_reader, "snapshot"):
+            ctx = self._ctx_reader.build_context_string(exclude=exclude, snapshot=snapshot)
+        else:
+            ctx = self._ctx_reader.build_context_string()
         accumulated = ""
         try:
             for chunk in self._client.send_message_stream(
@@ -854,10 +1012,15 @@ class AIPanelWindow(Adw.Window):
 
     def _open_diagnostics(self) -> None:
         """Open the Diagnostics window in Axon Settings, if installed."""
+        self._open_settings_action("diagnostics")
+
+    @staticmethod
+    def _open_settings_action(action: str) -> None:
+        """Run an Axon Settings desktop action ("diagnostics", "preferences")."""
         try:
             info = Gio.DesktopAppInfo.new("axon-settings.desktop")
             if info is not None:
-                info.launch_action("diagnostics", None)
+                info.launch_action(action, None)
         except Exception:
             pass
 
@@ -871,6 +1034,7 @@ class AIPanelWindow(Adw.Window):
         if not self._requests.finish(request_id):
             return False  # cancelled; the bubble already says so
         self._set_streaming(False)
+        self._refresh_context()
         if self._stream_bubble is not None:
             bubble = self._stream_bubble
             self._stream_bubble = None
@@ -892,6 +1056,7 @@ class AIPanelWindow(Adw.Window):
         if self.get_visible():
             self.set_visible(False)
         else:
+            self._refresh_context()
             self.present()
 
     # ------------------------------------------------------------------

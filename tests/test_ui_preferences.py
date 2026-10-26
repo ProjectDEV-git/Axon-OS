@@ -65,3 +65,17 @@ def test_without_extension_shows_explanation(monkeypatch: pytest.MonkeyPatch) ->
     win = prefs.PreferencesWindow()
     assert win._shell is None
     win.destroy()
+
+
+def test_privacy_switches_write_context_settings(tmp_path: Path) -> None:
+    import context_settings
+
+    path = tmp_path / "context.json"
+    win = prefs.PreferencesWindow(shell_settings=memory_settings(), context_path=path)
+    win._context_switches["share_clipboard"].set_active(False)
+    assert context_settings.load_settings(path).share_clipboard is False
+    win._context_master.set_active(False)
+    loaded = context_settings.load_settings(path)
+    assert loaded.share_context is False
+    assert not win._context_switches["share_open_files"].get_sensitive()
+    win.destroy()

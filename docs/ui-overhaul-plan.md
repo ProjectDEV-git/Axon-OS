@@ -182,12 +182,15 @@ add a short note under any item you skip or change.
       Note: `share_*` keys sit next to the existing `track_*` keys in
       `~/.config/axon-os/context.json` (`services/context_settings.py`). The Context
       service's `GetContextString` (used by the dock, terminal and panel) applies them too.
-- [ ] **Context controls (UI).** In the AI panel, above the entry, show what will be sent
+- [x] **Context controls (UI).** In the AI panel, above the entry, show what will be sent
       ("Context: Firefox, main.py, terminal history") with a way to remove items for this
       message and a link to the settings. Add the same toggles to Axon Settings.
-- [ ] **Cloud warning.** When a cloud model is selected and context includes clipboard,
+- [x] **Cloud warning.** When a cloud model is selected and context includes clipboard,
       terminal history or file contents, say so clearly before the first send in a
       conversation.
+      Note: the dialog offers Cancel (also on close), Send Without It and Send; Send is
+      remembered for the conversation. Until the user has been warned, a model that leaves
+      the computer never receives clipboard, terminal or file context.
 - [ ] **Command confirmation card.** Replace the `zenity` question (and the Shell's
       "Asking before running: …" text) with an Axon-styled confirmation showing: the exact
       command, what it affects where known, whether it needs admin rights, a risk level
