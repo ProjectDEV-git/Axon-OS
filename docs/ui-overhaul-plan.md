@@ -259,3 +259,9 @@ add a short note under any item you skip or change.
 
 Add a dated line per session: what was done, what was skipped and why, what wasn't
 tested in a real GNOME session.
+
+- 2026-10-26 — Phase 0 and Phase 1 done (10 items). Pure logic went into
+  `services/ui_logic.py` and its JS twin `shell/axon-shell/ui-logic.js`, with Python and
+  node tests. GTK smoke tests (`tests/test_ui_*.py`) run under `xvfb-run` and skip without
+  a display. Not tested in a real GNOME session: the Shell Intent Bar (scroll view, Stop
+  button, error row, Diagnostics button) and the Space OSD announcement with Orca.
