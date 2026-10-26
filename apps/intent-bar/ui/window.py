@@ -17,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
 from ..ollama_client import OllamaClient
 from ..spaces_manager import SpacesManager
@@ -186,6 +186,7 @@ _CHIPS: list[tuple[str, str]] = [
 ]
 
 _MAX_HISTORY = 20
+_RESPONSE_MAX_HEIGHT = 320  # px; longer answers scroll
 
 # Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
 _SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -352,7 +353,17 @@ class IntentBarWindow(Adw.Window):
         self._response_label.set_margin_top(2)
         self._response_label.set_margin_bottom(8)
         self._response_label.set_visible(False)
-        root.append(self._response_label)
+
+        # Long answers scroll instead of pushing the bar off-screen
+        self._response_scroll = Gtk.ScrolledWindow()
+        self._response_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self._response_scroll.set_max_content_height(_RESPONSE_MAX_HEIGHT)
+        self._response_scroll.set_propagate_natural_height(True)
+        self._response_scroll.set_child(self._response_label)
+        self._response_label.bind_property(
+            "visible", self._response_scroll, "visible", GObject.BindingFlags.SYNC_CREATE
+        )
+        root.append(self._response_scroll)
 
         # ---- Row 6b: semantic search results ----------------------------
         self._results_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)

@@ -70,7 +70,7 @@ add a short note under any item you skip or change.
       Intent Bars, checking how `intentbar.js` gets its response first.
       Note: the Shell bar calls `Generate` with `stream=false`, so it never showed partial
       JSON; it now shares `parseAction` (also accepts fenced JSON) via `ui-logic.js`.
-- [ ] **Long answers push the Intent Bar off-screen.** GTK: wrap `_response_label` in a
+- [x] **Long answers push the Intent Bar off-screen.** GTK: wrap `_response_label` in a
       `Gtk.ScrolledWindow` with `set_max_content_height(...)` and
       `set_propagate_natural_height(True)`. Shell: put the response in an `St.ScrollView`
       with a `max-height` in the stylesheet.

@@ -4,6 +4,7 @@ import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import Atk from 'gi://Atk';
+import Pango from 'gi://Pango';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
@@ -26,6 +27,7 @@ export default class IntentBar {
         this._actor = null;
         this._entry = null;
         this._responseLabel = null;
+        this._responseScroll = null;
         this._visible = false;
         this._keyPressId = null;
         this._brainProxy = null;
@@ -46,6 +48,7 @@ export default class IntentBar {
         this._brainProxy = null;
         this._entry = null;
         this._responseLabel = null;
+        this._responseScroll = null;
     }
 
     // ── UI construction ────────────────────────────────────────────────────────
@@ -92,10 +95,24 @@ export default class IntentBar {
             accessible_role: Atk.Role.LABEL,
         });
         this._responseLabel.clutter_text.set_line_wrap(true);
-        this._responseLabel.hide();
+        this._responseLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+
+        // Long answers scroll inside the bar (max-height in the stylesheet)
+        // instead of growing it off the bottom of the screen.
+        const responseBox = new St.BoxLayout({vertical: true, x_expand: true});
+        responseBox.add_child(this._responseLabel);
+        this._responseScroll = new St.ScrollView({
+            style_class: 'axon-response-scroll',
+            hscrollbar_policy: St.PolicyType.NEVER,
+            vscrollbar_policy: St.PolicyType.AUTOMATIC,
+            overlay_scrollbars: true,
+            x_expand: true,
+        });
+        this._responseScroll.set_child(responseBox);
+        this._responseScroll.hide();
 
         this._actor.add_child(this._entry);
-        this._actor.add_child(this._responseLabel);
+        this._actor.add_child(this._responseScroll);
 
         // Add to UI group (above all windows)
         Main.uiGroup.add_child(this._actor);
@@ -108,7 +125,7 @@ export default class IntentBar {
         this._visible = true;
 
         this._responseLabel.set_text('');
-        this._responseLabel.hide();
+        this._responseScroll.hide();
         this._entry.set_text('');
 
         this._positionCenter();
@@ -308,7 +325,7 @@ export default class IntentBar {
     _setResponse(text) {
         if (!this._responseLabel) return;
         this._responseLabel.set_text(text);
-        this._responseLabel.show();
+        this._responseScroll.show();
         // Re-center after content change
         GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._positionCenter();

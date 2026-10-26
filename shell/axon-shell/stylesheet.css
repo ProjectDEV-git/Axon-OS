@@ -42,9 +42,13 @@
     color: #9090b8;
     font-size: 13px;
     font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+}
+
+.axon-response-scroll {
     border-top: 1px solid #2a2a42;
     margin-top: 12px;
     padding-top: 12px;
+    max-height: 320px;
 }
 
 .axon-chips-row {

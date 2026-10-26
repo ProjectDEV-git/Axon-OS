@@ -82,3 +82,16 @@ def test_json_that_is_not_an_action_is_shown_at_the_end(monkeypatch: pytest.Monk
     assert shown == []
     assert win._response_label.get_text() == '{"name": "x"}'
     win.destroy()
+
+
+def test_long_answer_scrolls_instead_of_growing() -> None:
+    win = make_window([])
+    win._response_label.set_text("line\n" * 400)
+    win._response_label.set_visible(True)
+    pump(GLib)
+    assert win._response_scroll.get_visible()
+    _, natural = win._response_scroll.measure(Gtk.Orientation.VERTICAL, 600)[:2]
+    assert natural <= window_mod._RESPONSE_MAX_HEIGHT
+    win._response_label.set_visible(False)
+    assert not win._response_scroll.get_visible()
+    win.destroy()
