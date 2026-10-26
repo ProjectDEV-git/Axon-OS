@@ -66,3 +66,10 @@ test('splitError matches the Python twin', async () => {
     assert.deepEqual(splitError('Part\n[error] lost'), {body: 'Part', error: 'lost'});
     assert.deepEqual(splitError('[error]'), {body: '', error: 'Something went wrong.'});
 });
+
+test('spaceAnnouncement', async () => {
+    const {spaceAnnouncement} = await import('./ui-logic.mjs');
+    assert.equal(spaceAnnouncement('Code', 3), 'Switched to Code Space. 3 windows open.');
+    assert.equal(spaceAnnouncement('Web', 1), 'Switched to Web Space. 1 window open.');
+    assert.equal(spaceAnnouncement('Notes', 0), 'Switched to Notes Space. No windows open.');
+});

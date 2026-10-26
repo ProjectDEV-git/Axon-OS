@@ -8,6 +8,7 @@ import Atk from 'gi://Atk';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { safeCall, createProxyWithRetry, callWithRetry } from './dbus-helpers.js';
+import { spaceAnnouncement } from './ui-logic.js';
 
 // ─── Default space definitions ────────────────────────────────────────────────
 
@@ -378,7 +379,18 @@ export default class SpacesManager {
 
             // Fetch workspace windows and generate summary via Brain service
             let workspace = global.workspace_manager.get_workspace_by_index(idx);
-            let windows = workspace ? workspace.list_windows() : [];
+            let windows = workspace
+                ? workspace.list_windows().filter(w => !w.is_skip_taskbar())
+                : [];
+
+            // Screen readers (Orca) present a NOTIFICATION-role object when it
+            // becomes showing, using its accessible name.
+            try {
+                osd.accessible_role = Atk.Role.NOTIFICATION;
+                osd.accessible_name = spaceAnnouncement(space.name, windows.length);
+            } catch (e) {
+                // Accessibility metadata is best effort
+            }
             if (windows.length === 0) {
                 summaryLabel.set_text('Empty workspace');
             } else if (this._brainProxy) {
@@ -463,17 +475,8 @@ export default class SpacesManager {
 
         this._updateIndicator();
         this._saveState();
+        // The OSD also carries the screen-reader announcement
         this._showSpaceOSD(this._spaces[idx], idx);
-
-        // Announce workspace switch for screen readers
-        try {
-            const atkWindow = Atk.get_default_root();
-            if (atkWindow) {
-                atkWindow.emit_children_changed();
-            }
-        } catch (e) {
-            // Atk announcement not critical
-        }
     }
 
     createSpace(name, color = '#a78bfa') {

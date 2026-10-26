@@ -105,11 +105,13 @@ add a short note under any item you skip or change.
       work area (e.g. height = min(860, work-area height − 48)).
       Note: GTK4 has no portable work-area API (Wayland hides it), so this uses the monitor
       geometry minus the 48 px margin, via `fit_to_screen()`.
-- [ ] **Space-change announcement does nothing.** `spaces.js` calls
+- [x] **Space-change announcement does nothing.** `spaces.js` calls
       `Atk.get_default_root().emit_children_changed()`, which doesn't announce anything.
       Replace it with an accessible status element whose text/name is updated to e.g.
       "Switched to Code Space. 3 windows open." Check which mechanism actually announces on
       GNOME 45+ and note in the commit message how you verified it.
+      Note: not verified with Orca in a real session (no GNOME Shell in the container). The
+      OSD now has the NOTIFICATION role and the announcement as its accessible name.
 
 ## Phase 2 — Quick UX wins
 

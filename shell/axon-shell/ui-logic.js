@@ -152,3 +152,21 @@ export class RequestTracker {
 export function escapeAction(busy) {
     return busy ? 'cancel' : 'close';
 }
+
+/**
+ * Text a screen reader speaks after a Space switch.
+ *
+ * @param {string} spaceName - e.g. "Code"
+ * @param {number} windowCount - normal windows in that Space
+ * @returns {string} e.g. "Switched to Code Space. 3 windows open."
+ */
+export function spaceAnnouncement(spaceName, windowCount) {
+    let windows;
+    if (windowCount <= 0)
+        windows = 'No windows open.';
+    else if (windowCount === 1)
+        windows = '1 window open.';
+    else
+        windows = `${windowCount} windows open.`;
+    return `Switched to ${spaceName} Space. ${windows}`;
+}
