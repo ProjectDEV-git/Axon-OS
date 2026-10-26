@@ -83,3 +83,54 @@ export function describeAction(action) {
     }
     return "Axon suggested an action it can't perform here.";
 }
+
+/**
+ * Track the one AI request a popup may have running. Cancelling (or
+ * starting a newer request) makes older ids stale so late replies are
+ * dropped. Twin of RequestTracker in services/ui_logic.py.
+ */
+export class RequestTracker {
+    constructor() {
+        this._id = 0;
+        this._busy = false;
+    }
+
+    get busy() {
+        return this._busy;
+    }
+
+    start() {
+        this._id += 1;
+        this._busy = true;
+        return this._id;
+    }
+
+    finish(id) {
+        if (id !== this._id)
+            return false;
+        this._busy = false;
+        return true;
+    }
+
+    cancel() {
+        if (!this._busy)
+            return false;
+        this._id += 1;
+        this._busy = false;
+        return true;
+    }
+
+    isCurrent(id) {
+        return id === this._id && this._busy;
+    }
+}
+
+/**
+ * What Escape does: cancel a running request first, otherwise close.
+ *
+ * @param {boolean} busy - whether a request is running
+ * @returns {'cancel'|'close'}
+ */
+export function escapeAction(busy) {
+    return busy ? 'cancel' : 'close';
+}

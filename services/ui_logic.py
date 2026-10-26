@@ -91,3 +91,52 @@ def describe_action(action: dict[str, Any]) -> str:
         command = str(action.get("command", "")).strip()
         return f"Run: {command}" if command else "Run command"
     return "Axon suggested an action it can't perform here."
+
+
+class RequestTracker:
+    """Track the one AI request a window may have running.
+
+    Each request gets an id. Cancelling (or starting a newer request) makes
+    older ids stale, so a worker thread can drop late results with
+    ``is_current``. Thread safe enough for one writer (the GTK thread) and
+    readers in workers: ids only ever grow.
+    """
+
+    def __init__(self) -> None:
+        self._id = 0
+        self._busy = False
+
+    @property
+    def busy(self) -> bool:
+        """True while the latest request is running."""
+        return self._busy
+
+    def start(self) -> int:
+        """Begin a request and return its id."""
+        self._id += 1
+        self._busy = True
+        return self._id
+
+    def finish(self, request_id: int) -> bool:
+        """Mark *request_id* done. Returns False if it was already stale."""
+        if request_id != self._id:
+            return False
+        self._busy = False
+        return True
+
+    def cancel(self) -> bool:
+        """Cancel the running request. Returns False if nothing was running."""
+        if not self._busy:
+            return False
+        self._id += 1
+        self._busy = False
+        return True
+
+    def is_current(self, request_id: int) -> bool:
+        """True while *request_id* is the latest, uncancelled request."""
+        return request_id == self._id and self._busy
+
+
+def escape_action(busy: bool) -> str:
+    """What Escape does: cancel a running request first, otherwise close."""
+    return "cancel" if busy else "close"

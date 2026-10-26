@@ -78,10 +78,12 @@ add a short note under any item you skip or change.
       main thread before every query (a D-Bus call in `apps/intent-bar`, an HTTP request with
       a 2 s timeout in the AI panel). Move it to the worker thread, or cache the result and
       refresh it in the background.
-- [ ] **Escape doesn't cancel.** In both Intent Bars and the AI panel, the first Escape while
+- [x] **Escape doesn't cancel.** In both Intent Bars and the AI panel, the first Escape while
       a request is running must stop it (set the cancel flag, stop the spinner, re-enable
       the entry, show "Cancelled"). Only the next Escape hides the window. Show a visible
       Stop button while a request is running.
+      Note: the Shell bar uses non-streaming `Generate`, which the Brain can't cancel; the
+      late reply is dropped instead. The GTK apps also call Brain `CancelStream`.
 - [ ] **AI panel header clutter.** The header shows both a model dropdown and a model badge
       with the same name, plus an unused `spacer`. Keep the dropdown, remove the badge or
       repurpose it as the local/cloud indicator from Phase 3, and remove the spacer.

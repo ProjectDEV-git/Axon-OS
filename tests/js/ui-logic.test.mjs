@@ -41,3 +41,19 @@ test('describeAction', () => {
     assert.equal(describeAction({action: 'run_command', command: 'ls'}), 'Run: ls');
     assert.match(describeAction({action: 'nope'}), /can't/);
 });
+
+test('RequestTracker drops cancelled and superseded requests', async () => {
+    const {RequestTracker, escapeAction} = await import('./ui-logic.mjs');
+    const t = new RequestTracker();
+    const a = t.start();
+    assert.ok(t.busy && t.isCurrent(a));
+    assert.equal(escapeAction(t.busy), 'cancel');
+    assert.ok(t.cancel());
+    assert.ok(!t.finish(a));
+    assert.equal(escapeAction(t.busy), 'close');
+    const b = t.start();
+    const c = t.start();
+    assert.ok(!t.finish(b));
+    assert.ok(t.finish(c));
+    assert.ok(!t.cancel());
+});

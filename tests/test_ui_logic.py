@@ -101,3 +101,44 @@ class TestDescribeAction:
     def test_missing_fields(self) -> None:
         assert describe_action({"action": "open_app"}) == "Opening app…"
         assert describe_action({"action": "run_command"}) == "Run command"
+
+
+class TestRequestTracker:
+    def test_lifecycle(self) -> None:
+        from services.ui_logic import RequestTracker
+
+        t = RequestTracker()
+        assert not t.busy
+        rid = t.start()
+        assert t.busy and t.is_current(rid)
+        assert t.finish(rid)
+        assert not t.busy and not t.is_current(rid)
+
+    def test_cancel_makes_request_stale(self) -> None:
+        from services.ui_logic import RequestTracker
+
+        t = RequestTracker()
+        rid = t.start()
+        assert t.cancel()
+        assert not t.busy
+        assert not t.is_current(rid)
+        assert not t.finish(rid)  # late result is dropped
+        assert not t.cancel()  # nothing running
+
+    def test_newer_request_wins(self) -> None:
+        from services.ui_logic import RequestTracker
+
+        t = RequestTracker()
+        first = t.start()
+        second = t.start()
+        assert not t.is_current(first)
+        assert t.is_current(second)
+        assert not t.finish(first)
+        assert t.busy
+
+
+def test_escape_action() -> None:
+    from services.ui_logic import escape_action
+
+    assert escape_action(True) == "cancel"
+    assert escape_action(False) == "close"

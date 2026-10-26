@@ -172,6 +172,21 @@ class OllamaClient:
         except Exception:
             pass
 
+    def cancel(self) -> None:
+        """Stop the running stream: tell the Brain and unblock the reader.
+
+        Blocking D-Bus call; run it off the GTK thread.
+        """
+        tx = self.current_tx
+        if not tx:
+            return
+        try:
+            self._get_brain().CancelStream(tx)
+        except Exception:
+            pass  # the sentinel below still ends the local generator
+        if self.current_tx == tx:
+            self.q.put(None)
+
     def send_message_stream(
         self, conversation_id: str, message: str, model: str = "", ctx: str = ""
     ) -> Iterator[str]:

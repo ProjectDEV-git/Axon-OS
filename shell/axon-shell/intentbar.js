@@ -8,7 +8,7 @@ import Pango from 'gi://Pango';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
-import {parseAction} from './ui-logic.js';
+import {RequestTracker, escapeAction, parseAction} from './ui-logic.js';
 
 function logError(error, message) {
     if (message) {
@@ -31,6 +31,9 @@ export default class IntentBar {
         this._visible = false;
         this._keyPressId = null;
         this._brainProxy = null;
+        this._stopButton = null;
+        // The running Brain request; Escape or Stop cancels it
+        this._requests = new RequestTracker();
     }
 
     enable() {
@@ -46,6 +49,7 @@ export default class IntentBar {
         }
 
         this._brainProxy = null;
+        this._stopButton = null;
         this._entry = null;
         this._responseLabel = null;
         this._responseScroll = null;
@@ -80,11 +84,29 @@ export default class IntentBar {
                 return Clutter.EVENT_STOP;
             }
             if (key === Clutter.KEY_Escape) {
-                this.hide();
+                // First Escape stops a running request; the next one closes
+                if (escapeAction(this._requests.busy) === 'cancel')
+                    this._cancelRequest();
+                else
+                    this.hide();
                 return Clutter.EVENT_STOP;
             }
             return Clutter.EVENT_PROPAGATE;
         });
+
+        // Visible only while a request is running
+        this._stopButton = new St.Button({
+            style_class: 'axon-intentbar-stop',
+            child: new St.Icon({icon_name: 'process-stop-symbolic', icon_size: 16}),
+            can_focus: true,
+            visible: false,
+            accessible_name: 'Stop request',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._stopButton.connect('clicked', () => this._cancelRequest());
+        const entryRow = new St.BoxLayout({vertical: false, x_expand: true});
+        entryRow.add_child(this._entry);
+        entryRow.add_child(this._stopButton);
 
         // Response area
         this._responseLabel = new St.Label({
@@ -111,7 +133,7 @@ export default class IntentBar {
         this._responseScroll.set_child(responseBox);
         this._responseScroll.hide();
 
-        this._actor.add_child(this._entry);
+        this._actor.add_child(entryRow);
         this._actor.add_child(this._responseScroll);
 
         // Add to UI group (above all windows)
@@ -147,6 +169,9 @@ export default class IntentBar {
     hide() {
         if (!this._visible) return;
         this._visible = false;
+        // A reply that arrives after closing must not reopen or act
+        if (this._requests.cancel())
+            this._setBusy(false);
 
         this._actor.ease({
             opacity: 0,
@@ -189,11 +214,40 @@ export default class IntentBar {
         const query = this._entry.get_text().trim();
         if (!query) return;
 
+        const requestId = this._requests.start();
+        this._setBusy(true);
         this._setResponse('Thinking…');
-        this._callBrain(query);
+        this._callBrain(query, requestId);
     }
 
-    _callBrain(prompt) {
+    _setBusy(busy) {
+        if (this._stopButton)
+            this._stopButton.visible = busy;
+    }
+
+    _cancelRequest() {
+        // Generate(stream=false) can't be stopped server-side; the late
+        // reply is dropped by the request id check instead.
+        if (!this._requests.cancel())
+            return;
+        this._setBusy(false);
+        this._setResponse('Cancelled');
+    }
+
+    // Wraps a Brain callback so replies to cancelled requests are ignored.
+    _onBrainReply(requestId, result, error) {
+        if (!this._requests.finish(requestId))
+            return;
+        this._setBusy(false);
+        if (error) {
+            logError(error, 'AxonShell: Brain Generate failed');
+            this._setResponse(`Error: ${error.message}`);
+            return;
+        }
+        this._handleResponse(result ? result[0] : null);
+    }
+
+    _callBrain(prompt, requestId) {
         const currentSpace = this._spacesManager.getCurrentSpace();
         const spaceName = currentSpace ? currentSpace.name : 'Default';
 
@@ -211,14 +265,7 @@ export default class IntentBar {
             try {
                 brainProxy.GenerateRemote(
                     prompt, systemPrompt, '', false,
-                    (result, error) => {
-                        if (error) {
-                            logError(error, 'AxonShell: Brain Generate failed');
-                            this._setResponse(`Error: ${error.message}`);
-                            return;
-                        }
-                        this._handleResponse(result ? result[0] : null);
-                    }
+                    (result, error) => this._onBrainReply(requestId, result, error)
                 );
                 return;
             } catch (e) {
@@ -249,26 +296,25 @@ export default class IntentBar {
                 (proxy, error) => {
                     if (error) {
                         logError(error, 'AxonShell: could not reach Brain service');
-                        this._setResponse('AI service unavailable. Is Axon Brain running?');
+                        if (this._requests.finish(requestId)) {
+                            this._setBusy(false);
+                            this._setResponse('AI service unavailable. Is Axon Brain running?');
+                        }
                         return;
                     }
                     this._brainProxy = proxy;
                     proxy.GenerateRemote(
                         prompt, systemPrompt, '', false,
-                        (result, err) => {
-                            if (err) {
-                                logError(err, 'AxonShell: Brain Generate failed');
-                                this._setResponse(`Error: ${err.message}`);
-                                return;
-                            }
-                            this._handleResponse(result ? result[0] : null);
-                        }
+                        (result, err) => this._onBrainReply(requestId, result, err)
                     );
                 }
             );
         } catch (e) {
             logError(e, 'AxonShell: could not reach Brain service');
-            this._setResponse('AI service unavailable. Is Axon Brain running?');
+            if (this._requests.finish(requestId)) {
+                this._setBusy(false);
+                this._setResponse('AI service unavailable. Is Axon Brain running?');
+            }
         }
     }
 

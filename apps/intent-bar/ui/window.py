@@ -30,7 +30,14 @@ for _services in (Path(__file__).resolve().parents[3], Path(__file__).resolve().
         sys.path.insert(0, str(_services / "services"))
         break
 from service_utils import confirm_and_exec
-from ui_logic import SHOW, classify_stream_prefix, describe_action, parse_action
+from ui_logic import (
+    SHOW,
+    RequestTracker,
+    classify_stream_prefix,
+    describe_action,
+    escape_action,
+    parse_action,
+)
 
 try:
     import dbus
@@ -229,6 +236,8 @@ class IntentBarWindow(Adw.Window):
         # Accumulator for streaming tokens
         self._stream_parts: list[str] = []
         self._stream_cancelled: bool = False
+        # The running AI/search request; Escape or Stop cancels it
+        self._requests = RequestTracker()
 
         self.set_decorated(False)
         self.set_default_size(660, -1)
@@ -326,6 +335,14 @@ class IntentBarWindow(Adw.Window):
         self._spinner.set_size_request(22, 22)
         entry_row.append(self._spinner)
 
+        self._stop_btn = Gtk.Button.new_from_icon_name("process-stop-symbolic")
+        self._stop_btn.add_css_class("flat")
+        self._stop_btn.set_valign(Gtk.Align.CENTER)
+        self._stop_btn.set_tooltip_text("Stop (Esc)")
+        self._stop_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Stop request"])
+        self._stop_btn.set_visible(False)
+        entry_row.append(self._stop_btn)
+
         # ---- Row 4: separator -------------------------------------------
         sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep2.add_css_class("entry-sep")
@@ -392,6 +409,7 @@ class IntentBarWindow(Adw.Window):
     def _connect_signals(self) -> None:
         self._entry.connect("activate", self._on_activate)
         self._start_ollama_btn.connect("clicked", self._on_start_ollama)
+        self._stop_btn.connect("clicked", lambda _b: self._cancel_request())
 
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self._on_key_pressed)
@@ -409,7 +427,11 @@ class IntentBarWindow(Adw.Window):
         _state: Any,
     ) -> bool:
         if keyval == Gdk.KEY_Escape:
-            self.close()
+            # First Escape stops a running request; the next one closes
+            if escape_action(self._requests.busy) == "cancel":
+                self._cancel_request()
+            else:
+                self.close()
             return True
 
         if keyval == Gdk.KEY_Up:
@@ -484,77 +506,102 @@ class IntentBarWindow(Adw.Window):
             return
 
         # Prepare UI for streaming (the availability check runs in the worker)
-        self._spinner.start()
+        request_id = self._requests.start()
+        self._set_busy(True)
         self._response_label.set_text("")
         self._response_label.set_visible(False)
-        entry.set_sensitive(False)
         self._push_history(query)
         self._history_idx = -1
 
         thread = threading.Thread(
             target=self._do_query,
-            args=(query,),
+            args=(query, request_id),
             daemon=True,
         )
         thread.start()
+
+    def _set_busy(self, busy: bool) -> None:
+        """Show or hide the running-request UI (spinner, Stop, locked entry)."""
+        if busy:
+            self._spinner.start()
+        else:
+            self._spinner.stop()
+        self._stop_btn.set_visible(busy)
+        self._entry.set_sensitive(not busy)
+        if not busy:
+            self._entry.grab_focus()
+
+    def _cancel_request(self) -> None:
+        """Stop the running request; late results from it are dropped."""
+        if not self._requests.cancel():
+            return
+        self._set_busy(False)
+        self._clear_results()
+        self._response_label.set_text("Cancelled")
+        self._response_label.set_visible(True)
+        cancel = getattr(self._ollama, "cancel", None)
+        if cancel is not None:
+            threading.Thread(target=cancel, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Streaming implementation
     # ------------------------------------------------------------------
 
-    def _do_query(self, query: str) -> None:
+    def _do_query(self, query: str, request_id: int) -> None:
         """Run the Ollama streaming query in a background thread.
 
         A reply that may be an action (JSON) is held back until the stream
         ends, so the user sees "Opening Firefox…" instead of raw JSON.
         """
         if not self._ollama.is_available():
-            GLib.idle_add(self._on_ai_unavailable)
+            GLib.idle_add(self._on_ai_unavailable, request_id)
             return
         system = self._build_system_prompt()
-        self._stream_parts = []
+        parts: list[str] = []
+        self._stream_parts = parts
         showing = False
         try:
             for token in self._ollama.generate_stream(query, system=system):
-                if self._stream_cancelled:
-                    break
-                self._stream_parts.append(token)
+                if self._stream_cancelled or not self._requests.is_current(request_id):
+                    return
+                parts.append(token)
                 if showing:
-                    GLib.idle_add(self._append_token, token)
-                elif classify_stream_prefix("".join(self._stream_parts)) == SHOW:
+                    GLib.idle_add(self._append_token, token, request_id)
+                elif classify_stream_prefix("".join(parts)) == SHOW:
                     showing = True
-                    GLib.idle_add(self._append_token, "".join(self._stream_parts))
+                    GLib.idle_add(self._append_token, "".join(parts), request_id)
         except Exception as exc:
-            if not self._stream_cancelled:
-                self._stream_parts.append(f"\n[error] {exc}")
+            parts.append(f"\n[error] {exc}")
         if not self._stream_cancelled:
-            GLib.idle_add(self._finish_stream, "".join(self._stream_parts))
+            GLib.idle_add(self._finish_stream, "".join(parts), request_id)
 
     def _check_available_async(self) -> None:
         """Worker thread: show "Start Ollama" when the AI is offline."""
         if not self._ollama.is_available():
             GLib.idle_add(self._start_ollama_btn.set_visible, True)
 
-    def _on_ai_unavailable(self) -> bool:
+    def _on_ai_unavailable(self, request_id: int) -> bool:
         """GTK thread: the query found the AI offline."""
-        self._spinner.stop()
-        self._entry.set_sensitive(True)
-        self._entry.grab_focus()
+        if not self._requests.finish(request_id):
+            return False
+        self._set_busy(False)
         self._show_error("[error] Ollama is not running. Click 'Start Ollama'.")
         self._start_ollama_btn.set_visible(True)
         return False
 
-    def _append_token(self, token: str) -> bool:
+    def _append_token(self, token: str, request_id: int) -> bool:
         """Append a streaming token to the response label (GTK main thread)."""
+        if not self._requests.is_current(request_id):
+            return False
         self._response_label.set_text(self._response_label.get_text() + token)
         self._response_label.set_visible(True)
         return False
 
-    def _finish_stream(self, full: str) -> bool:
+    def _finish_stream(self, full: str, request_id: int) -> bool:
         """Called when streaming is complete (GTK main thread)."""
-        self._spinner.stop()
-        self._entry.set_sensitive(True)
-        self._entry.grab_focus()
+        if not self._requests.finish(request_id):
+            return False  # cancelled: the user already saw "Cancelled"
+        self._set_busy(False)
 
         action = parse_action(full)
         if action is not None:
@@ -599,13 +646,16 @@ class IntentBarWindow(Adw.Window):
     # ------------------------------------------------------------------
 
     def _start_semantic_search(self, query: str) -> None:
-        self._spinner.start()
+        request_id = self._requests.start()
+        self._set_busy(True)
         self._clear_results()
         self._response_label.set_text(f'Searching your files for "{query}"...')
         self._response_label.set_visible(True)
-        threading.Thread(target=self._do_semantic_search, args=(query,), daemon=True).start()
+        threading.Thread(
+            target=self._do_semantic_search, args=(query, request_id), daemon=True
+        ).start()
 
-    def _do_semantic_search(self, query: str) -> None:
+    def _do_semantic_search(self, query: str, request_id: int) -> None:
         results: list[dict[str, Any]] = []
         error = ""
         if dbus is None:
@@ -618,10 +668,14 @@ class IntentBarWindow(Adw.Window):
                 results = json.loads(iface.Query(query, 6, timeout=30))
             except Exception as exc:
                 error = str(exc)
-        GLib.idle_add(self._show_search_results, query, results, error)
+        GLib.idle_add(self._show_search_results, query, results, error, request_id)
 
-    def _show_search_results(self, query: str, results: list[dict[str, Any]], error: str) -> bool:
-        self._spinner.stop()
+    def _show_search_results(
+        self, query: str, results: list[dict[str, Any]], error: str, request_id: int
+    ) -> bool:
+        if not self._requests.finish(request_id):
+            return False
+        self._set_busy(False)
         self._clear_results()
         if error:
             self._show_error(f"[error] Semantic search unavailable: {error}")

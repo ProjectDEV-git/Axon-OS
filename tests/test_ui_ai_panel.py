@@ -107,3 +107,55 @@ def test_message_streams_into_bubble(monkeypatch: pytest.MonkeyPatch) -> None:
     assert bubble._text == "Hello there"
     assert win._client.sent == ["hi"]
     win.destroy()
+
+
+class BlockingClient(FakeClient):
+    def __init__(self) -> None:
+        import threading
+
+        super().__init__()
+        self.release = threading.Event()
+        self.cancelled = False
+
+    def send_message_stream(
+        self, _conv_id: str, message: str, model: str = "", ctx: str = ""
+    ) -> Iterator[str]:
+        yield "Once upon"
+        self.release.wait(5)
+        yield " a time"
+
+    def cancel(self) -> None:
+        self.cancelled = True
+        self.release.set()
+
+
+def test_escape_stops_stream_then_hides(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = BlockingClient()
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    win.present()
+    win._send_message("story")
+    assert win._stop_btn.get_visible() and not win._send_btn.get_visible()
+    bubble = win._stream_bubble
+    for _ in range(100):  # wait for the first chunk to reach the bubble
+        pump(GLib)
+        if bubble.get_text():
+            break
+        import time
+
+        time.sleep(0.01)
+    escape = panel_mod.Gdk.KEY_Escape
+    win._on_key_pressed(None, escape, 0, None)
+    assert win.get_visible()
+    assert not win._streaming
+    assert bubble.get_text() == "Once upon\n\n(Cancelled)"
+    assert win._send_btn.get_visible() and not win._stop_btn.get_visible()
+    rec.join()
+    pump(GLib)
+    assert client.cancelled
+    assert bubble.get_text() == "Once upon\n\n(Cancelled)"
+    win._on_key_pressed(None, escape, 0, None)
+    assert not win.get_visible()
+    win.destroy()

@@ -46,14 +46,14 @@ def run_query(win: Any, monkeypatch: pytest.MonkeyPatch) -> list[str]:
     shown: list[str] = []
     real_append = win._append_token
 
-    def spy(token: str) -> bool:
-        real_append(token)
+    def spy(token: str, request_id: int) -> bool:
+        real_append(token, request_id)
         shown.append(win._response_label.get_text())
         return False
 
     monkeypatch.setattr(win, "_append_token", spy)
     monkeypatch.setattr(window_mod.GLib, "idle_add", lambda fn, *a: fn(*a))
-    win._do_query("anything")
+    win._do_query("anything", win._requests.start())
     return shown
 
 
@@ -126,4 +126,57 @@ def test_availability_checked_off_main_thread(monkeypatch: pytest.MonkeyPatch) -
     assert win._start_ollama_btn.get_visible()
     assert "not running" in win._response_label.get_text()
     assert win._entry.get_sensitive()
+    win.destroy()
+
+
+class BlockingOllama(FakeOllama):
+    """Streams one token, then waits until cancelled."""
+
+    def __init__(self) -> None:
+        import threading
+
+        super().__init__(["partial"])
+        self.release = threading.Event()
+        self.cancelled = False
+
+    def generate_stream(self, prompt: str, system: str = "") -> Iterator[str]:
+        yield "partial answer"
+        self.release.wait(5)
+        yield " late"
+
+    def cancel(self) -> None:
+        self.cancelled = True
+        self.release.set()
+
+
+def press_escape(win: Any) -> None:
+    win._on_key_pressed(None, window_mod.Gdk.KEY_Escape, 0, None)
+
+
+def test_escape_cancels_first_then_closes(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(window_mod, monkeypatch)
+    ollama = BlockingOllama()
+    win = window_mod.IntentBarWindow(ollama_client=ollama, spaces_manager=FakeSpaces())
+    closed: list[bool] = []
+    monkeypatch.setattr(win, "close", lambda: closed.append(True))
+    win._entry.set_text("tell me a story")
+    win._on_activate(win._entry)
+    assert win._stop_btn.get_visible()
+    assert not win._entry.get_sensitive()
+
+    press_escape(win)
+    assert closed == []
+    assert win._response_label.get_text() == "Cancelled"
+    assert not win._stop_btn.get_visible()
+    assert win._entry.get_sensitive()
+
+    rec.join()
+    pump(GLib)
+    assert ollama.cancelled
+    assert win._response_label.get_text() == "Cancelled"  # late tokens dropped
+
+    press_escape(win)
+    assert closed == [True]
     win.destroy()

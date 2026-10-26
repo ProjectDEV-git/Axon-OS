@@ -31,6 +31,14 @@ _intent_bar_path = str(Path(__file__).resolve().parents[2] / "intent-bar")
 if _intent_bar_path not in sys.path:
     sys.path.insert(0, _intent_bar_path)
 
+# services/ sits next to apps/ in the source tree and the .deb, and inside
+# the app directory for install.sh (~/.local/share/axon-os/services).
+for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().parents[2]):
+    if (_base / "services").is_dir():
+        sys.path.insert(0, str(_base / "services"))
+        break
+from ui_logic import RequestTracker, escape_action
+
 try:
     from ollama_client import OllamaClient  # type: ignore[import]
 except ImportError:
@@ -179,6 +187,10 @@ class MessageBubble(Gtk.Box):
         if display is not None:
             clipboard = display.get_clipboard()
             clipboard.set(self._text)
+
+    def get_text(self) -> str:
+        """Return the message text received so far."""
+        return self._text
 
     def append_text(self, chunk: str) -> None:
         """Append *chunk* to the bubble label (used during streaming)."""
@@ -363,6 +375,7 @@ class AIPanelWindow(Adw.Window):
         self._streaming = False
         self._stream_bubble: MessageBubble | None = None
         self._stream_cancelled = False
+        self._requests = RequestTracker()
         self._conv_id: str = ""
 
         # Apply CSS (guard against re-registration)
@@ -487,12 +500,19 @@ class AIPanelWindow(Adw.Window):
         self._entry.set_placeholder_text("Ask anything…")
         self._entry.connect("activate", self._on_entry_activate)
 
-        send_btn = Gtk.Button(label="Send")
-        send_btn.add_css_class("suggested-action")
-        send_btn.connect("clicked", self._on_send_clicked)
+        self._send_btn = Gtk.Button(label="Send")
+        self._send_btn.add_css_class("suggested-action")
+        self._send_btn.connect("clicked", self._on_send_clicked)
+
+        # Replaces Send while an answer is streaming
+        self._stop_btn = Gtk.Button(label="Stop")
+        self._stop_btn.set_tooltip_text("Stop generating (Esc)")
+        self._stop_btn.connect("clicked", lambda _b: self._cancel_stream())
+        self._stop_btn.set_visible(False)
 
         input_area.append(self._entry)
-        input_area.append(send_btn)
+        input_area.append(self._send_btn)
+        input_area.append(self._stop_btn)
         root.append(input_area)
 
         # Escape key hides the window
@@ -559,7 +579,11 @@ class AIPanelWindow(Adw.Window):
         state: Any,
     ) -> bool:
         if keyval == Gdk.KEY_Escape:
-            self.set_visible(False)
+            # First Escape stops a streaming answer; the next one hides
+            if escape_action(self._requests.busy) == "cancel":
+                self._cancel_stream()
+            else:
+                self.set_visible(False)
             return True
         return False
 
@@ -654,6 +678,7 @@ class AIPanelWindow(Adw.Window):
 
         self._entry.set_text("")
         self._add_bubble("user", text)
+        request_id = self._requests.start()
         self._set_streaming(True)
         self._stream_bubble = self._add_bubble("assistant", "")
 
@@ -662,7 +687,7 @@ class AIPanelWindow(Adw.Window):
         model = self._client.model
         thread = threading.Thread(
             target=self._stream_response,
-            args=(text, model),
+            args=(text, model, request_id),
             daemon=True,
         )
         thread.start()
@@ -670,14 +695,32 @@ class AIPanelWindow(Adw.Window):
     def _set_streaming(self, active: bool) -> None:
         self._streaming = active
         self._spinner.set_visible(active)
+        self._send_btn.set_visible(not active)
+        self._stop_btn.set_visible(active)
         if active:
             self._spinner.start()
         else:
             self._spinner.stop()
 
-    def _stream_response(self, text: str, model: str) -> None:
+    def _cancel_stream(self) -> None:
+        """Stop the streaming answer, keep what arrived and mark it cancelled."""
+        if not self._requests.cancel():
+            return
+        self._set_streaming(False)
+        if self._stream_bubble is not None:
+            partial = self._stream_bubble.get_text()
+            self._stream_bubble.set_final_text(
+                f"{partial}\n\n(Cancelled)" if partial else "Cancelled"
+            )
+            self._stream_bubble = None
+        self._entry.grab_focus()
+        cancel = getattr(self._client, "cancel", None)
+        if cancel is not None:
+            threading.Thread(target=cancel, daemon=True).start()
+
+    def _stream_response(self, text: str, model: str, request_id: int) -> None:
         if not self._client.is_available():
-            GLib.idle_add(self._on_ai_unavailable)
+            GLib.idle_add(self._on_ai_unavailable, request_id)
             return
         ctx = self._ctx_reader.build_context_string()
         accumulated = ""
@@ -685,20 +728,20 @@ class AIPanelWindow(Adw.Window):
             for chunk in self._client.send_message_stream(
                 self._conv_id, text, model=model, ctx=ctx
             ):
-                if self._stream_cancelled:
-                    break
+                if self._stream_cancelled or not self._requests.is_current(request_id):
+                    return
                 accumulated += chunk
-                GLib.idle_add(self._on_chunk, chunk)
+                GLib.idle_add(self._on_chunk, chunk, request_id)
         except Exception as exc:
-            if not self._stream_cancelled:
-                error_text = f"\n[Error: {exc}]"
-                accumulated += error_text
-                GLib.idle_add(self._on_chunk, error_text)
-        finally:
-            if not self._stream_cancelled:
-                GLib.idle_add(self._on_stream_done, accumulated)
+            error_text = f"\n[Error: {exc}]"
+            accumulated += error_text
+            GLib.idle_add(self._on_chunk, error_text, request_id)
+        if not self._stream_cancelled:
+            GLib.idle_add(self._on_stream_done, accumulated, request_id)
 
-    def _on_ai_unavailable(self) -> bool:
+    def _on_ai_unavailable(self, request_id: int) -> bool:
+        if not self._requests.finish(request_id):
+            return False
         self._set_streaming(False)
         if self._stream_bubble is not None:
             self._stream_bubble.set_final_text(
@@ -707,13 +750,15 @@ class AIPanelWindow(Adw.Window):
             self._stream_bubble = None
         return False
 
-    def _on_chunk(self, chunk: str) -> bool:
-        if self._stream_bubble is not None:
+    def _on_chunk(self, chunk: str, request_id: int) -> bool:
+        if self._requests.is_current(request_id) and self._stream_bubble is not None:
             self._stream_bubble.append_text(chunk)
             self._scroll_to_bottom()
         return False
 
-    def _on_stream_done(self, full_text: str) -> bool:
+    def _on_stream_done(self, full_text: str, request_id: int) -> bool:
+        if not self._requests.finish(request_id):
+            return False  # cancelled; the bubble already says so
         self._set_streaming(False)
         if self._stream_bubble is not None:
             self._stream_bubble.set_final_text(full_text)
