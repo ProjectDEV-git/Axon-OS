@@ -47,9 +47,13 @@ add a short note under any item you skip or change.
 
 ## Phase 0 — Baseline
 
-- [ ] Run the full QA commands above and record which pass on the untouched branch,
+- [x] Run the full QA commands above and record which pass on the untouched branch,
       so later failures can be told apart from existing ones.
-- [ ] Read every file in the map above once.
+      Baseline (2026-10-26, Python 3.12, ruff 0.8.6): `ruff check` passes; `mypy` passes
+      (39 files); `pytest` 630 passed, 21 skipped, coverage 48.9%; `bandit` reports no
+      medium+ issues. `ruff format --check` already fails on 17 untouched files (CI does
+      not run it), so only files changed by this overhaul are held to it.
+- [x] Read every file in the map above once.
 
 ## Phase 1 — Bug fixes (small, high impact)
 
