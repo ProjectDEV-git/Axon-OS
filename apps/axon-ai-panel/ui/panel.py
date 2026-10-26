@@ -452,7 +452,7 @@ class AIPanelWindow(Adw.Window):
             chip_btn.add_css_class("flat")
             chip_btn.connect(
                 "clicked",
-                lambda _btn, lbl=chip_label: self._send_message(lbl + ": "),
+                lambda _btn, lbl=chip_label: self._on_chip_clicked(lbl + ": "),
             )
             chips_row.append(chip_btn)
 
@@ -567,6 +567,14 @@ class AIPanelWindow(Adw.Window):
     # Input handlers
     # ------------------------------------------------------------------
 
+    def _on_chip_clicked(self, prefix: str) -> None:
+        """Put the chip prefix in the entry so the user can finish the prompt."""
+        current = self._entry.get_text()
+        if not current.startswith(prefix):
+            self._entry.set_text(prefix + current)
+        self._entry.grab_focus()
+        self._entry.set_position(-1)
+
     def _on_entry_activate(self, entry: Gtk.Entry) -> None:
         self._send_message(entry.get_text())
 
@@ -675,7 +683,9 @@ class AIPanelWindow(Adw.Window):
     def _stream_response(self, text: str, ctx: str, model: str) -> None:
         accumulated = ""
         try:
-            for chunk in self._client.send_message_stream(self._conv_id, text, model=model, ctx=ctx):
+            for chunk in self._client.send_message_stream(
+                self._conv_id, text, model=model, ctx=ctx
+            ):
                 if self._stream_cancelled:
                     break
                 accumulated += chunk

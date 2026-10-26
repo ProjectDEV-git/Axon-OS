@@ -57,7 +57,7 @@ add a short note under any item you skip or change.
 
 ## Phase 1 — Bug fixes (small, high impact)
 
-- [ ] **AI panel quick chips send half a prompt.** In `panel.py` the chip handler calls
+- [x] **AI panel quick chips send half a prompt.** In `panel.py` the chip handler calls
       `self._send_message(lbl + ": ")`, which immediately sends `"Summarize: "`. Change it
       to put the prefix into the entry, move the cursor to the end and focus the entry,
       the same way `apps/intent-bar/ui/window.py::_on_chip_clicked` does.
