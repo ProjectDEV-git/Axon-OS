@@ -326,3 +326,8 @@ tested in a real GNOME session.
   the Axon confirmation card with risk levels and a re-checked "Always allow" list, and an
   Axon status section in the AI panel. Not tested in a real GNOME session: the Shell Intent
   Bar origin label and the Shell's use of the confirmation card (`ai-actions.js`).
+- 2026-10-26 — Phase 4 done: one token file (dark/light/high contrast, WCAG-checked),
+  `scripts/gen_tokens.py` for GTK and Shell styles, all app CSS on `@axon_*` tokens and out
+  of Python, a flatter Shell look with the accent kept for AI/active/focus, live light/dark
+  switching in GTK apps and reduced motion. Not tested in a real GNOME session: how the new
+  Shell stylesheet looks, the light Shell variant, and the Shell's reduced-motion paths.
