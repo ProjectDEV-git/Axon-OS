@@ -29,15 +29,25 @@ for _services in (Path(__file__).resolve().parents[3], Path(__file__).resolve().
     if (_services / "services").is_dir():
         sys.path.insert(0, str(_services / "services"))
         break
+from constants import AXON_DIR
 from service_utils import confirm_and_exec
 from ui_logic import (
+    EXAMPLE_PROMPTS,
     SHOW,
+    STAGE_CONNECTING,
+    STAGE_SEARCHING,
+    STAGE_WAITING,
     RequestTracker,
     classify_stream_prefix,
     describe_action,
     escape_action,
+    load_history,
     parse_action,
+    push_history,
+    recent_for_empty_state,
+    save_history,
     split_error,
+    stage_for_stream,
 )
 
 try:
@@ -151,6 +161,12 @@ _CSS = b"""
     font-size: 11px;
 }
 
+/* ---- Loading stage next to the spinner ---- */
+.stage-label {
+    color: #9090b8;
+    font-size: 12px;
+}
+
 /* ---- Keyboard hint labels ---- */
 .hint-label {
     color: #50507a;
@@ -197,12 +213,13 @@ _CHIPS: list[tuple[str, str]] = [
     ("Find File", "find "),
     ("Open App", "open "),
     ("Run Command", "run "),
-    ("Find Files", "find "),
     ("Search Web", "search "),
     ("Summarize", "summarize "),
 ]
 
 _MAX_HISTORY = 20
+# Queries survive closing the bar so the empty state can offer them again
+_HISTORY_FILE = AXON_DIR / "intent_history.json"
 _RESPONSE_MAX_HEIGHT = 320  # px; longer answers scroll
 
 # Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
@@ -240,7 +257,7 @@ class IntentBarWindow(Adw.Window):
         self._spaces = spaces_manager
 
         # Command history
-        self._history: list[str] = []
+        self._history: list[str] = load_history(_HISTORY_FILE, _MAX_HISTORY)
         self._history_idx: int = -1
 
         # Accumulator for streaming tokens
@@ -343,6 +360,13 @@ class IntentBarWindow(Adw.Window):
         self._spinner.set_size_request(22, 22)
         entry_row.append(self._spinner)
 
+        # What the running request is doing ("Waiting for model…")
+        self._stage_label = Gtk.Label()
+        self._stage_label.add_css_class("stage-label")
+        self._stage_label.set_valign(Gtk.Align.CENTER)
+        self._stage_label.set_visible(False)
+        entry_row.append(self._stage_label)
+
         self._stop_btn = Gtk.Button.new_from_icon_name("process-stop-symbolic")
         self._stop_btn.add_css_class("flat")
         self._stop_btn.set_valign(Gtk.Align.CENTER)
@@ -409,16 +433,62 @@ class IntentBarWindow(Adw.Window):
         self._results_box.set_visible(False)
         root.append(self._results_box)
 
+        # ---- Row 6c: empty state (before the user types) -----------------
+        self._empty_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self._empty_box.set_margin_bottom(8)
+        root.append(self._empty_box)
+        self._build_empty_state()
+
         # ---- Row 7: keyboard hint row -----------------------------------
         hint_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         hint_row.set_margin_top(4)
         root.append(hint_row)
 
-        for hint_text in ("Return  Submit", "Esc  Close", "Up/Down  History"):
+        for hint_text in ("Return  Submit", "Esc  Stop / Close", "Up/Down  History"):
             lbl = Gtk.Label(label=hint_text)
             lbl.add_css_class("hint-label")
             lbl.set_valign(Gtk.Align.CENTER)
             hint_row.append(lbl)
+
+    def _build_empty_state(self) -> None:
+        """Example prompts and recent queries; clicking one fills the entry."""
+        child = self._empty_box.get_first_child()
+        while child is not None:
+            nxt = child.get_next_sibling()
+            self._empty_box.remove(child)
+            child = nxt
+        sections = (
+            ("Try", list(EXAMPLE_PROMPTS)),
+            ("Recent", recent_for_empty_state(self._history)),
+        )
+        for title, items in sections:
+            if not items:
+                continue
+            heading = Gtk.Label(label=title, xalign=0.0)
+            heading.add_css_class("hint-label")
+            self._empty_box.append(heading)
+            for text in items:
+                btn = Gtk.Button(label=text)
+                btn.add_css_class("flat")
+                btn.add_css_class("search-result-row")
+                btn.set_halign(Gtk.Align.START)
+                btn.connect("clicked", lambda _b, t=text: self._fill_entry(t))
+                self._empty_box.append(btn)
+
+    def _fill_entry(self, text: str) -> None:
+        self._entry.set_text(text)
+        self._entry.grab_focus()
+        self._entry.set_position(-1)
+
+    def _update_empty_state(self, *_args: Any) -> None:
+        """Show the empty state only while nothing is typed or shown."""
+        idle = (
+            not self._entry.get_text()
+            and not self._requests.busy
+            and not self._response_label.get_visible()
+            and not self._results_box.get_visible()
+        )
+        self._empty_box.set_visible(idle)
 
     # ------------------------------------------------------------------
     # Signal connections
@@ -426,6 +496,9 @@ class IntentBarWindow(Adw.Window):
 
     def _connect_signals(self) -> None:
         self._entry.connect("activate", self._on_activate)
+        self._entry.connect("changed", self._update_empty_state)
+        self._response_label.connect("notify::visible", self._update_empty_state)
+        self._results_box.connect("notify::visible", self._update_empty_state)
         self._start_ollama_btn.connect("clicked", self._on_start_ollama)
         self._stop_btn.connect("clicked", lambda _b: self._cancel_request())
 
@@ -486,12 +559,10 @@ class IntentBarWindow(Adw.Window):
         self._entry.set_position(-1)
 
     def _push_history(self, query: str) -> None:
-        """Push a query onto the history stack (dedup head, cap at max)."""
-        if self._history and self._history[0] == query:
-            return
-        self._history.insert(0, query)
-        if len(self._history) > _MAX_HISTORY:
-            self._history = self._history[:_MAX_HISTORY]
+        """Put a query at the top of the history and save it."""
+        self._history = push_history(self._history, query, _MAX_HISTORY)
+        save_history(_HISTORY_FILE, self._history)
+        self._build_empty_state()
 
     # ------------------------------------------------------------------
     # Quick-action chips
@@ -526,6 +597,7 @@ class IntentBarWindow(Adw.Window):
         # Prepare UI for streaming (the availability check runs in the worker)
         request_id = self._requests.start()
         self._set_busy(True)
+        self._set_stage(STAGE_CONNECTING)
         self._set_response("")
         self._push_history(query)
         self._history_idx = -1
@@ -546,7 +618,17 @@ class IntentBarWindow(Adw.Window):
         self._stop_btn.set_visible(busy)
         self._entry.set_sensitive(not busy)
         if not busy:
+            self._set_stage(None)
             self._entry.grab_focus()
+        self._update_empty_state()
+
+    def _set_stage(self, stage: str | None, request_id: int | None = None) -> bool:
+        """Show the loading stage; ignored for a stale *request_id*."""
+        if request_id is not None and not self._requests.is_current(request_id):
+            return False
+        self._stage_label.set_text(stage or "")
+        self._stage_label.set_visible(bool(stage))
+        return False
 
     def _cancel_request(self) -> None:
         """Stop the running request; late results from it are dropped."""
@@ -572,6 +654,7 @@ class IntentBarWindow(Adw.Window):
         if not self._ollama.is_available():
             GLib.idle_add(self._on_ai_unavailable, request_id)
             return
+        GLib.idle_add(self._set_stage, STAGE_WAITING, request_id)
         system = self._build_system_prompt()
         parts: list[str] = []
         self._stream_parts = parts
@@ -583,9 +666,12 @@ class IntentBarWindow(Adw.Window):
                 parts.append(token)
                 if showing:
                     GLib.idle_add(self._append_token, token, request_id)
-                elif classify_stream_prefix("".join(parts)) == SHOW:
+                    continue
+                so_far = "".join(parts)
+                GLib.idle_add(self._set_stage, stage_for_stream(so_far), request_id)
+                if classify_stream_prefix(so_far) == SHOW:
                     showing = True
-                    GLib.idle_add(self._append_token, "".join(parts), request_id)
+                    GLib.idle_add(self._append_token, so_far, request_id)
         except Exception as exc:
             parts.append(f"\n[error] {exc}")
         if not self._stream_cancelled:
@@ -673,8 +759,9 @@ class IntentBarWindow(Adw.Window):
     def _start_semantic_search(self, query: str) -> None:
         request_id = self._requests.start()
         self._set_busy(True)
+        self._set_stage(STAGE_SEARCHING)
         self._clear_results()
-        self._set_response(f'Searching your files for "{query}"...')
+        self._set_response(f'Searching your files for "{query}"')
         threading.Thread(
             target=self._do_semantic_search, args=(query, request_id), daemon=True
         ).start()

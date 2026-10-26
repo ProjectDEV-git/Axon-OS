@@ -13,6 +13,12 @@ Gtk, Adw, GLib = require_gtk()
 window_mod = load_intent_bar_window()
 
 
+@pytest.fixture(autouse=True)
+def _tmp_history(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never touch the real ~/.axon history from tests."""
+    monkeypatch.setattr(window_mod, "_HISTORY_FILE", tmp_path / "history.json")
+
+
 class FakeOllama:
     def __init__(self, tokens: list[str] | None = None, available: bool = True) -> None:
         self.model = "llama3.2:3b"
@@ -195,3 +201,58 @@ def test_errors_have_icon_style_and_recovery(monkeypatch: pytest.MonkeyPatch) ->
     assert win._start_ollama_btn.get_visible()
     assert win._response_label.get_text() == "Ollama is not running."
     win.destroy()
+
+
+def test_loading_stages(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = make_window([])
+    stages: list[str | None] = []
+    real = win._set_stage
+
+    def spy(stage: str | None, request_id: int | None = None) -> bool:
+        stages.append(stage)
+        return real(stage, request_id)
+
+    monkeypatch.setattr(win, "_set_stage", spy)
+    win._ollama.tokens = ['{"action"', ': "open_app", "app": "x"}']
+    monkeypatch.setattr(win, "_execute_action", lambda _a: None)
+    monkeypatch.setattr(window_mod.GLib, "idle_add", lambda fn, *a: fn(*a))
+    rid = win._requests.start()
+    win._set_busy(True)
+    win._do_query("open x", rid)
+    assert stages[:2] == [window_mod.STAGE_WAITING, "Planning action…"]
+    assert not win._stage_label.get_visible()  # cleared when done
+    win.destroy()
+
+
+def test_empty_state_examples_fill_entry_and_hide() -> None:
+    win = make_window([])
+    assert win._empty_box.get_visible()
+    labels = []
+    child = win._empty_box.get_first_child()
+    while child is not None:
+        if isinstance(child, Gtk.Button):
+            labels.append(child.get_label())
+        child = child.get_next_sibling()
+    assert window_mod.EXAMPLE_PROMPTS[0] in labels
+    win._fill_entry("Open Firefox")
+    assert win._entry.get_text() == "Open Firefox"
+    assert not win._empty_box.get_visible()
+    win._entry.set_text("")
+    assert win._empty_box.get_visible()
+    win.destroy()
+
+
+def test_history_is_saved_and_offered(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = make_window([])
+    win._push_history("df -h please")
+    win.destroy()
+    again = make_window([])
+    assert again._history[0] == "df -h please"
+    texts = []
+    child = again._empty_box.get_first_child()
+    while child is not None:
+        if isinstance(child, Gtk.Button):
+            texts.append(child.get_label())
+        child = child.get_next_sibling()
+    assert "df -h please" in texts
+    again.destroy()

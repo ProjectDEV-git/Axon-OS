@@ -8,7 +8,16 @@ import Pango from 'gi://Pango';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
-import {RequestTracker, escapeAction, parseAction, splitError} from './ui-logic.js';
+import {
+    EXAMPLE_PROMPTS,
+    RequestTracker,
+    STAGES,
+    escapeAction,
+    parseAction,
+    pushHistory,
+    recentForEmptyState,
+    splitError,
+} from './ui-logic.js';
 
 function logError(error, message) {
     if (message) {
@@ -43,6 +52,9 @@ export default class IntentBar {
         this._keyPressId = null;
         this._brainProxy = null;
         this._stopButton = null;
+        this._emptyBox = null;
+        // Queries from this session, newest first, for the empty state
+        this._history = [];
         // The running Brain request; Escape or Stop cancels it
         this._requests = new RequestTracker();
     }
@@ -61,6 +73,7 @@ export default class IntentBar {
 
         this._brainProxy = null;
         this._stopButton = null;
+        this._emptyBox = null;
         this._entry = null;
         this._responseLabel = null;
         this._responseScroll = null;
@@ -167,7 +180,16 @@ export default class IntentBar {
         this._responseScroll.set_child(responseBox);
         this._responseScroll.hide();
 
+        // Shown before the user types: examples, recent queries, shortcuts
+        this._emptyBox = new St.BoxLayout({
+            style_class: 'axon-intentbar-empty',
+            vertical: true,
+            x_expand: true,
+        });
+        this._entry.clutter_text.connect('text-changed', () => this._updateEmptyState());
+
         this._actor.add_child(entryRow);
+        this._actor.add_child(this._emptyBox);
         this._actor.add_child(this._responseScroll);
 
         // Add to UI group (above all windows)
@@ -183,6 +205,8 @@ export default class IntentBar {
         this._responseLabel.set_text('');
         this._responseScroll.hide();
         this._entry.set_text('');
+        this._buildEmptyState();
+        this._updateEmptyState();
 
         this._positionCenter();
         this._actor.show();
@@ -248,10 +272,51 @@ export default class IntentBar {
         const query = this._entry.get_text().trim();
         if (!query) return;
 
+        this._history = pushHistory(this._history, query);
         const requestId = this._requests.start();
         this._setBusy(true);
-        this._setResponse('Thinking…');
+        // Only stages this code reaches: the proxy may still need creating
+        const connected = this._brainProxy || this._extension._brainProxy;
+        this._setResponse(connected ? STAGES.waiting : STAGES.connecting);
         this._callBrain(query, requestId);
+    }
+
+    _buildEmptyState() {
+        this._emptyBox.destroy_all_children();
+        const sections = [['Try', EXAMPLE_PROMPTS], ['Recent', recentForEmptyState(this._history)]];
+        for (const [title, items] of sections) {
+            if (items.length === 0)
+                continue;
+            this._emptyBox.add_child(new St.Label({style_class: 'axon-hint-label', text: title}));
+            const row = new St.BoxLayout({style_class: 'axon-chips-row', vertical: false});
+            for (const text of items) {
+                const chip = new St.Button({
+                    style_class: 'axon-chip',
+                    label: text,
+                    can_focus: true,
+                    accessible_name: `Use example: ${text}`,
+                });
+                chip.connect('clicked', () => {
+                    this._entry.set_text(text);
+                    this._entry.grab_key_focus();
+                    this._entry.clutter_text.set_cursor_position(-1);
+                });
+                row.add_child(chip);
+            }
+            this._emptyBox.add_child(row);
+        }
+        this._emptyBox.add_child(new St.Label({
+            style_class: 'axon-hint-label axon-hint-bar',
+            text: 'Enter  Run    Esc  Stop / Close',
+        }));
+    }
+
+    _updateEmptyState() {
+        if (!this._emptyBox)
+            return;
+        const idle = !this._entry.get_text() && !this._requests.busy &&
+            !this._responseScroll.visible;
+        this._emptyBox.visible = idle;
     }
 
     _setBusy(busy) {
@@ -338,6 +403,8 @@ export default class IntentBar {
                         return;
                     }
                     this._brainProxy = proxy;
+                    if (this._requests.isCurrent(requestId))
+                        this._setResponse(STAGES.waiting);
                     proxy.GenerateRemote(
                         prompt, systemPrompt, '', false,
                         (result, err) => this._onBrainReply(requestId, result, err)
@@ -393,7 +460,7 @@ export default class IntentBar {
                         {error: true});
                     return;
                 }
-                this._setResponse(`Asking before running: ${action.command}`);
+                this._setResponse(`${STAGES.confirm}: ${action.command}`);
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
                     this.hide();
                     return GLib.SOURCE_REMOVE;
@@ -419,6 +486,7 @@ export default class IntentBar {
         else
             this._responseLabel.remove_style_class_name('axon-response-error');
         this._responseScroll.show();
+        this._updateEmptyState();
         // Re-center after content change
         GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._positionCenter();

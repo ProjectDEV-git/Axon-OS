@@ -118,3 +118,11 @@ test('windowSummary', async () => {
     assert.equal(windowSummary(['A', 'B', 'C', 'D', 'E']), '5 windows · A · B · C · +2 more');
     assert.equal(windowSummary(['', 'B']), '2 windows · B');
 });
+
+test('history helpers', async () => {
+    const m = await import('./ui-logic.mjs');
+    assert.deepEqual(m.pushHistory(['b', 'a'], 'a'), ['a', 'b']);
+    assert.deepEqual(m.pushHistory(['a'], '  '), ['a']);
+    assert.deepEqual(m.recentForEmptyState(['x', m.EXAMPLE_PROMPTS[0], 'x', 'y', 'z', 'w']),
+        ['x', 'y', 'z']);
+});

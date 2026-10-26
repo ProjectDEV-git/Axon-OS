@@ -298,3 +298,53 @@ export function windowSummary(appNames, maxNames = 3) {
         parts.push(`+${unique.length - maxNames} more`);
     return parts.join(' · ');
 }
+
+/** Loading stages (twin of STAGE_* in services/ui_logic.py). */
+export const STAGES = Object.freeze({
+    connecting: 'Connecting to Axon Brain…',
+    waiting: 'Waiting for model…',
+    planning: 'Planning action…',
+    searching: 'Searching local files…',
+    confirm: 'Ready for confirmation',
+});
+
+/** Example prompts for the empty Intent Bar (twin of EXAMPLE_PROMPTS). */
+export const EXAMPLE_PROMPTS = Object.freeze([
+    'find the PDF I edited yesterday',
+    'Open Firefox',
+    'How much disk space is free?',
+    'Explain what a symlink is',
+]);
+
+/**
+ * History (newest first) with `query` moved to the front.
+ *
+ * @param {string[]} history
+ * @param {string} query
+ * @param {number} [limit]
+ * @returns {string[]}
+ */
+export function pushHistory(history, query, limit = 20) {
+    const q = String(query ?? '').trim();
+    if (!q)
+        return [...history];
+    return [q, ...history.filter(h => h !== q)].slice(0, limit);
+}
+
+/**
+ * Most recent distinct queries to offer before the user types.
+ *
+ * @param {string[]} history - newest first
+ * @param {number} [limit]
+ * @returns {string[]}
+ */
+export function recentForEmptyState(history, limit = 3) {
+    const out = [];
+    for (const item of history) {
+        if (item && !out.includes(item) && !EXAMPLE_PROMPTS.includes(item))
+            out.push(item);
+        if (out.length >= limit)
+            break;
+    }
+    return out;
+}

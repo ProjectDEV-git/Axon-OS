@@ -8,7 +8,9 @@ the parts it needs in ``shell/axon-shell/ui-logic.js``; keep the two in sync.
 from __future__ import annotations
 
 import json
+import os
 import re
+from pathlib import Path
 from typing import Any
 
 HOLD = "hold"
@@ -180,3 +182,72 @@ def fit_to_screen(preferred: int, available: int, margin: int = 48, minimum: int
     if available <= 0:
         return preferred
     return max(minimum, min(preferred, available - margin))
+
+
+# Loading stages shown while a request runs. Only show a stage the code has
+# actually reached. Keep in sync with STAGES in shell/axon-shell/ui-logic.js.
+STAGE_CONNECTING = "Connecting to Axon Brain…"
+STAGE_WAITING = "Waiting for model…"
+STAGE_PLANNING = "Planning action…"
+STAGE_SEARCHING = "Searching local files…"
+STAGE_CONFIRM = "Ready for confirmation"
+
+
+def stage_for_stream(text: str) -> str | None:
+    """Stage to show once tokens arrive: planning while JSON is held back.
+
+    Returns None when the reply is plain text and is being shown already.
+    """
+    return STAGE_PLANNING if classify_stream_prefix(text) == HOLD else None
+
+
+# Example prompts for the Intent Bar's empty state. Each one works with the
+# current actions: semantic file search, open_app, an allowlisted command,
+# or a plain answer.
+EXAMPLE_PROMPTS: tuple[str, ...] = (
+    "find the PDF I edited yesterday",
+    "Open Firefox",
+    "How much disk space is free?",
+    "Explain what a symlink is",
+)
+
+
+def push_history(history: list[str], query: str, limit: int = 20) -> list[str]:
+    """Return *history* (newest first) with *query* moved to the front."""
+    query = query.strip()
+    if not query:
+        return list(history)
+    return ([query] + [h for h in history if h != query])[:limit]
+
+
+def recent_for_empty_state(history: list[str], limit: int = 3) -> list[str]:
+    """Most recent distinct queries to offer before the user types."""
+    seen: list[str] = []
+    for item in history:
+        if item and item not in seen and item not in EXAMPLE_PROMPTS:
+            seen.append(item)
+        if len(seen) >= limit:
+            break
+    return seen
+
+
+def load_history(path: Path, limit: int = 20) -> list[str]:
+    """Read saved queries (newest first); missing or corrupt files give []."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [str(x) for x in data if isinstance(x, str) and x.strip()][:limit]
+
+
+def save_history(path: Path, history: list[str]) -> None:
+    """Write queries readable by the user only (they can be personal)."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(history, fh)
+    except OSError:
+        pass  # history is a convenience; never break the bar over it

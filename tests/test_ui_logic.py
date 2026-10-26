@@ -185,3 +185,46 @@ def test_fit_to_screen(preferred: int, available: int, expected: int) -> None:
     from services.ui_logic import fit_to_screen
 
     assert fit_to_screen(preferred, available) == expected
+
+
+def test_stage_for_stream() -> None:
+    from services.ui_logic import STAGE_PLANNING, stage_for_stream
+
+    assert stage_for_stream('{"action"') == STAGE_PLANNING
+    assert stage_for_stream("Sure, here") is None
+
+
+class TestHistory:
+    def test_push_moves_to_front_and_caps(self) -> None:
+        from services.ui_logic import push_history
+
+        h = push_history(["b", "a"], "a")
+        assert h == ["a", "b"]
+        assert push_history(h, "  ") == h
+        assert len(push_history([str(i) for i in range(30)], "new", limit=20)) == 20
+
+    def test_recent_skips_examples_and_dupes(self) -> None:
+        from services.ui_logic import EXAMPLE_PROMPTS, recent_for_empty_state
+
+        h = ["x", EXAMPLE_PROMPTS[0], "x", "y", "z", "w"]
+        assert recent_for_empty_state(h) == ["x", "y", "z"]
+
+    def test_save_and_load(self, tmp_path) -> None:
+        from services.ui_logic import load_history, save_history
+
+        path = tmp_path / "sub" / "history.json"
+        save_history(path, ["one", "two"])
+        assert load_history(path) == ["one", "two"]
+        assert (path.stat().st_mode & 0o777) == 0o600
+
+    def test_load_bad_files(self, tmp_path) -> None:
+        from services.ui_logic import load_history
+
+        assert load_history(tmp_path / "missing.json") == []
+        bad = tmp_path / "bad.json"
+        bad.write_text("{not json")
+        assert load_history(bad) == []
+        bad.write_text('{"a": 1}')
+        assert load_history(bad) == []
+        bad.write_text('["ok", 3, "  "]')
+        assert load_history(bad) == ["ok"]

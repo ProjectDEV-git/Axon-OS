@@ -138,12 +138,17 @@ add a short note under any item you skip or change.
       a gsettings toggle (default off), and drop the request if the user switches again.
 
 ### Intent Bar
-- [ ] **Clear loading states.** Replace "Thinking…" with real stages: "Connecting to Axon
+- [x] **Clear loading states.** Replace "Thinking…" with real stages: "Connecting to Axon
       Brain", "Searching local files", "Waiting for model", "Planning action", "Ready for
       confirmation". Show only stages the code actually reaches.
-- [ ] **Useful empty state.** Before the user types, show 3–4 example prompts ("Open my Code
+      Note: the Shell bar can't see model progress (non-streaming call), so it shows only
+      Connecting / Waiting / Ready for confirmation.
+- [x] **Useful empty state.** Before the user types, show 3–4 example prompts ("Open my Code
       space", "find the PDF I edited yesterday", "Set volume to 40%"), the last few
       commands from history, and the keyboard shortcuts. Clicking an example fills the entry.
+      Note: examples only use what works today, so "Set volume to 40%" was left out (`pactl`
+      is not allowlisted). GTK history is now saved to `~/.axon/intent_history.json`
+      (mode 0600); the Shell keeps its history for the session.
 
 ### Responsive sizing
 - [ ] **Intent Bar width.** Replace `min-width: 680px` with a width computed from the
