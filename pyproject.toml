@@ -122,7 +122,6 @@ omit = [
     ".venv/*",
     "apps/*/ui/*",
     "apps/*/main.py",
-    "apps/axon-logger.py",
     "apps/axon-terminal/terminal_widget.py",
     "apps/axon-terminal/ai_helper.py",
     "apps/axon-files/ui.py",

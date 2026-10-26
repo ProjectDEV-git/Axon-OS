@@ -109,7 +109,7 @@ This automatically:
 Use the centralized logging utility for consistent log output:
 
 ```python
-from apps.axon_logger import configure_app_logger
+from axon_logger import configure_app_logger
 
 logger = configure_app_logger(__name__)
 logger.info("App started")
