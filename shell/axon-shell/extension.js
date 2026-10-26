@@ -13,6 +13,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import SpacesManager from './spaces.js';
 import IntentBar from './intentbar.js';
 import DockManager from './dock.js';
+import SpaceSwitcher from './spaceswitcher.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 
 // ─── AxonAIIndicator ──────────────────────────────────────────────────────────
@@ -190,6 +191,7 @@ export default class AxonShellExtension extends Extension {
         this._intentBar     = null;
         this._aiIndicator   = null;
         this._dockManager   = null;
+        this._spaceSwitcher = null;
         this._keybindingIds = [];
         this._contextProxy  = null;
         this._brainProxy    = null;
@@ -237,6 +239,9 @@ export default class AxonShellExtension extends Extension {
 
             this._intentBar = new IntentBar(this, this._spacesManager);
             this._intentBar.enable();
+
+            this._spaceSwitcher = new SpaceSwitcher(this._spacesManager);
+            this._spaceSwitcher.enable();
 
             this._dockManager = new DockManager(this, this._intentBar);
             this._dockManager.enable();
@@ -340,6 +345,22 @@ export default class AxonShellExtension extends Extension {
             this._keybindingIds.push('toggle-intent-bar');
         } catch (e) {
             console.warn('AxonShell: could not bind toggle-intent-bar:', e.message);
+        }
+
+        // Super+J → Space quick switcher
+        try {
+            Main.wm.addKeybinding(
+                'open-space-switcher',
+                settings,
+                Meta.KeyBindingFlags.NONE,
+                Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+                () => {
+                    this._spaceSwitcher.toggle();
+                }
+            );
+            this._keybindingIds.push('open-space-switcher');
+        } catch (e) {
+            console.warn('AxonShell: could not bind open-space-switcher:', e.message);
         }
 
         // Super+A → toggle AI panel
@@ -567,6 +588,11 @@ export default class AxonShellExtension extends Extension {
             if (this._dockManager) {
                 this._dockManager.disable();
                 this._dockManager = null;
+            }
+
+            if (this._spaceSwitcher) {
+                this._spaceSwitcher.disable();
+                this._spaceSwitcher = null;
             }
 
             if (this._intentBar) {

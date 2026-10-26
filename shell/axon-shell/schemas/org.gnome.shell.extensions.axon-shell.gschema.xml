@@ -80,6 +80,13 @@
       <description>Keybinding to activate Space 9.</description>
     </key>
 
+    <!-- Space quick switcher: Super+J ("jump") -->
+    <key name="open-space-switcher" type="as">
+      <default>["&lt;Super&gt;j"]</default>
+      <summary>Open the Space switcher</summary>
+      <description>Keybinding to search Spaces and their windows and jump to one.</description>
+    </key>
+
     <!-- Voice toggle: Super+V -->
     <key name="toggle-voice" type="as">
       <default>["&lt;Super&gt;v"]</default>

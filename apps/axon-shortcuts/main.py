@@ -32,6 +32,7 @@ SHORTCUTS = [
             ("Super + 1–9", "Switch to Space 1–9"),
             ("Super + Shift + 1–9", "Move window to Space 1–9"),
             ("Super + Tab", "Switch between Spaces"),
+            ("Super + J", "Search Spaces and windows, then jump"),
             ("Alt + Tab", "Switch between windows"),
         ],
     },

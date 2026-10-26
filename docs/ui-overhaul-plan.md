@@ -301,8 +301,12 @@ add a short note under any item you skip or change.
       Note: shown as chips in the taskbar, because the extension hides GNOME's top panel
       (where the old Space indicator sat). Active = bold + underline bar, empty = dimmed
       with no count, "!" = a window wants attention; each chip has an accessible name.
-- [ ] Quick switcher with search (keyboard first).
+- [x] Quick switcher with search (keyboard first).
+      Note: Super+J (new `open-space-switcher` key). Matches Space names, numbers and window
+      titles; Enter switches and focuses the matched window.
 - [ ] Optional: small window previews and drag-and-drop between Spaces.
+      Note: skipped for now (optional). Needs Clutter clones and DnD in a live Shell to get
+      right; nothing here could be tested in the container.
 
 ### Accessibility
 - [ ] Every Shell popup and GTK app can be fully used with the keyboard (Tab order, arrows
