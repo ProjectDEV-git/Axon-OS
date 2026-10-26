@@ -303,3 +303,8 @@ tested in a real GNOME session.
   windows fit small screens. New Axon Settings → Preferences window. Not tested in a real
   GNOME session: notifications and their actions (`notify.js`, GNOME 45 vs 46+ APIs),
   window moves/undo, the OSD AI summary timing, Shell empty state and Start Menu sizing.
+- 2026-10-26 — Phase 3 done: local/cloud/remote indicator (never "local" without
+  checking), context share settings with a per-message context row and a cloud warning,
+  the Axon confirmation card with risk levels and a re-checked "Always allow" list, and an
+  Axon status section in the AI panel. Not tested in a real GNOME session: the Shell Intent
+  Bar origin label and the Shell's use of the confirmation card (`ai-actions.js`).
