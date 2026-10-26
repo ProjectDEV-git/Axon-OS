@@ -258,23 +258,32 @@ tail -f ~/.ollama/logs/server.log
 
 1. **Ollama not running:**
    ```bash
-   # Start Ollama
-   ollama serve &
-   
-   # Or use systemd
-   systemctl start ollama
+   sudo systemctl enable --now ollama
    ```
+   Don't run `ollama serve` as your own user next to the system service.
+   Whichever starts first takes port 11434, and a user-level server reads
+   `~/.ollama` instead of `/usr/share/ollama/.ollama`, so all models seem to
+   disappear. Stop a stray one with `pkill -u "$USER" -x ollama`.
 
 2. **Model not found:**
    ```bash
    # List available models
    ollama list
-   
+
    # Pull missing model
    ollama pull mistral:latest
    ```
+   If a tier names a model that isn't downloaded, Axon Brain falls back to
+   the model chosen in the installer or another installed model, and logs
+   `Model X is not installed; using Y instead`. Pick models per tier in
+   Settings → AI Models, or delete `~/.local/share/axon/config.toml` to
+   start over from the installer's choice.
 
-3. **Out of memory:**
+3. **First request after boot times out:** a cold model can take minutes to
+   load on CPU. Brain waits up to 5 minutes for the first token and preloads
+   the Speed model at startup.
+
+4. **Out of memory:**
    ```bash
    # Check available VRAM
    nvidia-smi  # or rocm-smi
@@ -283,7 +292,7 @@ tail -f ~/.ollama/logs/server.log
    # Edit ~/.ollama/modelfile or Ollama config
    ```
 
-4. **Port already in use:**
+5. **Port already in use:**
    ```bash
    # Find process using port 11434
    lsof -i :11434

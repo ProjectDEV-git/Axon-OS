@@ -123,14 +123,21 @@ gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
 gsettings set org.gnome.desktop.wm.keybindings show-desktop "['<Super>d']" || true
 gsettings set org.gnome.settings-daemon.plugins.media-keys home "['<Super>e']" || true
 
-# 6. Start Ollama service (if installed and not already running)
-# NOTE: Ollama should ideally run as a systemd user service (e.g.,
-# ollama.service) for proper lifecycle management (restart on crash,
-# graceful shutdown). This background-process approach is a temporary
-# workaround until a systemd unit is shipped with Ollama or added to the
-# Axon OS service layer. See: https://github.com/ProjectDEV-git/Axon-OS/issues
+# 6. Make sure Ollama is running.
+# install-ollama.sh ships a system ollama.service (user `ollama`, models in
+# /usr/share/ollama/.ollama). Never start a second `ollama serve` as the
+# desktop user next to it: that one grabs port 11434 first and serves an
+# empty ~/.ollama, so every model the system service pulled "disappears" and
+# the system unit crash-loops on "address already in use".
 if command -v ollama &>/dev/null; then
-    if ! pgrep -x ollama &>/dev/null; then
+    if systemctl cat ollama.service &>/dev/null; then
+        if ! systemctl is-active --quiet ollama.service; then
+            # Polkit may refuse this without a password; ollama.service is
+            # enabled at boot anyway, so a failure here is not fatal.
+            systemctl start ollama.service &>/dev/null || true
+        fi
+    elif ! pgrep -x ollama &>/dev/null; then
+        # No system unit (e.g. a manual install): run it for this session.
         ollama serve &>/dev/null &
     fi
 fi

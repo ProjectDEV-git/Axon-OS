@@ -25,7 +25,8 @@ WHISPER_DIR = AXON_DIR / "models" / "whisper"
 # ---------------------------------------------------------------------------
 # Ollama / AI
 # ---------------------------------------------------------------------------
-OLLAMA_BASE_URL = "http://localhost:11434"
+# OLLAMA_BASE_URL overrides the default (docker-compose points it at the host).
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 EMBED_MODEL = "nomic-embed-text"
 MAX_MODEL_NAME_LEN = 256
 MAX_PROMPT_LEN = 10_000

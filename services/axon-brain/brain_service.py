@@ -61,6 +61,8 @@ from providers import (
 from service_utils import rate_limited
 
 CONFIG_FILE = AXON_DIR / "config.toml"
+# Written by the graphical installer; holds the model the user picked there.
+INSTALLER_CONFIG_FILE = Path.home() / ".axon" / "config.toml"
 PROVIDERS_FILE = AXON_DIR / "providers.json"
 MODEL_TIERS = ("speed_model", "general_model", "deep_model")
 
@@ -74,6 +76,7 @@ _INJECTION_PATTERNS = re.compile(
     r"override.*system|forget everything)",
     re.IGNORECASE,
 )
+
 
 def _require_http_url(url: str) -> None:
     """Reject non-HTTP(S) URLs; urllib would also open file:// and custom schemes."""
@@ -156,9 +159,74 @@ class TokenBuffer:
             return len(self._buffer)
 
 
-# Per-read timeout for Ollama streaming (seconds).
-# If no data arrives within this window, the stream is considered hung.
-_STREAM_READ_TIMEOUT = 30.0
+# Per-read timeout for Ollama streaming (seconds), set once tokens start
+# flowing. If no data arrives within this window, the stream is considered hung.
+_STREAM_READ_TIMEOUT = 120.0
+
+# How long to wait for Ollama's first byte on a generate/chat request. Ollama
+# sends nothing until the model is loaded into memory and the prompt is read,
+# which takes minutes for a cold 7B+ model on CPU or a slow disk.
+_OLLAMA_LOAD_TIMEOUT = 300.0
+
+# How long a fetched list of installed Ollama models stays fresh (seconds).
+_INSTALLED_MODELS_TTL = 15.0
+
+# Local Ollama is never reached through an HTTP proxy: a desktop proxy setting
+# (http_proxy without a matching no_proxy) would otherwise swallow every call.
+_LOCAL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """True for errors worth retrying: Ollama not accepting connections yet.
+
+    HTTP errors (e.g. 404 model not found) and timeouts (model still loading)
+    are not retried: repeating them only multiplies the wait.
+    """
+    if isinstance(exc, urllib.error.HTTPError):
+        return False
+    if isinstance(exc, urllib.error.URLError):
+        exc = exc.reason if isinstance(exc.reason, BaseException) else exc
+    if isinstance(exc, TimeoutError):
+        return False
+    return isinstance(exc, (ConnectionError, FileNotFoundError))
+
+
+def _ollama_error_message(exc: BaseException, model: str = "") -> str:
+    """Turn an Ollama HTTP failure into a message a user can act on."""
+    if isinstance(exc, urllib.error.HTTPError):
+        detail = ""
+        try:
+            detail = json.loads(exc.read().decode(errors="replace") or "{}").get("error", "")
+        except Exception:
+            pass
+        if exc.code == 404 and model:
+            return f"Model '{model}' is not downloaded. Run: ollama pull {model}"
+        return f"Ollama error {exc.code}: {detail}" if detail else f"Ollama error {exc.code}"
+    reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+    if isinstance(reason, TimeoutError):
+        return "Ollama took too long to respond (the model may still be loading)"
+    if isinstance(reason, (ConnectionError, FileNotFoundError)):
+        return "Ollama is not running. Start it with: sudo systemctl start ollama"
+    return f"Ollama request failed: {reason}"
+
+
+def _same_model(a: str, b: str) -> bool:
+    """Compare Ollama tags, treating a missing tag as ``:latest``."""
+
+    def norm(name: str) -> str:
+        return name if ":" in name else f"{name}:latest"
+
+    return norm(a) == norm(b)
+
+
+def _read_installer_model() -> str:
+    """Return the model chosen in the installer (``[ai].default_model``), or ``""``."""
+    try:
+        with open(INSTALLER_CONFIG_FILE, "rb") as f:
+            model = tomllib.load(f).get("ai", {}).get("default_model", "")
+    except (OSError, ValueError):
+        return ""
+    return model if isinstance(model, str) else ""
 
 
 class BrainService(ServiceBase):
@@ -185,6 +253,37 @@ class BrainService(ServiceBase):
             flush_interval=0.1,
             max_tokens=10,
         )
+        threading.Thread(target=self._warm_up_ollama, daemon=True).start()
+
+    def _warm_up_ollama(self, wait_seconds: float = 180.0) -> None:
+        """Load the speed model into Ollama once it is up.
+
+        Intent and window classification give a model only 5-10 seconds, far
+        less than a cold load takes, so without this the first requests after
+        boot always fail. A generate request with no prompt only loads the model.
+        """
+        deadline = time.monotonic() + wait_seconds
+        while self._installed_models() is None:
+            if time.monotonic() > deadline:
+                logger.info("Ollama not reachable at %s; skipping warm-up", OLLAMA_BASE_URL)
+                return
+            time.sleep(5)
+        with self._config_lock:
+            speed = str(self.config.get("speed_model", ""))
+        if not speed or self._is_cloud(speed):
+            return
+        model = self._resolve_local_model(self._local_name(speed))
+        try:
+            with self._http_post(
+                f"{OLLAMA_BASE_URL}/api/generate",
+                {"model": model, "stream": False},
+                timeout=_OLLAMA_LOAD_TIMEOUT,
+                max_retries=1,
+            ) as r:
+                r.read()
+            logger.info("Loaded %s into Ollama", model)
+        except (urllib.error.URLError, OSError) as e:
+            logger.info("Warm-up of %s failed: %s", model, _ollama_error_message(e, model))
 
     def _cleanup(self):
         """Close DB connection pool on shutdown."""
@@ -232,6 +331,14 @@ class BrainService(ServiceBase):
                     except OSError as backup_err:
                         logger.warning("Could not back up corrupted config: %s", backup_err)
 
+            # The model picked in the installer is the one that was downloaded,
+            # so use it for every tier rather than models that may be missing.
+            installer_model = _read_installer_model()
+            if installer_model and self._validate_model_name(installer_model):
+                self.config = dict.fromkeys(MODEL_TIERS, installer_model)
+                self.save_config()
+                return
+
             # Profile hardware and save default config
             try:
                 profile = hardware_profiler.profile_hardware()
@@ -250,34 +357,70 @@ class BrainService(ServiceBase):
             self.save_config()
 
     def _http_post(self, url, payload, stream=False, timeout=60.0, max_retries=5):
-        """Helper to execute urllib POST requests with retry logic."""
+        """POST JSON to Ollama, retrying only while it refuses connections."""
         _require_http_url(url)
         data = json.dumps(payload).encode()
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-        max_backoff = 30.0
-        for attempt in range(max_retries):
-            try:
-                return urllib.request.urlopen(req, timeout=timeout)  # nosec B310 - http(s) only
-            except (urllib.error.URLError, OSError):
-                if attempt == max_retries - 1:
-                    raise
-                backoff = min(2.0**attempt, max_backoff)
-                time.sleep(backoff)
+        return self._open_with_retry(req, timeout, max_retries)
 
-    def _http_get(self, url, timeout=5.0):
-        """Helper to execute urllib GET requests with retry logic."""
+    def _http_get(self, url, timeout=5.0, max_retries=5):
+        """GET from Ollama, retrying only while it refuses connections."""
         _require_http_url(url)
-        req = urllib.request.Request(url)
-        max_retries = 5
+        return self._open_with_retry(urllib.request.Request(url), timeout, max_retries)
+
+    @staticmethod
+    def _open_with_retry(req, timeout, max_retries):
         max_backoff = 30.0
         for attempt in range(max_retries):
             try:
-                return urllib.request.urlopen(req, timeout=timeout)  # nosec B310 - http(s) only
-            except (urllib.error.URLError, OSError):
-                if attempt == max_retries - 1:
+                return _LOCAL_OPENER.open(req, timeout=timeout)  # nosec B310 - http(s) only
+            except (urllib.error.URLError, OSError) as e:
+                if attempt == max_retries - 1 or not _is_retryable(e):
                     raise
-                backoff = min(2.0**attempt, max_backoff)
-                time.sleep(backoff)
+                time.sleep(min(2.0**attempt, max_backoff))
+        raise RuntimeError("unreachable")  # pragma: no cover
+
+    def _installed_models(self) -> list[str] | None:
+        """Names of models pulled into Ollama, or ``None`` if it can't be reached."""
+        now = time.monotonic()
+        cache: tuple[float, list[str]] | None = getattr(self, "_installed_cache", None)
+        if cache is not None and now - cache[0] < _INSTALLED_MODELS_TTL:
+            return cache[1]
+        try:
+            with self._http_get(f"{OLLAMA_BASE_URL}/api/tags", timeout=3.0, max_retries=1) as r:
+                names = [m["name"] for m in json.loads(r.read().decode()).get("models", [])]
+        except Exception as e:
+            logger.debug("Could not list installed Ollama models: %s", e)
+            return None
+        self._installed_cache = (now, names)
+        return names
+
+    def _resolve_local_model(self, model: str) -> str:
+        """Return *model* if it is installed, else the best installed substitute.
+
+        The tier config can name models that were never pulled (the hardware
+        profile recommends several, the installer downloads one). Instead of
+        failing every request with "model not found", fall back to the
+        installer's choice, another configured tier, or any installed chat
+        model. If Ollama is unreachable or nothing fits, *model* is returned
+        unchanged so the caller reports the real error.
+        """
+        installed = self._installed_models()
+        if not installed or any(_same_model(model, m) for m in installed):
+            return model
+        config = getattr(self, "config", {}) or {}
+        candidates = [_read_installer_model()] + [str(config.get(k, "")) for k in MODEL_TIERS]
+        chat_models = [m for m in installed if "embed" not in m.lower()]
+        for cand in candidates:
+            match = next((m for m in chat_models if cand and _same_model(cand, m)), None)
+            if match:
+                break
+        else:
+            match = chat_models[0] if chat_models else None
+        if match is None:
+            return model
+        logger.warning("Model %s is not installed; using %s instead", model, match)
+        return match
 
     # ------------------------------------------------------------------
     # Input validation (defence against injection / abuse)
@@ -332,9 +475,14 @@ class BrainService(ServiceBase):
         arrives within *timeout* seconds.
         """
         try:
-            fp = response.raw._fp
-            if fp is not None and hasattr(fp, "sock") and fp.sock is not None:
-                fp.sock.settimeout(timeout)
+            # http.client.HTTPResponse (urllib): fp is a BufferedReader over a
+            # SocketIO whose _sock is the connection.
+            sock = getattr(getattr(response.fp, "raw", None), "_sock", None)
+            if sock is None:  # requests/urllib3-style response
+                fp = response.raw._fp
+                sock = getattr(fp, "sock", None) if fp is not None else None
+            if sock is not None:
+                sock.settimeout(timeout)
         except (AttributeError, OSError):
             pass  # Socket not yet connected or already closed
 
@@ -347,7 +495,7 @@ class BrainService(ServiceBase):
         """Returns JSON about Ollama and model config status."""
         status = {"ollama_online": False, "active_models": [], "configured_models": self.config}
         try:
-            with self._http_get(f"{OLLAMA_BASE_URL}/api/tags", timeout=2.0) as resp:
+            with self._http_get(f"{OLLAMA_BASE_URL}/api/tags", timeout=2.0, max_retries=1) as resp:
                 if resp.status == 200:
                     status["ollama_online"] = True
                     data = json.loads(resp.read().decode())
@@ -360,7 +508,7 @@ class BrainService(ServiceBase):
     def ListModels(self):
         """Returns local pulled models as a JSON array."""
         try:
-            with self._http_get(f"{OLLAMA_BASE_URL}/api/tags") as resp:
+            with self._http_get(f"{OLLAMA_BASE_URL}/api/tags", max_retries=1) as resp:
                 if resp.status == 200:
                     data = json.loads(resp.read().decode())
                     return json.dumps(data.get("models", []))
@@ -823,6 +971,7 @@ class BrainService(ServiceBase):
                 model, msgs, stream=False, temperature=temperature, timeout=timeout
             )
             return _sanitize_output("".join(chunks))
+        model = self._resolve_local_model(model)
         payload: dict[str, Any] = {"model": model, "prompt": prompt, "stream": False}
         if system:
             payload["system"] = system
@@ -834,14 +983,22 @@ class BrainService(ServiceBase):
 
     def _ollama_stream(self, path, payload, extract):
         """Yield tokens from an Ollama NDJSON streaming endpoint."""
-        with self._http_post(f"{OLLAMA_BASE_URL}{path}", payload) as r:
+        payload = {**payload, "model": self._resolve_local_model(payload["model"])}
+        try:
+            r = self._http_post(f"{OLLAMA_BASE_URL}{path}", payload, timeout=_OLLAMA_LOAD_TIMEOUT)
+        except (urllib.error.URLError, OSError) as e:
+            raise ProviderError(_ollama_error_message(e, payload["model"])) from None
+        with r:
             # FIX 3: Set per-read timeout on the underlying socket
             self._set_stream_timeout(r)
             for raw_line in r:
                 line = raw_line.decode().strip()
                 if not line:
                     continue
-                token = extract(json.loads(line))
+                chunk = json.loads(line)
+                if chunk.get("error"):
+                    raise ProviderError(f"Ollama error: {chunk['error']}")
+                token = extract(chunk)
                 if token:
                     yield token
 
@@ -896,9 +1053,11 @@ class BrainService(ServiceBase):
 
     def _do_generate_sync(self, prompt, system, model):
         try:
-            return self._complete(model, system, prompt)
+            return self._complete(model, system, prompt, timeout=_OLLAMA_LOAD_TIMEOUT)
         except ProviderError as e:
             return f"[Error: {e}]"
+        except (urllib.error.URLError, OSError) as e:
+            return f"[Error: {_ollama_error_message(e, model)}]"
         except Exception as e:
             logger.debug("Generate failed: %s", e)
             return "[Error: AI generation unavailable]"
@@ -928,7 +1087,9 @@ class BrainService(ServiceBase):
         system_prompt = CHAT_SYSTEM_PROMPT
         conv_prompt = self.store.get_system_prompt(conv_id)
         if conv_prompt:
-            system_prompt += f"\n\nConversation instructions:\n{_sanitize_context(str(conv_prompt))}"
+            system_prompt += (
+                f"\n\nConversation instructions:\n{_sanitize_context(str(conv_prompt))}"
+            )
         if context:
             system_prompt += f"\n\nHere is the user's current desktop context:\n{_sanitize_context(str(context))}"
         history = [
@@ -943,16 +1104,21 @@ class BrainService(ServiceBase):
         try:
             if self._is_cloud(model):
                 return _sanitize_output("".join(self.providers.chat(model, api_msgs, stream=False)))
+            model = self._resolve_local_model(model)
             payload = {
                 "model": model,
                 "messages": api_msgs,
                 "stream": False,
             }
-            with self._http_post(f"{OLLAMA_BASE_URL}/api/chat", payload) as resp:
+            with self._http_post(
+                f"{OLLAMA_BASE_URL}/api/chat", payload, timeout=_OLLAMA_LOAD_TIMEOUT
+            ) as resp:
                 data = json.loads(resp.read().decode())
                 return _sanitize_output(data.get("message", {}).get("content", ""))
         except ProviderError as e:
             return f"[Error: {e}]"
+        except (urllib.error.URLError, OSError) as e:
+            return f"[Error: {_ollama_error_message(e, model)}]"
         except Exception as e:
             logger.debug("Chat failed: %s", e)
             return "[Error: AI chat unavailable]"
