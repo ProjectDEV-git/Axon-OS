@@ -251,6 +251,7 @@ def save_history(path: Path, history: list[str]) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        os.fchmod(fd, 0o600)  # also tighten a file that already existed
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(history, fh)
     except OSError:

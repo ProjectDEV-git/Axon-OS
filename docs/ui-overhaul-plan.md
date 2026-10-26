@@ -175,10 +175,13 @@ add a short note under any item you skip or change.
       Brain's automatic tier choice (model `""`): the least private tier decides, and unknown
       tiers show "Model: unknown". The AI panel dropdown gained an honest "Automatic" entry;
       it used to show `llama3.2:3b` while sending `""`.
-- [ ] **Context controls (backend).** Add settings for what context may be sent:
+- [x] **Context controls (backend).** Add settings for what context may be sent:
       clipboard, terminal history, open files, active app, plus a master on/off. Make
       `apps/axon-ai-panel/context_reader.py::build_context_string` (and any Shell/Brain
       equivalent) respect them. Defaults: active app on, others as they are today. Add tests.
+      Note: `share_*` keys sit next to the existing `track_*` keys in
+      `~/.config/axon-os/context.json` (`services/context_settings.py`). The Context
+      service's `GetContextString` (used by the dock, terminal and panel) applies them too.
 - [ ] **Context controls (UI).** In the AI panel, above the entry, show what will be sent
       ("Context: Firefox, main.py, terminal history") with a way to remove items for this
       message and a link to the settings. Add the same toggles to Axon Settings.

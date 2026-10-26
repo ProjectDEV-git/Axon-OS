@@ -8,9 +8,19 @@ D-Bus service instead of scanning /proc and system log files directly.
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
 from typing import Any
 
 import dbus
+
+# services/ is beside apps/ (source tree, .deb) or inside the install dir.
+for _base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().parents[1]):
+    if (_base / "services").is_dir():
+        if str(_base / "services") not in sys.path:
+            sys.path.insert(0, str(_base / "services"))
+        break
+from context_settings import ContextSettings, available_items, format_context, load_settings
 
 
 class ContextReader:
@@ -98,12 +108,42 @@ class ContextReader:
                 pass
         return result
 
-    def build_context_string(self) -> str:
-        """Fetch the fully formatted prompt-ready context string from D-Bus."""
+    def snapshot(self) -> dict[str, Any]:
+        """Raw GetActiveContext() data, or {} when the service is unavailable."""
         ctx = self._get_context()
-        if ctx is not None:
-            try:
-                return str(ctx.GetContextString())
-            except Exception as e:
-                return f"Error retrieving context: {e}"
-        return "No desktop context available."
+        if ctx is None:
+            return {}
+        try:
+            data = json.loads(ctx.GetActiveContext())
+        except Exception:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def settings(self) -> ContextSettings:
+        """The user's share settings (re-read each time; the file may change)."""
+        return load_settings()
+
+    def context_items(self, snapshot: dict[str, Any] | None = None) -> list[tuple[str, str]]:
+        """What would be sent, as ``(key, description)`` pairs for the UI."""
+        data = self.snapshot() if snapshot is None else snapshot
+        return available_items(data, self.settings())
+
+    def build_context_string(
+        self,
+        exclude: frozenset[str] | set[str] = frozenset(),
+        snapshot: dict[str, Any] | None = None,
+    ) -> str:
+        """Prompt-ready context honouring the share settings.
+
+        Args:
+            exclude: Item keys the user removed for this one message.
+            snapshot: Data from :meth:`snapshot`, to avoid a second D-Bus call.
+
+        Returns:
+            The context text, or "" when nothing may be sent.
+        """
+        settings = self.settings()
+        if not settings.share_context:
+            return ""
+        data = self.snapshot() if snapshot is None else snapshot
+        return format_context(data, settings, exclude)

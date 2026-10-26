@@ -23,6 +23,14 @@ from service_base import ServiceBase
 logger = configure_app_logger("axon-context")
 
 from constants import AXON_DIR, MAX_CLIPBOARD_ENTRY_LEN, MAX_CLIPBOARD_HISTORY
+from context_settings import (
+    ACTIVE_APP,
+    CLIPBOARD,
+    OPEN_FILES,
+    TERMINAL,
+    format_context,
+    load_settings,
+)
 from service_utils import rate_limited
 
 _this = str(Path(__file__).resolve().parent)
@@ -130,45 +138,30 @@ class ContextService(ServiceBase):
     @rate_limited(rate=30, window_seconds=60)
     @dbus.service.method("org.axonos.Context", in_signature="", out_signature="s")
     def GetContextString(self):
-        """Formats context for injection into LLM system prompts."""
-        parts = []
+        """Formats context for injection into LLM system prompts.
 
-        if self.active_window_title and self.active_window_title != "None":
-            parts.append(
-                f"Active window: {self.active_window_title} (App: {self.active_window_app})"
-            )
-
-        parts.append(f"Current space: {self.active_space}")
-
-        open_files = self._get_open_files()
-        if open_files:
-            parts.append("Open files in editors:")
-            for f in open_files:
-                parts.append(f"  - {f}")
-
-        cmds = self._get_terminal_commands()
-        if cmds:
-            parts.append("Recent terminal commands:")
-            for cmd in cmds:
-                parts.append(f"  $ {cmd}")
-
-        stderr = self._get_last_stderr()
-        if stderr:
-            parts.append(f"Last terminal error:\n{stderr}")
-
-        with self._clipboard_lock:
-            clipboard_snapshot = list(self._clipboard_history)
-        if clipboard_snapshot:
-            parts.append("Recent clipboard entries:")
-            for i, entry in enumerate(reversed(clipboard_snapshot), 1):
-                # Truncate long entries for prompt injection
-                display = entry[:120] + "..." if len(entry) > 120 else entry
-                parts.append(f"  [{i}] {display}")
-
-        if not parts:
-            return "No desktop context available."
-
-        return "\n".join(parts)
+        Honours the share_* settings in ~/.config/axon-os/context.json
+        (see services/context_settings.py): items the user turned off are
+        neither collected nor sent, and the master switch returns "".
+        """
+        settings = load_settings()
+        if not settings.share_context:
+            return ""
+        snapshot: dict = {}
+        if settings.allows(ACTIVE_APP):
+            snapshot["active_window"] = {
+                "title": self.active_window_title,
+                "app": self.active_window_app,
+            }
+            snapshot["active_space"] = self.active_space
+        if settings.allows(OPEN_FILES):
+            snapshot["open_files"] = self._get_open_files()
+        if settings.allows(TERMINAL):
+            snapshot["terminal_commands"] = self._get_terminal_commands()
+            snapshot["last_stderr"] = self._get_last_stderr()
+        if settings.allows(CLIPBOARD):
+            snapshot["clipboard_history"] = self._get_clipboard_snapshot()
+        return format_context(snapshot, settings) or "No desktop context available."
 
     @rate_limited(rate=20, window_seconds=60)
     @dbus.service.method("org.axonos.Context", in_signature="s", out_signature="s")
