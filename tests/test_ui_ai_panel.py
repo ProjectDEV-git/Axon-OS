@@ -524,3 +524,57 @@ def test_answer_shows_model_time_sources_and_regenerate(monkeypatch: pytest.Monk
     pump(GLib)
     assert not bubble._sources_label.get_visible()
     win.destroy()
+
+
+def _find(widget: Any, kind: type, pred: Any = lambda w: True) -> list[Any]:
+    out = []
+    child = widget.get_first_child()
+    while child is not None:
+        if isinstance(child, kind) and pred(child):
+            out.append(child)
+        out += _find(child, kind, pred)
+        child = child.get_next_sibling()
+    return out
+
+
+def test_action_card_runs_only_through_confirmation(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = FakeClient(chunks=['{"action": "run_command", "command": "df -h"}'])
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    win._send_message("how much disk is free")
+    bubble = win._stream_bubble
+    rec.join()
+    pump(GLib)
+    assert bubble.get_text() == "Run: df -h"
+    cards = _find(bubble, Gtk.Box, lambda w: w.has_css_class("action-card"))
+    assert len(cards) == 1
+    labels = [w.get_text() for w in _find(cards[0], Gtk.Label)]
+    assert "df -h" in labels and any(t.startswith("Read-only.") for t in labels)
+
+    calls: list[str] = []
+
+    class Proc:
+        def communicate(self, timeout: float) -> tuple[str, None]:
+            return "/dev/sda1 100G\n", None
+
+    def fake_confirm(cmd: str, **_kw: Any) -> Any:
+        calls.append(cmd)
+        return Proc()
+
+    monkeypatch.setattr(panel_mod, "confirm_and_exec", fake_confirm)
+    win._run_card_command(bubble, cards[0], "df -h")
+    rec.join()
+    pump(GLib)
+    assert calls == ["df -h"]
+    assert not cards[0].get_visible()
+    assert "/dev/sda1 100G" in [w.get_text() for w in _find(bubble, Gtk.Label)]
+
+    # Declined on the confirmation card: nothing ran
+    monkeypatch.setattr(panel_mod, "confirm_and_exec", lambda cmd, **kw: None)
+    win._run_card_command(bubble, cards[0], "df -h")
+    rec.join()
+    pump(GLib)
+    assert "Not run." in [w.get_text() for w in _find(bubble, Gtk.Label)]
+    win.destroy()

@@ -113,3 +113,12 @@
     color: @axon_fg_muted;
     font-size: 11px;
 }
+
+/* A system change the AI proposes; it runs only after the confirmation card */
+.action-card {
+    background-color: @axon_surface_raised;
+    border: 1px solid @axon_border_strong;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 6px;
+}

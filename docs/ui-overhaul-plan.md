@@ -290,7 +290,7 @@ add a short note under any item you skip or change.
 - [x] **Sources.** When local files were used as context, list their paths under the answer.
       Note: lists the open-file paths that were actually sent (respecting the settings and
       per-message removals). The Brain doesn't report which files the model relied on.
-- [ ] **Action cards.** Show proposed system changes as cards using the Phase 3
+- [x] **Action cards.** Show proposed system changes as cards using the Phase 3
       confirmation component.
 - [ ] **Compact mode.** Layout works at 320 px wide.
 

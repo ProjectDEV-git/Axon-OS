@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -42,8 +43,11 @@ from ui_logic import (
     ModelOrigin,
     RequestTracker,
     answer_meta,
+    describe_action,
     escape_action,
+    format_command_output,
     origin_tooltip,
+    parse_action,
     routing_origin,
     split_error,
     visible_conversations,
@@ -51,6 +55,7 @@ from ui_logic import (
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
 from axon_gtk_utils import fit_default_size, load_app_css
+from command_risk import assess
 from context_settings import (
     ITEM_LABELS,
     SENSITIVE_ITEMS,
@@ -59,6 +64,7 @@ from context_settings import (
     sent_files,
 )
 from diagnostics import FAIL, INFO, OK, WARN, run_diagnostics
+from service_utils import confirm_and_exec
 from status_summary import StatusSummary, build_status
 
 _STATUS_ICONS = {
@@ -246,6 +252,10 @@ class MessageBubble(Gtk.Box):
     def get_text(self) -> str:
         """Return the message text received so far."""
         return self._text
+
+    def append_widget(self, widget: Gtk.Widget) -> None:
+        """Add a widget (e.g. an action card) under the message text."""
+        self._inner.insert_child_after(widget, self._label.get_parent())
 
     def set_meta(self, text: str) -> None:
         """Show the model and response time under the answer."""
@@ -1230,6 +1240,107 @@ class AIPanelWindow(Adw.Window):
         if offline:
             bubble.add_action("Diagnostics", self._open_diagnostics)
 
+    # ------------------------------------------------------------------
+    # Action cards: system changes the AI proposes
+    # ------------------------------------------------------------------
+
+    _RISK_ICONS = {  # noqa: RUF012
+        "read_only": "dialog-information-symbolic",
+        "changes_files": "document-edit-symbolic",
+        "deletes_files": "user-trash-symbolic",
+        "needs_root": "dialog-password-symbolic",
+    }
+
+    def _show_action_card(self, bubble: MessageBubble, action: dict[str, Any]) -> None:
+        """Show a proposed action as a card instead of its JSON.
+
+        Nothing runs from the card itself: commands go through the allowlist
+        and the confirmation card (confirm_and_exec), apps launch by desktop id.
+        """
+        bubble.set_final_text(describe_action(action))
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        card.add_css_class("action-card")
+        kind = action.get("action")
+        if kind == "run_command":
+            command = str(action.get("command", ""))
+            risk = assess(command)
+            command_label = Gtk.Label(xalign=0.0)
+            command_label.set_text(command)  # plain text, never markup
+            command_label.set_selectable(True)
+            command_label.set_wrap(True)
+            command_label.add_css_class("monospace")
+            card.append(command_label)
+            risk_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            risk_row.append(Gtk.Image.new_from_icon_name(self._RISK_ICONS[risk.level]))
+            risk_row.append(
+                Gtk.Label(label=f"{risk.label}. {risk.description}", xalign=0.0, wrap=True)
+            )
+            card.append(risk_row)
+            run = Gtk.Button(label="Review and Run…")
+            run.set_tooltip_text("Opens the confirmation card first")
+            run.connect("clicked", lambda _b: self._run_card_command(bubble, card, command))
+            primary = run
+        elif kind == "open_app":
+            name = str(action.get("app", ""))
+            primary = Gtk.Button(label=f"Open {name}")
+            primary.connect("clicked", lambda _b: self._open_card_app(bubble, card, name))
+        else:
+            bubble.set_final_text("Axon suggested an action it can't perform here.")
+            return
+        buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        buttons.set_halign(Gtk.Align.END)
+        dismiss = Gtk.Button(label="Dismiss")
+        dismiss.add_css_class("flat")
+        dismiss.connect("clicked", lambda _b: card.set_visible(False))
+        primary.add_css_class("suggested-action")
+        buttons.append(dismiss)
+        buttons.append(primary)
+        card.append(buttons)
+        bubble.append_widget(card)
+
+    def _run_card_command(self, bubble: MessageBubble, card: Gtk.Box, command: str) -> None:
+        card.set_sensitive(False)
+
+        def worker() -> None:
+            proc = confirm_and_exec(
+                command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            )
+            if proc is None:
+                GLib.idle_add(self._card_result, bubble, card, "Not run.")
+                return
+            try:
+                out, _ = proc.communicate(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                out = "(stopped after 15 seconds)"
+            GLib.idle_add(self._card_result, bubble, card, format_command_output(out or ""))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _card_result(self, bubble: MessageBubble, card: Gtk.Box, text: str) -> bool:
+        card.set_visible(False)
+        result = Gtk.Label(xalign=0.0)
+        result.set_text(text)
+        result.set_selectable(True)
+        result.set_wrap(True)
+        result.add_css_class("monospace")
+        bubble.append_widget(result)
+        return False
+
+    def _open_card_app(self, bubble: MessageBubble, card: Gtk.Box, name: str) -> None:
+        launched = False
+        for app_id in (name, f"{name}.desktop"):
+            try:
+                info = Gio.DesktopAppInfo.new(app_id)
+            except TypeError:
+                info = None
+            if info is not None:
+                launched = bool(info.launch([], None))
+                break
+        self._card_result(
+            bubble, card, f"Opened {name}." if launched else f"No installed app called “{name}”."
+        )
+
     def _offer_regenerate(self, bubble: MessageBubble, prompt: str) -> None:
         """Put "Regenerate" on the newest answer only."""
         old = getattr(self, "_regenerate_btn", None)
@@ -1277,8 +1388,12 @@ class AIPanelWindow(Adw.Window):
             bubble = self._stream_bubble
             self._stream_bubble = None
             body, error = split_error(full_text)
-            if error is None:
+            action = parse_action(full_text) if error is None else None
+            if action is not None:
+                self._show_action_card(bubble, action)
+            elif error is None:
                 bubble.set_final_text(full_text)
+            if error is None:
                 now = time.monotonic()
                 first = self._first_token_at
                 bubble.set_meta(
