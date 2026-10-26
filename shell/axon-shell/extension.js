@@ -172,6 +172,17 @@ const BrainGenerateInterface = `
 
 const BrainFullProxy = Gio.DBusProxy.makeProxyWrapper(BrainGenerateInterface);
 
+// Lets the GTK apps (e.g. the GTK Intent Bar) switch Spaces.
+const AxonShellInterface = `
+<node>
+  <interface name="org.axonos.Shell">
+    <method name="SwitchToSpace">
+      <arg type="i" name="index" direction="in"/>
+    </method>
+  </interface>
+</node>
+`;
+
 export default class AxonShellExtension extends Extension {
     constructor(metadata) {
         super(metadata);
@@ -186,6 +197,8 @@ export default class AxonShellExtension extends Extension {
         this._voiceOverlayProc = null;
         this._focusWindowId = null;
         this._overlayKeyId  = null;
+        this._dbusImpl      = null;
+        this._busNameId     = 0;
     }
 
     enable() {
@@ -238,6 +251,7 @@ export default class AxonShellExtension extends Extension {
             }
 
             this._registerKeybindings();
+            this._exportDBus();
 
             // 1. Intercept the Super / Windows Key press to toggle Start Menu
             this._overlayKeyId = global.display.connect('overlay-key', () => {
@@ -270,6 +284,22 @@ export default class AxonShellExtension extends Extension {
             if (Main.panel) {
                 Main.panel.show();
             }
+        }
+    }
+
+    _exportDBus() {
+        try {
+            this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(AxonShellInterface, {
+                SwitchToSpace: index => {
+                    if (this._spacesManager && Number.isInteger(index))
+                        this._spacesManager.switchToSpace(index);
+                },
+            });
+            this._dbusImpl.export(Gio.DBus.session, '/org/axonos/Shell');
+            this._busNameId = Gio.bus_own_name_on_connection(
+                Gio.DBus.session, 'org.axonos.Shell', Gio.BusNameOwnerFlags.NONE, null, null);
+        } catch (e) {
+            console.warn('AxonShell: could not export org.axonos.Shell:', e.message);
         }
     }
 
@@ -501,6 +531,14 @@ export default class AxonShellExtension extends Extension {
                 this._voiceOverlayProc = null;
             }
             this._voiceProxy = null;
+            if (this._busNameId) {
+                Gio.bus_unown_name(this._busNameId);
+                this._busNameId = 0;
+            }
+            if (this._dbusImpl) {
+                this._dbusImpl.unexport();
+                this._dbusImpl = null;
+            }
             // Remove Super key overlay listener
             if (this._overlayKeyId) {
                 global.display.disconnect(this._overlayKeyId);

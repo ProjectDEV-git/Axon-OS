@@ -264,12 +264,18 @@ add a short note under any item you skip or change.
 ## Phase 5 — Larger features
 
 ### Intent Bar
-- [ ] **Categorised suggestions while typing.** Applications (`Shell.AppSystem` /
+- [x] **Categorised suggestions while typing.** Applications (`Shell.AppSystem` /
       `Gio.AppInfo`), Files (axon-search), Settings, Spaces, Commands, "Ask AI". Keyboard
       navigable, with an accessible list.
-- [ ] **Action preview.** Before running an action show what will happen ("Open Visual
+- [x] **Action preview.** Before running an action show what will happen ("Open Visual
       Studio Code in Code Space", "Run: `pytest tests/ -v`", "Change volume to 40%"),
       confirmed with Enter.
+      Note: suggestions come from `services/suggestions.py` (JS twin checked by a test).
+      Enter runs the best app/setting/Space/command match, otherwise "Ask Axon AI", so plain
+      questions still go to the AI. The preview line under the list says what Enter does;
+      AI-proposed app launches now wait for Enter; commands keep the confirmation card as
+      their preview and their output is shown in the bar. The GTK bar switches Spaces through
+      a new `org.axonos.Shell.SwitchToSpace` D-Bus method exported by the extension.
 
 ### AI panel
 - [ ] **Conversation list.** Sidebar or popover using Brain `ListConversations` /

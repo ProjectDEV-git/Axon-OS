@@ -324,3 +324,14 @@ def test_origin_tooltip() -> None:
     assert "this computer" in origin_tooltip(ModelOrigin(LOCAL, "Ollama", "x"))
     assert "OpenAI over the internet" in origin_tooltip(ModelOrigin(CLOUD, "OpenAI", "x"))
     assert "may leave" in origin_tooltip(ModelOrigin(UNKNOWN, "", ""))
+
+
+def test_format_command_output() -> None:
+    from services.ui_logic import format_command_output
+
+    assert format_command_output("") == "(no output)"
+    assert format_command_output("a\nb\n") == "a\nb"
+    long = "\n".join(str(i) for i in range(100))
+    out = format_command_output(long, max_lines=5)
+    assert out.splitlines()[:5] == ["0", "1", "2", "3", "4"] and out.endswith("(output shortened)")
+    assert format_command_output("x" * 50, max_chars=10).startswith("x" * 10)

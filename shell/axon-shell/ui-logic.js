@@ -522,3 +522,148 @@ export function confirmArgv(command, context, cardPath) {
 export function motionDuration(ms, enabled) {
     return enabled ? ms : 0;
 }
+
+// ── Intent Bar suggestions (twin of services/suggestions.py) ────────────────
+
+export const SUGGESTION_CATEGORIES = Object.freeze(
+    ['Applications', 'Files', 'Settings', 'Spaces', 'Commands', 'Ask AI']);
+
+/** [title, GNOME Settings panel, extra search words] */
+export const SETTINGS_PANELS = Object.freeze([
+    ['Wi-Fi', 'wifi', 'network wireless internet'],
+    ['Bluetooth', 'bluetooth', 'devices headphones'],
+    ['Displays', 'display', 'screen monitor resolution scale'],
+    ['Sound', 'sound', 'volume audio speaker microphone'],
+    ['Appearance', 'background', 'dark light theme wallpaper'],
+    ['Power', 'power', 'battery sleep'],
+    ['Keyboard', 'keyboard', 'shortcuts layout'],
+    ['Mouse & Touchpad', 'mouse', 'pointer touchpad'],
+    ['Privacy', 'privacy', 'location camera'],
+    ['Accessibility', 'universal-access', 'a11y large text contrast zoom'],
+]);
+
+/** [exact allowlisted command, what it shows, extra search words] */
+export const SUGGESTED_COMMANDS = Object.freeze([
+    ['df -h', 'Free disk space', 'disk storage space'],
+    ['free -h', 'Memory in use', 'ram memory'],
+    ['uptime', 'How long the computer has been on', 'uptime load'],
+    ['uname -a', 'System and kernel version', 'kernel version system'],
+    ['whoami', 'Your user name', 'user account'],
+    ['date', 'Date and time', 'time clock'],
+]);
+
+/**
+ * 3 prefix, 2 word prefix, 1 inside (single words of 3+ letters), 0 none.
+ *
+ * @param {string} query
+ * @param {...string} texts
+ * @returns {number}
+ */
+export function matchScore(query, ...texts) {
+    const q = String(query ?? '').trim().toLowerCase();
+    if (!q)
+        return 0;
+    let best = 0;
+    for (const text of texts) {
+        const t = String(text ?? '').toLowerCase();
+        if (t.startsWith(q))
+            return 3;
+        if (t.replace(/-/g, ' ').split(/\s+/).some(w => w.startsWith(q)))
+            best = Math.max(best, 2);
+        else if (!q.includes(' ') && q.length >= 3 && t.includes(q))
+            best = Math.max(best, 1);
+    }
+    return best;
+}
+
+function topRows(scored, limit) {
+    scored.sort((a, b) => b[0] - a[0] || a[1].title.toLowerCase().localeCompare(b[1].title.toLowerCase()));
+    return scored.slice(0, limit).map(([, row]) => row);
+}
+
+/**
+ * Suggestions for `query`, grouped in SUGGESTION_CATEGORIES order.
+ *
+ * @param {string} query
+ * @param {Array<[string, string, string]>} apps - [appId, name, keywords]
+ * @param {string[]} spaces - Space names in Super+1…9 order
+ * @param {number} [limit]
+ * @returns {Array<{category: string, title: string, subtitle: string, action: object}>}
+ */
+export function buildSuggestions(query, apps = [], spaces = [], limit = 3) {
+    const q = String(query ?? '').trim();
+    if (!q)
+        return [];
+    const row = (category, title, subtitle, action) => ({category, title, subtitle, action});
+    if (q.toLowerCase().startsWith('find ') && q.length > 5) {
+        const target = q.slice(5).trim();
+        return [
+            row('Files', `Search files for “${target}”`, 'Semantic search in your files',
+                {type: 'files', query: target, explicit: true}),
+            row('Ask AI', 'Ask Axon AI', q, {type: 'ask', query: q}),
+        ];
+    }
+    const out = [];
+    out.push(...topRows(apps
+        .map(([appId, name, keywords]) =>
+            [matchScore(q, name, keywords), row('Applications', name, 'Application', {type: 'open_app', app_id: appId})])
+        .filter(([s]) => s >= 2), limit));
+    out.push(row('Files', `Search files for “${q}”`, 'Semantic search in your files', {type: 'files', query: q}));
+    out.push(...topRows(SETTINGS_PANELS
+        .map(([title, panel, words]) =>
+            [matchScore(q, title, words), row('Settings', title, 'Settings', {type: 'settings', panel})])
+        .filter(([s]) => s >= 2), limit));
+    out.push(...topRows(spaces
+        .map((name, i) =>
+            [matchScore(q, name, `${name} space`), row('Spaces', `${name} Space`, `Super+${i + 1}`, {type: 'space', index: i, name})])
+        .filter(([s]) => s >= 2), limit));
+    out.push(...topRows(SUGGESTED_COMMANDS
+        .map(([command, description, words]) =>
+            [matchScore(q, command, description, words), row('Commands', command, description, {type: 'command', command})])
+        .filter(([s]) => s >= 2), limit));
+    out.push(row('Ask AI', 'Ask Axon AI', q, {type: 'ask', query: q}));
+    return out;
+}
+
+/** Action preview for a suggestion (twin of suggestions.describe()). */
+export function describeSuggestion(s) {
+    const a = s?.action ?? {};
+    switch (a.type) {
+    case 'open_app': return `Open ${s.title}`;
+    case 'files': return `Search your files for “${a.query ?? ''}”`;
+    case 'settings': return `Open Settings → ${s.title}`;
+    case 'space': return `Switch to ${a.name ?? ''} Space`;
+    case 'command': return `Run: ${a.command ?? ''} (asks first)`;
+    default: return 'Ask Axon AI';
+    }
+}
+
+const STRONG_CATEGORIES = new Set(['Applications', 'Settings', 'Spaces', 'Commands']);
+
+/**
+ * Row Enter runs when the selection wasn't moved (twin of default_index()):
+ * the best app/setting/Space/command, the file search only after "find …",
+ * otherwise "Ask Axon AI".
+ *
+ * @param {Array<{category: string, action: object}>} rows
+ * @returns {number}
+ */
+export function defaultSuggestionIndex(rows) {
+    const i = rows.findIndex(r => STRONG_CATEGORIES.has(r.category) || r.action?.explicit);
+    return i >= 0 ? i : rows.length - 1;
+}
+
+/** Trim command output for the Intent Bar (twin of format_command_output()). */
+export function formatCommandOutput(text, maxLines = 40, maxChars = 4000) {
+    const t = String(text ?? '').replace(/\s+$/, '');
+    if (!t)
+        return '(no output)';
+    const lines = t.split('\n');
+    let cut = lines.length > maxLines;
+    let shown = lines.slice(0, maxLines).join('\n');
+    if (shown.length > maxChars) {
+        shown = shown.slice(0, maxChars);
+        cut = true;
+    }
+    return cut ? `${shown}\n… (output shortened)` : shown;
+}

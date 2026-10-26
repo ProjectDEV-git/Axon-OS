@@ -181,3 +181,21 @@ test('motionDuration', async () => {
     assert.equal(motionDuration(150, true), 150);
     assert.equal(motionDuration(150, false), 0);
 });
+
+test('defaultSuggestionIndex', async () => {
+    const m = await import('./ui-logic.mjs');
+    const apps = [['firefox.desktop', 'Firefox', 'web']];
+    const pick = q => { const rows = m.buildSuggestions(q, apps, ['Code']); return rows[m.defaultSuggestionIndex(rows)].category; };
+    assert.equal(pick('fire'), 'Applications');
+    assert.equal(pick('tell me a joke'), 'Ask AI');
+    assert.equal(pick('find taxes'), 'Files');
+    assert.equal(pick('disk'), 'Commands');
+});
+
+test('formatCommandOutput', async () => {
+    const {formatCommandOutput} = await import('./ui-logic.mjs');
+    assert.equal(formatCommandOutput(''), '(no output)');
+    assert.equal(formatCommandOutput('a\nb\n'), 'a\nb');
+    const long = Array.from({length: 100}, (_, i) => String(i)).join('\n');
+    assert.ok(formatCommandOutput(long, 5).endsWith('(output shortened)'));
+});

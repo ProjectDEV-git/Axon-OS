@@ -8,11 +8,18 @@ import Pango from 'gi://Pango';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
+import Shell from 'gi://Shell';
 import {
     EXAMPLE_PROMPTS,
     RequestTracker,
+    SETTINGS_PANELS,
     STAGES,
+    buildSuggestions,
+    defaultSuggestionIndex,
+    describeAction,
+    describeSuggestion,
     escapeAction,
+    formatCommandOutput,
     intentBarWidth,
     motionDuration,
     parseAction,
@@ -60,6 +67,14 @@ export default class IntentBar {
         this._stopButton = null;
         this._emptyBox = null;
         this._originLabel = null;
+        this._suggestBox = null;
+        this._previewLabel = null;
+        // Suggestions for what is typed, the selected row, and an AI action
+        // waiting for Enter
+        this._suggestions = [];
+        this._selected = -1;
+        this._apps = [];
+        this._pendingAction = null;
         // Queries from this session, newest first, for the empty state
         this._history = [];
         // The running Brain request; Escape or Stop cancels it
@@ -82,6 +97,8 @@ export default class IntentBar {
         this._stopButton = null;
         this._emptyBox = null;
         this._originLabel = null;
+        this._suggestBox = null;
+        this._previewLabel = null;
         this._entry = null;
         this._responseLabel = null;
         this._responseScroll = null;
@@ -121,15 +138,24 @@ export default class IntentBar {
         this._entry.clutter_text.connect('key-press-event', (actor, event) => {
             const key = event.get_key_symbol();
             if (key === Clutter.KEY_Return || key === Clutter.KEY_KP_Enter) {
-                this._onSubmit();
+                this._onEnter();
+                return Clutter.EVENT_STOP;
+            }
+            if ((key === Clutter.KEY_Up || key === Clutter.KEY_Down) && this._suggestions.length) {
+                this._moveSelection(key === Clutter.KEY_Up ? -1 : 1);
                 return Clutter.EVENT_STOP;
             }
             if (key === Clutter.KEY_Escape) {
-                // First Escape stops a running request; the next one closes
-                if (escapeAction(this._requests.busy) === 'cancel')
+                // Escape drops a waiting action, then stops a running request;
+                // only after that does it close the bar
+                if (this._pendingAction) {
+                    this._pendingAction = null;
+                    this._setResponse('Cancelled');
+                } else if (escapeAction(this._requests.busy) === 'cancel') {
                     this._cancelRequest();
-                else
+                } else {
                     this.hide();
+                }
                 return Clutter.EVENT_STOP;
             }
             return Clutter.EVENT_PROPAGATE;
@@ -203,9 +229,29 @@ export default class IntentBar {
             vertical: true,
             x_expand: true,
         });
-        this._entry.clutter_text.connect('text-changed', () => this._updateEmptyState());
+        this._entry.clutter_text.connect('text-changed', () => {
+            this._pendingAction = null; // typing changes the request
+            this._updateSuggestions();
+            this._updateEmptyState();
+        });
+
+        // Suggestions while typing, and what Enter will do
+        this._suggestBox = new St.BoxLayout({
+            style_class: 'axon-suggestions',
+            vertical: true,
+            x_expand: true,
+            visible: false,
+            accessible_name: 'Suggestions',
+        });
+        this._previewLabel = new St.Label({
+            style_class: 'axon-hint-label',
+            text: '',
+            visible: false,
+        });
 
         this._actor.add_child(entryRow);
+        this._actor.add_child(this._suggestBox);
+        this._actor.add_child(this._previewLabel);
         this._actor.add_child(this._emptyBox);
         this._actor.add_child(this._responseScroll);
 
@@ -222,6 +268,8 @@ export default class IntentBar {
         this._responseLabel.set_text('');
         this._responseScroll.hide();
         this._entry.set_text('');
+        this._pendingAction = null;
+        this._apps = this._installedApps();
         this._buildEmptyState();
         this._updateEmptyState();
         this._refreshOrigin();
@@ -282,6 +330,187 @@ export default class IntentBar {
     }
 
     // ── Submit / AI call ───────────────────────────────────────────────────────
+
+    // ── Suggestions ────────────────────────────────────────────────────────────
+
+    _installedApps() {
+        try {
+            return Shell.AppSystem.get_default().get_installed()
+                .filter(info => info.should_show())
+                .map(info => [info.get_id(), info.get_display_name() || info.get_name(),
+                    typeof info.get_keywords === 'function' ? (info.get_keywords() || []).join(' ') : '']);
+        } catch (e) {
+            logError(e, 'AxonShell: could not list apps');
+            return [];
+        }
+    }
+
+    _updateSuggestions() {
+        if (!this._suggestBox)
+            return;
+        const spaces = this._spacesManager.getSpaces().map(s => s.name);
+        this._suggestions = this._requests.busy
+            ? [] : buildSuggestions(this._entry.get_text(), this._apps, spaces);
+        this._selected = this._suggestions.length ? defaultSuggestionIndex(this._suggestions) : -1;
+        this._renderSuggestions();
+    }
+
+    _renderSuggestions() {
+        this._suggestBox.destroy_all_children();
+        let category = null;
+        this._suggestions.forEach((s, i) => {
+            if (s.category !== category) {
+                category = s.category;
+                this._suggestBox.add_child(new St.Label({style_class: 'axon-hint-label', text: category}));
+            }
+            const row = new St.BoxLayout({vertical: false, x_expand: true});
+            row.add_child(new St.Label({text: s.title, x_expand: true, style_class: 'axon-suggestion-title'}));
+            row.add_child(new St.Label({text: s.subtitle, style_class: 'axon-hint-label'}));
+            const button = new St.Button({
+                style_class: i === this._selected ? 'axon-suggestion axon-suggestion-selected' : 'axon-suggestion',
+                child: row,
+                x_expand: true,
+                accessible_name: `${s.category}: ${s.title}. ${s.subtitle}`,
+            });
+            button.connect('clicked', () => {
+                this._selected = i;
+                this._onEnter();
+            });
+            this._suggestBox.add_child(button);
+        });
+        this._suggestBox.visible = this._suggestions.length > 0;
+        const selected = this._suggestions[this._selected];
+        this._previewLabel.visible = Boolean(selected);
+        this._previewLabel.set_text(selected ? `Enter: ${describeSuggestion(selected)}` : '');
+    }
+
+    _moveSelection(step) {
+        this._selected = Math.max(0, Math.min(this._selected + step, this._suggestions.length - 1));
+        this._renderSuggestions();
+    }
+
+    _hideSuggestions() {
+        this._suggestions = [];
+        this._selected = -1;
+        if (this._suggestBox) {
+            this._suggestBox.destroy_all_children();
+            this._suggestBox.visible = false;
+            this._previewLabel.visible = false;
+        }
+    }
+
+    _onEnter() {
+        // Enter confirms an AI action shown as a preview
+        if (this._pendingAction) {
+            const action = this._pendingAction;
+            this._pendingAction = null;
+            this._runConfirmedAction(action);
+            return;
+        }
+        const selected = this._suggestions[this._selected];
+        if (selected && selected.action.type !== 'ask') {
+            this._history = pushHistory(this._history, this._entry.get_text());
+            this._runSuggestion(selected);
+            return;
+        }
+        this._hideSuggestions();
+        this._onSubmit();
+    }
+
+    _runSuggestion(s) {
+        const a = s.action;
+        this._hideSuggestions();
+        if (a.type === 'open_app') {
+            if (launchAppById(a.app_id))
+                this.hide();
+            else
+                this._setResponse(`Couldn't open ${s.title}.`, {error: true});
+        } else if (a.type === 'settings') {
+            // Only the fixed panel names, never text from the query
+            if (!SETTINGS_PANELS.some(([, panel]) => panel === a.panel))
+                return;
+            try {
+                Gio.Subprocess.new(['gnome-control-center', a.panel], Gio.SubprocessFlags.NONE);
+                this.hide();
+            } catch (e) {
+                this._setResponse("GNOME Settings isn't available.", {error: true});
+            }
+        } else if (a.type === 'space') {
+            this.hide();
+            this._spacesManager.switchToSpace(a.index);
+        } else if (a.type === 'command') {
+            this._runCommand(a.command);
+        } else if (a.type === 'files') {
+            this._searchFiles(a.query);
+        }
+    }
+
+    _runCommand(command) {
+        const shown = confirmAndRun(command, '', out => {
+            this._setResponse(out === null ? 'Not run.' : formatCommandOutput(out));
+        });
+        if (!shown) {
+            this._setResponse('Blocked: command not in allowlist or contains unsafe characters.',
+                {error: true});
+            return;
+        }
+        this._setResponse(`${STAGES.confirm}: ${command}`);
+    }
+
+    // Semantic file search through org.axonos.Search; results open on click.
+    _searchFiles(query) {
+        const requestId = this._requests.start();
+        this._setBusy(true);
+        this._setResponse(STAGES.searching);
+        Gio.DBus.session.call(
+            'org.axonos.Search', '/org/axonos/Search', 'org.axonos.Search', 'Query',
+            new GLib.Variant('(si)', [query, 6]), null, Gio.DBusCallFlags.NONE, 30000, null,
+            (conn, res) => {
+                if (!this._requests.finish(requestId))
+                    return;
+                this._setBusy(false);
+                let results = [];
+                try {
+                    const [json] = conn.call_finish(res).deepUnpack();
+                    results = JSON.parse(json);
+                } catch (e) {
+                    this._setResponse(`Semantic search unavailable: ${e.message}`, {error: true});
+                    return;
+                }
+                this._showFileResults(query, results);
+            });
+    }
+
+    _showFileResults(query, results) {
+        if (!results.length) {
+            this._setResponse(`No matching files for "${query}".`);
+            return;
+        }
+        this._setResponse(`Top ${results.length} matches. Click to open:`);
+        const home = GLib.get_home_dir();
+        this._suggestBox.destroy_all_children();
+        for (const item of results) {
+            const path = String(item.path ?? '');
+            const shownPath = home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+            const button = new St.Button({
+                style_class: 'axon-suggestion',
+                label: shownPath,
+                x_expand: true,
+                accessible_name: `Open ${shownPath}`,
+            });
+            button.connect('clicked', () => {
+                try {
+                    Gio.AppInfo.launch_default_for_uri(Gio.File.new_for_path(path).get_uri(),
+                        global.create_app_launch_context(0, -1));
+                    this.hide();
+                } catch (e) {
+                    this._setResponse(`Couldn't open ${shownPath}: ${e.message}`, {error: true});
+                }
+            });
+            this._suggestBox.add_child(button);
+        }
+        this._suggestBox.visible = true;
+    }
 
     _onSubmit() {
         const query = this._entry.get_text().trim();
@@ -369,6 +598,8 @@ export default class IntentBar {
     _setBusy(busy) {
         if (this._stopButton)
             this._stopButton.visible = busy;
+        if (busy)
+            this._hideSuggestions();
     }
 
     _cancelRequest() {
@@ -491,27 +722,12 @@ export default class IntentBar {
     _executeAction(action) {
         try {
             if (action.action === 'open_app' && action.app) {
-                const appName = String(action.app).trim();
-                if (!launchAppById(appName)) {
-                    this._setResponse(`No installed app called "${appName}".`, {error: true});
-                    return;
-                }
-                this._setResponse(`Opening ${appName}…`);
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
-                    this.hide();
-                    return GLib.SOURCE_REMOVE;
-                });
+                // Show what will happen and wait for Enter (Esc cancels)
+                this._pendingAction = action;
+                this._setResponse(`${describeAction(action)} Press Enter to confirm, Esc to cancel.`);
             } else if (action.action === 'run_command' && action.command) {
-                if (!confirmAndRun(action.command)) {
-                    this._setResponse('Blocked: command not in allowlist or contains unsafe characters.',
-                        {error: true});
-                    return;
-                }
-                this._setResponse(`${STAGES.confirm}: ${action.command}`);
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
-                    this.hide();
-                    return GLib.SOURCE_REMOVE;
-                });
+                // The confirmation card is the preview; output shows here
+                this._runCommand(action.command);
             } else {
                 this._setResponse('Unknown action received from AI.', {error: true});
             }
@@ -519,6 +735,15 @@ export default class IntentBar {
             logError(e, 'AxonShell: could not execute action');
             this._setResponse(`Failed to execute: ${e.message}`, {error: true});
         }
+    }
+
+    _runConfirmedAction(action) {
+        const appName = String(action.app ?? '').trim();
+        if (!launchAppById(appName)) {
+            this._setResponse(`No installed app called "${appName}".`, {error: true});
+            return;
+        }
+        this.hide();
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

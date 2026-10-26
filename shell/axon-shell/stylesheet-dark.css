@@ -112,6 +112,34 @@
     border: 2px solid #a78bfa;
 }
 
+.axon-suggestions {
+    margin-top: 8px;
+    spacing: 2px;
+}
+
+.axon-suggestion {
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: #e8e8f0;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    font-size: 13px;
+    text-align: left;
+}
+
+.axon-suggestion:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Selected row: background plus a border, not colour alone */
+.axon-suggestion-selected {
+    background-color: rgba(139, 92, 246, 0.16);
+    border: 1px solid #a78bfa;
+}
+
+.axon-suggestion-title {
+    color: #e8e8f0;
+}
+
 .axon-intentbar-empty {
     margin-top: 8px;
 }

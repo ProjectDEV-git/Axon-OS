@@ -69,7 +69,9 @@ def test_action_json_never_shown(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(win, "_execute_action", executed.append)
     shown = run_query(win, monkeypatch)
     assert shown == []
-    assert win._response_label.get_text() == "Opening firefox…"
+    assert win._response_label.get_text().startswith("Opening firefox…")
+    assert executed == []  # waits for Enter (action preview)
+    win._on_activate(win._entry)
     assert executed == [{"action": "open_app", "app": "firefox"}]
     win.destroy()
 
@@ -256,3 +258,126 @@ def test_history_is_saved_and_offered(monkeypatch: pytest.MonkeyPatch) -> None:
         child = child.get_next_sibling()
     assert "df -h please" in texts
     again.destroy()
+
+
+class SpacesWithList(FakeSpaces):
+    def get_spaces(self) -> list[Any]:
+        class S:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+        return [S("Code"), S("Web")]
+
+
+def suggestion_window(monkeypatch: pytest.MonkeyPatch, tokens: list[str] | None = None) -> Any:
+    monkeypatch.setattr(
+        window_mod, "_installed_apps", lambda: [("firefox.desktop", "Firefox", "web browser")]
+    )
+    win = window_mod.IntentBarWindow(
+        ollama_client=FakeOllama(tokens or []), spaces_manager=SpacesWithList()
+    )
+    pump(GLib)
+    return win
+
+
+def test_typing_shows_grouped_suggestions_with_preview(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = suggestion_window(monkeypatch)
+    win._entry.set_text("fire")
+    assert win._suggest_list.get_visible()
+    assert [s.category for s in win._suggestions] == ["Applications", "Files", "Ask AI"]
+    assert win._preview_label.get_text() == "Enter: Open Firefox"
+    win._move_selection(1)
+    assert win._preview_label.get_text() == "Enter: Search your files for “fire”"
+    win._move_selection(5)  # clamps at the last row
+    assert win._selected_suggestion().category == "Ask AI"
+    win.destroy()
+
+
+def test_up_down_navigate_suggestions_not_history(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = suggestion_window(monkeypatch)
+    win._history = ["older query"]
+    win._entry.set_text("web")
+    win._on_key_pressed(None, window_mod.Gdk.KEY_Down, 0, None)
+    assert win._entry.get_text() == "web"
+    assert win._selected_suggestion() is not None
+    win.destroy()
+
+
+def test_enter_runs_command_suggestion_through_confirmation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    win = suggestion_window(monkeypatch)
+    ran: list[str] = []
+    monkeypatch.setattr(win, "_run_command", ran.append)
+    win._entry.set_text("disk")
+    while win._selected_suggestion().category != "Commands":
+        win._move_selection(1)
+    win._on_activate(win._entry)
+    assert ran == ["df -h"]
+    win.destroy()
+
+
+def test_ask_ai_row_sends_to_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = suggestion_window(monkeypatch)
+    started: list[str] = []
+    monkeypatch.setattr(win, "_do_query", lambda q, rid: started.append(q))
+    monkeypatch.setattr(window_mod.threading, "Thread", _InlineThread)
+    win._entry.set_text("what is a symlink")
+    assert win._selected_suggestion().category == "Ask AI"  # questions go to the AI
+    win._on_activate(win._entry)
+    assert started == ["what is a symlink"]
+    assert not win._suggest_list.get_visible()
+    win.destroy()
+
+
+class _InlineThread:
+    def __init__(self, target: Any = None, args: tuple = (), daemon: bool = False) -> None:
+        self._target, self._args = target, args
+
+    def start(self) -> None:
+        if self._target is not None:
+            self._target(*self._args)
+
+
+def test_ai_open_app_waits_for_enter(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = make_window(['{"action": "open_app", "app": "firefox"}'])
+    executed: list[dict[str, Any]] = []
+    monkeypatch.setattr(win, "_execute_action", executed.append)
+    run_query(win, monkeypatch)
+    assert executed == []
+    assert "Press Enter to confirm" in win._response_label.get_text()
+    win._on_activate(win._entry)
+    assert executed == [{"action": "open_app", "app": "firefox"}]
+    win.destroy()
+
+
+def test_escape_cancels_a_waiting_action(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = make_window(['{"action": "open_app", "app": "firefox"}'])
+    closed: list[bool] = []
+    monkeypatch.setattr(win, "close", lambda: closed.append(True))
+    run_query(win, monkeypatch)
+    press_escape(win)
+    assert win._pending_action is None and closed == []
+    assert win._response_label.get_text() == "Cancelled"
+    win.destroy()
+
+
+def test_command_output_is_shown(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess as sp
+
+    win = make_window([])
+
+    class Proc:
+        def communicate(self, timeout: float) -> tuple[str, None]:
+            return "Filesystem Size\n/dev/sda1 100G\n", None
+
+    monkeypatch.setattr(window_mod, "confirm_and_exec", lambda cmd, **kw: Proc())
+    monkeypatch.setattr(window_mod.threading, "Thread", _InlineThread)
+    monkeypatch.setattr(window_mod.GLib, "idle_add", lambda fn, *a: fn(*a))
+    win._run_command("df -h")
+    assert win._response_label.get_text() == "Filesystem Size\n/dev/sda1 100G"
+    monkeypatch.setattr(window_mod, "confirm_and_exec", lambda cmd, **kw: None)
+    win._run_command("df -h")
+    assert win._response_label.get_text() == "Not run."
+    assert sp  # subprocess is used for the PIPE flags in the real call
+    win.destroy()

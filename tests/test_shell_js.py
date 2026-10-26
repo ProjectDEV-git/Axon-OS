@@ -55,3 +55,38 @@ def test_pure_logic_unit_tests(tmp_path: Path) -> None:
         [str(NODE), "--test", *tests], capture_output=True, text=True, check=False, timeout=60
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_suggestion_data_and_ranking_match_python(tmp_path: Path) -> None:
+    import json
+
+    from services import suggestions
+
+    _copy_as_mjs(tmp_path)
+    apps = [["firefox.desktop", "Firefox", "web"], ["code.desktop", "Visual Studio Code", "ide"]]
+    spaces = ["Code", "Web", "Files"]
+    queries = ["fi", "wi", "disk", "code", "find tax", "what is firefox", "web"]
+    script = (
+        "import('./ui-logic.mjs').then(m => console.log(JSON.stringify({"
+        "settings: m.SETTINGS_PANELS, commands: m.SUGGESTED_COMMANDS,"
+        f"rows: {json.dumps(queries)}.map(q => m.buildSuggestions(q, {json.dumps(apps)}, "
+        f"{json.dumps(spaces)}).map(r => [r.category, r.title, r.subtitle, r.action]))"
+        "})))"
+    )
+    result = subprocess.run(
+        [str(NODE), "--input-type=module", "-e", script],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    js = json.loads(result.stdout)
+    assert [tuple(x) for x in js["settings"]] == suggestions.SETTINGS_PANELS
+    assert [tuple(x) for x in js["commands"]] == suggestions.SUGGESTED_COMMANDS
+    for query, js_rows in zip(queries, js["rows"], strict=True):
+        py_rows = [
+            [r.category, r.title, r.subtitle, r.action]
+            for r in suggestions.build_suggestions(query, [tuple(a) for a in apps], spaces)
+        ]
+        assert js_rows == py_rows, query

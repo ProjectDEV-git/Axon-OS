@@ -58,9 +58,11 @@ const CONFIRM_CARD_PATHS = [
  *
  * @param {string} command - command line proposed by the model
  * @param {string} [context] - optional extra line shown above the command
+ * @param {Function|null} [onOutput] - gets the command's output, or null
+ *   when it didn't run (declined, timed out, failed)
  * @returns {boolean} false if the command was rejected before asking
  */
-export function confirmAndRun(command, context = '') {
+export function confirmAndRun(command, context = '', onOutput = null) {
     const argv = parseAllowedCommand(command);
     if (!argv) {
         console.warn(`Axon: blocked AI command not in allowlist: ${command}`);
@@ -76,12 +78,30 @@ export function confirmAndRun(command, context = '') {
         confirmProc.wait_async(null, (proc, res) => {
             try {
                 proc.wait_finish(res);
-                if (!proc.get_successful()) return;
-                const runProc = new Gio.Subprocess({argv, flags: Gio.SubprocessFlags.NONE});
+                if (!proc.get_successful()) {
+                    onOutput?.(null);
+                    return;
+                }
+                const flags = onOutput
+                    ? Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE
+                    : Gio.SubprocessFlags.NONE;
+                const runProc = new Gio.Subprocess({argv, flags});
                 runProc.init(null);
-                runProc.wait_async(null, () => {});
+                if (!onOutput) {
+                    runProc.wait_async(null, () => {});
+                    return;
+                }
+                runProc.communicate_utf8_async(null, null, (p, r) => {
+                    try {
+                        const [, out] = p.communicate_utf8_finish(r);
+                        onOutput(out ?? '');
+                    } catch (e) {
+                        onOutput(null);
+                    }
+                });
             } catch (e) {
                 console.error(`Axon: failed to run AI command: ${e.message}`);
+                onOutput?.(null);
             }
         });
     } catch (e) {

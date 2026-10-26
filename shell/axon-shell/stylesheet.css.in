@@ -108,6 +108,34 @@
     border: {{focus.width}} solid {{color.focus_ring}};
 }
 
+.axon-suggestions {
+    margin-top: {{space.md}};
+    spacing: {{space.xxs}};
+}
+
+.axon-suggestion {
+    border-radius: {{radius.sm}};
+    padding: {{space.sm}} {{space.md}};
+    color: {{color.fg}};
+    font-family: {{font.family}};
+    font-size: {{font_size.md}};
+    text-align: left;
+}
+
+.axon-suggestion:hover {
+    background-color: {{color.hover}};
+}
+
+/* Selected row: background plus a border, not colour alone */
+.axon-suggestion-selected {
+    background-color: {{color.accent_subtle}};
+    border: 1px solid {{color.focus_ring}};
+}
+
+.axon-suggestion-title {
+    color: {{color.fg}};
+}
+
 .axon-intentbar-empty {
     margin-top: {{space.md}};
 }

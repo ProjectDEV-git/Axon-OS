@@ -31,6 +31,8 @@ for _services in (Path(__file__).resolve().parents[3], Path(__file__).resolve().
         break
 from constants import AXON_DIR
 from service_utils import confirm_and_exec
+from suggestions import SETTINGS_PANELS, Suggestion, build_suggestions, default_index
+from suggestions import describe as describe_suggestion
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
 from axon_gtk_utils import load_app_css, monitor_size
@@ -46,6 +48,7 @@ from ui_logic import (
     classify_stream_prefix,
     describe_action,
     escape_action,
+    format_command_output,
     intent_bar_width,
     load_history,
     origin_tooltip,
@@ -101,6 +104,19 @@ _RESPONSE_MAX_HEIGHT = 320  # px; longer answers scroll
 _SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
+def _installed_apps() -> list[tuple[str, str, str]]:
+    """Visible installed apps as ``(desktop id, name, keywords)``."""
+    apps = []
+    for info in Gio.AppInfo.get_all():
+        if not info.should_show() or not info.get_id():
+            continue
+        keywords = ""
+        if isinstance(info, Gio.DesktopAppInfo):
+            keywords = " ".join(info.get_keywords() or [])
+        apps.append((info.get_id(), info.get_display_name() or info.get_name(), keywords))
+    return apps
+
+
 def _validate_app_name(name: str) -> str | None:
     """Return sanitized app name, or None if the name is unsafe."""
     name = name.strip()
@@ -137,6 +153,10 @@ class IntentBarWindow(Adw.Window):
         self._stream_cancelled: bool = False
         # The running AI/search request; Escape or Stop cancels it
         self._requests = RequestTracker()
+        # Suggestions for what is typed, and an AI action waiting for Enter
+        self._apps = _installed_apps()
+        self._suggestions: list[Suggestion] = []
+        self._pending_action: dict[str, Any] | None = None
 
         self.set_decorated(False)
         # clamp(480 px, 45% of the monitor, 820 px)
@@ -299,7 +319,22 @@ class IntentBarWindow(Adw.Window):
         self._results_box.set_visible(False)
         root.append(self._results_box)
 
-        # ---- Row 6c: empty state (before the user types) -----------------
+        # ---- Row 6c: suggestions while typing ----------------------------
+        self._suggest_list = Gtk.ListBox()
+        self._suggest_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self._suggest_list.set_header_func(self._suggestion_header)
+        self._suggest_list.update_property([Gtk.AccessibleProperty.LABEL], ["Suggestions"])
+        self._suggest_list.connect("row-activated", self._on_suggestion_activated)
+        self._suggest_list.connect("row-selected", lambda *_a: self._update_preview())
+        self._suggest_list.set_visible(False)
+        root.append(self._suggest_list)
+        # What Enter will do ("↵ Open Firefox")
+        self._preview_label = Gtk.Label(xalign=0.0)
+        self._preview_label.add_css_class("hint-label")
+        self._preview_label.set_visible(False)
+        root.append(self._preview_label)
+
+        # ---- Row 6d: empty state (before the user types) -----------------
         self._empty_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self._empty_box.set_margin_bottom(8)
         root.append(self._empty_box)
@@ -363,6 +398,7 @@ class IntentBarWindow(Adw.Window):
     def _connect_signals(self) -> None:
         self._entry.connect("activate", self._on_activate)
         self._entry.connect("changed", self._update_empty_state)
+        self._entry.connect("changed", self._on_entry_changed)
         self._response_label.connect("notify::visible", self._update_empty_state)
         self._results_box.connect("notify::visible", self._update_empty_state)
         self._start_ollama_btn.connect("clicked", self._on_start_ollama)
@@ -384,11 +420,20 @@ class IntentBarWindow(Adw.Window):
         _state: Any,
     ) -> bool:
         if keyval == Gdk.KEY_Escape:
-            # First Escape stops a running request; the next one closes
-            if escape_action(self._requests.busy) == "cancel":
+            # Escape drops a waiting action, then stops a running request;
+            # only after that does it close the bar
+            if self._pending_action is not None:
+                self._pending_action = None
+                self._set_response("Cancelled")
+            elif escape_action(self._requests.busy) == "cancel":
                 self._cancel_request()
             else:
                 self.close()
+            return True
+
+        # Up/Down move through suggestions while typing, history otherwise
+        if keyval in (Gdk.KEY_Up, Gdk.KEY_Down) and self._suggest_list.get_visible():
+            self._move_selection(-1 if keyval == Gdk.KEY_Up else 1)
             return True
 
         if keyval == Gdk.KEY_Up:
@@ -448,9 +493,21 @@ class IntentBarWindow(Adw.Window):
     # ------------------------------------------------------------------
 
     def _on_activate(self, entry: Gtk.Entry) -> None:
+        # Enter confirms an AI action shown as a preview
+        if self._pending_action is not None:
+            action, self._pending_action = self._pending_action, None
+            self._execute_action(action)
+            return
         query = entry.get_text().strip()
         if not query:
             return
+        selected = self._selected_suggestion()
+        if selected is not None and selected.action.get("type") != "ask":
+            self._push_history(query)
+            self._history_idx = -1
+            self._run_suggestion(selected)
+            return
+        self._hide_suggestions()
 
         # "find <something>" routes to the local semantic index instead of
         # the LLM — works even when Ollama is offline (keyword fallback).
@@ -591,9 +648,13 @@ class IntentBarWindow(Adw.Window):
             if action.get("action") == "run_command":
                 # The confirmation card opens next; nothing runs without it
                 self._set_response(f"{STAGE_CONFIRM}: {action.get('command', '')}")
+                self._execute_action(action)
             else:
-                self._set_response(describe_action(action))
-            self._execute_action(action)
+                # Show what will happen and wait for Enter (Esc cancels)
+                self._pending_action = action
+                self._set_response(
+                    f"{describe_action(action)} Press Enter to confirm, Esc to cancel."
+                )
             return False
         body, error = split_error(full)
         if error is not None:
@@ -627,8 +688,166 @@ class IntentBarWindow(Adw.Window):
         elif action_type == "run_command":
             command: str = action.get("command", "")
             if command:
-                # The confirmation dialog blocks, so keep it off the GTK thread
-                threading.Thread(target=confirm_and_exec, args=(command,), daemon=True).start()
+                self._run_command(command)
+
+    def _run_command(self, command: str) -> None:
+        """Allowlist + confirmation card, then show the output here."""
+        self._set_response(f"{STAGE_CONFIRM}: {command}")
+
+        def worker() -> None:
+            # The confirmation card blocks, so keep it off the GTK thread
+            proc = confirm_and_exec(
+                command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            )
+            if proc is None:
+                GLib.idle_add(self._set_response, "Not run.")
+                return
+            try:
+                out, _ = proc.communicate(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                out = "(stopped after 15 seconds)"
+            GLib.idle_add(self._set_response, format_command_output(out or ""))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    # ------------------------------------------------------------------
+    # Suggestions while typing
+    # ------------------------------------------------------------------
+
+    def _on_entry_changed(self, _entry: Gtk.Entry) -> None:
+        self._pending_action = None  # typing changes the request
+        self._update_suggestions()
+
+    def _update_suggestions(self) -> None:
+        query = self._entry.get_text()
+        spaces = (
+            [s.name for s in self._spaces.get_spaces()]
+            if hasattr(self._spaces, "get_spaces")
+            else []
+        )
+        self._suggestions = build_suggestions(query, self._apps, spaces)
+        self._suggest_list.remove_all()
+        for suggestion in self._suggestions:
+            self._suggest_list.append(self._suggestion_row(suggestion))
+        visible = bool(self._suggestions) and not self._requests.busy
+        self._suggest_list.set_visible(visible)
+        default = self._suggest_list.get_row_at_index(default_index(self._suggestions))
+        if visible and default is not None:
+            self._suggest_list.select_row(default)
+        self._update_preview()
+
+    def _hide_suggestions(self) -> None:
+        self._suggest_list.set_visible(False)
+        self._preview_label.set_visible(False)
+
+    @staticmethod
+    def _suggestion_row(suggestion: Suggestion) -> Gtk.ListBoxRow:
+        row = Gtk.ListBoxRow()
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        box.set_margin_top(4)
+        box.set_margin_bottom(4)
+        box.set_margin_start(6)
+        box.set_margin_end(6)
+        title = Gtk.Label(label=suggestion.title, xalign=0.0)
+        title.set_ellipsize(Pango.EllipsizeMode.END)
+        title.set_hexpand(True)
+        subtitle = Gtk.Label(label=suggestion.subtitle, xalign=1.0)
+        subtitle.add_css_class("hint-label")
+        subtitle.set_ellipsize(Pango.EllipsizeMode.END)
+        box.append(title)
+        box.append(subtitle)
+        row.set_child(box)
+        row.update_property([Gtk.AccessibleProperty.LABEL], [suggestion.accessible_label])
+        return row
+
+    def _suggestion_header(self, row: Gtk.ListBoxRow, before: Gtk.ListBoxRow | None) -> None:
+        index = row.get_index()
+        category = self._suggestions[index].category if index < len(self._suggestions) else ""
+        previous = self._suggestions[before.get_index()].category if before is not None else None
+        if category and category != previous:
+            header = Gtk.Label(label=category, xalign=0.0)
+            header.add_css_class("hint-label")
+            header.set_margin_top(4)
+            row.set_header(header)
+        else:
+            row.set_header(None)
+
+    def _selected_suggestion(self) -> Suggestion | None:
+        if not self._suggest_list.get_visible():
+            return None
+        row = self._suggest_list.get_selected_row()
+        if row is None or row.get_index() >= len(self._suggestions):
+            return None
+        return self._suggestions[row.get_index()]
+
+    def _move_selection(self, step: int) -> None:
+        row = self._suggest_list.get_selected_row()
+        index = (row.get_index() if row is not None else -1) + step
+        index = max(0, min(index, len(self._suggestions) - 1))
+        target = self._suggest_list.get_row_at_index(index)
+        if target is not None:
+            self._suggest_list.select_row(target)
+
+    def _update_preview(self) -> None:
+        selected = self._selected_suggestion()
+        self._preview_label.set_visible(selected is not None)
+        if selected is not None:
+            self._preview_label.set_text(f"Enter: {describe_suggestion(selected)}")
+
+    def _on_suggestion_activated(self, _list: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
+        self._suggest_list.select_row(row)
+        self._on_activate(self._entry)
+
+    def _run_suggestion(self, suggestion: Suggestion) -> None:
+        action = suggestion.action
+        kind = action.get("type")
+        self._hide_suggestions()
+        if kind == "files":
+            self._start_semantic_search(str(action.get("query", "")))
+        elif kind == "open_app":
+            info = Gio.DesktopAppInfo.new(str(action.get("app_id", "")))
+            if info is not None and info.launch([], None):
+                self.close()
+            else:
+                self._show_error(f"Couldn't open {suggestion.title}.")
+        elif kind == "settings":
+            panel = str(action.get("panel", ""))
+            # Only the fixed panel names, never text from the query
+            if panel in {p for _t, p, _w in SETTINGS_PANELS} and shutil.which(
+                "gnome-control-center"
+            ):
+                subprocess.Popen(  # nosec B603 B607 - fixed program and panel name
+                    ["gnome-control-center", panel],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+                self.close()
+            else:
+                self._show_error("GNOME Settings isn't available.")
+        elif kind == "space":
+            self._switch_space(int(action.get("index", 0)), str(action.get("name", "")))
+        elif kind == "command":
+            self._run_command(str(action.get("command", "")))
+
+    def _switch_space(self, index: int, name: str) -> None:
+        """Ask the Axon Shell extension (org.axonos.Shell) to switch Space."""
+
+        def worker() -> None:
+            try:
+                if dbus is None:
+                    raise RuntimeError("python3-dbus is not available")
+                obj = dbus.SessionBus().get_object("org.axonos.Shell", "/org/axonos/Shell")
+                obj.SwitchToSpace(index, dbus_interface="org.axonos.Shell", timeout=5)
+            except Exception:
+                GLib.idle_add(
+                    self._show_error, f"Couldn't switch to {name}: Axon Shell isn't running."
+                )
+                return
+            GLib.idle_add(self.close)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Semantic file search (org.axonos.Search)

@@ -382,3 +382,16 @@ def origin_tooltip(origin: ModelOrigin) -> str:
     if origin.kind == CLOUD:
         return f"Requests are sent to {origin.provider} over the internet."
     return "Couldn't check where the model runs, so assume requests may leave this computer."
+
+
+def format_command_output(text: str, max_lines: int = 40, max_chars: int = 4000) -> str:
+    """Trim command output for the Intent Bar, saying what was cut."""
+    text = text.rstrip()
+    if not text:
+        return "(no output)"
+    lines = text.splitlines()
+    cut = len(lines) > max_lines
+    shown = "\n".join(lines[:max_lines])
+    if len(shown) > max_chars:
+        shown, cut = shown[:max_chars], True
+    return f"{shown}\n… (output shortened)" if cut else shown
