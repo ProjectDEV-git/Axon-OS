@@ -4,11 +4,23 @@ import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import Atk from 'gi://Atk';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { safeCall, createProxyWithRetry, callWithRetry } from './dbus-helpers.js';
-import { spaceAnnouncement } from './ui-logic.js';
+import {
+    NEVER_ROUTE,
+    askMessage,
+    classificationDecision,
+    movedMessage,
+    parseClassification,
+    ruleDecision,
+    ruleKeyFor,
+    spaceAnnouncement,
+} from './ui-logic.js';
+import { destroyNotifications, notify } from './notify.js';
 
 // ─── Default space definitions ────────────────────────────────────────────────
 
@@ -105,6 +117,11 @@ const BrainInterface = `
       <arg type="s" name="wm_class" direction="in"/>
       <arg type="s" name="space_name" direction="out"/>
     </method>
+    <method name="ClassifyWindowDetailed">
+      <arg type="s" name="title" direction="in"/>
+      <arg type="s" name="wm_class" direction="in"/>
+      <arg type="s" name="result_json" direction="out"/>
+    </method>
     <method name="Generate">
       <arg type="s" name="prompt" direction="in"/>
       <arg type="s" name="context" direction="in"/>
@@ -131,11 +148,19 @@ export default class SpacesManager {
         this._contextProxy = null;
         this._brainProxy = null;
         this._windowCreatedId = null;
+        this._settings = null;
+        // Windows that closed while a classification or notification was pending
+        this._goneWindows = new WeakSet();
         this._stateDir = GLib.build_filenamev([GLib.get_home_dir(), '.axon']);
         this._stateFile = GLib.build_filenamev([this._stateDir, 'spaces.json']);
     }
 
     enable() {
+        try {
+            this._settings = this._extension.getSettings();
+        } catch (e) {
+            console.warn('AxonShell: no settings for Spaces, using defaults:', e.message);
+        }
         this._ensureStateDir();
         this._loadState();
 
@@ -180,16 +205,7 @@ export default class SpacesManager {
         // Listen for new windows to auto-classify and route
         this._windowCreatedId = global.display.connect('window-created', (display, window) => {
             try {
-                if (window && this._brainProxy) {
-                    let title = window.get_title() || "None";
-                    let wmClass = window.get_wm_class() || "None";
-                    callWithRetry(this._brainProxy, 'ClassifyWindow', [title, wmClass], (result, error) => {
-                        if (!error && result) {
-                            let [spaceName] = result;
-                            this._routeWindowToSpace(window, spaceName);
-                        }
-                    }, 2);
-                }
+                this._onWindowCreated(window);
             } catch (e) {
                 console.warn('AxonShell: window-created hook error:', e.message);
             }
@@ -212,8 +228,10 @@ export default class SpacesManager {
             this._indicator = null;
         }
 
+        destroyNotifications();
         this._contextProxy = null;
         this._brainProxy = null;
+        this._settings = null;
         this._saveState();
     }
 
@@ -527,25 +545,155 @@ export default class SpacesManager {
         }
     }
 
-    _routeWindowToSpace(window, spaceName) {
-        let targetIdx = -1;
-        for (let i = 0; i < this._spaces.length; i++) {
-            if (this._spaces[i].name.toLowerCase() === spaceName.toLowerCase()) {
-                targetIdx = i;
-                break;
+    // ── Window routing ─────────────────────────────────────────────────────────
+
+    _onWindowCreated(window) {
+        // Only real app windows: no menus, tooltips, dialogs or panels
+        if (!window || window.is_skip_taskbar() ||
+            window.get_window_type() !== Meta.WindowType.NORMAL)
+            return;
+        window.connect('unmanaged', () => this._goneWindows.add(window));
+
+        const enabled = this._settings ? this._settings.get_boolean('auto-route-windows') : true;
+        const key = this._ruleKey(window);
+        const byRule = ruleDecision(enabled, this._getRules(), key);
+        if (byRule) {
+            // A remembered rule is what the user asked for: move without a
+            // notification, once the window has finished being created
+            if (byRule.kind === 'move') {
+                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                    this._routeWindowToSpace(window, byRule.space, {key, quiet: true});
+                    return GLib.SOURCE_REMOVE;
+                });
             }
+            return;
         }
-        
-        if (targetIdx !== -1) {
-            const workspaceManager = global.workspace_manager;
-            while (workspaceManager.get_n_workspaces() <= targetIdx) {
-                workspaceManager.append_new_workspace(false, global.get_current_time());
+        if (!this._brainProxy)
+            return;
+
+        const title = window.get_title() || 'None';
+        const wmClass = window.get_wm_class() || 'None';
+        const onReply = raw => {
+            const {space, confidence} = parseClassification(raw);
+            const decision = classificationDecision(space, confidence,
+                this._spaces.map(s => s.name), this._spaceNameOf(window));
+            if (decision.kind === 'move')
+                this._routeWindowToSpace(window, decision.space, {key});
+            else if (decision.kind === 'ask')
+                this._askToRoute(window, decision.space, key);
+        };
+        callWithRetry(this._brainProxy, 'ClassifyWindowDetailed', [title, wmClass], (result, error) => {
+            if (!error && result) {
+                onReply(result[0]);
+                return;
             }
-            let workspace = workspaceManager.get_workspace_by_index(targetIdx);
-            if (workspace) {
-                window.change_workspace(workspace);
-                console.log(`AxonShell: Auto-routed window "${window.get_title()}" to Space ${spaceName} (Workspace ${targetIdx})`);
-            }
+            // Older Brain without confidence: plain Space name, trusted as before
+            callWithRetry(this._brainProxy, 'ClassifyWindow', [title, wmClass], (res, err) => {
+                if (!err && res)
+                    onReply(res[0]);
+            }, 1);
+        }, 1);
+    }
+
+    _ruleKey(window) {
+        let appId = null;
+        try {
+            const app = Shell.WindowTracker.get_default().get_window_app(window);
+            appId = app ? app.get_id() : null;
+        } catch (_e) {
+            // fall back to WM_CLASS
         }
+        return ruleKeyFor(appId, window.get_wm_class());
+    }
+
+    _appName(window) {
+        try {
+            const app = Shell.WindowTracker.get_default().get_window_app(window);
+            if (app)
+                return app.get_name();
+        } catch (_e) {
+            // fall through
+        }
+        return window.get_wm_class() || window.get_title() || 'Window';
+    }
+
+    _getRules() {
+        if (!this._settings)
+            return {};
+        try {
+            return this._settings.get_value('space-rules').deepUnpack();
+        } catch (_e) {
+            return {};
+        }
+    }
+
+    _setRule(key, value) {
+        if (!key || !this._settings)
+            return;
+        const rules = this._getRules();
+        rules[key] = value;
+        this._settings.set_value('space-rules', new GLib.Variant('a{ss}', rules));
+    }
+
+    _spaceNameOf(window) {
+        const ws = window.get_workspace();
+        const space = ws ? this._spaces[ws.index()] : null;
+        return space ? space.name : null;
+    }
+
+    _indexOfSpace(spaceName) {
+        const wanted = String(spaceName).toLowerCase();
+        return this._spaces.findIndex(s => s.name.toLowerCase() === wanted);
+    }
+
+    // Returns false when the window is gone or the index is invalid.
+    _moveWindowToIndex(window, idx) {
+        if (idx < 0 || !window || this._goneWindows.has(window))
+            return false;
+        const workspaceManager = global.workspace_manager;
+        while (workspaceManager.get_n_workspaces() <= idx)
+            workspaceManager.append_new_workspace(false, global.get_current_time());
+        const workspace = workspaceManager.get_workspace_by_index(idx);
+        if (!workspace)
+            return false;
+        window.change_workspace(workspace);
+        return true;
+    }
+
+    _routeWindowToSpace(window, spaceName, {key = '', quiet = false} = {}) {
+        const targetIdx = this._indexOfSpace(spaceName);
+        if (targetIdx === -1)
+            return;
+        const fromWs = window.get_workspace();
+        const fromIdx = fromWs ? fromWs.index() : -1;
+        if (!this._moveWindowToIndex(window, targetIdx))
+            return;
+        console.log(`AxonShell: Auto-routed window "${window.get_title()}" to Space ${spaceName} (Workspace ${targetIdx})`);
+        if (quiet)
+            return;
+
+        const name = this._appName(window);
+        const undo = () => this._moveWindowToIndex(window, fromIdx);
+        notify(movedMessage(name, spaceName), 'Axon moved this window to its Space.', [
+            {label: 'Undo', callback: undo},
+            {label: 'Always do this', callback: () => this._setRule(key, spaceName)},
+            {label: 'Never move this app', callback: () => {
+                undo();
+                this._setRule(key, NEVER_ROUTE);
+            }},
+        ]);
+    }
+
+    // Low confidence: ask instead of moving.
+    _askToRoute(window, spaceName, key) {
+        const move = () => this._routeWindowToSpace(window, spaceName, {key, quiet: true});
+        notify(askMessage(this._appName(window), spaceName), 'Move it there?', [
+            {label: 'Move', callback: move},
+            {label: 'Keep here', callback: () => {}},
+            {label: 'Always do this', callback: () => {
+                this._setRule(key, spaceName);
+                move();
+            }},
+        ]);
     }
 }

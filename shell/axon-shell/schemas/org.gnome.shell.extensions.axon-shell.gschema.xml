@@ -87,5 +87,18 @@
       <description>Keybinding to trigger local voice commands.</description>
     </key>
 
+    <!-- Spaces: moving new windows to the Space the AI picks -->
+    <key name="auto-route-windows" type="b">
+      <default>true</default>
+      <summary>Move new windows to their Space</summary>
+      <description>When on, Axon asks the AI which Space a new window belongs in and moves it there (or asks first when unsure). Per-app rules are applied first.</description>
+    </key>
+
+    <key name="space-rules" type="a{ss}">
+      <default>{}</default>
+      <summary>Per-app Space rules</summary>
+      <description>App ID (or WM class) mapped to the Space its windows always go to, or "__never__" to never move that app.</description>
+    </key>
+
   </schema>
 </schemalist>

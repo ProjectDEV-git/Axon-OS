@@ -73,3 +73,38 @@ test('spaceAnnouncement', async () => {
     assert.equal(spaceAnnouncement('Web', 1), 'Switched to Web Space. 1 window open.');
     assert.equal(spaceAnnouncement('Notes', 0), 'Switched to Notes Space. No windows open.');
 });
+
+test('window routing helpers', async () => {
+    const m = await import('./ui-logic.mjs');
+    assert.equal(m.shellMajor('46.2'), 46);
+    assert.equal(m.shellMajor('45.beta'), 45);
+    assert.equal(m.shellMajor(''), 0);
+
+    assert.equal(m.ruleKeyFor('Firefox.desktop', 'firefox'), 'firefox');
+    assert.equal(m.ruleKeyFor(null, 'Code'), 'code');
+    assert.equal(m.ruleKeyFor('window:42', 'Gimp'), 'gimp');
+    assert.equal(m.ruleKeyFor(null, 'None'), '');
+
+    const rules = {firefox: 'Web', gimp: m.NEVER_ROUTE};
+    assert.deepEqual(m.ruleDecision(false, rules, 'firefox'), {kind: 'none'});
+    assert.deepEqual(m.ruleDecision(true, rules, 'gimp'), {kind: 'none'});
+    assert.deepEqual(m.ruleDecision(true, rules, 'firefox'),
+        {kind: 'move', space: 'Web', remembered: true});
+    assert.equal(m.ruleDecision(true, rules, 'code'), null);
+    assert.equal(m.ruleDecision(true, {}, ''), null);
+
+    assert.deepEqual(m.parseClassification('{"space":"Web","confidence":0.4}'),
+        {space: 'Web', confidence: 0.4});
+    assert.deepEqual(m.parseClassification('Code'), {space: 'Code', confidence: 1});
+    assert.deepEqual(m.parseClassification('{bad'), {space: '', confidence: 0});
+
+    const names = ['Code', 'Web', 'Notes'];
+    assert.deepEqual(m.classificationDecision('web', 0.9, names, 'Code'), {kind: 'move', space: 'Web'});
+    assert.deepEqual(m.classificationDecision('Web', 0.4, names, 'Code'), {kind: 'ask', space: 'Web'});
+    assert.deepEqual(m.classificationDecision('Web', 0.9, names, 'Web'), {kind: 'none'});
+    assert.deepEqual(m.classificationDecision('Default', 0.9, names, 'Code'), {kind: 'none'});
+    assert.deepEqual(m.classificationDecision('Web', 0, names, 'Code'), {kind: 'none'});
+
+    assert.equal(m.movedMessage('Firefox', 'Web'), 'Firefox moved to Web');
+    assert.equal(m.askMessage('Firefox', 'Web'), 'Axon thinks Firefox belongs in Web.');
+});

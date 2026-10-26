@@ -170,3 +170,111 @@ export function spaceAnnouncement(spaceName, windowCount) {
         windows = `${windowCount} windows open.`;
     return `Switched to ${spaceName} Space. ${windows}`;
 }
+
+// ── Spaces: window routing ──────────────────────────────────────────────────
+
+/** Move without asking at or above this classifier confidence. */
+export const ROUTE_CONFIDENCE_THRESHOLD = 0.6;
+
+/** Per-app rule value meaning "never move this app". */
+export const NEVER_ROUTE = '__never__';
+
+/**
+ * Major version from a GNOME Shell version string ("46.2" → 46).
+ *
+ * @param {string} version - e.g. Config.PACKAGE_VERSION
+ * @returns {number} 0 when unknown
+ */
+export function shellMajor(version) {
+    const n = parseInt(String(version ?? '').split('.')[0], 10);
+    return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * The key a per-app routing rule is stored under.
+ *
+ * @param {string|null} appId - desktop app id, e.g. "firefox.desktop"
+ * @param {string|null} wmClass - WM_CLASS fallback
+ * @returns {string} lower-case key, '' when nothing identifies the app
+ */
+export function ruleKeyFor(appId, wmClass) {
+    const id = String(appId ?? '').trim().toLowerCase().replace(/\.desktop$/, '');
+    if (id && !id.startsWith('window:'))
+        return id;
+    const cls = String(wmClass ?? '').trim().toLowerCase();
+    return cls === 'none' ? '' : cls;
+}
+
+/**
+ * Decide from settings alone, before asking the AI.
+ *
+ * @param {boolean} enabled - the auto-route-windows setting
+ * @param {object} rules - per-app rules: key → Space name or NEVER_ROUTE
+ * @param {string} key - from ruleKeyFor()
+ * @returns {{kind: 'none'}|{kind: 'move', space: string, remembered: true}|null}
+ *   null when the AI should be asked
+ */
+export function ruleDecision(enabled, rules, key) {
+    if (!enabled)
+        return {kind: 'none'};
+    const rule = key && rules ? rules[key] : undefined;
+    if (rule === NEVER_ROUTE)
+        return {kind: 'none'};
+    if (typeof rule === 'string' && rule)
+        return {kind: 'move', space: rule, remembered: true};
+    return null;
+}
+
+/**
+ * Parse the Brain's answer: ClassifyWindowDetailed JSON or a bare Space name
+ * from the older ClassifyWindow (no confidence → trusted, as before).
+ *
+ * @param {string} raw - D-Bus reply
+ * @returns {{space: string, confidence: number}}
+ */
+export function parseClassification(raw) {
+    const text = String(raw ?? '').trim();
+    if (text.startsWith('{')) {
+        try {
+            const obj = JSON.parse(text);
+            const confidence = Number(obj.confidence);
+            return {
+                space: String(obj.space ?? ''),
+                confidence: Number.isFinite(confidence) ? confidence : 0,
+            };
+        } catch (_e) {
+            return {space: '', confidence: 0};
+        }
+    }
+    return {space: text, confidence: 1};
+}
+
+/**
+ * Decide what to do with the AI's classification.
+ *
+ * @param {string} space - classified Space name
+ * @param {number} confidence - 0..1
+ * @param {string[]} spaceNames - the user's Spaces
+ * @param {string|null} currentSpace - Space the window is already on
+ * @param {number} [threshold]
+ * @returns {{kind: 'none'}|{kind: 'move'|'ask', space: string}}
+ */
+export function classificationDecision(space, confidence, spaceNames, currentSpace,
+    threshold = ROUTE_CONFIDENCE_THRESHOLD) {
+    const match = spaceNames.find(n => n.toLowerCase() === String(space).toLowerCase());
+    if (!match || confidence <= 0)
+        return {kind: 'none'};
+    if (currentSpace && match.toLowerCase() === currentSpace.toLowerCase())
+        return {kind: 'none'};
+    return {kind: confidence >= threshold ? 'move' : 'ask', space: match};
+}
+
+/** "Firefox moved to Web" */
+export function movedMessage(appName, spaceName) {
+    return `${appName || 'Window'} moved to ${spaceName}`;
+}
+
+/** "Axon thinks Firefox belongs in Web." */
+export function askMessage(appName, spaceName) {
+    return `Axon thinks ${appName || 'this window'} belongs in ${spaceName}.`;
+}

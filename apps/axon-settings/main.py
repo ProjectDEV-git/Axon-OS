@@ -20,6 +20,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ai_models import AIModelsWindow
 from diagnostics_window import DiagnosticsWindow
+from preferences_window import PreferencesWindow
 from settings_executor import SettingsExecutor
 
 
@@ -55,6 +56,11 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         diagnostics_btn.set_tooltip_text("Diagnostics: check that everything is working")
         diagnostics_btn.connect("clicked", lambda _b: self.open_diagnostics())
         header.pack_start(diagnostics_btn)
+        prefs_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+        prefs_btn.set_tooltip_text("Preferences: Spaces, privacy and command approvals")
+        prefs_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Preferences"])
+        prefs_btn.connect("clicked", lambda _b: self.open_preferences())
+        header.pack_start(prefs_btn)
         models_btn = Gtk.Button(label="AI Models")
         models_btn.set_tooltip_text("Choose AI models and providers")
         models_btn.connect("clicked", lambda _b: self.open_ai_models())
@@ -193,6 +199,9 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
     def open_diagnostics(self) -> None:
         DiagnosticsWindow(transient_for=self, application=self.get_application()).present()
 
+    def open_preferences(self) -> None:
+        PreferencesWindow(transient_for=self, application=self.get_application()).present()
+
     def open_ai_models(self) -> None:
         AIModelsWindow(transient_for=self, application=self.get_application()).present()
 
@@ -253,12 +262,15 @@ class AxonSettingsApp(Adw.Application):
             self._window.open_diagnostics()
         if "--ai-models" in sys.argv:
             self._window.open_ai_models()
+        if "--preferences" in sys.argv:
+            self._window.open_preferences()
 
 
 def main() -> int:
     app = AxonSettingsApp()
-    # GApplication rejects unknown options; --ai-models and --diagnostics are read in do_activate
-    return app.run([arg for arg in sys.argv if arg not in ("--ai-models", "--diagnostics")])
+    # GApplication rejects unknown options; ours are read in do_activate
+    ours = ("--ai-models", "--diagnostics", "--preferences")
+    return app.run([arg for arg in sys.argv if arg not in ours])
 
 
 if __name__ == "__main__":

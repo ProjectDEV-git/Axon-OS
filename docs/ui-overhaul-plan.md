@@ -116,18 +116,22 @@ add a short note under any item you skip or change.
 ## Phase 2 — Quick UX wins
 
 ### Spaces
-- [ ] **Tell the user when a window is moved.** `_routeWindowToSpace` in `spaces.js` moves
+- [x] **Tell the user when a window is moved.** `_routeWindowToSpace` in `spaces.js` moves
       windows silently (only `console.log`). Show a notification ("Firefox moved to Web")
       with an **Undo** action that moves the window back.
-- [ ] **Per-app rules.** Add a "Remember this choice" option. Store per-app routing rules
+- [x] **Per-app rules.** Add a "Remember this choice" option. Store per-app routing rules
       (app ID → Space, or "never route") in a gsettings key, and check them before asking
       the AI.
-- [ ] **Setting to turn routing off.** Add an `auto-route-windows` boolean (default true) to
+- [x] **Setting to turn routing off.** Add an `auto-route-windows` boolean (default true) to
       the gschema and check it before routing. Expose it in Axon Settings if there is a
       natural place for it.
-- [ ] **Ask when unsure.** If the classifier returns a confidence (or can be made to), ask
+- [x] **Ask when unsure.** If the classifier returns a confidence (or can be made to), ask
       below a threshold instead of moving: "Axon thinks this belongs in Code.
       [Move] [Keep here] [Always do this]".
+      Note: new Brain method `ClassifyWindowDetailed` returns `{space, confidence, source}`
+      (well-known apps 0.95, exact model answer 0.75, loose answer 0.4); the Shell asks
+      below 0.6 and falls back to `ClassifyWindow` on older Brains. Rules and the switch are
+      in the new Axon Settings → Preferences window.
 - [ ] **Fast Space OSD.** The OSD asks the AI for a summary on every switch. Show a summary
       built from the window list straight away (e.g. "3 windows · Code · Terminal · Firefox")
       in a pure helper. Optionally replace it with an AI summary after a short delay, behind
