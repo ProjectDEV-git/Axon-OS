@@ -22,6 +22,7 @@ import {
     spaceAnnouncement,
     spaceChipState,
     windowSummary,
+    MOTION,
     _t,
 } from './ui-logic.js';
 import { destroyNotifications, notify } from './notify.js';
@@ -535,9 +536,10 @@ export default class SpacesManager {
             Main.uiGroup.add_child(osd);
 
             // Fade in
+            // Space switches come from the keyboard: appear almost at once
             osd.ease({
                 opacity: 255,
-                duration: motion(200),
+                duration: motion(MOTION.keyboard),
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
 
@@ -545,8 +547,8 @@ export default class SpacesManager {
             GLib.timeout_add(GLib.PRIORITY_DEFAULT, 3500, () => {
                 osd.ease({
                     opacity: 0,
-                    duration: motion(300),
-                    mode: Clutter.AnimationMode.EASE_IN_QUAD,
+                    duration: motion(MOTION.enter),
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                     onComplete: () => {
                         try {
                             Main.uiGroup.remove_child(osd);

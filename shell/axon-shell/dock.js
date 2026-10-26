@@ -21,12 +21,13 @@ import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import Atk from 'gi://Atk';
+import Graphene from 'gi://Graphene';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import StartMenuPopup from './startmenu.js';
 import {SpaceStrip} from './spaces.js';
-import {_t, motionDuration} from './ui-logic.js';
+import {MOTION, PRESS_SCALE, _t, motionDuration, tooltipDelay} from './ui-logic.js';
 
 // Animation length; 0 when the user turned animations off (reduced motion)
 const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
@@ -68,10 +69,10 @@ const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
 
 const TASKBAR_HEIGHT     = 48;   // px, taskbar height
 const ICON_SIZE          = 32;   // px, taskbar icon size
-const BOUNCE_PEAK        = 1.25; // bounce scale
-const BOUNCE_DURATION    = 150;  // ms
-const TRAMPOLINE_SCALE   = 0.90; // press scale
-const TRAMPOLINE_DURATION = 100; // ms
+const LAUNCH_LIFT        = 1.08; // launch feedback: a gentle lift, no bounce
+
+// When the last dock tooltip closed, so neighbours open without a delay
+let lastTooltipHidden = null;
 
 // ─── Clock Label ───────────────────────────────────────────────────────────────
 
@@ -118,6 +119,8 @@ class DockIcon extends St.Button {
             track_hover: true,
             can_focus: true,
             accessible_name: opts.label ?? '',
+            // Scale from the centre, not the top-left corner
+            pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
         });
 
         this._app      = opts.app      ?? null;
@@ -163,6 +166,8 @@ class DockIcon extends St.Button {
         this.set_child(cell);
 
         this.connect('clicked',      this._onClick.bind(this));
+        // Feedback on press, not on release
+        this.connect('notify::pressed', this._onPressedChanged.bind(this));
         this.connect('notify::hover', this._onHoverChanged.bind(this));
         this.connect('destroy',      this._onDestroy.bind(this));
 
@@ -187,46 +192,41 @@ class DockIcon extends St.Button {
         if (!St.Settings.get().enable_animations)
             return;
         this.ease({
-            scale_y:  BOUNCE_PEAK,
-            scale_x:  BOUNCE_PEAK,
-            duration: motion(BOUNCE_DURATION),
-            mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
+            scale_y:  LAUNCH_LIFT,
+            scale_x:  LAUNCH_LIFT,
+            duration: motion(MOTION.enter),
+            mode:     Clutter.AnimationMode.EASE_OUT_QUINT,
             onComplete: () => {
                 this.ease({
                     scale_y:  1.0,
                     scale_x:  1.0,
-                    duration: motion(BOUNCE_DURATION),
-                    mode:     Clutter.AnimationMode.EASE_IN_OUT_BOUNCE,
+                    duration: motion(MOTION.settle),
+                    mode:     Clutter.AnimationMode.EASE_OUT_QUINT,
                 });
             },
         });
     }
 
-    _onClick() {
-        if (!St.Settings.get().enable_animations) {
-            this._callback();
-            return;
-        }
+    _onPressedChanged() {
+        // Starts from the current scale, so a quick tap can reverse mid-way
+        const scale = this.pressed ? PRESS_SCALE : 1.0;
         this.ease({
-            scale_x:  TRAMPOLINE_SCALE,
-            scale_y:  TRAMPOLINE_SCALE,
-            duration: motion(TRAMPOLINE_DURATION),
-            mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
-                this.ease({
-                    scale_x:  1.0,
-                    scale_y:  1.0,
-                    duration: motion(TRAMPOLINE_DURATION),
-                    mode:     Clutter.AnimationMode.EASE_OUT_BACK,
-                });
-            },
+            scale_x:  scale,
+            scale_y:  scale,
+            duration: motion(this.pressed ? MOTION.press : MOTION.release),
+            mode:     Clutter.AnimationMode.EASE_OUT_QUINT,
         });
+    }
+
+    _onClick() {
         this._callback();
     }
 
     _onHoverChanged() {
         if (this.hover) {
-            this._tooltipId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+            const delay = tooltipDelay(GLib.get_monotonic_time() / 1000, lastTooltipHidden);
+            this._tooltipInstant = delay === 0;
+            this._tooltipId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
                 this._showTooltip();
                 this._tooltipId = null;
                 return GLib.SOURCE_REMOVE;
@@ -257,11 +257,13 @@ class DockIcon extends St.Button {
         const y = Math.round(iconY - natH - 6);
 
         this._tooltip.set_position(x, y);
+        if (this._tooltipInstant)
+            return;
         this._tooltip.set_opacity(0);
         this._tooltip.ease({
             opacity:  255,
-            duration: motion(120),
-            mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
+            duration: motion(MOTION.tooltip),
+            mode:     Clutter.AnimationMode.EASE_OUT_QUINT,
         });
     }
 
@@ -269,10 +271,11 @@ class DockIcon extends St.Button {
         if (!this._tooltip) return;
         const t = this._tooltip;
         this._tooltip = null;
+        lastTooltipHidden = GLib.get_monotonic_time() / 1000;
         t.ease({
             opacity:    0,
-            duration:   motion(80),
-            mode:       Clutter.AnimationMode.EASE_IN_QUAD,
+            duration:   motion(MOTION.exit),
+            mode:       Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => t.destroy(),
         });
     }

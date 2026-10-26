@@ -7,7 +7,7 @@ import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {_t, filterSpaces, intentBarWidth, motionDuration} from './ui-logic.js';
+import {MOTION, _t, filterSpaces, intentBarWidth, motionDuration} from './ui-logic.js';
 
 const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
@@ -99,7 +99,7 @@ export default class SpaceSwitcher {
         }
         this._actor.show();
         this._actor.set_opacity(0);
-        this._actor.ease({opacity: 255, duration: motion(120), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        this._actor.ease({opacity: 255, duration: motion(MOTION.keyboard), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
         this._entry.grab_key_focus();
     }
 
@@ -109,8 +109,8 @@ export default class SpaceSwitcher {
         this._visible = false;
         this._actor.ease({
             opacity: 0,
-            duration: motion(80),
-            mode: Clutter.AnimationMode.EASE_IN_QUAD,
+            duration: motion(MOTION.keyboard),
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => this._actor?.hide(),
         });
     }

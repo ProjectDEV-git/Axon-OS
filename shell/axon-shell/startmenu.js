@@ -6,7 +6,7 @@ import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {_t, fitToWorkArea, motionDuration} from './ui-logic.js';
+import {ENTER_SCALE, MOTION, _t, fitToWorkArea, motionDuration} from './ui-logic.js';
 
 // Animation length; 0 when the user turned animations off (reduced motion)
 const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
@@ -25,6 +25,8 @@ class StartMenuPopup extends St.BoxLayout {
             reactive: true,
             visible: false,
         });
+        this._open = false;
+        this._fromKeyboard = false;
 
         this._extension = extension;
         this._spacesManager = spacesManager;
@@ -210,8 +212,15 @@ class StartMenuPopup extends St.BoxLayout {
         Main.uiGroup.add_child(this);
     }
 
-    show() {
-        if (this.visible) return;
+    /**
+     * @param {boolean} [fromKeyboard] - opened with the Super key: a 50 ms
+     *   fade only; from the dock button it grows out of the button
+     */
+    show(fromKeyboard = false) {
+        // _open, not visible: visible stays true while closing, and a press
+        // during the exit must reopen from wherever the menu is right now
+        if (this._open) return;
+        this._open = true;
         this.visible = true;
 
         this._searchEntry.set_text('');
@@ -219,11 +228,23 @@ class StartMenuPopup extends St.BoxLayout {
         this._populateRecentFiles();
         this._reposition();
 
-        this.set_opacity(0);
+        // Grows out of the dock button it came from, never from nothing.
+        // A reopen mid-exit eases on from the current opacity and scale.
+        this.set_pivot_point(0.0, 1.0);
+        if (this.opacity === 255)
+            this.set_opacity(0);
+        this._fromKeyboard = fromKeyboard;
+        if (fromKeyboard) {
+            this.set_scale(1.0, 1.0);
+        } else if (this.scale_x === 1.0) {
+            this.set_scale(ENTER_SCALE, ENTER_SCALE);
+        }
         this.ease({
             opacity: 255,
-            duration: motion(150),
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            scale_x: 1.0,
+            scale_y: 1.0,
+            duration: motion(fromKeyboard ? MOTION.keyboard : MOTION.enter),
+            mode: Clutter.AnimationMode.EASE_OUT_QUINT,
         });
 
         this._searchEntry.grab_key_focus();
@@ -239,28 +260,34 @@ class StartMenuPopup extends St.BoxLayout {
     }
 
     hide() {
-        if (!this.visible) return;
-        
+        if (!this._open) return;
+        this._open = false;
+
         if (this._clickDismissId) {
             global.stage.disconnect(this._clickDismissId);
             this._clickDismissId = null;
         }
 
+        // Leaves the way it came, faster than it arrived
+        const scale = this._fromKeyboard ? 1.0 : ENTER_SCALE;
         this.ease({
             opacity: 0,
-            duration: motion(100),
-            mode: Clutter.AnimationMode.EASE_IN_QUAD,
+            scale_x: scale,
+            scale_y: scale,
+            duration: motion(this._fromKeyboard ? MOTION.keyboard : MOTION.exit),
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
-                this.visible = false;
+                if (!this._open)
+                    this.visible = false;
             },
         });
     }
 
-    toggle() {
-        if (this.visible) {
+    toggle(fromKeyboard = false) {
+        if (this._open) {
             this.hide();
         } else {
-            this.show();
+            this.show(fromKeyboard);
         }
     }
 

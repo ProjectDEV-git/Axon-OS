@@ -249,3 +249,15 @@ test('setTranslator routes Shell strings through gettext and fills placeholders'
     }
     assert.equal(describe({action: 'open_app', app: 'Firefox'}), 'Opening Firefox…');
 });
+
+test('motion timings follow the rules', async () => {
+    const {MOTION, PRESS_SCALE, ENTER_SCALE, tooltipDelay} = await import('./ui-logic.mjs');
+    assert.ok(MOTION.keyboard <= 60);
+    assert.ok(MOTION.exit < MOTION.enter);
+    assert.ok(Object.values(MOTION).every(ms => ms > 0 && ms <= 300));
+    assert.ok(PRESS_SCALE >= 0.95 && PRESS_SCALE < 1);
+    assert.ok(ENTER_SCALE >= 0.9 && ENTER_SCALE < 1);
+    assert.equal(tooltipDelay(10_000, null), 400);
+    assert.equal(tooltipDelay(10_000, 9_700), 0);
+    assert.equal(tooltipDelay(10_000, 9_000), 400);
+});

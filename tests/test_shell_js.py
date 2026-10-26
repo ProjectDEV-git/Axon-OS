@@ -90,3 +90,16 @@ def test_suggestion_data_and_ranking_match_python(tmp_path: Path) -> None:
             for r in suggestions.build_suggestions(query, [tuple(a) for a in apps], spaces)
         ]
         assert js_rows == py_rows, query
+
+
+def test_shell_motion_never_eases_in_or_bounces() -> None:
+    """Emil Kowalski's rule: no ease-in on UI; bounce only after a flick (none here)."""
+    import re
+
+    for path in sorted(SHELL_DIR.glob("*.js")):
+        text = path.read_text(encoding="utf-8")
+        bad = re.findall(r"AnimationMode\.(EASE_IN_\w+|\w*BOUNCE|\w*BACK|\w*ELASTIC)", text)
+        assert not bad, f"{path.name}: {bad}"
+        # Every Shell animation length comes from MOTION in ui-logic.js
+        raw = re.findall(r"duration:\s*motion\((\d+)\)", text)
+        assert not raw, f"{path.name}: use MOTION.* instead of {raw}"

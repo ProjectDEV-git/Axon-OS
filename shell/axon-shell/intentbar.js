@@ -11,6 +11,7 @@ import {confirmAndRun, launchAppById} from './ai-actions.js';
 import {announce} from './a11y.js';
 import Shell from 'gi://Shell';
 import {
+    MOTION,
     _t,
     EXAMPLE_PROMPTS,
     RequestTracker,
@@ -280,11 +281,11 @@ export default class IntentBar {
         this._positionCenter();
         this._actor.show();
 
-        // Animate in: fade + slight scale
+        // Opened from the keyboard many times a day: only a 50 ms fade
         this._actor.set_opacity(0);
         this._actor.ease({
             opacity: 255,
-            duration: motion(150),
+            duration: motion(MOTION.keyboard),
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
 
@@ -302,8 +303,8 @@ export default class IntentBar {
 
         this._actor.ease({
             opacity: 0,
-            duration: motion(100),
-            mode: Clutter.AnimationMode.EASE_IN_QUAD,
+            duration: motion(MOTION.keyboard),
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
                 if (this._actor) this._actor.hide();
             },

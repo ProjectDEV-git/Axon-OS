@@ -549,6 +549,45 @@ export function motionDuration(ms, enabled) {
     return enabled ? ms : 0;
 }
 
+/**
+ * Shell motion timings in ms (Emil Kowalski's rules): surfaces opened from the
+ * keyboard many times a day get only a 50 ms fade; exits are faster than
+ * entrances; nothing in the UI runs past 300 ms. Entrances use a strong
+ * ease-out (Clutter EASE_OUT_QUINT), exits EASE_OUT_QUAD; never ease-in.
+ */
+export const MOTION = Object.freeze({
+    keyboard: 50,   // Intent Bar, Space switcher, Space OSD
+    press: 100,     // a pressed control scaling down
+    release: 160,   // and settling back
+    enter: 160,     // mouse-opened menus and popovers
+    exit: 110,
+    tooltip: 120,
+    settle: 240,    // launch feedback returning to rest
+});
+
+/** Pressed controls scale to this (subtle: 0.95-0.98). */
+export const PRESS_SCALE = 0.95;
+
+/** Menus and popovers enter from this scale with opacity, never from 0. */
+export const ENTER_SCALE = 0.97;
+
+const TOOLTIP_DELAY = 400;
+const TOOLTIP_WARM = 600;
+
+/**
+ * Delay before a tooltip shows: the first waits, and once one has been open,
+ * neighbours open at once (and without a fade) for a short while.
+ *
+ * @param {number} now - current time in ms
+ * @param {?number} lastHidden - when the last tooltip closed, or null
+ * @returns {number}
+ */
+export function tooltipDelay(now, lastHidden) {
+    return lastHidden !== null && lastHidden !== undefined && now - lastHidden < TOOLTIP_WARM
+        ? 0
+        : TOOLTIP_DELAY;
+}
+
 // ── Intent Bar suggestions (twin of services/suggestions.py) ────────────────
 
 export const SUGGESTION_CATEGORIES = Object.freeze(

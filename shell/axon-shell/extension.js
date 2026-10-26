@@ -266,7 +266,7 @@ export default class AxonShellExtension extends Extension {
             // 1. Intercept the Super / Windows Key press to toggle Start Menu
             this._overlayKeyId = global.display.connect('overlay-key', () => {
                 if (this._dockManager && this._dockManager._startMenuPopup) {
-                    this._dockManager._startMenuPopup.toggle();
+                    this._dockManager._startMenuPopup.toggle(true);
                 }
             });
 
