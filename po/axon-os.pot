@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-26 10:37+0000\n"
+"POT-Creation-Date: 2026-10-26 10:43+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -459,6 +459,11 @@ msgstr ""
 msgid "Ask anything or type a command..."
 msgstr ""
 
+#: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
+#, python-brace-format
+msgid "Copied {text}"
+msgstr ""
+
 #: apps/intent-bar/ui/window.py
 #, python-brace-format
 msgid "Couldn't open {name}."
@@ -707,7 +712,16 @@ msgid "Bluetooth"
 msgstr ""
 
 #: services/suggestions.py
+msgid "Calculator"
+msgstr ""
+
+#: services/suggestions.py
 msgid "Commands"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Copy {text}"
 msgstr ""
 
 #: services/suggestions.py
@@ -716,6 +730,10 @@ msgstr ""
 
 #: services/suggestions.py
 msgid "Displays"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Enter copies the result"
 msgstr ""
 
 #: services/suggestions.py

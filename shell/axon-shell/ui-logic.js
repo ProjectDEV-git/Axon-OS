@@ -617,10 +617,131 @@ export function useMaterial(reduceTransparency, highContrast) {
     return !reduceTransparency && !highContrast;
 }
 
+// ── Inline calculator (twin of services/calculator.py) ─────────────────────
+
+const CALC_MAX_LENGTH = 80;
+const CALC_MAX_EXPONENT = 100;
+const CALC_MAX_RESULT = 1e15;
+
+function calcNormalise(query) {
+    return String(query ?? '').replace(/×/g, '*').replace(/÷/g, '/').replace(/\*\*/g, '^');
+}
+
+/**
+ * True for typed arithmetic: allowed characters and at least one operator.
+ * Dates and phone-style numbers (2024-10-26) are not sums.
+ */
+export function looksLikeMath(query) {
+    const text = calcNormalise(String(query ?? '').trim());
+    if (!text || text.length > CALC_MAX_LENGTH || !/^[\d.\s+\-*/^()]+$/.test(text))
+        return false;
+    if (/^\d+(?:-\d+){2,}$/.test(text))
+        return false;
+    return /\d\s*[+\-*/^]|\)|[*/^]/.test(text) && /\d/.test(text);
+}
+
+/** Ten significant digits, no exponent notation; null when it can't be shown simply. */
+export function formatNumber(value) {
+    if (!Number.isFinite(value) || Math.abs(value) >= CALC_MAX_RESULT)
+        return null;
+    const rounded = Number(value.toPrecision(10));
+    if (rounded === 0)
+        return '0';
+    if (Math.abs(rounded) < 1e-6)
+        return null;
+    return String(rounded);
+}
+
+/**
+ * The result of *query* as text, or null when it isn't a calculation.
+ * A recursive-descent parser, never eval: same grammar and limits as Python.
+ */
+export function calculate(query) {
+    if (!looksLikeMath(query))
+        return null;
+    const tokens = calcNormalise(String(query).trim()).match(/\d+(?:\.\d*)?|\.\d+|[+\-*/^()]/g) ?? [];
+    let pos = 0;
+    const peek = () => (pos < tokens.length ? tokens[pos] : null);
+    const take = () => tokens[pos++];
+    const fail = why => {
+        throw new Error(why);
+    };
+
+    let expr, unary;
+    const primary = () => {
+        const token = peek();
+        if (token === '(') {
+            take();
+            const value = expr();
+            if (peek() !== ')')
+                fail('unbalanced brackets');
+            take();
+            return value;
+        }
+        if (token !== null && /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(token))
+            return Number(take());
+        return fail('expected a number');
+    };
+    const power = () => {
+        const base = primary();
+        if (peek() === '^') {
+            take();
+            const exponent = unary();
+            if (Math.abs(exponent) > CALC_MAX_EXPONENT)
+                fail('exponent too large');
+            if (base === 0 && exponent < 0)
+                fail('division by zero');
+            if (base < 0 && !Number.isInteger(exponent))
+                fail('complex result');
+            return base ** exponent;
+        }
+        return base;
+    };
+    unary = () => {
+        if (peek() === '+' || peek() === '-') {
+            const sign = take() === '-' ? -1 : 1;
+            return sign * unary();
+        }
+        return power();
+    };
+    const term = () => {
+        let value = unary();
+        while (peek() === '*' || peek() === '/') {
+            const op = take();
+            const right = unary();
+            if (op === '*')
+                value *= right;
+            else if (right === 0)
+                fail('division by zero');
+            else
+                value /= right;
+        }
+        return value;
+    };
+    expr = () => {
+        let value = term();
+        while (peek() === '+' || peek() === '-') {
+            const op = take();
+            const right = term();
+            value = op === '+' ? value + right : value - right;
+        }
+        return value;
+    };
+
+    try {
+        const value = expr();
+        if (peek() !== null)
+            return null;
+        return formatNumber(value);
+    } catch (_e) {
+        return null;
+    }
+}
+
 // ── Intent Bar suggestions (twin of services/suggestions.py) ────────────────
 
 export const SUGGESTION_CATEGORIES = Object.freeze(
-    ['Applications', 'Files', 'Settings', 'Spaces', 'Commands', 'Ask AI']);
+    ['Calculator', 'Applications', 'Files', 'Settings', 'Spaces', 'Commands', 'Ask AI']);
 
 /** [title, GNOME Settings panel, extra search words] */
 export const SETTINGS_PANELS = Object.freeze([
@@ -698,6 +819,10 @@ export function buildSuggestions(query, apps = [], spaces = [], limit = 3) {
         ];
     }
     const out = [];
+    // Typed arithmetic answers at once; Enter copies the result
+    const result = calculate(q);
+    if (result !== null)
+        out.push(row('Calculator', `= ${result}`, _t('Enter copies the result'), {type: 'copy', text: result}));
     out.push(...topRows(apps
         .map(([appId, name, keywords]) =>
             [matchScore(q, name, keywords), row('Applications', name, _t('Application'), {type: 'open_app', app_id: appId})])
@@ -725,6 +850,7 @@ export function buildSuggestions(query, apps = [], spaces = [], limit = 3) {
 export function describeSuggestion(s) {
     const a = s?.action ?? {};
     switch (a.type) {
+    case 'copy': return _t('Copy {text}', {text: a.text ?? ''});
     case 'open_app': return _t('Open {app}', {app: s.title});
     case 'files': return _t('Search your files for “{query}”', {query: a.query ?? ''});
     case 'settings': return _t('Open Settings → {panel}', {panel: s.title});
@@ -734,7 +860,7 @@ export function describeSuggestion(s) {
     }
 }
 
-const STRONG_CATEGORIES = new Set(['Applications', 'Settings', 'Spaces', 'Commands']);
+const STRONG_CATEGORIES = new Set(['Calculator', 'Applications', 'Settings', 'Spaces', 'Commands']);
 
 /**
  * Row Enter runs when the selection wasn't moved (twin of default_index()):

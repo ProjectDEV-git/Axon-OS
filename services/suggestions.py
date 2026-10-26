@@ -12,16 +12,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from calculator import calculate
 from i18n import N_, _
 
 # Category ids stay English because code compares them; show them with _().
+CALCULATOR = N_("Calculator")
 APPS = N_("Applications")
 FILES = N_("Files")
 SETTINGS = N_("Settings")
 SPACES = N_("Spaces")
 COMMANDS = N_("Commands")
 ASK = N_("Ask AI")
-CATEGORIES = (APPS, FILES, SETTINGS, SPACES, COMMANDS, ASK)
+CATEGORIES = (CALCULATOR, APPS, FILES, SETTINGS, SPACES, COMMANDS, ASK)
 
 # (title, GNOME Settings panel, extra search words)
 SETTINGS_PANELS: list[tuple[str, str, str]] = [
@@ -125,6 +127,18 @@ def build_suggestions(
             Suggestion(ASK, _("Ask Axon AI"), q, {"type": "ask", "query": q}),
         ]
 
+    # Typed arithmetic answers at once; Enter copies the result
+    result = calculate(q)
+    if result is not None:
+        out.append(
+            Suggestion(
+                CALCULATOR,
+                f"= {result}",
+                _("Enter copies the result"),
+                {"type": "copy", "text": result},
+            )
+        )
+
     out += _top(
         [
             (
@@ -192,6 +206,8 @@ def describe(suggestion: Suggestion) -> str:
     """Action preview, e.g. "Open Firefox" or "Run: df -h"."""
     action = suggestion.action
     kind = action.get("type")
+    if kind == "copy":
+        return _("Copy {text}").format(text=action.get("text", ""))
     if kind == "open_app":
         return _("Open {app}").format(app=suggestion.title)
     if kind == "files":
@@ -205,7 +221,7 @@ def describe(suggestion: Suggestion) -> str:
     return _("Ask Axon AI")
 
 
-_STRONG = frozenset({APPS, SETTINGS, SPACES, COMMANDS})
+_STRONG = frozenset({CALCULATOR, APPS, SETTINGS, SPACES, COMMANDS})
 
 
 def default_index(rows: list[Suggestion]) -> int:

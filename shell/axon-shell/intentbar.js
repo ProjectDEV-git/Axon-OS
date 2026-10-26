@@ -424,7 +424,12 @@ export default class IntentBar {
     _runSuggestion(s) {
         const a = s.action;
         this._hideSuggestions();
-        if (a.type === 'open_app') {
+        if (a.type === 'copy') {
+            St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, String(a.text ?? ''));
+            const message = _t('Copied {text}', {text: a.text ?? ''});
+            this._setResponse(message);
+            announce(message);
+        } else if (a.type === 'open_app') {
             if (launchAppById(a.app_id))
                 this.hide();
             else

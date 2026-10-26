@@ -857,7 +857,13 @@ class IntentBarWindow(Adw.Window):
         action = suggestion.action
         kind = action.get("type")
         self._hide_suggestions()
-        if kind == "files":
+        if kind == "copy":
+            text = str(action.get("text", ""))
+            self.get_clipboard().set(text)
+            message = _("Copied {text}").format(text=text)
+            self._set_response(message)
+            announce(self, message)
+        elif kind == "files":
             self._start_semantic_search(str(action.get("query", "")))
         elif kind == "open_app":
             info = Gio.DesktopAppInfo.new(str(action.get("app_id", "")))

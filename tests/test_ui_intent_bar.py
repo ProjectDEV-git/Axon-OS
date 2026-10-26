@@ -411,3 +411,13 @@ def test_window_has_no_blank_band(monkeypatch: pytest.MonkeyPatch) -> None:
     win._fit_height()
     assert win.get_default_size()[1] == win.measure(Gtk.Orientation.VERTICAL, width)[1]
     win.destroy()
+
+
+def test_calculator_suggestion_copies_the_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = suggestion_window(monkeypatch)
+    win._entry.set_text("12*7")
+    pump(GLib)
+    assert win._suggestions[0].title == "= 84"
+    win._run_suggestion(win._suggestions[0])
+    assert win._response_label.get_text() == "Copied 84"
+    win.destroy()

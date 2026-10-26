@@ -275,3 +275,17 @@ test('the taskbar floats inside the screen edge and turns solid on request', asy
     assert.equal(useMaterial(true, false), false);
     assert.equal(useMaterial(false, true), false);
 });
+
+test('calculator answers arithmetic and leaves other text alone', async () => {
+    const {calculate, buildSuggestions, defaultSuggestionIndex, describeSuggestion} = await import('./ui-logic.mjs');
+    assert.equal(calculate('12*7'), '84');
+    assert.equal(calculate('-2^2'), '-4');
+    assert.equal(calculate('2024-10-26'), null);
+    assert.equal(calculate('1/0'), null);
+    assert.equal(calculate('hello'), null);
+    const rows = buildSuggestions('12*7');
+    assert.equal(rows[0].category, 'Calculator');
+    assert.deepEqual(rows[0].action, {type: 'copy', text: '84'});
+    assert.equal(defaultSuggestionIndex(rows), 0);
+    assert.equal(describeSuggestion(rows[0]), 'Copy 84');
+});

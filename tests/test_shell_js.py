@@ -103,3 +103,27 @@ def test_shell_motion_never_eases_in_or_bounces() -> None:
         # Every Shell animation length comes from MOTION in ui-logic.js
         raw = re.findall(r"duration:\s*motion\((\d+)\)", text)
         assert not raw, f"{path.name}: use MOTION.* instead of {raw}"
+
+
+def test_calculator_matches_python(tmp_path: Path) -> None:
+    import json
+
+    from services.calculator import calculate
+    from tests.test_calculator import CASES, NOT_MATH
+
+    _copy_as_mjs(tmp_path)
+    queries = [q for q, _ in CASES] + NOT_MATH + ["7*(3+4)/2", "100-1-1", "2^0.5"]
+    script = (
+        "import('./ui-logic.mjs').then(m => console.log(JSON.stringify("
+        f"{json.dumps(queries)}.map(q => m.calculate(q)))))"
+    )
+    result = subprocess.run(
+        [str(NODE), "--input-type=module", "-e", script],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    js = json.loads(result.stdout)
+    assert js == [calculate(q) for q in queries]
