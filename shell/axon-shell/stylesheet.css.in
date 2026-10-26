@@ -468,6 +468,60 @@
     margin-top: {{space.md}};
 }
 
+/* ── Space chips in the taskbar (Super+1…9) ─────────────────────────────── */
+
+.axon-space-strip {
+    spacing: {{space.xxs}};
+    margin-left: {{space.md}};
+}
+
+.axon-space-chip {
+    min-width: 28px;
+    padding: {{space.xxs}} {{space.sm}};
+    border-radius: {{radius.sm}};
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    color: {{color.fg_secondary}};
+    font-family: {{font.family}};
+    font-size: {{font_size.sm}};
+}
+
+.axon-space-chip:hover {
+    background-color: {{color.hover}};
+}
+
+.axon-space-chip:focus {
+    border: {{focus.width}} solid {{color.focus_ring}};
+}
+
+/* Active: bold number and an underline bar, not colour alone */
+.axon-space-chip-active {
+    color: {{color.fg}};
+    font-weight: {{font_weight.bold}};
+    background-color: {{color.active}};
+    border-bottom: 2px solid {{color.accent_text}};
+}
+
+/* Empty: dimmed and no window count */
+.axon-space-chip-empty {
+    color: {{color.fg_muted}};
+}
+
+.axon-space-chip-number {
+    font-family: {{font.family}};
+}
+
+.axon-space-chip-badge {
+    font-size: {{font_size.xs}};
+    margin-left: {{space.xxs}};
+    color: {{color.fg_secondary}};
+}
+
+.axon-space-chip-attention .axon-space-chip-badge {
+    color: {{color.warning}};
+    font-weight: {{font_weight.bold}};
+}
+
 /* ── Space indicator in the top panel ───────────────────────────────────── */
 
 .axon-space-indicator {

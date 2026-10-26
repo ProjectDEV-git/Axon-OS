@@ -667,3 +667,62 @@ export function formatCommandOutput(text, maxLines = 40, maxChars = 4000) {
     }
     return cut ? `${shown}\n… (output shortened)` : shown;
 }
+
+// ── Spaces strip and quick switcher ─────────────────────────────────────────
+
+/**
+ * How one Space chip in the taskbar looks and reads. States differ by more
+ * than colour: the active Space is bold with an underline bar, a Space with
+ * windows shows their count, an empty one is dimmed, and "!" marks a window
+ * that wants attention.
+ *
+ * @param {number} index - 0-based (chip shows index + 1, matching Super+1…9)
+ * @param {string} name - Space name
+ * @param {boolean} active - is the current Space
+ * @param {number} windowCount - normal windows on it
+ * @param {boolean} attention - a window on it demands attention
+ * @returns {{number: string, badge: string, styleClasses: string[], accessibleName: string}}
+ */
+export function spaceChipState(index, name, active, windowCount, attention) {
+    const styleClasses = ['axon-space-chip'];
+    if (active)
+        styleClasses.push('axon-space-chip-active');
+    else if (windowCount === 0)
+        styleClasses.push('axon-space-chip-empty');
+    if (attention)
+        styleClasses.push('axon-space-chip-attention');
+    let badge = windowCount > 0 ? String(windowCount) : '';
+    if (attention)
+        badge = `${badge}!`;
+    const windows = windowCount === 0 ? 'empty'
+        : windowCount === 1 ? '1 window' : `${windowCount} windows`;
+    const parts = [`Space ${index + 1}: ${name}`, windows];
+    if (active)
+        parts.push('current');
+    if (attention)
+        parts.push('needs attention');
+    return {number: String(index + 1), badge, styleClasses, accessibleName: parts.join(', ')};
+}
+
+/**
+ * Quick switcher results: Spaces whose name, number or window titles match.
+ *
+ * @param {string} query - typed text; '' lists every Space
+ * @param {Array<{name: string, windows: string[]}>} spaces - in Super+1…9 order
+ * @returns {Array<{index: number, name: string, window: string|null, windowIndex: number}>}
+ */
+export function filterSpaces(query, spaces) {
+    const q = String(query ?? '').trim().toLowerCase();
+    const out = [];
+    spaces.forEach((space, index) => {
+        if (!q || String(index + 1) === q || space.name.toLowerCase().includes(q)) {
+            out.push({index, name: space.name, window: null, windowIndex: -1});
+            return;
+        }
+        space.windows.forEach((title, windowIndex) => {
+            if (String(title).toLowerCase().includes(q))
+                out.push({index, name: space.name, window: title, windowIndex});
+        });
+    });
+    return out;
+}

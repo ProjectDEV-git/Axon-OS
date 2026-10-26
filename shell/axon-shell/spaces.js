@@ -20,6 +20,7 @@ import {
     ruleDecision,
     ruleKeyFor,
     spaceAnnouncement,
+    spaceChipState,
     windowSummary,
 } from './ui-logic.js';
 import { destroyNotifications, notify } from './notify.js';
@@ -144,6 +145,119 @@ const BrainInterface = `
 
 const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
 const BrainProxy = Gio.DBusProxy.makeProxyWrapper(BrainInterface);
+
+// ─── SpaceStrip ───────────────────────────────────────────────────────────────
+
+const MAX_CHIPS = 9; // Super+1…9
+
+/**
+ * Numbered Space chips for the taskbar: 1–9 like Super+1…9, with each
+ * Space's window count, an attention marker and distinct active / inactive
+ * / empty states (shape and text as well as colour).
+ */
+export class SpaceStrip {
+    constructor(spacesManager) {
+        this._manager = spacesManager;
+        this._attention = new Set();
+        this._signals = [];
+        this._workspaceSignals = [];
+        this._updateId = 0;
+        this.actor = new St.BoxLayout({
+            style_class: 'axon-space-strip',
+            vertical: false,
+            y_align: Clutter.ActorAlign.CENTER,
+            accessible_name: 'Spaces',
+        });
+        this._connect();
+        this.update();
+    }
+
+    _connect() {
+        const wm = global.workspace_manager;
+        const display = global.display;
+        const later = () => this._queueUpdate();
+        this._signals.push([wm, wm.connect('active-workspace-changed', later)]);
+        this._signals.push([wm, wm.connect('notify::n-workspaces', () => {
+            this._connectWorkspaces();
+            later();
+        })]);
+        const flag = (_d, window) => {
+            this._attention.add(window);
+            later();
+        };
+        this._signals.push([display, display.connect('window-demands-attention', flag)]);
+        this._signals.push([display, display.connect('window-marked-urgent', flag)]);
+        this._signals.push([display, display.connect('notify::focus-window', () => {
+            if (display.focus_window && this._attention.delete(display.focus_window))
+                later();
+        })]);
+        this._connectWorkspaces();
+    }
+
+    _connectWorkspaces() {
+        for (const [ws, id] of this._workspaceSignals)
+            ws.disconnect(id);
+        this._workspaceSignals = [];
+        const wm = global.workspace_manager;
+        for (let i = 0; i < Math.min(wm.get_n_workspaces(), MAX_CHIPS); i++) {
+            const ws = wm.get_workspace_by_index(i);
+            for (const signal of ['window-added', 'window-removed'])
+                this._workspaceSignals.push([ws, ws.connect(signal, () => this._queueUpdate())]);
+        }
+    }
+
+    _queueUpdate() {
+        if (this._updateId)
+            return;
+        this._updateId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            this._updateId = 0;
+            this.update();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    update() {
+        if (!this.actor)
+            return;
+        this.actor.destroy_all_children();
+        const wm = global.workspace_manager;
+        const activeIndex = wm.get_active_workspace_index();
+        this._manager.getSpaces().slice(0, MAX_CHIPS).forEach((space, i) => {
+            const ws = i < wm.get_n_workspaces() ? wm.get_workspace_by_index(i) : null;
+            const windows = ws ? ws.list_windows().filter(w => !w.is_skip_taskbar()) : [];
+            const state = spaceChipState(i, space.name, i === activeIndex, windows.length,
+                windows.some(w => this._attention.has(w)));
+            const box = new St.BoxLayout({vertical: false, y_align: Clutter.ActorAlign.CENTER});
+            box.add_child(new St.Label({text: state.number, style_class: 'axon-space-chip-number'}));
+            if (state.badge)
+                box.add_child(new St.Label({text: state.badge, style_class: 'axon-space-chip-badge'}));
+            const chip = new St.Button({
+                style_class: state.styleClasses.join(' '),
+                child: box,
+                can_focus: true,
+                accessible_name: state.accessibleName,
+            });
+            chip.connect('clicked', () => this._manager.switchToSpace(i));
+            this.actor.add_child(chip);
+        });
+    }
+
+    destroy() {
+        if (this._updateId) {
+            GLib.source_remove(this._updateId);
+            this._updateId = 0;
+        }
+        for (const [obj, id] of [...this._signals, ...this._workspaceSignals])
+            obj.disconnect(id);
+        this._signals = [];
+        this._workspaceSignals = [];
+        this._attention.clear();
+        if (this.actor) {
+            this.actor.destroy();
+            this.actor = null;
+        }
+    }
+}
 
 // ─── SpacesManager ────────────────────────────────────────────────────────────
 

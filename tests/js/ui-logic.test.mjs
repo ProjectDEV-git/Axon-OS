@@ -199,3 +199,32 @@ test('formatCommandOutput', async () => {
     const long = Array.from({length: 100}, (_, i) => String(i)).join('\n');
     assert.ok(formatCommandOutput(long, 5).endsWith('(output shortened)'));
 });
+
+test('spaceChipState never relies on colour alone', async () => {
+    const {spaceChipState} = await import('./ui-logic.mjs');
+    const active = spaceChipState(0, 'Code', true, 3, false);
+    assert.equal(active.number, '1');
+    assert.equal(active.badge, '3');
+    assert.ok(active.styleClasses.includes('axon-space-chip-active'));
+    assert.equal(active.accessibleName, 'Space 1: Code, 3 windows, current');
+    const empty = spaceChipState(4, 'Media', false, 0, false);
+    assert.ok(empty.styleClasses.includes('axon-space-chip-empty'));
+    assert.equal(empty.badge, '');
+    assert.equal(empty.accessibleName, 'Space 5: Media, empty');
+    const urgent = spaceChipState(2, 'Chat', false, 1, true);
+    assert.equal(urgent.badge, '1!');
+    assert.match(urgent.accessibleName, /1 window, needs attention$/);
+});
+
+test('filterSpaces', async () => {
+    const {filterSpaces} = await import('./ui-logic.mjs');
+    const spaces = [
+        {name: 'Code', windows: ['main.py - VS Code', 'Terminal']},
+        {name: 'Web', windows: ['Inbox - Firefox']},
+    ];
+    assert.equal(filterSpaces('', spaces).length, 2);
+    assert.deepEqual(filterSpaces('2', spaces).map(r => r.name), ['Web']);
+    assert.deepEqual(filterSpaces('cod', spaces).map(r => [r.name, r.window]), [['Code', null]]);
+    assert.deepEqual(filterSpaces('inbox', spaces), [{index: 1, name: 'Web', window: 'Inbox - Firefox', windowIndex: 0}]);
+    assert.deepEqual(filterSpaces('zzz', spaces), []);
+});

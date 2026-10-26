@@ -25,6 +25,7 @@ import Atk from 'gi://Atk';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import StartMenuPopup from './startmenu.js';
+import {SpaceStrip} from './spaces.js';
 import {motionDuration} from './ui-logic.js';
 
 // Animation length; 0 when the user turned animations off (reduced motion)
@@ -385,6 +386,11 @@ export default class DockManager {
             this._dateMenuOrigParent = null;
         }
 
+        if (this._spaceStrip) {
+            this._spaceStrip.destroy();
+            this._spaceStrip = null;
+        }
+
         if (this._actor) {
             Main.layoutManager.removeChrome(this._actor);
             this._actor.destroy();
@@ -437,6 +443,12 @@ export default class DockManager {
             dockManager: this,
         });
         leftBox.add_child(searchBtn);
+
+        // Numbered Space chips (Super+1…9), with window counts
+        if (this._extension._spacesManager) {
+            this._spaceStrip = new SpaceStrip(this._extension._spacesManager);
+            leftBox.add_child(this._spaceStrip.actor);
+        }
 
         // Spacer to push apps to center
         const centerSpacerLeft = new St.Widget({ x_expand: true });

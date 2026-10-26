@@ -295,9 +295,12 @@ add a short note under any item you skip or change.
 - [x] **Compact mode.** Layout works at 320 px wide.
 
 ### Spaces visibility
-- [ ] Numbered indicators matching Super+1…9.
-- [ ] Window count and activity marker for each Space, with distinct active / inactive /
+- [x] Numbered indicators matching Super+1…9.
+- [x] Window count and activity marker for each Space, with distinct active / inactive /
       empty states that don't rely on colour alone.
+      Note: shown as chips in the taskbar, because the extension hides GNOME's top panel
+      (where the old Space indicator sat). Active = bold + underline bar, empty = dimmed
+      with no count, "!" = a window wants attention; each chip has an accessible name.
 - [ ] Quick switcher with search (keyboard first).
 - [ ] Optional: small window previews and drag-and-drop between Spaces.
 

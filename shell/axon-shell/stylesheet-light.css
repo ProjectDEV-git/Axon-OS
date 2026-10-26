@@ -472,6 +472,60 @@
     margin-top: 8px;
 }
 
+/* ── Space chips in the taskbar (Super+1…9) ─────────────────────────────── */
+
+.axon-space-strip {
+    spacing: 2px;
+    margin-left: 8px;
+}
+
+.axon-space-chip {
+    min-width: 28px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    border-bottom: 2px solid transparent;
+    color: #52526a;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    font-size: 12px;
+}
+
+.axon-space-chip:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.axon-space-chip:focus {
+    border: 2px solid #7c3aed;
+}
+
+/* Active: bold number and an underline bar, not colour alone */
+.axon-space-chip-active {
+    color: #1e1e28;
+    font-weight: 700;
+    background-color: rgba(0, 0, 0, 0.09);
+    border-bottom: 2px solid #6d28d9;
+}
+
+/* Empty: dimmed and no window count */
+.axon-space-chip-empty {
+    color: #5e5e74;
+}
+
+.axon-space-chip-number {
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+}
+
+.axon-space-chip-badge {
+    font-size: 11px;
+    margin-left: 2px;
+    color: #52526a;
+}
+
+.axon-space-chip-attention .axon-space-chip-badge {
+    color: #946200;
+    font-weight: 700;
+}
+
 /* ── Space indicator in the top panel ───────────────────────────────────── */
 
 .axon-space-indicator {
