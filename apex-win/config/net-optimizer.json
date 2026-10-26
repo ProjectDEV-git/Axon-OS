@@ -1,0 +1,18 @@
+{
+  "bbr": true,
+  "sqm": true,
+  "socket_buffers": true,
+  "dscp_marking": true,
+  "tcp_tweaks": true,
+  "game_ports": [
+    27015, 27016, 27017, 27018, 27019, 27020,
+    3478, 3479, 3480,
+    3074,
+    6112, 6113, 6114, 6115, 6116,
+    5060, 5061,
+    1935,
+    80, 443
+  ],
+  "download_mbps": 0,
+  "upload_mbps": 0
+}

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "win-sandbox-runner rules",
+  "description": "Sandbox policy rules for Windows executables running via Wine",
+  "type": "object",
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["hash", "name", "tier"],
+        "properties": {
+          "hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "SHA-256 hex string of the binary"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name for this binary"
+          },
+          "tier": {
+            "type": "string",
+            "enum": ["tier0", "tier1", "tier2", "tier3"],
+            "description": "Sandbox tier (tier0=none, tier1=landlock, tier2=bwrap, tier3=overlayfs)"
+          },
+          "trusted": {
+            "type": "boolean",
+            "default": false,
+            "description": "Skip all sandboxing — run wine directly with full host access. Use for trusted apps (CAD, game launchers, etc.)."
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          },
+          "network": {
+            "type": "boolean",
+            "default": false
+          },
+          "gpu": {
+            "type": "boolean",
+            "default": false
+          },
+          "dxvk": {
+            "type": "boolean",
+            "default": false,
+            "description": "Install DXVK (DirectX-to-Vulkan) into the Wine prefix. Informational for the GUI — runner does not manage prefix setup."
+          },
+          "winetricks": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": [],
+            "description": "Winetricks components needed by this app (e.g. dotnet48, vcrun2019). Informational for the GUI."
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "default": {},
+            "description": "Additional environment variables for this app (e.g. DXVK_HUD=1, MESA_GL_VERSION_OVERRIDE=4.5)"
+          },
+          "wine_variant": {
+            "type": "string",
+            "enum": ["system", "proton", "staging"],
+            "default": "system",
+            "description": "Recommended Wine variant. Informational for the GUI — runner uses the system wine."
+          }
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "unmapped_tier": {
+          "type": "string",
+          "enum": ["tier0", "tier1", "tier2", "tier3"],
+          "default": "tier0"
+        },
+        "untrusted_path_tier": {
+          "type": "string",
+          "enum": ["tier0", "tier1", "tier2", "tier3"],
+          "default": "tier2"
+        },
+        "network_default": {
+          "type": "boolean",
+          "default": false
+        },
+        "gpu_default": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

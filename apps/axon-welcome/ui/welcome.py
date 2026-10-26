@@ -1,4 +1,4 @@
-"""Axon OS Welcome App — WelcomeWindow (4-page onboarding wizard)."""
+"""Axon OS Welcome App — WelcomeWindow (onboarding wizard)."""
 
 import json
 import os
@@ -24,6 +24,10 @@ try:
     import hardware_profiler
 except ImportError:
     hardware_profiler = None
+
+# apps/axon-welcome/ holds windows_mode.py (also importable without GTK)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import windows_mode
 
 # Hash-pinned Ollama installer shipped in the image (see build/config/install-ollama.sh)
 OLLAMA_INSTALLER = "/usr/lib/axon/ollama/install-ollama.sh"
@@ -153,7 +157,7 @@ def _scrollable(page: Gtk.Widget) -> Gtk.ScrolledWindow:
 
 
 class WelcomeWindow(Adw.Window):
-    _PAGE_NAMES = ["welcome", "setup", "preferences", "features", "ready"]  # noqa: RUF012
+    _PAGE_NAMES = ["welcome", "setup", "preferences", "windows", "features", "ready"]  # noqa: RUF012
 
     def __init__(self, app: Adw.Application):
         super().__init__(application=app)
@@ -209,6 +213,7 @@ class WelcomeWindow(Adw.Window):
         self._stack.add_named(_scrollable(self._build_page_welcome()), "welcome")
         self._stack.add_named(_scrollable(self._build_page_setup()), "setup")
         self._stack.add_named(_scrollable(self._build_page_preferences()), "preferences")
+        self._stack.add_named(_scrollable(self._build_page_windows()), "windows")
         self._stack.add_named(_scrollable(self._build_page_features()), "features")
         self._stack.add_named(_scrollable(self._build_page_ready()), "ready")
 
@@ -848,7 +853,7 @@ class WelcomeWindow(Adw.Window):
 
         continue_btn = Gtk.Button(label="Continue →")
         _add_class(continue_btn, "nav-btn-next")
-        continue_btn.connect("clicked", lambda _: self._go_to("features"))
+        continue_btn.connect("clicked", lambda _: self._go_to("windows"))
         nav.append(continue_btn)
 
         page.append(nav)
@@ -875,7 +880,128 @@ class WelcomeWindow(Adw.Window):
             pass
 
     # ------------------------------------------------------------------
-    # PAGE 3 — Features
+    # PAGE — Windows programs (APEX-WIN)
+    # ------------------------------------------------------------------
+
+    # (mode, title, description)
+    _WINDOWS_CHOICES = (
+        (
+            "apex",
+            "Axon APEX — full access (Recommended)",
+            "Double-click any .exe or .msi and it runs with Wine like a normal app, "
+            "with your files, network, GPU and controllers. No sandbox.",
+        ),
+        (
+            "sandboxed",
+            "Axon APEX — sandboxed",
+            "Programs run in an isolated sandbox with their own home folder. Safer for "
+            "downloads you don't trust; some games and installers won't work.",
+        ),
+        (
+            "off",
+            "Off",
+            "Windows programs don't run. You can turn this on again here at any time.",
+        ),
+    )
+
+    def _build_page_windows(self) -> Gtk.Box:
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        page.set_margin_top(24)
+        page.set_margin_bottom(24)
+        page.set_margin_start(32)
+        page.set_margin_end(32)
+
+        title = Gtk.Label(label="Windows Programs")
+        _add_class(title, "page-title")
+        title.set_halign(Gtk.Align.START)
+        page.append(title)
+
+        subtitle = Gtk.Label(
+            label="Choose how Axon APEX opens Windows programs (.exe and .msi files)."
+        )
+        _add_class(subtitle, "page-subtitle")
+        subtitle.set_halign(Gtk.Align.START)
+        subtitle.set_wrap(True)
+        page.append(subtitle)
+
+        self.windows_mode = windows_mode.load_mode()
+        choices_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self._windows_radios: dict[str, Gtk.CheckButton] = {}
+        first_radio = None
+        for mode, label, desc in self._WINDOWS_CHOICES:
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            _add_class(row, "model-row")
+
+            radio = Gtk.CheckButton()
+            if first_radio is None:
+                first_radio = radio
+            else:
+                radio.set_group(first_radio)
+
+            lbl_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            name_lbl = Gtk.Label(label=label)
+            _add_class(name_lbl, "model-name")
+            name_lbl.set_halign(Gtk.Align.START)
+            name_lbl.set_wrap(True)
+            lbl_box.append(name_lbl)
+            desc_lbl = Gtk.Label(label=desc)
+            _add_class(desc_lbl, "model-desc")
+            desc_lbl.set_halign(Gtk.Align.START)
+            desc_lbl.set_wrap(True)
+            desc_lbl.set_xalign(0)
+            lbl_box.append(desc_lbl)
+            radio.set_child(lbl_box)
+
+            radio.set_active(mode == self.windows_mode)
+            radio.connect("toggled", self._on_windows_mode_toggled, mode)
+            self._windows_radios[mode] = radio
+            row.append(radio)
+            choices_box.append(row)
+        page.append(choices_box)
+
+        self._windows_status = Gtk.Label()
+        _add_class(self._windows_status, "model-desc")
+        self._windows_status.set_halign(Gtk.Align.START)
+        self._windows_status.set_wrap(True)
+        self._windows_status.set_xalign(0)
+        if not windows_mode.apex_installed():
+            self._windows_status.set_label(
+                "Axon APEX isn't installed on this system yet, so this choice applies once it is."
+            )
+        page.append(self._windows_status)
+
+        spacer = Gtk.Box()
+        spacer.set_vexpand(True)
+        page.append(spacer)
+
+        nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        nav.set_halign(Gtk.Align.CENTER)
+
+        back_btn = Gtk.Button(label="← Back")
+        _add_class(back_btn, "nav-btn-back")
+        back_btn.connect("clicked", lambda _: self._go_to("preferences"))
+        nav.append(back_btn)
+
+        continue_btn = Gtk.Button(label="Continue →")
+        _add_class(continue_btn, "nav-btn-next")
+        continue_btn.connect("clicked", lambda _: self._go_to("features"))
+        nav.append(continue_btn)
+
+        page.append(nav)
+        return page
+
+    def _on_windows_mode_toggled(self, btn: Gtk.CheckButton, mode: str) -> None:
+        if not btn.get_active():
+            return
+        try:
+            windows_mode.save_mode(mode)
+        except OSError as exc:
+            self._windows_status.set_label(f"Could not save your choice: {exc}")
+            return
+        self.windows_mode = mode
+
+    # ------------------------------------------------------------------
+    # PAGE — Features
     # ------------------------------------------------------------------
 
     def _build_page_features(self) -> Gtk.Box:
@@ -919,7 +1045,7 @@ class WelcomeWindow(Adw.Window):
 
         back_btn = Gtk.Button(label="← Back")
         _add_class(back_btn, "nav-btn-back")
-        back_btn.connect("clicked", lambda _: self._go_to("preferences"))
+        back_btn.connect("clicked", lambda _: self._go_to("windows"))
         nav.append(back_btn)
 
         next_btn = Gtk.Button(label="Next →")

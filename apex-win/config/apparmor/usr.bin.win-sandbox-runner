@@ -1,0 +1,71 @@
+# AppArmor profile for win-sandbox-runner
+# Provides mandatory access control for the sandbox handler binary.
+# This profile restricts win-sandbox-runner to only the resources it needs.
+
+#include <tunables/global>
+
+/usr/bin/win-sandbox-runner {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+
+  # Capabilities needed
+  capability sys_admin,     # for binfmt_misc registration
+  capability net_admin,     # for TAP device management
+  capability sys_ptrace,    # for wine process management
+
+  # Binary and libraries
+  /usr/bin/win-sandbox-runner mr,
+  /usr/local/bin/win-sandbox-runner mr,
+  /usr/lib/** mr,
+  /usr/lib64/** mr,
+  /usr/share/** r,
+
+  # Wine
+  /usr/bin/wine mr,
+  /usr/bin/wine64 mr,
+  /opt/wine-*/** mr,
+  /usr/lib/wine/** mr,
+
+  # Rules and config
+  /etc/win-sandbox-runner/** r,
+  /etc/win-sandbox-runner.conf r,
+  owner @{HOME}/.config/win-sandbox/** rw,
+
+  # Wine prefix (read-only by default, RW for drive_c)
+  owner @{HOME}/.wine/** rw,
+  /tmp/.wine-* rw,
+
+  # OverlayFS work directories (RAM-backed)
+  /dev/shm/win-run-*/** rw,
+
+  # TAP bridge
+  /var/run/win-tap-bridge.sock rw,
+  /dev/net/tun rw,
+
+  # Bubblewrap
+  /usr/bin/bwrap mr,
+  /usr/lib/x86_64-linux-gnu/bubblewrap/** mr,
+
+  # Landlock
+  # (no special paths needed — kernel-level)
+
+  # Logging
+  /var/log/win-sandbox-runner.log w,
+  /dev/log w,
+
+  # dbus (for GUI IPC)
+  dbus bus=session
+       peer=(name=org.wine.SandboxRunner),
+
+  # Deny dangerous paths
+  deny /etc/shadow r,
+  deny /etc/gshadow r,
+  deny /root/** rw,
+  deny /boot/** rw,
+
+  # Deny network access (TAP bridge handles networking)
+  deny network inet dgram,
+  deny network inet stream,
+  deny network inet6 dgram,
+  deny network inet6 stream,
+}

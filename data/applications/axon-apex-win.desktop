@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Windows Program (APEX-WIN)
+GenericName=Windows Application
+Comment=Run this Windows program with Wine through APEX-WIN, without a sandbox
+Exec=axon-apex-run --chdir %f
+Icon=wine
+Terminal=false
+NoDisplay=true
+StartupNotify=true
+Categories=System;Emulator;
+# Every MIME type the desktop may give a Windows program or installer.
+# shared-mime-info reports modern PE files as
+# application/vnd.microsoft.portable-executable.
+MimeType=application/vnd.microsoft.portable-executable;application/x-ms-dos-executable;application/x-msdownload;application/x-msi;application/x-ms-installer;

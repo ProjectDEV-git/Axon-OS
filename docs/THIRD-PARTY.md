@@ -13,5 +13,6 @@ not shipped.
 | Brave (`brave-browser`) | Default web browser | brave-browser-apt-release.s3.brave.com (signing key pinned) | MPL-2.0; "Brave" name and logo are Brave Software trademarks, shipped unmodified |
 | Mission Center (`io.missioncenter.MissionCenter`) | System monitor | Flathub | GPL-3.0 |
 | Ollama | Local AI runtime, installed on first boot | github.com/ollama/ollama (SHA-256 pinned) | MIT |
+| APEX-WIN (`apex-win/`, vendored) | Runs Windows programs with Wine on double-click | github.com/Gaming-RF/APEX-WIN (commit in `apex-win/AXON-VENDOR.md`) | MIT |
 
 The WhiteSur *icon* theme was dropped because it reproduces Apple's app icons.

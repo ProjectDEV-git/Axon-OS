@@ -1,0 +1,58 @@
+#!/bin/sh
+# Launch Circuit Wizard 3 with the GENIE USB cable wired to COM1.
+#
+# Why this wrapper exists:
+#   Wine's `wineboot` (which runs on updates, winecfg, and sometimes on first
+#   launch after an upgrade) regenerates dosdevices/ and resets com1 back to
+#   /dev/ttyS0 - a phantom motherboard port that returns EIO. Circuit Wizard
+#   then reports "no cable found". Re-linking COM1 here makes that self-healing.
+set -e
+
+WINEPREFIX="${WINEPREFIX:-$HOME/.wine}"
+export WINEPREFIX
+export WINEDEBUG="${WINEDEBUG:--all}"
+
+CW="$WINEPREFIX/drive_c/Program Files (x86)/New Wave Concepts/Circuit Wizard 3 SE/CktWiz.exe"
+DOSDEV="$WINEPREFIX/dosdevices"
+
+# --- Re-assert COM1 -> GENIE cable ---
+if [ -d "$DOSDEV" ]; then
+    if [ -e /dev/genie ]; then
+        TARGET=/dev/genie
+    else
+        # Fall back to the first FTDI ttyUSB node if the udev symlink is absent.
+        TARGET=""
+        for cand in /dev/ttyUSB0 /dev/ttyUSB1 /dev/ttyUSB2 /dev/ttyUSB3; do
+            [ -e "$cand" ] && { TARGET="$cand"; break; }
+        done
+    fi
+
+    if [ -z "$TARGET" ]; then
+        # Cable is not plugged in right now. Still point COM1 at /dev/genie so
+        # the mapping is correct the moment the cable appears - and so we never
+        # leave COM1 aimed at the phantom /dev/ttyS0 that wineboot writes.
+        TARGET=/dev/genie
+        echo "[circuit-wizard] WARNING: GENIE cable not detected."
+        echo "[circuit-wizard] Plug it in, or run: sudo sh scripts/setup-genie-serial.sh"
+    fi
+
+    CURRENT=$(readlink "$DOSDEV/com1" 2>/dev/null || echo "")
+    if [ "$CURRENT" != "$TARGET" ]; then
+        ln -sfn "$TARGET" "$DOSDEV/com1"
+        echo "[circuit-wizard] COM1 -> $TARGET"
+    fi
+
+    if [ -e "$TARGET" ] && { [ ! -r "$TARGET" ] || [ ! -w "$TARGET" ]; }; then
+        echo "[circuit-wizard] WARNING: cannot read/write $TARGET."
+        echo "[circuit-wizard] You may need: sudo usermod -aG dialout $(id -un)  (then log out/in)"
+    fi
+fi
+
+if [ ! -f "$CW" ]; then
+    echo "[circuit-wizard] ERROR: Circuit Wizard not found at:"
+    echo "  $CW"
+    exit 1
+fi
+
+cd "$(dirname "$CW")"
+exec wine "$CW" "$@"

@@ -1,0 +1,20 @@
+[package]
+name = "win-sandbox-gui"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "win-sandbox-gui"
+path = "src/main.rs"
+
+[dependencies]
+win-sandbox-common.workspace = true
+gtk.workspace = true
+adw.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+zbus.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

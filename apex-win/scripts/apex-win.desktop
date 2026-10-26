@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Run with APEX-WIN
+GenericName=Windows Application
+Comment=Run this Windows program through APEX-WIN's sandboxed Wine
+# %f = single local file path. APEX-WIN resolves the tier itself.
+Exec=win-sandbox-runner --exe %f
+Icon=wine
+Terminal=false
+NoDisplay=true
+Categories=System;Emulator;
+# Covers every MIME type the desktop may assign to a PE binary.
+# Note: shared-mime-info reports modern PE files as
+# application/vnd.microsoft.portable-executable, which Zorin's own
+# exec-guard entry does not claim.
+MimeType=application/vnd.microsoft.portable-executable;application/x-ms-dos-executable;application/x-msdownload;application/x-msi;application/x-ms-shortcut;

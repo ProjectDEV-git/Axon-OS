@@ -35,8 +35,23 @@ start_service() {
     fi
 }
 
+# GPU access: AMD (ROCm) and Intel need /dev/kfd and /dev/dri/render*,
+# owned by the render and video groups. Without them Ollama silently falls
+# back to the CPU. Also let the desktop user read the shared model store.
+setup_groups() {
+    id ollama >/dev/null 2>&1 || return 0
+    local g
+    for g in render video; do
+        getent group "${g}" >/dev/null 2>&1 && usermod -a -G "${g}" ollama
+    done
+    if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+        usermod -a -G ollama "${SUDO_USER}" || true
+    fi
+}
+
 if command -v ollama >/dev/null 2>&1; then
     log "ollama already installed at $(command -v ollama)"
+    setup_groups
     start_service
     exit 0
 fi
@@ -73,10 +88,12 @@ esac
 if ! id ollama >/dev/null 2>&1; then
     useradd -r -s /bin/false -U -m -d /usr/share/ollama ollama
 fi
+setup_groups
 
 cat > /etc/systemd/system/ollama.service <<UNIT
 [Unit]
 Description=Ollama Service
+Wants=network-online.target
 After=network-online.target
 
 [Service]

@@ -1,0 +1,42 @@
+[Unit]
+Description=APEX-WIN Background Daemon — transparent Windows .exe execution via Wine
+Documentation=https://github.com/Gaming-RF/APEX-WIN
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/win-sandbox-runner --daemon
+ExecStop=/usr/bin/win-sandbox-runner --stop
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=win-sandbox
+
+# Runtime directory (systemd creates /run/win-sandbox-runner before ExecStart).
+# 0755, not 1777: users only connect to the sockets inside (launch.sock,
+# ipc.sock are 0666 and authorize each peer by SO_PEERCRED). A world-writable
+# dir let any user pre-create squatter files or symlinks there.
+RuntimeDirectory=win-sandbox-runner
+RuntimeDirectoryMode=0755
+
+# Security hardening
+#
+# NOTE: ProtectHome must NOT be set. The daemon spawns Wine, whose per-app
+# prefix lives under the user's home (~/.local/share/win-sandbox/prefixes).
+# systemd applies these restrictions to the whole cgroup, so ProtectHome=read-only
+# makes /home read-only for Wine too, and it fails with:
+#     wine: unable to create wineserver tmpdir
+# Verified directly:
+#     systemd-run -p ProtectHome=read-only --uid=1000 touch ~/.local/share/...
+#     -> "Read-only file system"
+#
+# Isolation of the Windows binary itself is the tiers' job (Landlock, bwrap),
+# not the service unit's. The unit must stay permissive enough for Wine to run.
+# (ReadWritePaths is also omitted: it only has meaning alongside
+# ProtectSystem/ProtectHome, so it would be a no-op here.)
+NoNewPrivileges=no
+
+[Install]
+WantedBy=multi-user.target

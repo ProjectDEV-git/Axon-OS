@@ -1,0 +1,13 @@
+/target/
+*.o
+*.dll
+*.so
+*.dylib
+csrc/sys_netmp/*.o
+csrc/win-tap-bridge/*.o
+csrc/win-tap-bridge/win-tap-bridge
+csrc/win_tap_filter/*.o
+csrc/win_tap_filter/*.bpf.o
+csrc/win_tap_filter/loader
+*.tar.gz
+/dist/

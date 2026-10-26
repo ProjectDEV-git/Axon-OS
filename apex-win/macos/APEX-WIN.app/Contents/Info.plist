@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>APEX-WIN</string>
+	<key>CFBundleDisplayName</key>
+	<string>Run with APEX-WIN</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.apex-win.launcher</string>
+	<key>CFBundleVersion</key>
+	<string>0.1.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleSignature</key>
+	<string>?????</string>
+	<key>CFBundleExecutable</key>
+	<string>apex-win-launcher</string>
+	<!--
+	No CFBundleIconFile: no .icns asset is bundled here (icon design is
+	outside this port's scope). Omitting the key is safe: Launch Services
+	falls back to a generic bundle icon rather than erroring on a missing
+	file, which a dangling reference to a nonexistent AppIcon.icns would
+	risk instead. Add scripts/apex-win.icns and this key together, not one
+	without the other.
+	-->
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+
+	<!--
+	This bundle is a launcher, not a windowed application: it forwards the
+	opened .exe path to win-sandbox-runner (the exe flag) and exits
+	immediately (the real Wine/window UI is Wine's own, same as the Linux
+	.desktop path). No Dock icon or menu bar is wanted for that.
+	LSUIElement=true keeps it out of the Dock and app switcher entirely,
+	mirroring the Linux .desktop file's NoDisplay=true (both hide the
+	launcher itself from app pickers while still being invocable as a
+	document handler).
+	-->
+	<key>LSUIElement</key>
+	<true/>
+
+	<!--
+	Document type association: what Launch Services should offer this app
+	for when a user picks "Open With" or double-clicks a .exe. The system
+	already declares com.microsoft.windows-executable for .exe (Apple's own
+	System-Declared Uniform Type Identifiers reference, table 1: conforms to
+	public.data + public.executable, tags "exe" / "application/x-msdownload"),
+	so this only needs to reference it, not redeclare it. Same posture as
+	the Linux .desktop file's MimeType= line, which claims
+	application/vnd.microsoft.portable-executable rather than inventing a
+	new type.
+	-->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Windows Executable</string>
+			<key>CFBundleTypeRole</key>
+			<string>Shell</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.microsoft.windows-executable</string>
+			</array>
+			<key>LSHandlerRank</key>
+			<!--
+			Alternate, not Owner or Default: APEX-WIN offers to run .exe
+			files, it doesn't own the type the way Wine's own installed
+			.exe association might, and a user should still see a picker
+			rather than have APEX-WIN silently become the enforced default
+			the first time it's installed. The user opts in via "Open
+			With" or by explicitly setting it as default in Finder's Get
+			Info, same posture as apex-win.desktop, which is NoDisplay=true
+			and only reachable via the Nautilus "Open With" list, not
+			auto-selected as the system default.
+			-->
+			<string>Alternate</string>
+		</dict>
+	</array>
+</dict>
+</plist>
