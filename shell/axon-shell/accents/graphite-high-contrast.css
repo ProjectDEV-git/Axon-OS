@@ -1,0 +1,62 @@
+/* Shell accent override generated from theme/tokens/axon-tokens.json by scripts/gen_tokens.py.
+ * Do not edit: change the tokens or the template and run the script. */
+/* Accent: graphite, variant: high-contrast */
+
+.axon-chip:focus {
+    border: 2px solid #ffffff;
+}
+
+.axon-intentbar-input,
+.axon-intentbar-input StEntry {
+    caret-color: #aeb2b7;
+    selection-background-color: rgba(106, 113, 124, 0.28);
+}
+
+.axon-origin-label {
+    color: #aeb2b7;
+}
+
+.axon-intentbar-stop:focus {
+    border: 2px solid #ffffff;
+}
+
+.axon-suggestion:focus {
+    border: 2px solid #ffffff;
+}
+
+.axon-suggestion-selected {
+    background-color: rgba(106, 113, 124, 0.28);
+    border: 1px solid #ffffff;
+}
+
+.axon-dock-icon:focus {
+    border: 2px solid #ffffff;
+}
+
+.axon-ai-indicator-icon {
+    color: #aeb2b7;
+}
+
+.axon-startmenu-search-container:focus,
+.axon-startmenu-search:focus {
+    border: 2px solid #ffffff;
+}
+
+.axon-startmenu-app-item:focus,
+.axon-startmenu-file-item:focus,
+.axon-startmenu-power-btn:focus {
+    border: 2px solid #ffffff;
+}
+
+.axon-space-chip:focus {
+    border: 2px solid #ffffff;
+}
+
+.axon-space-chip-active {
+    border-bottom: 2px solid #aeb2b7;
+}
+
+.axon-dock-menu-item:focus {
+    background-color: rgba(106, 113, 124, 0.28);
+    border: 2px solid #ffffff;
+}

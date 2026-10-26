@@ -127,3 +127,27 @@ def test_reduce_transparency_switch_writes_the_shell_key(tmp_path: Path) -> None
     win._reduce_transparency_row.set_active(True)
     assert settings.get_boolean("reduce-transparency") is True
     win.destroy()
+
+
+def test_accent_swatches_match_the_tokens() -> None:
+    import json
+
+    tokens = json.loads((ROOT / "theme" / "tokens" / "axon-tokens.json").read_text())
+    names = [n for n in tokens["accents"] if not n.startswith("$")]
+    assert [key for key, _n, _f in prefs.ACCENTS] == names
+    for key, _name, fill in prefs.ACCENTS:
+        assert tokens["accents"][key]["dark"]["accent"] == fill
+
+
+def test_accent_swatch_writes_the_shell_key(tmp_path: Path) -> None:
+    settings = memory_settings()
+    win = prefs.PreferencesWindow(
+        shell_settings=settings,
+        context_path=tmp_path / "c.json",
+        approvals_path=tmp_path / "a.json",
+    )
+    assert win._accent_buttons["blue"].get_active()
+    win._accent_buttons["teal"].set_active(True)
+    assert settings.get_string("accent-color") == "teal"
+    assert not win._accent_buttons["blue"].get_active()  # one choice at a time
+    win.destroy()

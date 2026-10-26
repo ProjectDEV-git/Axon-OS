@@ -184,3 +184,47 @@ def test_app_css_font_sizes_scale_with_large_text() -> None:
         assert not re.search(r"font-size:\s*[\d.]+px", text), f"{css}: use pt so Large Text works"
     template = (ROOT / "shell" / "axon-shell" / "stylesheet.css.in").read_text()
     assert not re.search(r"font-size:\s*[\d.]+px", template)
+
+
+ACCENTS = {k: v for k, v in TOKENS["accents"].items() if not k.startswith("$")}
+
+
+@pytest.mark.parametrize("accent", sorted(ACCENTS))
+@pytest.mark.parametrize("variant", sorted(VARIANTS))
+def test_every_accent_meets_contrast(accent: str, variant: str) -> None:
+    colours = {**VARIANTS[variant], **ACCENTS[accent][variant]}
+    minimum = 7.0 if variant == "high-contrast" else 4.5
+    for surface in ("bg", "surface", "surface_raised"):
+        ratio = contrast(colours["accent_text"], colours[surface])
+        assert ratio >= minimum, f"{accent}/{variant}: accent_text on {surface} {ratio:.2f}"
+    assert contrast(colours["accent_fg"], colours["accent"]) >= 4.5
+    assert contrast(colours["focus_ring"], colours["bg"]) >= 3.0
+
+
+def test_blue_accent_is_the_default_palette() -> None:
+    for variant, values in ACCENTS["blue"].items():
+        for key, value in values.items():
+            assert VARIANTS[variant][key] == value, (variant, key)
+
+
+def test_accent_choices_match_the_schema_and_shell() -> None:
+    schema = (
+        ROOT
+        / "shell"
+        / "axon-shell"
+        / "schemas"
+        / "org.gnome.shell.extensions.axon-shell.gschema.xml"
+    ).read_text()
+    choices = re.findall(r'<choice value="([a-z]+)"/>', schema)
+    assert choices == list(ACCENTS)
+    js = (ROOT / "shell" / "axon-shell" / "ui-logic.js").read_text()
+    listed = re.search(r"export const ACCENTS = Object.freeze\(\[([^\]]+)\]\)", js)
+    assert listed and re.findall(r"'([a-z]+)'", listed.group(1)) == list(ACCENTS)
+
+
+def test_shell_accent_override_holds_only_accent_rules() -> None:
+    css = (ROOT / "shell" / "axon-shell" / "accents" / "teal-dark.css").read_text()
+    teal = ACCENTS["teal"]["dark"]
+    assert ".axon-suggestion-selected" in css and teal["focus_ring"] in css
+    assert VARIANTS["dark"]["surface"] not in css  # no unrelated rules
+    assert "{{" not in css

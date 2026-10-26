@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-26 10:43+0000\n"
+"POT-Creation-Date: 2026-10-26 10:52+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -306,6 +306,10 @@ msgstr ""
 msgid "AI summary when switching Spaces"
 msgstr ""
 
+#: apps/axon-settings/preferences_window.py
+msgid "Accent colour"
+msgstr ""
+
 #: apps/axon-settings/preferences_window.py services/suggestions.py
 msgid "Appearance"
 msgstr ""
@@ -320,6 +324,10 @@ msgstr ""
 
 #: apps/axon-settings/preferences_window.py
 msgid "Axon picks a Space for each new window and asks when it isn't sure"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Blue"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -345,12 +353,24 @@ msgid "Draw the taskbar on a solid surface. High Contrast does this too"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
+msgid "Focus rings, selections and the main action"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
 #, python-brace-format
 msgid "Forget rule for {app}"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
 msgid "Forget this rule"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Graphite"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Green"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -366,7 +386,15 @@ msgid "None yet. Use “Always do this” on a notification."
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
+msgid "Orange"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
 msgid "Per-app rules"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Pink"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -396,6 +424,10 @@ msgstr ""
 #: apps/axon-settings/preferences_window.py
 #, python-brace-format
 msgid "Stop allowing {command}"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Teal"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py

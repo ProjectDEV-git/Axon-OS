@@ -134,5 +134,164 @@
       "focus_ring": "#ffffff",
       "shadow": "none"
     }
+  },
+  "accents": {
+    "$comment": "User-chosen accent colours (Axon Preferences > Appearance). 'blue' is the default and equals the accent keys in 'variants'. gen_tokens.py writes one GTK and one Shell override per accent and variant.",
+    "blue": {
+      "dark": {
+        "accent": "#2b6fde",
+        "accent_hover": "#245fc2",
+        "accent_fg": "#ffffff",
+        "accent_text": "#7db3ff",
+        "accent_subtle": "rgba(43, 111, 222, 0.20)",
+        "focus_ring": "#5c9dff"
+      },
+      "light": {
+        "accent": "#1d64d8",
+        "accent_hover": "#1854b8",
+        "accent_fg": "#ffffff",
+        "accent_text": "#1858c2",
+        "accent_subtle": "rgba(29, 100, 216, 0.10)",
+        "focus_ring": "#1d64d8"
+      },
+      "high-contrast": {
+        "accent": "#8cc2ff",
+        "accent_hover": "#b8d9ff",
+        "accent_fg": "#000000",
+        "accent_text": "#b8d9ff",
+        "accent_subtle": "rgba(140, 194, 255, 0.28)",
+        "focus_ring": "#ffffff"
+      }
+    },
+    "teal": {
+      "dark": {
+        "accent": "#1d7c79",
+        "accent_hover": "#186765",
+        "accent_fg": "#ffffff",
+        "accent_text": "#6dc5c2",
+        "accent_subtle": "rgba(29, 124, 121, 0.20)",
+        "focus_ring": "#6dc5c2"
+      },
+      "light": {
+        "accent": "#1d7c79",
+        "accent_hover": "#186765",
+        "accent_fg": "#ffffff",
+        "accent_text": "#1b7471",
+        "accent_subtle": "rgba(29, 124, 121, 0.10)",
+        "focus_ring": "#1d7c79"
+      },
+      "high-contrast": {
+        "accent": "#8dd8d6",
+        "accent_hover": "#8dd8d6",
+        "accent_fg": "#000000",
+        "accent_text": "#8dd8d6",
+        "accent_subtle": "rgba(29, 124, 121, 0.28)",
+        "focus_ring": "#ffffff"
+      }
+    },
+    "green": {
+      "dark": {
+        "accent": "#2a7e49",
+        "accent_hover": "#246b3e",
+        "accent_fg": "#ffffff",
+        "accent_text": "#75bd8f",
+        "accent_subtle": "rgba(42, 126, 73, 0.20)",
+        "focus_ring": "#75bd8f"
+      },
+      "light": {
+        "accent": "#2a7e49",
+        "accent_hover": "#246b3e",
+        "accent_fg": "#ffffff",
+        "accent_text": "#267342",
+        "accent_subtle": "rgba(42, 126, 73, 0.10)",
+        "focus_ring": "#2a7e49"
+      },
+      "high-contrast": {
+        "accent": "#94d1aa",
+        "accent_hover": "#94d1aa",
+        "accent_fg": "#000000",
+        "accent_text": "#94d1aa",
+        "accent_subtle": "rgba(42, 126, 73, 0.28)",
+        "focus_ring": "#ffffff"
+      }
+    },
+    "orange": {
+      "dark": {
+        "accent": "#b35914",
+        "accent_hover": "#9c4d11",
+        "accent_fg": "#ffffff",
+        "accent_text": "#d29160",
+        "accent_subtle": "rgba(179, 89, 20, 0.20)",
+        "focus_ring": "#d29160"
+      },
+      "light": {
+        "accent": "#b35914",
+        "accent_hover": "#9c4d11",
+        "accent_fg": "#ffffff",
+        "accent_text": "#a15012",
+        "accent_subtle": "rgba(179, 89, 20, 0.10)",
+        "focus_ring": "#b35914"
+      },
+      "high-contrast": {
+        "accent": "#e3ac82",
+        "accent_hover": "#e3ac82",
+        "accent_fg": "#000000",
+        "accent_text": "#e3ac82",
+        "accent_subtle": "rgba(179, 89, 20, 0.28)",
+        "focus_ring": "#ffffff"
+      }
+    },
+    "pink": {
+      "dark": {
+        "accent": "#ca2f7d",
+        "accent_hover": "#b62b70",
+        "accent_fg": "#ffffff",
+        "accent_text": "#cb7ba3",
+        "accent_subtle": "rgba(202, 47, 125, 0.20)",
+        "focus_ring": "#cb7ba3"
+      },
+      "light": {
+        "accent": "#ca2f7d",
+        "accent_hover": "#b62b70",
+        "accent_fg": "#ffffff",
+        "accent_text": "#ba2c73",
+        "accent_subtle": "rgba(202, 47, 125, 0.10)",
+        "focus_ring": "#ca2f7d"
+      },
+      "high-contrast": {
+        "accent": "#db94b8",
+        "accent_hover": "#db94b8",
+        "accent_fg": "#000000",
+        "accent_text": "#db94b8",
+        "accent_subtle": "rgba(202, 47, 125, 0.28)",
+        "focus_ring": "#ffffff"
+      }
+    },
+    "graphite": {
+      "dark": {
+        "accent": "#6a717c",
+        "accent_hover": "#5e656e",
+        "accent_fg": "#ffffff",
+        "accent_text": "#93989f",
+        "accent_subtle": "rgba(106, 113, 124, 0.20)",
+        "focus_ring": "#93989f"
+      },
+      "light": {
+        "accent": "#6a717c",
+        "accent_hover": "#5e656e",
+        "accent_fg": "#ffffff",
+        "accent_text": "#606771",
+        "accent_subtle": "rgba(106, 113, 124, 0.10)",
+        "focus_ring": "#6a717c"
+      },
+      "high-contrast": {
+        "accent": "#aeb2b7",
+        "accent_hover": "#aeb2b7",
+        "accent_fg": "#000000",
+        "accent_text": "#aeb2b7",
+        "accent_subtle": "rgba(106, 113, 124, 0.28)",
+        "focus_ring": "#ffffff"
+      }
+    }
   }
 }

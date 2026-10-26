@@ -113,6 +113,20 @@
       <description>After a short delay, replace the window-list summary in the Space switch overlay with a phrase from the AI. Off by default: it sends window titles to the selected model.</description>
     </key>
 
+    <key name="accent-color" type="s">
+      <choices>
+        <choice value="blue"/>
+        <choice value="teal"/>
+        <choice value="green"/>
+        <choice value="orange"/>
+        <choice value="pink"/>
+        <choice value="graphite"/>
+      </choices>
+      <default>"blue"</default>
+      <summary>Accent colour</summary>
+      <description>The colour of focus rings, selections, the main action and AI details in Axon apps and the Axon Shell.</description>
+    </key>
+
     <key name="reduce-transparency" type="b">
       <default>false</default>
       <summary>Reduce transparency</summary>

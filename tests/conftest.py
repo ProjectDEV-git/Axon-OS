@@ -10,9 +10,13 @@ the real hyphenated directories, letting the import system load submodules from
 them. It is import-only — no service is instantiated here.
 """
 
+import os
 import sys
 import types
 from pathlib import Path
+
+# Tests never write the developer's real GSettings (accent colour, Shell keys)
+os.environ["GSETTINGS_BACKEND"] = "memory"
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:

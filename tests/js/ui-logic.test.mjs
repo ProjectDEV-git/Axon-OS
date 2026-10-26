@@ -289,3 +289,15 @@ test('calculator answers arithmetic and leaves other text alone', async () => {
     assert.equal(defaultSuggestionIndex(rows), 0);
     assert.equal(describeSuggestion(rows[0]), 'Copy 84');
 });
+
+test('accent stylesheet follows the accent, scheme and contrast', async () => {
+    const {accentStylesheet, gnomeAccent} = await import('./ui-logic.mjs');
+    assert.equal(accentStylesheet('blue', 'prefer-dark', false), null);
+    assert.equal(accentStylesheet('teal', 'prefer-dark', false), 'accents/teal-dark.css');
+    assert.equal(accentStylesheet('teal', 'prefer-light', false), 'accents/teal-light.css');
+    assert.equal(accentStylesheet('teal', 'default', false), 'accents/teal-dark.css');
+    assert.equal(accentStylesheet('pink', 'prefer-light', true), 'accents/pink-high-contrast.css');
+    assert.equal(accentStylesheet('bogus', 'prefer-dark', false), null);
+    assert.equal(gnomeAccent('graphite'), 'slate');
+    assert.equal(gnomeAccent('teal'), 'teal');
+});

@@ -85,3 +85,12 @@ def test_no_app_css_transitions_everything() -> None:
         text = css.read_text()
         assert not re.search(r"transition:\s*all\b", text), f"{css}: name the properties"
         assert not re.search(r"\bease-in\b(?!-out)", text), f"{css}: no ease-in on UI"
+
+
+def test_accent_file_falls_back_to_blue() -> None:
+    from tests.gtk_helpers import load_module
+
+    utils = load_module("axon_gtk_utils_accent", "apps/shared/axon_gtk_utils.py")
+    assert utils.accent_file("teal", "dark").name == "axon-accent-teal-dark.css"
+    assert utils.accent_file("nope", "light").name == "axon-accent-blue-light.css"
+    assert utils.accent_file("teal", "dark").is_file()

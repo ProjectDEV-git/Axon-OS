@@ -15,6 +15,10 @@ Outputs:
                                             and selection
   theme/axon-gtk/libadwaita.css             the same accent for libadwaita apps
                                             (installed as ~/.config/gtk-4.0/gtk.css)
+  apps/shared/accents/*.css                 GTK accent overrides, one per accent and
+                                            variant (Axon Preferences > Appearance)
+  shell/axon-shell/accents/*.css            Shell accent overrides: only the template
+                                            rules that use the accent or focus ring
 
 GNOME Shell's St CSS has no variables or @define-color, so the Shell
 stylesheet is rendered from shell/axon-shell/stylesheet.css.in, replacing
@@ -43,6 +47,9 @@ GTK_OUT = {
     "light": ROOT / "apps" / "shared" / "axon-design-tokens-light.css",
     "high-contrast": ROOT / "apps" / "shared" / "axon-design-tokens-hc.css",
 }
+GTK_ACCENT_DIR = ROOT / "apps" / "shared" / "accents"
+SHELL_ACCENT_DIR = ROOT / "shell" / "axon-shell" / "accents"
+ACCENT_KEYS = ("accent", "accent_hover", "accent_fg", "accent_text", "accent_subtle", "focus_ring")
 GTK_THEME_OUT = ROOT / "theme" / "axon-gtk" / "gtk-dark.css"
 LIBADWAITA_OUT = ROOT / "theme" / "axon-gtk" / "libadwaita.css"
 SHELL_OUT = {
@@ -118,6 +125,62 @@ def render_shell(template: str, tokens: dict, variant: str) -> str:
     )
 
 
+def accent_names(tokens: dict) -> list[str]:
+    return [name for name in tokens["accents"] if not name.startswith("$")]
+
+
+def gtk_accent_css(tokens: dict, accent: str, variant: str) -> str:
+    """@define-color overrides for one accent; loaded after the token file."""
+    colours = tokens["accents"][accent][variant]
+    lines = [header("GTK accent override"), f"/* Accent: {accent}, variant: {variant} */", ""]
+    lines += [f"@define-color axon_{key} {colours[key]};" for key in ACCENT_KEYS]
+    lines += ["", "/* Names used by older app stylesheets */"]
+    lines += [
+        f"@define-color {alias} @axon_{target};"
+        for alias, target in LEGACY_ALIASES.items()
+        if target in ACCENT_KEYS
+    ]
+    # libadwaita's own widgets (switches, suggested buttons, links) in Axon apps
+    lines += [
+        "",
+        "/* libadwaita accent names */",
+        "@define-color accent_bg_color @axon_accent;",
+        "@define-color accent_fg_color @axon_accent_fg;",
+        "@define-color accent_color @axon_accent_text;",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+_RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")
+_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_ACCENT_TOKEN = re.compile(r"\{\{\s*color\.(accent\w*|focus_ring)\s*\}\}")
+
+
+def accent_rules(template: str) -> str:
+    """The template's rules cut down to the declarations that use the accent."""
+    # Placeholders contain braces; swap them out while finding the rules
+    hidden = re.sub(r"\{\{\s*([a-z_]+(?:\.[a-z_-]+)?)\s*\}\}", r"@@\1@@", template)
+    out = []
+    for selector, body in _RULE.findall(_COMMENT.sub("", hidden)):
+        body = re.sub(r"@@([^@]+)@@", r"{{\1}}", body)
+        decls = [line.strip() for line in body.split(";") if _ACCENT_TOKEN.search(line)]
+        if decls:
+            out.append(selector.strip() + " {\n" + "".join(f"    {d};\n" for d in decls) + "}\n")
+    return "\n".join(out)
+
+
+def shell_accent_css(tokens: dict, template: str, accent: str, variant: str) -> str:
+    merged = {**tokens, "variants": {**tokens["variants"]}}
+    merged["variants"][variant] = {
+        **tokens["variants"][variant],
+        **tokens["accents"][accent][variant],
+    }
+    body = render_shell(accent_rules(template), merged, variant)
+    return body.replace("Shell stylesheet", "Shell accent override", 1).replace(
+        f"/* Variant: {variant} */", f"/* Accent: {accent}, variant: {variant} */", 1
+    )
+
+
 def gtk_theme_css(tokens: dict) -> str:
     """The system GTK 4 theme: GTK's built-in default theme with Axon colours.
 
@@ -162,6 +225,14 @@ def generate(tokens: dict | None = None, template: str | None = None) -> dict[Pa
     out = {path: gtk_css(tokens, variant) for variant, path in GTK_OUT.items()}
     for path, variant in SHELL_OUT.items():
         out[path] = render_shell(template, tokens, variant)
+    for accent in accent_names(tokens):
+        for variant in tokens["variants"]:
+            out[GTK_ACCENT_DIR / f"axon-accent-{accent}-{variant}.css"] = gtk_accent_css(
+                tokens, accent, variant
+            )
+            out[SHELL_ACCENT_DIR / f"{accent}-{variant}.css"] = shell_accent_css(
+                tokens, template, accent, variant
+            )
     out[GTK_THEME_OUT] = gtk_theme_css(tokens)
     out[LIBADWAITA_OUT] = libadwaita_css(tokens)
     return out
@@ -187,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.write("Run: python3 scripts/gen_tokens.py\n")
         return 1 if out_of_date else 0
     for path in out_of_date:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(files[path], encoding="utf-8")
         sys.stdout.write(f"wrote {path.relative_to(ROOT)}\n")
     return 0

@@ -1,0 +1,22 @@
+/* GTK accent override generated from theme/tokens/axon-tokens.json by scripts/gen_tokens.py.
+ * Do not edit: change the tokens or the template and run the script. */
+
+/* Accent: blue, variant: dark */
+
+@define-color axon_accent #2b6fde;
+@define-color axon_accent_hover #245fc2;
+@define-color axon_accent_fg #ffffff;
+@define-color axon_accent_text #7db3ff;
+@define-color axon_accent_subtle rgba(43, 111, 222, 0.20);
+@define-color axon_focus_ring #5c9dff;
+
+/* Names used by older app stylesheets */
+@define-color accent @axon_accent;
+@define-color accent_hover @axon_accent_hover;
+@define-color accent_active @axon_accent_hover;
+@define-color accent_light @axon_accent_text;
+
+/* libadwaita accent names */
+@define-color accent_bg_color @axon_accent;
+@define-color accent_fg_color @axon_accent_fg;
+@define-color accent_color @axon_accent_text;

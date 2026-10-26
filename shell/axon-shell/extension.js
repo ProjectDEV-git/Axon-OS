@@ -14,6 +14,7 @@ import SpacesManager from './spaces.js';
 import IntentBar from './intentbar.js';
 import DockManager from './dock.js';
 import SpaceSwitcher from './spaceswitcher.js';
+import AccentManager from './accent.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import {_t, setTranslator} from './ui-logic.js';
 
@@ -247,6 +248,10 @@ export default class AxonShellExtension extends Extension {
 
             this._spaceSwitcher = new SpaceSwitcher(this._spacesManager);
             this._spaceSwitcher.enable();
+
+            // The accent colour chosen in Axon Preferences
+            this._accent = new AccentManager(this);
+            this._accent.enable();
 
             this._dockManager = new DockManager(this, this._intentBar);
             this._dockManager.enable();
@@ -599,6 +604,10 @@ export default class AxonShellExtension extends Extension {
             if (this._spaceSwitcher) {
                 this._spaceSwitcher.disable();
                 this._spaceSwitcher = null;
+            }
+            if (this._accent) {
+                this._accent.disable();
+                this._accent = null;
             }
 
             if (this._intentBar) {

@@ -617,6 +617,32 @@ export function useMaterial(reduceTransparency, highContrast) {
     return !reduceTransparency && !highContrast;
 }
 
+// ── Accent colour ───────────────────────────────────────────────────────────
+
+/** Accent choices, in the order Axon Preferences shows them (schema choices). */
+export const ACCENTS = Object.freeze(['blue', 'teal', 'green', 'orange', 'pink', 'graphite']);
+
+/**
+ * The Shell accent override for the current appearance, relative to the
+ * extension directory, or null for the default blue (already in stylesheet.css).
+ *
+ * @param {string} accent - the accent-color setting
+ * @param {string} colorScheme - org.gnome.desktop.interface color-scheme
+ * @param {boolean} highContrast
+ * @returns {?string}
+ */
+export function accentStylesheet(accent, colorScheme, highContrast) {
+    if (!ACCENTS.includes(accent) || accent === 'blue')
+        return null;
+    const variant = highContrast ? 'high-contrast' : colorScheme === 'prefer-light' ? 'light' : 'dark';
+    return `accents/${accent}-${variant}.css`;
+}
+
+/** GNOME 47+ accent-color value for an Axon accent (graphite is GNOME's slate). */
+export function gnomeAccent(accent) {
+    return accent === 'graphite' ? 'slate' : accent;
+}
+
 // ── Inline calculator (twin of services/calculator.py) ─────────────────────
 
 const CALC_MAX_LENGTH = 80;

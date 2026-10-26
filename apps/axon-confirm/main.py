@@ -82,6 +82,16 @@ def build_window(app: object, command: str, context: str, timeout: int) -> objec
             self.set_default_size(460, -1)
             self.set_resizable(False)
 
+            # The Axon tokens and accent; a styling problem never blocks the
+            # card (and a card that fails to build already means "no")
+            try:
+                sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+                from axon_gtk_utils import install_axon_style
+
+                install_axon_style()
+            except Exception as exc:  # nosec B110 - cosmetic only
+                sys.stderr.write(f"axon-confirm: no Axon style: {exc}\n")
+
             provider = Gtk.CssProvider()
             provider.load_from_data(_CSS)
             display = Gdk.Display.get_default()
