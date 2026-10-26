@@ -11,21 +11,37 @@
 #   * ./program.exe in a terminal (the kernel's binfmt_misc hands any file
 #                                  starting with the "MZ" header to this script)
 #
-# Programs run with no sandbox: APEX-WIN Tier 0 runs Wine directly with full
-# access to your files, network, GPU and devices, exactly like a native app.
-# They always run as you, never as root.
+# The user picks how programs run in the Welcome app, saved as one word in
+# ~/.config/axon-os/windows.conf:
+#   apex       (default) APEX-WIN Tier 0: Wine directly, full access to your
+#              files, network, GPU and devices, like a native app. No sandbox.
+#   sandboxed  APEX-WIN Tier 2: bubblewrap namespaces, isolated home.
+#   off        Windows programs don't run.
+# Programs always run as you, never as root.
 #
-# Override with AXON_APEX_TIER=1|2|3 to sandbox a single launch, e.g.
+# AXON_APEX_TIER=0|1|2|3 overrides the choice for a single launch, e.g.
 #   AXON_APEX_TIER=2 axon-apex-run untrusted.exe
 set -eu
 
 RUNNER="${AXON_APEX_RUNNER:-/usr/bin/win-sandbox-runner}"
-TIER="${AXON_APEX_TIER:-0}"
+MODE_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/axon-os/windows.conf"
+
+# Tell the user why nothing happened, in the terminal and, for double-click,
+# as a desktop notification.
+fail() {
+    echo "axon-apex-run: $1" >&2
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send --app-name="Axon APEX" --icon=wine "Windows program not started" "$1" \
+            2>/dev/null || true
+    fi
+    exit 1
+}
 
 if [ "$#" -lt 1 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "Usage: axon-apex-run [--chdir] <program.exe|setup.msi> [args...]"
-    echo "Runs a Windows program through APEX-WIN (Wine, no sandbox)."
-    echo "Set AXON_APEX_TIER=1|2|3 to sandbox one launch."
+    echo "Runs a Windows program with Wine through Axon APEX."
+    echo "Choose full access, sandboxed or off in the Welcome app."
+    echo "Set AXON_APEX_TIER=0|1|2|3 to override it for one launch."
     [ "$#" -lt 1 ] && exit 1
     exit 0
 fi
@@ -57,14 +73,35 @@ if [ "$CHDIR" = true ]; then
     cd "$dir"
 fi
 
+MODE=apex
+if [ -r "$MODE_FILE" ]; then
+    MODE="$(head -n 1 "$MODE_FILE" | tr -d '[:space:]')"
+fi
+
+if [ -n "${AXON_APEX_TIER:-}" ]; then
+    TIER="$AXON_APEX_TIER"
+else
+    case "$MODE" in
+        sandboxed) TIER=2 ;;
+        off)
+            fail "Windows programs are turned off. Turn them on in the Welcome app \
+(Windows Programs page)."
+            ;;
+        *) TIER=0 ;;  # apex, or an unreadable/unknown value
+    esac
+fi
+
 case "$TIER" in
     0|1|2|3) ;;
-    *) echo "axon-apex-run: AXON_APEX_TIER must be 0-3, got '$TIER'" >&2; exit 1 ;;
+    *) fail "AXON_APEX_TIER must be 0-3, got '$TIER'" ;;
 esac
 
 # .msi packages are not PE files: hand them to Wine's installer service.
+# That runs without a sandbox, so only with full access (Tier 0).
 case "$EXE" in
     *.msi|*.MSI|*.Msi)
+        [ "$TIER" = 0 ] || fail "MSI installers can't run sandboxed. Choose \
+'Axon APEX — full access' in the Welcome app to install $(basename "$EXE")."
         exec wine msiexec /i "$EXE" "$@"
         ;;
 esac
@@ -75,6 +112,8 @@ if [ -x "$RUNNER" ]; then
     exec "$RUNNER" --tier "$TIER" --no-gui --exe "$EXE" -- "$@"
 fi
 
-# APEX-WIN missing (e.g. a source install without cargo): plain Wine still works.
+# APEX-WIN missing (e.g. a source install without cargo): plain Wine still
+# works, but has no sandbox, so never fall back to it for a sandboxed launch.
+[ "$TIER" = 0 ] || fail "Axon APEX is not installed, so $(basename "$EXE") can't run sandboxed."
 echo "axon-apex-run: $RUNNER not found; running with plain Wine" >&2
 exec wine "$EXE" "$@"

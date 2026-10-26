@@ -11,16 +11,27 @@ Axon OS runs Windows programs (`.exe`, `.msi`) with Wine through
   file to APEX-WIN, so no `wine` prefix is needed.
 - Or call the launcher yourself: `axon-apex-run program.exe [args...]`.
 
-Programs run **without a sandbox**: APEX-WIN Tier 0 runs Wine directly, so a
-program can read and write your files, use the network, GPU, audio, gamepads and
-USB devices, the same as a native Linux app. They always run as your user,
-never as root (`axon-apex-run` refuses to run as root).
+## Choosing how programs run
 
-Only run programs you trust. To sandbox one launch, pick a stricter APEX-WIN tier:
+The **Windows Programs** page of the Welcome app (shown on first login, and in
+the app menu as *Welcome*) offers three choices:
+
+| Choice | What happens |
+|---|---|
+| **Axon APEX — full access** (default) | APEX-WIN Tier 0 runs Wine directly. Programs can read and write your files and use the network, GPU, audio, gamepads and USB devices, like a native Linux app. No sandbox. |
+| **Axon APEX — sandboxed** | APEX-WIN Tier 2: bubblewrap namespaces with an isolated home folder. Safer for untrusted downloads; some games and installers won't work. `.msi` installers are refused, because Wine's installer can't run sandboxed. |
+| **Off** | Windows programs don't run; you get a notification saying how to turn them back on. |
+
+The choice is saved per user in `~/.config/axon-os/windows.conf` and applies to
+double-click and `./program.exe` alike. Programs always run as your user, never
+as root (`axon-apex-run` refuses to run as root).
+
+To override the choice for one launch, set an APEX-WIN tier:
 
 ```bash
 AXON_APEX_TIER=2 axon-apex-run untrusted.exe   # namespaces, isolated home
 AXON_APEX_TIER=1 axon-apex-run tool.exe        # Landlock filesystem allowlist
+AXON_APEX_TIER=0 axon-apex-run setup.msi       # full access, even if the choice is Off
 ```
 
 ## Where things live
