@@ -509,3 +509,16 @@ export function confirmArgv(command, context, cardPath) {
         '--text', text,
     ];
 }
+
+// ── Reduced motion ──────────────────────────────────────────────────────────
+
+/**
+ * Animation length honouring org.gnome.desktop.interface enable-animations.
+ *
+ * @param {number} ms - designed duration
+ * @param {boolean} enabled - St.Settings.get().enable_animations
+ * @returns {number} 0 when animations are off
+ */
+export function motionDuration(ms, enabled) {
+    return enabled ? ms : 0;
+}

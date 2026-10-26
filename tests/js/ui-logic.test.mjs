@@ -175,3 +175,9 @@ test('confirmArgv passes the exact command as its own argument', async () => {
     assert.ok(zen.includes('--no-markup'));
     assert.ok(zen.at(-1).includes('ls -la'));
 });
+
+test('motionDuration', async () => {
+    const {motionDuration} = await import('./ui-logic.mjs');
+    assert.equal(motionDuration(150, true), 150);
+    assert.equal(motionDuration(150, false), 0);
+});

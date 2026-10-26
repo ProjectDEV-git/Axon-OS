@@ -25,6 +25,10 @@ import Atk from 'gi://Atk';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import StartMenuPopup from './startmenu.js';
+import {motionDuration} from './ui-logic.js';
+
+// Animation length; 0 when the user turned animations off (reduced motion)
+const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
 // ─── D-Bus interfaces ─────────────────────────────────────────────────────────
 
@@ -178,16 +182,19 @@ class DockIcon extends St.Button {
     }
 
     bounce() {
+        // Decorative only: skip it entirely when animations are off
+        if (!St.Settings.get().enable_animations)
+            return;
         this.ease({
             scale_y:  BOUNCE_PEAK,
             scale_x:  BOUNCE_PEAK,
-            duration: BOUNCE_DURATION,
+            duration: motion(BOUNCE_DURATION),
             mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
                 this.ease({
                     scale_y:  1.0,
                     scale_x:  1.0,
-                    duration: BOUNCE_DURATION,
+                    duration: motion(BOUNCE_DURATION),
                     mode:     Clutter.AnimationMode.EASE_IN_OUT_BOUNCE,
                 });
             },
@@ -195,16 +202,20 @@ class DockIcon extends St.Button {
     }
 
     _onClick() {
+        if (!St.Settings.get().enable_animations) {
+            this._callback();
+            return;
+        }
         this.ease({
             scale_x:  TRAMPOLINE_SCALE,
             scale_y:  TRAMPOLINE_SCALE,
-            duration: TRAMPOLINE_DURATION,
+            duration: motion(TRAMPOLINE_DURATION),
             mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
                 this.ease({
                     scale_x:  1.0,
                     scale_y:  1.0,
-                    duration: TRAMPOLINE_DURATION,
+                    duration: motion(TRAMPOLINE_DURATION),
                     mode:     Clutter.AnimationMode.EASE_OUT_BACK,
                 });
             },
@@ -248,7 +259,7 @@ class DockIcon extends St.Button {
         this._tooltip.set_opacity(0);
         this._tooltip.ease({
             opacity:  255,
-            duration: 120,
+            duration: motion(120),
             mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
         });
     }
@@ -259,7 +270,7 @@ class DockIcon extends St.Button {
         this._tooltip = null;
         t.ease({
             opacity:    0,
-            duration:   80,
+            duration:   motion(80),
             mode:       Clutter.AnimationMode.EASE_IN_QUAD,
             onComplete: () => t.destroy(),
         });

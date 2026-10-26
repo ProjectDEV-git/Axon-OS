@@ -255,8 +255,11 @@ add a short note under any item you skip or change.
       `stylesheet-light.css` by colour scheme and reload on change (checked in
       `extensionSystem.js`). The Shell has no high-contrast variant; GNOME doesn't load one
       for extensions.
-- [ ] **Reduced motion.** Respect `org.gnome.desktop.interface enable-animations` in all
+- [x] **Reduced motion.** Respect `org.gnome.desktop.interface enable-animations` in all
       Shell animations and GTK transitions.
+      Note: Shell `ease()` calls now use `motion(ms)` (0 when off) and the dock bounces are
+      skipped. GTK CSS transitions and stack animations already follow
+      `gtk-enable-animations`; the voice overlay's own 60 fps wave loop now holds still.
 
 ## Phase 5 — Larger features
 

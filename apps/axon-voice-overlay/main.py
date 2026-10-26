@@ -56,6 +56,10 @@ class VoiceOverlay(Gtk.ApplicationWindow):
         self.present()
 
     def on_tick(self):
+        # Reduced motion: keep the waves still while animations are off
+        settings = Gtk.Settings.get_default()
+        if settings is not None and not settings.get_property("gtk-enable-animations"):
+            return True
         self.phase += 0.1
         if self.phase > 2 * math.pi:
             self.phase -= 2 * math.pi

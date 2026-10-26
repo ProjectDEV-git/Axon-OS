@@ -14,12 +14,16 @@ import {
     STAGES,
     escapeAction,
     intentBarWidth,
+    motionDuration,
     parseAction,
     pushHistory,
     recentForEmptyState,
     routingOrigin,
     splitError,
 } from './ui-logic.js';
+
+// Animation length; 0 when the user turned animations off (reduced motion)
+const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
 function logError(error, message) {
     if (message) {
@@ -229,7 +233,7 @@ export default class IntentBar {
         this._actor.set_opacity(0);
         this._actor.ease({
             opacity: 255,
-            duration: 150,
+            duration: motion(150),
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
 
@@ -247,7 +251,7 @@ export default class IntentBar {
 
         this._actor.ease({
             opacity: 0,
-            duration: 100,
+            duration: motion(100),
             mode: Clutter.AnimationMode.EASE_IN_QUAD,
             onComplete: () => {
                 if (this._actor) this._actor.hide();

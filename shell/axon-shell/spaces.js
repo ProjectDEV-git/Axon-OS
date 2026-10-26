@@ -14,6 +14,7 @@ import {
     NEVER_ROUTE,
     askMessage,
     classificationDecision,
+    motionDuration,
     movedMessage,
     parseClassification,
     ruleDecision,
@@ -22,6 +23,9 @@ import {
     windowSummary,
 } from './ui-logic.js';
 import { destroyNotifications, notify } from './notify.js';
+
+// Animation length; 0 when the user turned animations off (reduced motion)
+const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
 // ─── Default space definitions ────────────────────────────────────────────────
 
@@ -418,7 +422,7 @@ export default class SpacesManager {
             // Fade in
             osd.ease({
                 opacity: 255,
-                duration: 200,
+                duration: motion(200),
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
 
@@ -426,7 +430,7 @@ export default class SpacesManager {
             GLib.timeout_add(GLib.PRIORITY_DEFAULT, 3500, () => {
                 osd.ease({
                     opacity: 0,
-                    duration: 300,
+                    duration: motion(300),
                     mode: Clutter.AnimationMode.EASE_IN_QUAD,
                     onComplete: () => {
                         try {

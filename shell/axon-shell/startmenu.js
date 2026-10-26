@@ -6,7 +6,10 @@ import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {fitToWorkArea} from './ui-logic.js';
+import {fitToWorkArea, motionDuration} from './ui-logic.js';
+
+// Animation length; 0 when the user turned animations off (reduced motion)
+const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
 // Preferred Start Menu size; shrunk to fit small work areas
 const MENU_WIDTH = 620;
@@ -213,7 +216,7 @@ class StartMenuPopup extends St.BoxLayout {
         this.set_opacity(0);
         this.ease({
             opacity: 255,
-            duration: 150,
+            duration: motion(150),
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
 
@@ -239,7 +242,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         this.ease({
             opacity: 0,
-            duration: 100,
+            duration: motion(100),
             mode: Clutter.AnimationMode.EASE_IN_QUAD,
             onComplete: () => {
                 this.visible = false;
