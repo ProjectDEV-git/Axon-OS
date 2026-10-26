@@ -97,6 +97,23 @@ impl PrefixManager {
         self.prefix_dir(hash).join("prefix")
     }
 
+    /// Return the key of the prefix that `exe` lives inside, if any.
+    ///
+    /// An installer gets its own prefix, and the program it installs lands in
+    /// `<base>/<key>/prefix/drive_c/...`. That program has a different hash,
+    /// so without this it would start in a fresh, empty prefix with none of
+    /// the registry keys or DLLs its installer set up.
+    pub fn owning_prefix(&self, exe: &Path) -> Option<String> {
+        let exe = std::fs::canonicalize(exe).ok()?;
+        let base = std::fs::canonicalize(&self.base_dir).ok()?;
+        let mut parts = exe.strip_prefix(&base).ok()?.components();
+        let key = parts.next()?.as_os_str().to_str()?.to_string();
+        if parts.next()?.as_os_str() != "prefix" {
+            return None;
+        }
+        self.wine_prefix(&key).is_dir().then_some(key)
+    }
+
     /// Get the state file path for a given binary hash.
     pub fn state_path(&self, hash: &str) -> PathBuf {
         self.prefix_dir(hash).join("state.json")
@@ -526,6 +543,33 @@ mod tests {
 
         let state = mgr.state_path("abc123");
         assert!(state.ends_with("abc123/state.json"));
+    }
+
+    #[test]
+    fn owning_prefix_finds_installed_app() {
+        let tmp = TempDir::new().unwrap();
+        let mgr = PrefixManager::with_base(tmp.path().to_path_buf());
+        let app_dir = mgr
+            .wine_prefix("installer")
+            .join("drive_c/Program Files/App");
+        std::fs::create_dir_all(&app_dir).unwrap();
+        let app = app_dir.join("app.exe");
+        std::fs::write(&app, b"MZ").unwrap();
+        assert_eq!(mgr.owning_prefix(&app).as_deref(), Some("installer"));
+    }
+
+    #[test]
+    fn owning_prefix_ignores_other_paths() {
+        let tmp = TempDir::new().unwrap();
+        let mgr = PrefixManager::with_base(tmp.path().join("prefixes"));
+        std::fs::create_dir_all(mgr.prefix_dir("k")).unwrap();
+        let outside = tmp.path().join("setup.exe");
+        std::fs::write(&outside, b"MZ").unwrap();
+        assert_eq!(mgr.owning_prefix(&outside), None);
+        // Inside the prefix dir but not inside the Wine prefix itself.
+        let beside = mgr.prefix_dir("k").join("state.exe");
+        std::fs::write(&beside, b"MZ").unwrap();
+        assert_eq!(mgr.owning_prefix(&beside), None);
     }
 
     #[test]

@@ -271,6 +271,12 @@ pub fn execute(
         // process runs as root, where HOME is /root or unset, so relying on
         // the ambient environment would create an unusable prefix.
         let prefix_mgr = crate::prefix::PrefixManager::for_user(&args.user_env, args.uid);
+        // A program installed into an existing prefix runs in that prefix.
+        let owning = prefix_mgr.owning_prefix(std::path::Path::new(exe));
+        if let Some(ref key) = owning {
+            info!("{exe} is installed in prefix {key}; reusing it");
+        }
+        let hash = owning.as_deref().unwrap_or(hash);
         if args.dry_run {
             info!(
                 "[DRY RUN] Would use WINEPREFIX: {}",

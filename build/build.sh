@@ -283,10 +283,17 @@ save_base_image() {
 # Phase 2: configure the chroot (packages + Axon components)
 # ---------------------------------------------------------------------------
 configure_chroot() {
+    # APEX-WIN (Windows programs via Wine) is Rust: build it here, where the
+    # host's toolchain lives, and let chroot-setup.sh install the binary.
+    log "Building APEX-WIN runner..."
+    bash "${BASE_DIR}/scripts/build-apex-win.sh" || \
+        log "WARNING: APEX-WIN build failed — .exe files will open with plain Wine"
+
     log "Copying project sources into chroot..."
     mkdir -p "${CHROOT}/opt/axon-src"
     rsync -a --delete \
-        --exclude='.git' --exclude='.idea' --exclude='dist' \
+        --exclude='.git' --exclude='.idea' --exclude='/dist' \
+        --exclude='apex-win/target' \
         --exclude='__pycache__' --exclude='*.pyc' --exclude='*.iso' \
         "${BASE_DIR}/" "${CHROOT}/opt/axon-src/"
 

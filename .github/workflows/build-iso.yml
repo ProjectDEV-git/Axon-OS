@@ -54,6 +54,13 @@ jobs:
             grub-pc-bin grub-efi-amd64-bin \
             mtools dosfstools rsync
 
+      # APEX-WIN (Windows programs) is Rust. Build it as the runner user with
+      # the preinstalled toolchain; build.sh runs under sudo, which drops it.
+      - name: Build APEX-WIN runner
+        run: |
+          cargo --version
+          bash scripts/build-apex-win.sh
+
       - name: Build ISO
         run: sudo AXON_BUILD_DIR=/mnt/axon-build bash build/build.sh --ci
 

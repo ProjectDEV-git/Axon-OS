@@ -283,6 +283,28 @@ for f in "${SCRIPT_DIR}/data/applications/"*.desktop; do
 done
 success "Applications installed to ${APPS_DIR}"
 
+# Windows programs: APEX-WIN runs any .exe with Wine, no sandbox, on
+# double-click or as ./program.exe (kernel binfmt_misc hand-off).
+if command -v wine &>/dev/null; then
+    info "Setting up APEX-WIN for Windows programs..."
+    if bash "${SCRIPT_DIR}/scripts/build-apex-win.sh"; then
+        sudo install -Dm755 "${SCRIPT_DIR}/apex-win/dist/win-sandbox-runner" /usr/bin/win-sandbox-runner
+    else
+        warn "Could not build APEX-WIN (needs Rust: https://rustup.rs) — .exe files will use plain Wine"
+    fi
+    sudo install -Dm755 "${SCRIPT_DIR}/scripts/axon-apex-run" /usr/bin/axon-apex-run
+    sudo install -Dm644 "${SCRIPT_DIR}/data/binfmt/axon-apex-win.conf" /usr/lib/binfmt.d/axon-apex-win.conf
+    sudo systemctl restart systemd-binfmt.service 2>/dev/null || \
+        warn "Could not load the binfmt rule now; it loads on next boot"
+    for m in application/vnd.microsoft.portable-executable application/x-ms-dos-executable \
+             application/x-msdownload application/x-msi application/x-ms-installer; do
+        xdg-mime default axon-apex-win.desktop "${m}" 2>/dev/null || true
+    done
+    success "Windows programs open with APEX-WIN (double-click any .exe)"
+else
+    warn "Wine is not installed — skipping APEX-WIN. Install it with: sudo apt install wine64, then re-run"
+fi
+
 # ---------------------------------------------------------------------------
 # STEP 7: Install D-Bus services and configure Systemd
 # ---------------------------------------------------------------------------

@@ -10,3 +10,4 @@ csrc/win_tap_filter/*.o
 csrc/win_tap_filter/*.bpf.o
 csrc/win_tap_filter/loader
 *.tar.gz
+/dist/

@@ -1,0 +1,80 @@
+#!/bin/sh
+# axon-apex-run — run a Windows program on Axon OS through APEX-WIN.
+#
+# Usage: axon-apex-run [--chdir] <program.exe|setup.msi> [args...]
+#
+#   --chdir  start in the program's own folder (used for double-click, since
+#            many Windows programs load data files relative to themselves)
+#
+# This is the one entry point for Windows programs:
+#   * double-click in Files      (axon-apex-win.desktop)
+#   * ./program.exe in a terminal (the kernel's binfmt_misc hands any file
+#                                  starting with the "MZ" header to this script)
+#
+# Programs run with no sandbox: APEX-WIN Tier 0 runs Wine directly with full
+# access to your files, network, GPU and devices, exactly like a native app.
+# They always run as you, never as root.
+#
+# Override with AXON_APEX_TIER=1|2|3 to sandbox a single launch, e.g.
+#   AXON_APEX_TIER=2 axon-apex-run untrusted.exe
+set -eu
+
+RUNNER="${AXON_APEX_RUNNER:-/usr/bin/win-sandbox-runner}"
+TIER="${AXON_APEX_TIER:-0}"
+
+if [ "$#" -lt 1 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Usage: axon-apex-run [--chdir] <program.exe|setup.msi> [args...]"
+    echo "Runs a Windows program through APEX-WIN (Wine, no sandbox)."
+    echo "Set AXON_APEX_TIER=1|2|3 to sandbox one launch."
+    [ "$#" -lt 1 ] && exit 1
+    exit 0
+fi
+
+CHDIR=false
+if [ "$1" = "--chdir" ]; then
+    CHDIR=true
+    shift
+    [ "$#" -ge 1 ] || { echo "axon-apex-run: no program given" >&2; exit 1; }
+fi
+
+EXE="$1"
+shift
+
+if [ ! -f "$EXE" ]; then
+    echo "axon-apex-run: file not found: $EXE" >&2
+    exit 1
+fi
+
+# Wine refuses to run as root, and a Windows program must never get root.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "axon-apex-run: refusing to run Windows programs as root" >&2
+    exit 1
+fi
+
+if [ "$CHDIR" = true ]; then
+    dir="$(cd "$(dirname "$EXE")" && pwd)"
+    EXE="${dir}/$(basename "$EXE")"
+    cd "$dir"
+fi
+
+case "$TIER" in
+    0|1|2|3) ;;
+    *) echo "axon-apex-run: AXON_APEX_TIER must be 0-3, got '$TIER'" >&2; exit 1 ;;
+esac
+
+# .msi packages are not PE files: hand them to Wine's installer service.
+case "$EXE" in
+    *.msi|*.MSI|*.Msi)
+        exec wine msiexec /i "$EXE" "$@"
+        ;;
+esac
+
+if [ -x "$RUNNER" ]; then
+    # --exe runs APEX-WIN in this process, as this user (never via the root
+    # daemon). --no-gui skips the first-launch trust prompt: the tier is fixed.
+    exec "$RUNNER" --tier "$TIER" --no-gui --exe "$EXE" -- "$@"
+fi
+
+# APEX-WIN missing (e.g. a source install without cargo): plain Wine still works.
+echo "axon-apex-run: $RUNNER not found; running with plain Wine" >&2
+exec wine "$EXE" "$@"

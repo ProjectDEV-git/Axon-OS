@@ -399,8 +399,49 @@ export WINEPREFIX=${HOME}/.axon-winabi/prefix
 export AXON_WINABI=1
 EOF
 
-# GNOME desktop integration: set .exe as default handler for PE files
-xdg-mime default axon-winabi-run-exe.desktop application/x-ms-dos-executable 2>/dev/null || true
+# ── 5a4. APEX-WIN: run any Windows program with a double-click ──────────────
+# apex-win/ is vendored from https://github.com/Gaming-RF/APEX-WIN. build.sh
+# builds the runner on the host (scripts/build-apex-win.sh); install it here.
+# Every .exe opens through axon-apex-run, which runs APEX-WIN Tier 0: Wine
+# directly, no sandbox, as the logged-in user. Two entry points:
+#   * double-click in Files  -> axon-apex-win.desktop (default MIME handler)
+#   * ./program.exe          -> kernel binfmt_misc rule (MZ header)
+# The root win-sandbox-runner daemon is not installed: nothing needs it.
+log "Installing APEX-WIN (Windows programs via Wine)..."
+APEX_SRC="${SRC}/apex-win"
+if [[ -x "${APEX_SRC}/dist/win-sandbox-runner" ]]; then
+    install -Dm755 "${APEX_SRC}/dist/win-sandbox-runner" /usr/bin/win-sandbox-runner
+    install -Dm644 "${APEX_SRC}/config/rules.json" /etc/win-sandbox-runner/rules.json
+    install -Dm644 "${APEX_SRC}/config/rules.schema.json" /etc/win-sandbox-runner/rules.schema.json
+    install -Dm644 "${APEX_SRC}/config/appdb.json" /etc/win-sandbox-runner/appdb.json
+    install -Dm644 "${APEX_SRC}/config/net-optimizer.json" /etc/win-sandbox-runner/net-optimizer.json
+    install -Dm644 "${APEX_SRC}/config/win-sandbox-runner.conf" /etc/win-sandbox-runner.conf
+    log "APEX-WIN runner installed"
+else
+    log "WARNING: APEX-WIN runner was not built — .exe files will open with plain Wine"
+fi
+install -Dm755 "${SRC}/scripts/axon-apex-run" /usr/bin/axon-apex-run
+install -Dm644 "${SRC}/data/applications/axon-apex-win.desktop" \
+    /usr/share/applications/axon-apex-win.desktop
+update-desktop-database /usr/share/applications || true
+
+# Kernel-level hand-off: systemd-binfmt.service registers this at boot.
+install -Dm644 "${SRC}/data/binfmt/axon-apex-win.conf" /usr/lib/binfmt.d/axon-apex-win.conf
+echo "binfmt_misc" > /etc/modules-load.d/binfmt.conf
+# Wine's own MZ handler (wine-binfmt) would race ours for the same files.
+if command -v update-binfmts >/dev/null 2>&1; then
+    update-binfmts --disable wine 2>/dev/null || true
+fi
+
+# Default handler for Windows programs, for every user. xdg-mime here would
+# only change root's own preferences, so add to the system-wide list instead.
+cat >> /etc/xdg/mimeapps.list <<'MIMEEOF'
+application/vnd.microsoft.portable-executable=axon-apex-win.desktop
+application/x-ms-dos-executable=axon-apex-win.desktop
+application/x-msdownload=axon-apex-win.desktop
+application/x-msi=axon-apex-win.desktop
+application/x-ms-installer=axon-apex-win.desktop
+MIMEEOF
 
 # ---------------------------------------------------------------------------
 # 5b. Networking — hand every interface to NetworkManager
