@@ -335,3 +335,15 @@ def test_format_command_output() -> None:
     out = format_command_output(long, max_lines=5)
     assert out.splitlines()[:5] == ["0", "1", "2", "3", "4"] and out.endswith("(output shortened)")
     assert format_command_output("x" * 50, max_chars=10).startswith("x" * 10)
+
+
+def test_visible_conversations() -> None:
+    from services.ui_logic import visible_conversations
+
+    convs = [
+        {"id": "a", "updated_at": "2026-01-01", "archived": 0},
+        {"id": "b", "updated_at": "2026-03-01", "archived": 1},
+        {"id": "c", "updated_at": "2026-02-01"},
+    ]
+    assert [c["id"] for c in visible_conversations(convs)] == ["c", "a"]
+    assert [c["id"] for c in visible_conversations(convs, True)] == ["b", "c", "a"]

@@ -611,6 +611,11 @@ class BrainService(ServiceBase):
         self.store.delete_conversation(conversation_id)
         return True
 
+    @dbus.service.method("org.axonos.Brain", in_signature="sb", out_signature="b")
+    def ArchiveConversation(self, conversation_id, archived):
+        """Archive or restore a conversation. Returns False if it doesn't exist."""
+        return bool(self.store.set_archived(str(conversation_id), bool(archived)))
+
     @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="b")
     def UpdateTitle(self, conversation_id, title):
         self.store.update_title(conversation_id, title)

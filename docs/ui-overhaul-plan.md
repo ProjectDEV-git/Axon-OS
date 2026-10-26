@@ -278,7 +278,7 @@ add a short note under any item you skip or change.
       a new `org.axonos.Shell.SwitchToSpace` D-Bus method exported by the extension.
 
 ### AI panel
-- [ ] **Conversation list.** Sidebar or popover using Brain `ListConversations` /
+- [x] **Conversation list.** Sidebar or popover using Brain `ListConversations` /
       `GetMessages`, with rename, delete and archive (add Brain methods if missing, with tests).
 - [ ] **Message actions.** Stop generation, regenerate, copy, insert into the focused app
       (if feasible; otherwise skip and note why).

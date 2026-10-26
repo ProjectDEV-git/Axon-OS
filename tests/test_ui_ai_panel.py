@@ -404,3 +404,89 @@ def test_status_section_shows_problem_and_fix(monkeypatch: pytest.MonkeyPatch) -
     names = [r.name for r in win._status.rows]
     assert names == ["Axon Brain", "Ollama", "Model", "Download", "Semantic index", "Voice"]
     win.destroy()
+
+
+class ConvClient(FakeClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.convs = [
+            {"id": "c1", "title": "Taxes", "updated_at": "2026-02", "archived": 0},
+            {"id": "c2", "title": "Old trip", "updated_at": "2026-01", "archived": 1},
+        ]
+        self.messages = {"c1": [{"role": "user", "content": "hi"}], "c2": []}
+        self.calls: list[tuple] = []
+
+    def list_conversations(self) -> list[dict[str, Any]]:
+        return [dict(c) for c in self.convs]
+
+    def get_messages(self, conv_id: str) -> list[dict[str, Any]]:
+        return self.messages.get(conv_id, [])
+
+    def create_conversation(self, title: str = "") -> str:
+        self.calls.append(("create", title))
+        return "new"
+
+    def rename_conversation(self, conv_id: str, title: str) -> bool:
+        self.calls.append(("rename", conv_id, title))
+        return True
+
+    def archive_conversation(self, conv_id: str, archived: bool) -> bool:
+        self.calls.append(("archive", conv_id, archived))
+        return True
+
+    def delete_conversation(self, conv_id: str) -> None:
+        self.calls.append(("delete", conv_id))
+
+
+def test_conversation_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = ConvClient()
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    assert win._conv_id == "c1"  # first non-archived conversation
+    win._refresh_conversations()
+    rec.join()
+    pump(GLib)
+    assert [c["id"] for c in win._conv_rows] == ["c1"]
+    win._show_archived.set_active(True)
+    rec.join()
+    pump(GLib)
+    assert [c["id"] for c in win._conv_rows] == ["c1", "c2"]
+
+    win._open_conversation("c2")
+    rec.join()
+    pump(GLib)
+    assert win._conv_id == "c2"
+
+    win._archive_conversation("c2", False)
+    win._on_delete_response(None, "cancel", "c1")
+    win._on_delete_response(None, "delete", "c1")
+    rec.join()
+    pump(GLib)
+    assert ("archive", "c2", False) in client.calls
+    assert ("delete", "c1") in client.calls
+    assert next(c for c in client.calls if c[0] == "delete") == ("delete", "c1")
+
+    # Deleting the open conversation starts a new one
+    win._on_delete_response(None, "delete", "c2")
+    rec.join()
+    assert win._conv_id == "new"
+    win.destroy()
+
+
+def test_rename_conversation(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = ConvClient()
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    row = win._conversation_row(client.convs[0])
+    label = row.get_child().get_first_child()
+    win._start_rename(row, label, client.convs[0])
+    entry = label.get_next_sibling()
+    entry.set_text("2026 taxes")
+    entry.emit("activate")
+    rec.join()
+    assert ("rename", "c1", "2026 taxes") in client.calls
+    win.destroy()

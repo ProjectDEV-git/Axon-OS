@@ -214,6 +214,20 @@ class OllamaClient:
         except Exception:
             return []
 
+    def rename_conversation(self, conversation_id: str, title: str) -> bool:
+        """Change a conversation's title. Blocking D-Bus call."""
+        try:
+            return bool(self._get_brain().UpdateTitle(conversation_id, title))
+        except Exception:
+            return False
+
+    def archive_conversation(self, conversation_id: str, archived: bool) -> bool:
+        """Archive or restore a conversation. Blocking D-Bus call."""
+        try:
+            return bool(self._get_brain().ArchiveConversation(conversation_id, archived))
+        except Exception:
+            return False
+
     def delete_conversation(self, conversation_id: str) -> None:
         """Delete a conversation session."""
         try:

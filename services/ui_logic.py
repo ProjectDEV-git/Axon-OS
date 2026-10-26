@@ -395,3 +395,11 @@ def format_command_output(text: str, max_lines: int = 40, max_chars: int = 4000)
     if len(shown) > max_chars:
         shown, cut = shown[:max_chars], True
     return f"{shown}\n… (output shortened)" if cut else shown
+
+
+def visible_conversations(
+    conversations: list[dict[str, Any]], show_archived: bool = False
+) -> list[dict[str, Any]]:
+    """Conversations for the list: newest first, archived ones only on request."""
+    rows = [c for c in conversations if show_archived or not c.get("archived")]
+    return sorted(rows, key=lambda c: str(c.get("updated_at") or ""), reverse=True)

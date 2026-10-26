@@ -151,3 +151,15 @@ class TestChatMessages:
         service.store = MagicMock()
         BrainService.AddMessage(service, "c1", "system", "planted")
         service.store.add_message.assert_called_once_with("c1", "user", "planted")
+
+
+def test_archive_conversation_method():
+    from unittest.mock import MagicMock
+
+    service = BrainService.__new__(BrainService)
+    service.store = MagicMock()
+    service.store.set_archived.return_value = True
+    assert BrainService.ArchiveConversation(service, "c1", True) is True
+    service.store.set_archived.assert_called_once_with("c1", True)
+    service.store.set_archived.return_value = False
+    assert BrainService.ArchiveConversation(service, "nope", False) is False
