@@ -37,7 +37,7 @@ for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().pare
     if (_base / "services").is_dir():
         sys.path.insert(0, str(_base / "services"))
         break
-from ui_logic import RequestTracker, escape_action, split_error
+from ui_logic import RequestTracker, escape_action, fit_to_screen, split_error
 
 try:
     from ollama_client import OllamaClient  # type: ignore[import]
@@ -276,6 +276,18 @@ def _apply_markup(text: str) -> str:
 _css_loaded = False
 
 
+def _monitor_height(display: Gdk.Display | None) -> int:
+    """Logical height of the first monitor, or 0 when unknown.
+
+    GTK4 has no portable work-area API, so callers keep a margin for panels.
+    """
+    if display is None:
+        return 0
+    monitors = display.get_monitors()
+    monitor = monitors.get_item(0) if monitors.get_n_items() else None
+    return int(monitor.get_geometry().height) if monitor is not None else 0
+
+
 class AIPanelWindow(Adw.Window):
     """Main side-panel window for the Axon AI assistant."""
 
@@ -415,7 +427,8 @@ class AIPanelWindow(Adw.Window):
             )
             _css_loaded = True
 
-        self.set_default_size(420, 860)
+        # 860 px doesn't fit 768 px-high screens on an undecorated window
+        self.set_default_size(420, fit_to_screen(860, _monitor_height(self.get_display())))
         self.set_resizable(True)
         self.set_decorated(False)
 

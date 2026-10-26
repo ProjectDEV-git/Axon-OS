@@ -210,3 +210,10 @@ def test_stream_error_marker_becomes_error_bubble(monkeypatch: pytest.MonkeyPatc
     assert bubble._inner.has_css_class("bubble-error")
     assert bubble.get_text() == "Half\n\nmodel crashed"
     win.destroy()
+
+
+def test_default_height_fits_the_monitor(window: Any) -> None:
+    _, height = window.get_default_size()
+    monitor_h = panel_mod._monitor_height(window.get_display())
+    assert monitor_h > 0
+    assert height <= max(320, monitor_h - 48)

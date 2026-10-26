@@ -100,9 +100,11 @@ add a short note under any item you skip or change.
       Apply it in both Intent Bars and the AI panel.
       Note: recovery is "Start Ollama" (GTK Intent Bar), "Diagnostics" (Shell bar, opens
       Axon Settings → Diagnostics) and "Try again" / "Diagnostics" (AI panel).
-- [ ] **AI panel too tall for small screens.** `set_default_size(420, 860)` on an
+- [x] **AI panel too tall for small screens.** `set_default_size(420, 860)` on an
       undecorated window doesn't fit 768 px-high displays. Size it from the monitor's
       work area (e.g. height = min(860, work-area height − 48)).
+      Note: GTK4 has no portable work-area API (Wayland hides it), so this uses the monitor
+      geometry minus the 48 px margin, via `fit_to_screen()`.
 - [ ] **Space-change announcement does nothing.** `spaces.js` calls
       `Atk.get_default_root().emit_children_changed()`, which doesn't announce anything.
       Replace it with an accessible status element whose text/name is updated to e.g.

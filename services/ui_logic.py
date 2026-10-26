@@ -162,3 +162,21 @@ class RequestTracker:
 def escape_action(busy: bool) -> str:
     """What Escape does: cancel a running request first, otherwise close."""
     return "cancel" if busy else "close"
+
+
+def fit_to_screen(preferred: int, available: int, margin: int = 48, minimum: int = 320) -> int:
+    """Clamp a window dimension so it fits the screen.
+
+    Args:
+        preferred: The size the design asks for, in px.
+        available: Monitor size (or work area) in the same direction, in px.
+            0 or less means unknown, and *preferred* is returned.
+        margin: Space to leave for panels/docks, in px.
+        minimum: Never go below this, even on tiny screens.
+
+    Returns:
+        ``max(minimum, min(preferred, available - margin))``.
+    """
+    if available <= 0:
+        return preferred
+    return max(minimum, min(preferred, available - margin))

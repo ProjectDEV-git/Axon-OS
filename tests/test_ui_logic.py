@@ -169,3 +169,19 @@ class TestSplitError:
         from services.ui_logic import split_error
 
         assert split_error("[error]") == ("", "Something went wrong.")
+
+
+@pytest.mark.parametrize(
+    ("preferred", "available", "expected"),
+    [
+        (860, 1080, 860),  # fits
+        (860, 768, 720),  # 1366x768 laptop: shrink
+        (860, 640, 592),  # 1280x800 at 125% scale is 640 logical px tall
+        (860, 300, 320),  # never below the minimum
+        (860, 0, 860),  # unknown monitor
+    ],
+)
+def test_fit_to_screen(preferred: int, available: int, expected: int) -> None:
+    from services.ui_logic import fit_to_screen
+
+    assert fit_to_screen(preferred, available) == expected
