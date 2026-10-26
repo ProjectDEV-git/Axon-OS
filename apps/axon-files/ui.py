@@ -154,7 +154,7 @@ class FileRow(Gtk.ListBoxRow):
 class FilesWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
-        self.set_title("Axon Files")
+        self.set_title(_("Axon Files"))
         fit_default_size(self, 1000, 680)
 
         self.indexer = FileIndexer()
@@ -183,7 +183,7 @@ class FilesWindow(Adw.ApplicationWindow):
         self.spinner = Gtk.Spinner()
         sync_box.append(self.spinner)
 
-        self.sync_btn = Gtk.Button(label="Sync Index")
+        self.sync_btn = Gtk.Button(label=_("Sync Index"))
         self.sync_btn.get_style_context().add_class("sync-btn")
         self.sync_btn.connect("clicked", self.on_sync_clicked)
         sync_box.append(self.sync_btn)
@@ -194,13 +194,13 @@ class FilesWindow(Adw.ApplicationWindow):
         search_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
         self.search_entry = Gtk.SearchEntry()
-        self.search_entry.set_placeholder_text("Search files, folders or content...")
+        self.search_entry.set_placeholder_text(_("Search files, folders or content..."))
         self.search_entry.set_width_chars(32)
         self.search_entry.connect("search-changed", self.on_search_changed)
         search_box.append(self.search_entry)
 
         # AI Semantic Search Toggle
-        self.ai_toggle = Gtk.ToggleButton(label="AI Search")
+        self.ai_toggle = Gtk.ToggleButton(label=_("AI Search"))
         self.ai_toggle.get_style_context().add_class("ai-toggle-btn")
         self.ai_toggle.connect("toggled", self.on_ai_toggled)
         search_box.append(self.ai_toggle)
@@ -288,7 +288,7 @@ class FilesWindow(Adw.ApplicationWindow):
         main_box.append(scroll)
 
         # Bottom status label
-        self.status_lbl = Gtk.Label(label="Index state: Loading...")
+        self.status_lbl = Gtk.Label(label=_("Index state: Loading..."))
         self.status_lbl.set_halign(Gtk.Align.START)
         self.status_lbl.get_style_context().add_class("file-path-label")
         self.status_lbl.set_margin_top(8)
@@ -310,7 +310,7 @@ class FilesWindow(Adw.ApplicationWindow):
         ph_icon.set_opacity(0.3)
         self.preview_placeholder.append(ph_icon)
 
-        self.ph_lbl = Gtk.Label(label="Select a file to preview AI details")
+        self.ph_lbl = Gtk.Label(label=_("Select a file to preview AI details"))
         self.ph_lbl.set_justify(Gtk.Justification.CENTER)
         self.ph_lbl.get_style_context().add_class("file-meta-label")
         self.preview_placeholder.append(self.ph_lbl)
@@ -334,7 +334,7 @@ class FilesWindow(Adw.ApplicationWindow):
         self.prev_meta.set_wrap(True)
         self.preview_details.append(self.prev_meta)
 
-        summary_title = Gtk.Label(label="AI Content Summary:")
+        summary_title = Gtk.Label(label=_("AI Content Summary:"))
         summary_title.set_halign(Gtk.Align.START)
         summary_title.get_style_context().add_class("file-name-label")
         self.preview_details.append(summary_title)
@@ -352,7 +352,7 @@ class FilesWindow(Adw.ApplicationWindow):
         self.preview_details.append(prev_scroll)
 
         # Action Open button
-        self.open_btn = Gtk.Button(label="Open File")
+        self.open_btn = Gtk.Button(label=_("Open File"))
         self.open_btn.get_style_context().add_class("sync-btn")
         self.open_btn.connect("clicked", self.on_open_clicked)
         self.preview_details.append(self.open_btn)
@@ -373,7 +373,7 @@ class FilesWindow(Adw.ApplicationWindow):
             count = self.indexer.get_indexed_count()
             self.status_lbl.set_text(f"Index state: {count} files semantically indexed.")
         except Exception:
-            self.status_lbl.set_text("Index state: Database offline.")
+            self.status_lbl.set_text(_("Index state: Database offline."))
 
     def on_sidebar_selected(self, listbox, row):
         if row is None:
@@ -409,7 +409,7 @@ class FilesWindow(Adw.ApplicationWindow):
         self.path_bar_box.append(breadcrumbs_box)
 
         if self.current_dir is None:
-            lbl = Gtk.Label(label="Global Search (All Directories)")
+            lbl = Gtk.Label(label=_("Search All Folders"))
             lbl.get_style_context().add_class("file-name-label")
             breadcrumbs_box.append(lbl)
         else:
@@ -444,7 +444,7 @@ class FilesWindow(Adw.ApplicationWindow):
             # New Folder Button
             new_dir_btn = Gtk.Button()
             new_dir_btn.set_icon_name("folder-new-symbolic")
-            new_dir_btn.set_tooltip_text("New Folder")
+            new_dir_btn.set_tooltip_text(_("New Folder"))
             new_dir_btn.get_style_context().add_class("path-btn")
             new_dir_btn.set_has_frame(False)
             new_dir_btn.connect("clicked", lambda b: self.create_new_folder_dialog())
@@ -453,7 +453,7 @@ class FilesWindow(Adw.ApplicationWindow):
             # New File Button
             new_file_btn = Gtk.Button()
             new_file_btn.set_icon_name("document-new-symbolic")
-            new_file_btn.set_tooltip_text("New File")
+            new_file_btn.set_tooltip_text(_("New File"))
             new_file_btn.get_style_context().add_class("path-btn")
             new_file_btn.set_has_frame(False)
             new_file_btn.connect("clicked", lambda b: self.create_new_file_dialog())
@@ -462,7 +462,7 @@ class FilesWindow(Adw.ApplicationWindow):
             # Paste Button
             paste_btn = Gtk.Button()
             paste_btn.set_icon_name("edit-paste-symbolic")
-            paste_btn.set_tooltip_text("Paste")
+            paste_btn.set_tooltip_text(_("Paste"))
             paste_btn.get_style_context().add_class("path-btn")
             paste_btn.set_has_frame(False)
             paste_btn.set_sensitive(self.clipboard_file is not None)
@@ -589,7 +589,7 @@ class FilesWindow(Adw.ApplicationWindow):
         # Get roots to scan
         scan_roots = self.get_default_scan_roots()
 
-        self.status_lbl.set_text("Indexing background process started...")
+        self.status_lbl.set_text(_("Indexing background process started..."))
 
         # Setup cancel and progress tracking
         def progress_cb(current_path, indexed, total):
@@ -861,7 +861,7 @@ class FilesWindow(Adw.ApplicationWindow):
         dest_path = Path(dest_dir) / src_path.name
 
         if not src_path.exists():
-            self.status_lbl.set_text("Paste failed: Source file no longer exists.")
+            self.status_lbl.set_text(_("Paste failed: Source file no longer exists."))
             return
 
         if dest_path.exists():
@@ -892,12 +892,12 @@ class FilesWindow(Adw.ApplicationWindow):
                 return
             # Reject path traversal in new name
             if "/" in new_name or "\\" in new_name or ".." in new_name:
-                self.status_lbl.set_text("Rename failed: invalid characters in name")
+                self.status_lbl.set_text(_("Rename failed: invalid characters in name"))
                 return
             dest = src.parent / new_name
             # Verify resolved path stays in same directory
             if dest.resolve().parent != src.parent.resolve():
-                self.status_lbl.set_text("Rename failed: path escapes directory")
+                self.status_lbl.set_text(_("Rename failed: path escapes directory"))
                 return
             try:
                 src.rename(dest)
@@ -951,11 +951,13 @@ class FilesWindow(Adw.ApplicationWindow):
                 return
             # Reject path traversal in new name
             if "/" in name or "\\" in name or ".." in name:
-                self.status_lbl.set_text("Failed to create folder: invalid characters in name")
+                self.status_lbl.set_text(_("Failed to create folder: invalid characters in name"))
                 return
             p = Path(dest_dir) / name
             if p.resolve().parent != Path(dest_dir).resolve():
-                self.status_lbl.set_text("Failed to create folder: name escapes target directory")
+                self.status_lbl.set_text(
+                    _("Failed to create folder: name escapes target directory")
+                )
                 return
             try:
                 p.mkdir(parents=True, exist_ok=False)
@@ -974,11 +976,11 @@ class FilesWindow(Adw.ApplicationWindow):
                 return
             # Reject path traversal in new name
             if "/" in name or "\\" in name or ".." in name:
-                self.status_lbl.set_text("Failed to create file: invalid characters in name")
+                self.status_lbl.set_text(_("Failed to create file: invalid characters in name"))
                 return
             p = Path(dest_dir) / name
             if p.resolve().parent != Path(dest_dir).resolve():
-                self.status_lbl.set_text("Failed to create file: name escapes target directory")
+                self.status_lbl.set_text(_("Failed to create file: name escapes target directory"))
                 return
             try:
                 p.touch(exist_ok=False)
@@ -1068,7 +1070,9 @@ def list_directory_contents(dir_path, indexer):
         cursor = conn.cursor()
         try:
             # Escape LIKE wildcards in path to prevent SQL injection
-            escaped_path = str(path_obj).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            escaped_path = (
+                str(path_obj).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
             cursor.execute(
                 """
                 SELECT id, file_path, file_name, file_type, file_size, last_modified, content_summary

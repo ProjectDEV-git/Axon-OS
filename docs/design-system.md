@@ -34,8 +34,12 @@ any change; the tests fail while an output is stale.
 
 Inter, in pt so Large Text works. Floor 11 px, app titles at most 32 px.
 Tracking is size-specific: tighter on large text (-0.6 px at display size),
-0 on body, slightly looser on small labels. Sentence case everywhere; no
-tracked uppercase labels.
+0 on body, slightly looser on small labels. No tracked uppercase labels.
+
+Capitalisation follows the platform (GNOME HIG and Apple HIG agree): Title
+Case for window titles, buttons, menu items and headings ("Get Started",
+"Pinned Apps"); sentence case for descriptions, row labels, tooltips and
+status text ("Move new windows to their Space").
 
 ## Surfaces
 
@@ -87,3 +91,4 @@ icons; a test checks the UI strings.
 | Accent hue | Any | No violet or indigo | Calm blue default (Axon used violet before) |
 | Keyboard surfaces | Respond instantly | — | 50 ms fade (owner's choice over Emil's "none") |
 | Gradients | Fine in icons | Banned on UI | A subtle tone step in app icons only; flat UI |
+| Capitalisation | Title case for buttons and titles | Sentence case labels | Platform rule: Title Case for buttons, titles and headings; sentence case for labels and descriptions |

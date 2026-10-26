@@ -198,7 +198,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         group = Adw.PreferencesGroup(title=_("Spaces"))
         if self._shell is None:
             group.set_description(
-                "These settings need the Axon Shell extension, which isn't installed here."
+                _("These settings need the Axon Shell extension, which isn't installed here.")
             )
             return group
 

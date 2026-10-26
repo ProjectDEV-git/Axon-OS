@@ -24,6 +24,19 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, GLib, Gtk
 
+# Translations (services/i18n.py); plain English when services/ isn't found
+for _base in (*Path(__file__).resolve().parents, Path("/usr/lib/axon")):
+    if (_base / "services" / "i18n.py").is_file():
+        sys.path.insert(0, str(_base / "services"))
+        break
+try:
+    from i18n import _
+except ImportError:
+
+    def _(text: str) -> str:  # type: ignore[no-redef]
+        return text
+
+
 # ---------------------------------------------------------------------------
 # Logging — use the shared Axon logger when available, otherwise stdlib
 # ---------------------------------------------------------------------------
@@ -146,7 +159,7 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
 
     def __init__(self, **kwargs: object) -> None:
         super().__init__(**kwargs)
-        self.set_title("Axon OS Updater")
+        self.set_title(_("Axon OS Updater"))
         self.set_default_size(520, 380)
         self.set_resizable(False)
 
@@ -188,8 +201,8 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
         # Status page — icon + title + description
         status = Adw.StatusPage()
         status.set_icon_name("software-update-available-symbolic")
-        status.set_title("System Update Available")
-        status.set_description("Ready to update core OS and sandboxed apps.")
+        status.set_title(_("System Update Available"))
+        status.set_description(_("Ready to update core OS and sandboxed apps."))
         status.add_css_class("updater-status-page")
         self._status_page = status
         content.append(status)
@@ -218,7 +231,7 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
         btn_box.set_margin_top(8)
         content.append(btn_box)
 
-        self._btn = Gtk.Button(label="Start Update")
+        self._btn = Gtk.Button(label=_("Start Update"))
         self._btn.add_css_class("updater-start-btn")
         self._btn.connect("clicked", self._on_start_clicked)
         btn_box.append(self._btn)
@@ -301,7 +314,7 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
 
         # Swap button to "Close"
         def _swap_button():
-            self._btn.set_label("Close")
+            self._btn.set_label(_("Close"))
             self._btn.remove_css_class("updater-start-btn")
             self._btn.add_css_class("updater-close-btn")
             self._btn.set_sensitive(True)

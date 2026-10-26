@@ -32,6 +32,19 @@ from ai_helper import AIHelper
 from gi.repository import Adw, Gdk, GLib, Gtk, Pango, Vte
 from safety import assess_command, format_findings, is_insertable_suggestion
 
+# Translations (services/i18n.py); plain English when services/ isn't found
+for _base in (*Path(__file__).resolve().parents, Path("/usr/lib/axon")):
+    if (_base / "services" / "i18n.py").is_file():
+        sys.path.insert(0, str(_base / "services"))
+        break
+try:
+    from i18n import _
+except ImportError:
+
+    def _(text: str) -> str:  # type: ignore[no-redef]
+        return text
+
+
 log = logging.getLogger("axon-terminal")
 
 # ---------------------------------------------------------------------------
@@ -156,7 +169,7 @@ class TerminalWidget(Gtk.Box):
         # Header row
         diag_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         diag_header.set_spacing(6)
-        diag_title = Gtk.Label(label="⬡ AI Diagnosis")
+        diag_title = Gtk.Label(label=_("⬡ AI Diagnosis"))
         diag_title.add_css_class("diagnosis-title")
         diag_title.set_xalign(0.0)
         diag_title.set_hexpand(True)
@@ -165,7 +178,7 @@ class TerminalWidget(Gtk.Box):
         dismiss_btn = Gtk.Button.new_from_icon_name("window-close-symbolic")
         dismiss_btn.add_css_class("flat")
         dismiss_btn.add_css_class("diagnosis-dismiss")
-        dismiss_btn.set_tooltip_text("Dismiss")
+        dismiss_btn.set_tooltip_text(_("Dismiss"))
         dismiss_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Dismiss diagnosis"])
         dismiss_btn.connect("clicked", lambda _b: self._hide_diagnosis())
         diag_header.append(dismiss_btn)
@@ -213,7 +226,7 @@ class TerminalWidget(Gtk.Box):
 
         self._nl_entry = Gtk.Entry()
         self._nl_entry.set_hexpand(True)
-        self._nl_entry.set_placeholder_text("Describe what you want to do…")
+        self._nl_entry.set_placeholder_text(_("Describe what you want to do…"))
         self._nl_entry.connect("activate", self._on_nl_activate)
         nl_box.append(self._nl_entry)
 
@@ -240,12 +253,12 @@ class TerminalWidget(Gtk.Box):
         self._nl_confirm_box.set_margin_bottom(4)
         self._nl_confirm_box.set_visible(False)
 
-        confirm_btn = Gtk.Button(label="Run")
+        confirm_btn = Gtk.Button(label=_("Run"))
         confirm_btn.add_css_class("suggested-action")
         confirm_btn.connect("clicked", self._on_nl_confirm)
         self._nl_confirm_box.append(confirm_btn)
 
-        cancel_btn = Gtk.Button(label="Cancel")
+        cancel_btn = Gtk.Button(label=_("Cancel"))
         cancel_btn.add_css_class("flat")
         cancel_btn.connect("clicked", self._on_nl_cancel)
         self._nl_confirm_box.append(cancel_btn)
@@ -284,10 +297,18 @@ class TerminalWidget(Gtk.Box):
         term.set_colors(_FG, _BG, _PALETTE)
 
         # Spawn user shell (allowlist of known safe shells)
-        _ALLOWED_SHELLS = frozenset({
-            "/bin/bash", "/bin/sh", "/bin/dash", "/bin/zsh",
-            "/usr/bin/bash", "/usr/bin/sh", "/usr/bin/zsh", "/usr/bin/fish",
-        })
+        _ALLOWED_SHELLS = frozenset(
+            {
+                "/bin/bash",
+                "/bin/sh",
+                "/bin/dash",
+                "/bin/zsh",
+                "/usr/bin/bash",
+                "/usr/bin/sh",
+                "/usr/bin/zsh",
+                "/usr/bin/fish",
+            }
+        )
         shell = "/bin/bash"
         config_path = Path.home() / ".config" / "axon-os" / "shell.conf"
         if config_path.exists():
@@ -297,7 +318,11 @@ class TerminalWidget(Gtk.Box):
                     shell = candidate
             except Exception:
                 pass
-        if shell not in _ALLOWED_SHELLS or not Path(shell).exists() or not os.access(shell, os.X_OK):
+        if (
+            shell not in _ALLOWED_SHELLS
+            or not Path(shell).exists()
+            or not os.access(shell, os.X_OK)
+        ):
             env_shell = os.environ.get("SHELL", "/bin/bash")
             shell = env_shell if env_shell in _ALLOWED_SHELLS else "/bin/bash"
 
@@ -434,7 +459,7 @@ class TerminalWidget(Gtk.Box):
             return
 
         # Show overlay with spinner
-        self._diagnosis_label.set_text("Analyzing error…")
+        self._diagnosis_label.set_text(_("Analyzing error…"))
         self._diag_spinner.set_visible(True)
         self._diag_spinner.start()
         self._clear_suggestions()
@@ -531,7 +556,7 @@ class TerminalWidget(Gtk.Box):
             return
 
         if not self._ai.is_available:
-            self._nl_preview.set_text("⚠ AI unavailable")
+            self._nl_preview.set_text(_("⚠ AI unavailable"))
             self._nl_preview.set_visible(True)
             return
 
@@ -548,7 +573,7 @@ class TerminalWidget(Gtk.Box):
         self._nl_spinner.stop()
 
         if not command:
-            self._nl_preview.set_text("⚠ Could not translate to a command.")
+            self._nl_preview.set_text(_("⚠ Could not translate to a command."))
             self._nl_preview.set_visible(True)
             return
 

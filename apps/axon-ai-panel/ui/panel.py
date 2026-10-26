@@ -382,10 +382,10 @@ class AIPanelWindow(Adw.Window):
     """Main side-panel window for the Axon AI assistant."""
 
     _QUICK_CHIPS: list[str] = [  # noqa: RUF012
-        N_("Explain error"),
+        N_("Explain Error"),
         N_("Summarize"),
-        N_("Write code"),
-        N_("Fix bug"),
+        N_("Write Code"),
+        N_("Fix Bug"),
         N_("Translate"),
     ]
 

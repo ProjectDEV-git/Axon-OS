@@ -27,11 +27,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from axon_gtk_utils import load_app_css
 from settings_executor import SettingsExecutor
 
+# Translations (services/i18n.py); plain English when services/ isn't found
+for _base in (*Path(__file__).resolve().parents, Path("/usr/lib/axon")):
+    if (_base / "services" / "i18n.py").is_file():
+        sys.path.insert(0, str(_base / "services"))
+        break
+try:
+    from i18n import _
+except ImportError:
+
+    def _(text: str) -> str:  # type: ignore[no-redef]
+        return text
+
 
 class AxonSettingsWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs: object) -> None:
         super().__init__(**kwargs)
-        self.set_title("Axon Assistant")
+        self.set_title(_("Axon Assistant"))
         self.set_default_size(560, 420)
         self._timer_ids: list[int] = []
         self.connect("destroy", self._on_destroy)
@@ -48,17 +60,17 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         header.add_css_class("settings-header")
         diagnostics_btn = Gtk.Button(icon_name="utilities-system-monitor-symbolic")
-        diagnostics_btn.set_tooltip_text("Diagnostics: check that everything is working")
+        diagnostics_btn.set_tooltip_text(_("Diagnostics: check that everything is working"))
         diagnostics_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Diagnostics"])
         diagnostics_btn.connect("clicked", lambda _b: self.open_diagnostics())
         header.pack_start(diagnostics_btn)
         prefs_btn = Gtk.Button(icon_name="preferences-system-symbolic")
-        prefs_btn.set_tooltip_text("Preferences: Spaces, privacy and command approvals")
+        prefs_btn.set_tooltip_text(_("Preferences: Spaces, privacy and command approvals"))
         prefs_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Preferences"])
         prefs_btn.connect("clicked", lambda _b: self.open_preferences())
         header.pack_start(prefs_btn)
-        models_btn = Gtk.Button(label="AI Models")
-        models_btn.set_tooltip_text("Choose AI models and providers")
+        models_btn = Gtk.Button(label=_("AI Models"))
+        models_btn.set_tooltip_text(_("Choose AI models and providers"))
         models_btn.connect("clicked", lambda _b: self.open_ai_models())
         header.pack_end(models_btn)
         root.append(header)
@@ -82,7 +94,7 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         ai_badge.add_css_class("ai-badge-icon")
         title_box.append(ai_badge)
 
-        app_title = Gtk.Label(label="System Assistant")
+        app_title = Gtk.Label(label=_("System Assistant"))
         app_title.add_css_class("app-title-label")
         title_box.append(app_title)
 
@@ -100,7 +112,9 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         feedback_inner.set_margin_bottom(16)
 
         self._feedback_text = Gtk.Label(
-            label="Tell me what you'd like to adjust. Try: 'toggle dark mode', 'enable night light', 'turn on bluetooth', or 'enable do not disturb'."
+            label=_(
+                "Tell me what you'd like to adjust. Try: 'toggle dark mode', 'enable night light', 'turn on bluetooth', or 'enable do not disturb'."
+            )
         )
         self._feedback_text.set_wrap(True)
         self._feedback_text.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
@@ -119,49 +133,49 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         quick_grid.set_margin_top(8)
 
         # Dark Mode button
-        dark_btn = Gtk.Button(label="Toggle Theme")
+        dark_btn = Gtk.Button(label=_("Toggle Theme"))
         dark_btn.add_css_class("quick-action-btn")
         dark_btn.connect("clicked", lambda _b: self._run_command("toggle dark mode"))
         quick_grid.attach(dark_btn, 0, 0, 1, 1)
 
         # WiFi button
-        wifi_btn = Gtk.Button(label="Toggle Wi-Fi")
+        wifi_btn = Gtk.Button(label=_("Toggle Wi-Fi"))
         wifi_btn.add_css_class("quick-action-btn")
         wifi_btn.connect("clicked", lambda _b: self._run_command("toggle wifi"))
         quick_grid.attach(wifi_btn, 1, 0, 1, 1)
 
         # Mute button
-        mute_btn = Gtk.Button(label="Toggle Mute")
+        mute_btn = Gtk.Button(label=_("Toggle Mute"))
         mute_btn.add_css_class("quick-action-btn")
         mute_btn.connect("clicked", lambda _b: self._run_command("mute audio"))
         quick_grid.attach(mute_btn, 0, 1, 1, 1)
 
         # Max Brightness button
-        bright_btn = Gtk.Button(label="Max Brightness")
+        bright_btn = Gtk.Button(label=_("Max Brightness"))
         bright_btn.add_css_class("quick-action-btn")
         bright_btn.connect("clicked", lambda _b: self._run_command("set brightness to 100%"))
         quick_grid.attach(bright_btn, 1, 1, 1, 1)
 
         # Night Light button
-        night_btn = Gtk.Button(label="Toggle Night Light")
+        night_btn = Gtk.Button(label=_("Toggle Night Light"))
         night_btn.add_css_class("quick-action-btn")
         night_btn.connect("clicked", lambda _b: self._run_command("toggle night light"))
         quick_grid.attach(night_btn, 0, 2, 1, 1)
 
         # Bluetooth button
-        bt_btn = Gtk.Button(label="Toggle Bluetooth")
+        bt_btn = Gtk.Button(label=_("Toggle Bluetooth"))
         bt_btn.add_css_class("quick-action-btn")
         bt_btn.connect("clicked", lambda _b: self._run_command("toggle bluetooth"))
         quick_grid.attach(bt_btn, 1, 2, 1, 1)
 
         # Do Not Disturb button
-        dnd_btn = Gtk.Button(label="Toggle DND")
+        dnd_btn = Gtk.Button(label=_("Toggle DND"))
         dnd_btn.add_css_class("quick-action-btn")
         dnd_btn.connect("clicked", lambda _b: self._run_command("toggle do not disturb"))
         quick_grid.attach(dnd_btn, 0, 3, 1, 1)
 
         # Natural Scroll button
-        scroll_btn = Gtk.Button(label="Toggle Natural Scroll")
+        scroll_btn = Gtk.Button(label=_("Toggle Natural Scroll"))
         scroll_btn.add_css_class("quick-action-btn")
         scroll_btn.connect("clicked", lambda _b: self._run_command("toggle natural scrolling"))
         quick_grid.attach(scroll_btn, 1, 3, 1, 1)
@@ -178,12 +192,12 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
 
         self._entry = Gtk.Entry()
         self._entry.set_hexpand(True)
-        self._entry.set_placeholder_text("Ask the assistant to configure something...")
+        self._entry.set_placeholder_text(_("Ask the assistant to configure something..."))
         self._entry.connect("activate", self._on_entry_activated)
         self._entry.add_css_class("settings-input-entry")
         input_container.append(self._entry)
 
-        send_btn = Gtk.Button(label="Apply")
+        send_btn = Gtk.Button(label=_("Apply"))
         send_btn.add_css_class("settings-apply-btn")
         send_btn.connect("clicked", lambda _b: self._on_entry_activated(self._entry))
         input_container.append(send_btn)
@@ -209,7 +223,7 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         self._run_command(text)
 
     def _run_command(self, query: str) -> None:
-        self._feedback_text.set_text("Applying settings change...")
+        self._feedback_text.set_text(_("Applying settings change..."))
         self._feedback_card.add_css_class("loading")
 
         # Async execution helper
@@ -229,11 +243,15 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         self._feedback_text.set_text(msg)
         if result.get("success"):
             self._feedback_card.add_css_class("success")
-            tid = GLib.timeout_add(1500, lambda: self._feedback_card.remove_css_class("success") or False)
+            tid = GLib.timeout_add(
+                1500, lambda: self._feedback_card.remove_css_class("success") or False
+            )
             self._timer_ids.append(tid)
         else:
             self._feedback_card.add_css_class("error")
-            tid = GLib.timeout_add(2000, lambda: self._feedback_card.remove_css_class("error") or False)
+            tid = GLib.timeout_add(
+                2000, lambda: self._feedback_card.remove_css_class("error") or False
+            )
             self._timer_ids.append(tid)
 
     def _on_destroy(self, _widget: Gtk.Widget) -> None:
