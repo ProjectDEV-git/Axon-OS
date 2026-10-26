@@ -1,14 +1,14 @@
-/* Axon Files Modern Glassmorphic Stylesheet */
-@import url("../shared/axon-design-tokens.css");
+/* Axon Files. Colours come from the design tokens (@axon_*), loaded by
+ * axon_gtk_utils.load_app_css; see theme/tokens/axon-tokens.json. */
 
 .window-bg {
-    background-color: @bg_primary;
+    background-color: @axon_bg;
 }
 
-/* Sidebar styling */
+/* Sidebar */
 .sidebar {
-    background-color: rgba(17, 17, 25, 0.75);
-    border-right: 1px solid rgba(139, 92, 246, 0.15);
+    background-color: @axon_surface;
+    border-right: 1px solid @axon_border;
 }
 
 .sidebar-list {
@@ -20,143 +20,142 @@
     padding: 10px 14px;
     border-radius: 8px;
     margin-bottom: 4px;
-    color: #c0c0d8;
+    color: @axon_fg_secondary;
     font-weight: 500;
-    transition: all 0.2s ease;
+    transition: all 150ms ease;
 }
 
 .sidebar-item:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-    color: #e8e8f4;
+    background-color: @axon_hover;
+    color: @axon_fg;
 }
 
+/* Selected: accent tint plus a bar, not colour alone */
 .sidebar-item:selected {
-    background-color: rgba(139, 92, 246, 0.2);
-    color: #c084fc;
-    border-left: 3px solid #8b5cf6;
+    background-color: @axon_accent_subtle;
+    color: @axon_fg;
+    border-left: 3px solid @axon_accent_text;
 }
 
-/* Main Area styling */
+/* Main area */
 .main-content {
-    background-color: @bg_secondary;
+    background-color: @axon_bg;
     padding: 16px;
 }
 
 .path-bar {
     padding: 4px 8px;
-    background-color: @bg_secondary;
+    background-color: @axon_surface;
     border-radius: 8px;
-    border: 1px solid rgba(139, 92, 246, 0.1);
+    border: 1px solid @axon_border;
     margin-bottom: 12px;
 }
 
 .path-btn {
-    color: #c0c0d8;
+    color: @axon_fg_secondary;
     font-weight: 500;
 }
 
 .path-btn:hover {
-    color: #8b5cf6;
-    background-color: rgba(255, 255, 255, 0.03);
+    color: @axon_fg;
+    background-color: @axon_hover;
 }
 
-/* File List Row */
+/* File list rows */
 .file-list {
     background-color: transparent;
 }
 
 .file-row {
     padding: 12px 16px;
-    border-radius: 10px;
-    margin-bottom: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.02);
-    background-color: #11111a;
-    transition: all 0.15s ease;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+    background-color: @axon_surface;
+    transition: all 150ms ease;
 }
 
 .file-row:hover {
-    background-color: #161625;
-    border-color: rgba(139, 92, 246, 0.2);
-    transform: translateY(-1px);
+    background-color: @axon_surface_raised;
+    border-color: @axon_border;
 }
 
 .file-row:selected {
-    background-color: rgba(139, 92, 246, 0.12);
-    border-color: rgba(139, 92, 246, 0.4);
+    background-color: @axon_accent_subtle;
+    border-color: @axon_accent_text;
 }
 
 .file-name-label {
     font-size: 14px;
     font-weight: bold;
-    color: @text_primary;
+    color: @axon_fg;
 }
 
 .file-path-label {
     font-size: 11px;
-    color: #80809b;
+    color: @axon_fg_muted;
 }
 
 .file-meta-label {
     font-size: 12px;
-    color: #9090a8;
+    color: @axon_fg_secondary;
 }
 
-/* Preview Panel */
+/* Preview panel */
 .preview-panel {
-    background-color: @bg_secondary;
-    border-left: 1px solid rgba(139, 92, 246, 0.15);
+    background-color: @axon_surface;
+    border-left: 1px solid @axon_border;
     padding: 20px;
-    width: 280px;
 }
 
 .preview-title {
     font-size: 18px;
     font-weight: bold;
-    color: @text_primary;
+    color: @axon_fg;
     margin-bottom: 8px;
 }
 
 .preview-meta {
     font-size: 12px;
-    color: #9090a8;
+    color: @axon_fg_secondary;
     margin-bottom: 16px;
 }
 
 .preview-summary-box {
-    background-color: @bg_primary;
+    background-color: @axon_bg;
     border-radius: 8px;
-    border: 1px solid rgba(139, 92, 246, 0.1);
+    border: 1px solid @axon_border;
     padding: 12px;
     font-family: monospace;
     font-size: 12px;
-    color: #c0c0d8;
+    color: @axon_fg_secondary;
 }
 
 /* Badges */
 .badge-similarity {
-    background-color: rgba(16, 185, 129, 0.15);
-    color: #34d399;
+    background-color: @axon_surface_raised;
+    color: @axon_success;
     font-weight: bold;
     font-size: 11px;
     padding: 2px 8px;
     border-radius: 9999px;
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    border: 1px solid @axon_border;
 }
 
 .badge-type {
-    background-color: rgba(139, 92, 246, 0.15);
-    color: #c084fc;
+    background-color: @axon_surface_raised;
+    color: @axon_fg_secondary;
     font-size: 10px;
     padding: 2px 6px;
     border-radius: 4px;
-    border: 1px solid rgba(139, 92, 246, 0.3);
+    border: 1px solid @axon_border;
 }
 
-/* Header bar components */
+/* Header bar: the AI features keep the accent */
 .sync-btn {
-    background-color: rgba(139, 92, 246, 0.2);
-    color: #c084fc;
-    border: 1px solid rgba(139, 92, 246, 0.4);
+    background-color: @axon_accent_subtle;
+    color: @axon_accent_text;
+    border: 1px solid @axon_border;
     border-radius: 9999px;
     padding: 6px 12px;
     font-weight: bold;
@@ -164,8 +163,8 @@
 }
 
 .sync-btn:hover {
-    background-color: #8b5cf6;
-    color: white;
+    background-color: @axon_accent;
+    color: @axon_accent_fg;
 }
 
 .ai-toggle-btn {
@@ -175,6 +174,6 @@
 }
 
 .ai-toggle-btn:checked {
-    background-color: #8b5cf6;
-    color: white;
+    background-color: @axon_accent;
+    color: @axon_accent_fg;
 }

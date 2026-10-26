@@ -19,6 +19,10 @@ APP_CSS = [
     "apps/axon-ai-panel/ui/panel.css",
     "apps/axon-welcome/ui/welcome.css",
     "apps/axon-installer/ui/wizard.css",
+    "apps/axon-files/main.css",
+    "apps/axon-settings/main.css",
+    "apps/axon-shortcuts/main.css",
+    "apps/axon-terminal/main.css",
 ]
 HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 
@@ -34,6 +38,8 @@ def test_no_embedded_css_or_hex_colours(path: str) -> None:
 def test_app_css_uses_tokens_not_hex(path: str) -> None:
     css = (ROOT / path).read_text(encoding="utf-8")
     assert not HEX.search(css), f"{path}: use @axon_* tokens"
+    assert "rgba(" not in css, f"{path}: use @axon_* tokens"
+    assert "@import" not in css, "load tokens with load_app_css so the variant can change"
     assert "@axon_" in css
 
 

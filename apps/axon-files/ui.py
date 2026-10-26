@@ -18,26 +18,12 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 # Shared GTK helpers live in apps/shared next to every app
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
-from axon_gtk_utils import fit_default_size
-
-_css_loaded = False
+from axon_gtk_utils import fit_default_size, load_app_css
 
 
 def load_css():
-    """Loads application CSS styling."""
-    global _css_loaded
-    if _css_loaded:
-        return
-    css_path = Path(__file__).parent / "main.css"
-    if css_path.exists():
-        provider = Gtk.CssProvider()
-        provider.load_from_path(str(css_path))
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-        )
-    _css_loaded = True
+    """Loads application CSS styling (design tokens first)."""
+    load_app_css(Path(__file__).parent / "main.css")
 
 
 class SidebarRow(Gtk.ListBoxRow):

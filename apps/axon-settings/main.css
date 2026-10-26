@@ -1,68 +1,60 @@
-/* Axon Assistant Stylings sheet */
-@import url("../shared/axon-design-tokens.css");
+/* Axon Settings. Colours come from the design tokens (@axon_*), loaded by
+ * axon_gtk_utils.load_app_css; see theme/tokens/axon-tokens.json. */
 
 window {
-    background-color: @bg_primary;
-    color: @text_primary;
+    background-color: @axon_bg;
+    color: @axon_fg;
 }
 
 .settings-header {
-    background-color: @bg_primary;
-    border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+    background-color: @axon_bg;
+    border-bottom: 1px solid @axon_border;
 }
 
 .ai-badge-icon {
     font-size: 28px;
-    color: #8b5cf6;
+    color: @axon_accent_text;
     font-weight: 700;
 }
 
 .app-title-label {
-    font-family: "Inter", "Outfit", "Ubuntu", sans-serif;
     font-size: 18px;
     font-weight: 700;
-    color: @text_primary;
+    color: @axon_fg;
 }
 
-/* Feedback card styles */
+/* Feedback card: state shown by border colour and the message text */
 .feedback-card {
-    background-color: rgba(20, 20, 30, 0.6);
-    border: 1px solid rgba(139, 92, 246, 0.25);
+    background-color: @axon_surface;
+    border: 1px solid @axon_border;
     border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     transition: all 250ms ease;
 }
 
 .feedback-card.loading {
-    border-color: #8b5cf6;
-    background-color: rgba(139, 92, 246, 0.1);
+    border-color: @axon_accent_text;
+    background-color: @axon_accent_subtle;
 }
 
 .feedback-card.success {
-    border-color: #10b981;
-    background-color: rgba(16, 185, 129, 0.1);
+    border-color: @axon_success;
 }
 
 .feedback-card.error {
-    border-color: #ef4444;
-    background-color: rgba(239, 68, 68, 0.1);
+    border-color: @axon_error;
 }
 
 .feedback-text {
-    font-family: "Inter", "Ubuntu", sans-serif;
     font-size: 13px;
-    line-height: 1.5;
-    color: #b4b4c6;
-    text-align: center;
+    color: @axon_fg_secondary;
 }
 
-/* Quick Action buttons */
+/* Quick Action buttons: neutral */
 .quick-action-btn {
-    background-color: rgba(30, 30, 46, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: @axon_surface;
+    border: 1px solid @axon_border;
     border-radius: 8px;
-    color: #e4e4e8;
-    font-family: "Inter", "Ubuntu", sans-serif;
+    color: @axon_fg;
     font-size: 12px;
     font-weight: 600;
     padding: 10px 16px;
@@ -71,40 +63,34 @@ window {
 }
 
 .quick-action-btn:hover {
-    background-color: rgba(139, 92, 246, 0.18);
-    border-color: rgba(139, 92, 246, 0.45);
-    color: #ffffff;
+    background-color: @axon_hover;
+    border-color: @axon_border_strong;
 }
 
 .quick-action-btn:active {
-    background-color: rgba(139, 92, 246, 0.3);
-    transform: scale(0.97);
+    background-color: @axon_active;
 }
 
-/* Input Entry & Apply Button */
+/* Input entry & apply button */
 .settings-input-entry {
-    background-color: rgba(15, 15, 25, 0.9);
-    border: 1px solid rgba(139, 92, 246, 0.25);
+    background-color: @axon_surface;
+    border: 1px solid @axon_border;
     border-radius: 8px;
-    color: @text_primary;
-    font-family: "Inter", "Ubuntu", sans-serif;
+    color: @axon_fg;
     font-size: 13px;
     padding: 8px 12px;
-    caret-color: #8b5cf6;
     transition: all 200ms ease;
 }
 
 .settings-input-entry:focus {
-    border-color: #8b5cf6;
-    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+    border-color: @axon_focus_ring;
 }
 
 .settings-apply-btn {
-    background-color: @accent;
+    background-color: @axon_accent;
     border: none;
     border-radius: 8px;
-    color: #ffffff;
-    font-family: "Inter", "Ubuntu", sans-serif;
+    color: @axon_accent_fg;
     font-size: 13px;
     font-weight: 600;
     padding: 8px 16px;
@@ -112,11 +98,5 @@ window {
 }
 
 .settings-apply-btn:hover {
-    background-color: @accent_hover;
-    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
-}
-
-.settings-apply-btn:active {
-    background-color: @accent_active;
-    transform: scale(0.96);
+    background-color: @axon_accent_hover;
 }

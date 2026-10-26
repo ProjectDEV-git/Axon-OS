@@ -14,13 +14,17 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Adw, Gdk, GLib, Gtk, Pango
+from gi.repository import Adw, GLib, Gtk, Pango
 
 # Sibling import resolution
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ai_models import AIModelsWindow
 from diagnostics_window import DiagnosticsWindow
 from preferences_window import PreferencesWindow
+
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import load_app_css
 from settings_executor import SettingsExecutor
 
 
@@ -34,16 +38,7 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
 
         self._executor = SettingsExecutor()
 
-        css_path = Path(__file__).resolve().parent / "main.css"
-        if css_path.exists() and not hasattr(AxonSettingsWindow, "_css_loaded"):
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_path(str(css_path))
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
-            AxonSettingsWindow._css_loaded = True
+        load_app_css(Path(__file__).resolve().parent / "main.css")
 
         # Main Layout
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)

@@ -23,7 +23,7 @@ from gi.repository import Adw, Gdk, Gtk
 
 # Shared GTK helpers live in apps/shared next to every app
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
-from axon_gtk_utils import fit_default_size
+from axon_gtk_utils import fit_default_size, load_app_css
 
 # Ensure sibling modules are importable when running as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -41,18 +41,8 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
         fit_default_size(self, 900, 600)
         self.set_icon_name("utilities-terminal")
 
-        # ---- Load CSS (guard against re-registration) ----------------------
-        if not hasattr(AxonTerminalWindow, "_css_loaded"):
-            css_path = Path(__file__).resolve().parent / "main.css"
-            if css_path.exists():
-                css_provider = Gtk.CssProvider()
-                css_provider.load_from_path(str(css_path))
-                Gtk.StyleContext.add_provider_for_display(
-                    Gdk.Display.get_default(),
-                    css_provider,
-                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-                )
-            AxonTerminalWindow._css_loaded = True
+        # ---- Load CSS (design tokens first, once) ---------------------------
+        load_app_css(Path(__file__).resolve().parent / "main.css")
 
         # ---- Root layout ---------------------------------------------------
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)

@@ -1,140 +1,132 @@
-/*
- * main.css — Styling for Axon Terminal.
- */
-@import url("../shared/axon-design-tokens.css");
+/* Axon Terminal. Colours come from the design tokens (@axon_*), loaded by
+ * axon_gtk_utils.load_app_css; see theme/tokens/axon-tokens.json. The
+ * terminal's own ANSI palette is set in terminal_widget.py. */
 
-/* ---- Global window background ---- */
 window {
-    background-color: @bg_primary;
+    background-color: @axon_bg;
 }
 
-/* ---- Header bar ---- */
 .header-bar {
-    background: linear-gradient(180deg, @bg_secondary 0%, @bg_primary 100%);
-    border-bottom: 1px solid @border;
-    color: @text_primary;
+    background-color: @axon_bg;
+    border-bottom: 1px solid @axon_border;
+    color: @axon_fg;
 }
 
-/* ---- AI toggle button in header ---- */
+/* AI toggle: an AI feature, so it keeps the accent */
 .ai-toggle-btn {
-    background: linear-gradient(135deg, rgba(196, 181, 253, 0.15) 0%, rgba(196, 181, 253, 0.08) 100%);
-    color: @accent_light;
-    border: 1px solid rgba(196, 181, 253, 0.25);
+    background-color: @axon_accent_subtle;
+    color: @axon_accent_text;
+    border: 1px solid @axon_border;
     border-radius: 8px;
     padding: 4px 12px;
     font-weight: 600;
     font-size: 12px;
 }
+
 .ai-toggle-btn:hover {
-    background: linear-gradient(135deg, rgba(196, 181, 253, 0.25) 0%, rgba(196, 181, 253, 0.15) 100%);
-    border-color: @accent_light;
+    border-color: @axon_accent_text;
 }
 
-/* ---- Tab bar ---- */
+/* Tab bar */
 tabbar {
-    background-color: @bg_secondary;
-    border-bottom: 1px solid @border;
+    background-color: @axon_surface;
+    border-bottom: 1px solid @axon_border;
 }
 
 tabbar tab {
-    background-color: @bg_surface;
+    background-color: @axon_surface_raised;
     border-radius: 6px 6px 0 0;
-    color: #8888a0;
+    color: @axon_fg_secondary;
     padding: 4px 12px;
     margin: 2px 1px 0 1px;
 }
 
 tabbar tab:selected {
-    background-color: @bg_primary;
-    color: @text_primary;
-    border-bottom: 2px solid @accent_light;
+    background-color: @axon_bg;
+    color: @axon_fg;
+    border-bottom: 2px solid @axon_accent_text;
 }
 
 tabbar tab:hover:not(:selected) {
-    background-color: #18182a;
-    color: #c4c4d4;
+    background-color: @axon_hover;
+    color: @axon_fg;
 }
 
-/* ---- AI Diagnosis overlay ---- */
+/* AI diagnosis overlay */
 .diagnosis-box {
-    background: linear-gradient(180deg, #12121e 0%, #0d0d18 100%);
-    border-top: 2px solid #c4b5fd;
+    background-color: @axon_surface;
+    border-top: 2px solid @axon_accent_text;
     border-radius: 0;
     padding: 12px 16px;
 }
 
 .diagnosis-title {
-    color: #c4b5fd;
+    color: @axon_accent_text;
     font-weight: 700;
     font-size: 13px;
 }
 
 .diagnosis-text {
-    color: #d0d0dc;
+    color: @axon_fg;
     font-size: 12px;
-    line-height: 1.5;
 }
 
 .diagnosis-dismiss {
-    color: #5a5a78;
-    font-size: 14px;
+    color: @axon_fg_muted;
     padding: 2px 6px;
     border-radius: 4px;
 }
+
 .diagnosis-dismiss:hover {
-    color: #f87171;
-    background-color: rgba(248, 113, 113, 0.1);
+    color: @axon_fg;
+    background-color: @axon_hover;
 }
 
-/* ---- Suggestion chips ---- */
+/* Suggestion chips */
 .suggestion-chip {
-    background-color: rgba(196, 181, 253, 0.08);
-    color: #c4b5fd;
-    border: 1px solid rgba(196, 181, 253, 0.2);
+    background-color: @axon_hover;
+    color: @axon_fg;
+    border: 1px solid @axon_border;
     border-radius: 9999px;
     padding: 3px 12px;
     font-size: 11px;
     font-family: monospace;
 }
+
 .suggestion-chip:hover {
-    background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
-    color: #0f0f14;
-    border-color: #c4b5fd;
+    background-color: @axon_active;
+    border-color: @axon_border_strong;
 }
 
-/* ---- Natural language command bar ---- */
+/* Natural-language command bar */
 .nl-bar {
-    background: linear-gradient(180deg, @bg_surface 0%, @bg_primary 100%);
-    border-top: 1px solid @border;
+    background-color: @axon_surface;
+    border-top: 1px solid @axon_border;
     padding: 8px 12px;
 }
 
 .nl-icon {
-    color: #c4b5fd;
+    color: @axon_accent_text;
     font-size: 16px;
     font-weight: 700;
 }
 
 .nl-bar entry {
-    background-color: #1a1a28;
-    color: @text_primary;
-    border: 1px solid @border;
+    background-color: @axon_bg;
+    color: @axon_fg;
+    border: 1px solid @axon_border;
     border-radius: 6px;
     padding: 6px 10px;
 }
+
 .nl-bar entry:focus {
-    border-color: @accent_light;
+    border-color: @axon_focus_ring;
 }
 
 .nl-preview {
-    color: #86efac;
+    color: @axon_success;
     font-family: monospace;
     font-size: 12px;
     padding: 4px 12px;
     margin-left: 28px;
-}
-
-/* ---- Global window background ---- */
-window {
-    background-color: #0f0f14;
 }

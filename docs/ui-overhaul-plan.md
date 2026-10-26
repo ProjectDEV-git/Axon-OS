@@ -243,8 +243,11 @@ add a short note under any item you skip or change.
 - [x] **Drop the "Windows glass" look.** Remove the "Windows 10/11 Fluent Modern Glass
       (Acrylic)" design-system header. Reduce heavy transparency and large shadows, use
       fewer floating rounded boxes, and follow GNOME/libadwaita spacing and hierarchy.
-- [ ] **Use purple sparingly.** Reserve the accent for active, selected and AI-related
+- [x] **Use purple sparingly.** Reserve the accent for active, selected and AI-related
       states. Use neutral borders and the standard focus ring elsewhere.
+      Note: done for the Shell, the four moved stylesheets and the Files, Settings,
+      Shortcuts and Terminal `main.css`, which are now on tokens too. The system GTK theme
+      (`theme/axon-gtk/gtk-dark.css`, 838 lines) was not reworked in this pass.
 - [ ] **Follow system appearance.** GTK apps follow `Adw.StyleManager` (light/dark) and
       high contrast. The Shell follows `org.gnome.desktop.interface color-scheme`.
 - [ ] **Reduced motion.** Respect `org.gnome.desktop.interface enable-animations` in all
