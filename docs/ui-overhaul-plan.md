@@ -61,13 +61,15 @@ add a short note under any item you skip or change.
       `self._send_message(lbl + ": ")`, which immediately sends `"Summarize: "`. Change it
       to put the prefix into the entry, move the cursor to the end and focus the entry,
       the same way `apps/intent-bar/ui/window.py::_on_chip_clicked` does.
-- [ ] **Raw JSON shown in the Intent Bar.** When the model replies with an action
+- [x] **Raw JSON shown in the Intent Bar.** When the model replies with an action
       (`{"action": ...}`), each token is shown as it arrives and the reply is parsed only at
       the end. Hold back output that starts with `{` (after whitespace or a ```` ``` ```` fence)
       until the stream ends. If it parses as an action, show a friendly line ("Opening
       Firefox…") instead of the JSON. If it doesn't, show the text as normal. Put the
       "does this look like an action" check in a pure helper with tests. Do this in both
       Intent Bars, checking how `intentbar.js` gets its response first.
+      Note: the Shell bar calls `Generate` with `stream=false`, so it never showed partial
+      JSON; it now shares `parseAction` (also accepts fenced JSON) via `ui-logic.js`.
 - [ ] **Long answers push the Intent Bar off-screen.** GTK: wrap `_response_label` in a
       `Gtk.ScrolledWindow` with `set_max_content_height(...)` and
       `set_propagate_natural_height(True)`. Shell: put the response in an `St.ScrollView`

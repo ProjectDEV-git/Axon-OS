@@ -51,3 +51,19 @@ def pump(glib: Any, rounds: int = 50) -> None:
     for _ in range(rounds):
         if not ctx.iteration(False):
             break
+
+
+def load_intent_bar_window() -> ModuleType:
+    """Import ``apps/intent-bar/ui/window.py`` with its package-relative imports."""
+    import importlib
+    import types
+
+    for name, path in (
+        ("intent_bar", ROOT / "apps" / "intent-bar"),
+        ("intent_bar.ui", ROOT / "apps" / "intent-bar" / "ui"),
+    ):
+        if name not in sys.modules:
+            pkg = types.ModuleType(name)
+            pkg.__path__ = [str(path)]
+            sys.modules[name] = pkg
+    return importlib.import_module("intent_bar.ui.window")

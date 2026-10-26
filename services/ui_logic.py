@@ -1,0 +1,93 @@
+"""Pure UI logic shared by the Axon GTK apps (Intent Bar, AI panel).
+
+Nothing in this module imports GTK or D-Bus, so every function can be unit
+tested without a display. The GNOME Shell extension keeps a JavaScript copy of
+the parts it needs in ``shell/axon-shell/ui-logic.js``; keep the two in sync.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from typing import Any
+
+HOLD = "hold"
+SHOW = "show"
+
+_FENCE = "```"
+_FENCE_RE = re.compile(r"^```[A-Za-z0-9_-]*\s*\n?(.*?)\n?```\s*$", re.DOTALL)
+
+
+def classify_stream_prefix(text: str) -> str:
+    """Decide whether a partial model reply can be shown yet.
+
+    A reply that may turn out to be an action (``{"action": ...}``, optionally
+    inside a ```` ```json ```` fence) is held back until the stream ends so the
+    user never sees raw JSON. Anything else is shown as it arrives.
+
+    Args:
+        text: Everything received so far.
+
+    Returns:
+        ``"hold"`` while the reply could still be an action, else ``"show"``.
+    """
+    s = text.lstrip()
+    if not s or s.startswith("{"):
+        return HOLD
+    if _FENCE.startswith(s):
+        return HOLD  # a fence that is still arriving: "`" or "``"
+    if not s.startswith(_FENCE):
+        return SHOW
+    rest = s[len(_FENCE) :]
+    newline = rest.find("\n")
+    if newline < 0:
+        # Language tag still arriving: hold while it could become "json".
+        return HOLD if "json".startswith(rest.strip().lower()) else SHOW
+    lang = rest[:newline].strip().lower()
+    if lang not in ("", "json"):
+        return SHOW
+    body = rest[newline + 1 :].lstrip()
+    if not body or body.startswith("{"):
+        return HOLD
+    return SHOW
+
+
+def strip_code_fence(text: str) -> str:
+    """Return the inside of a single fenced code block, or *text* unchanged."""
+    s = text.strip()
+    match = _FENCE_RE.match(s)
+    return match.group(1).strip() if match else s
+
+
+def parse_action(text: str) -> dict[str, Any] | None:
+    """Parse a model reply as an action object.
+
+    Args:
+        text: The complete reply.
+
+    Returns:
+        The action dict when the reply is a JSON object with a string
+        ``action`` key, otherwise None.
+    """
+    body = strip_code_fence(text)
+    if not body.startswith("{"):
+        return None
+    try:
+        obj = json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if isinstance(obj, dict) and isinstance(obj.get("action"), str):
+        return obj
+    return None
+
+
+def describe_action(action: dict[str, Any]) -> str:
+    """Return a short, friendly line for an action instead of its JSON."""
+    kind = action.get("action", "")
+    if kind == "open_app":
+        app = str(action.get("app", "")).strip()
+        return f"Opening {app}…" if app else "Opening app…"
+    if kind == "run_command":
+        command = str(action.get("command", "")).strip()
+        return f"Run: {command}" if command else "Run command"
+    return "Axon suggested an action it can't perform here."

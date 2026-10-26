@@ -7,6 +7,7 @@ import Atk from 'gi://Atk';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
+import {parseAction} from './ui-logic.js';
 
 function logError(error, message) {
     if (message) {
@@ -260,15 +261,11 @@ export default class IntentBar {
             return;
         }
 
-        // Try to parse as action JSON
-        try {
-            const action = JSON.parse(responseText.trim());
-            if (action && typeof action.action === 'string') {
-                this._executeAction(action);
-                return;
-            }
-        } catch (_) {
-            // Not JSON — display as plain text
+        // Actions may arrive bare or inside a ```json fence; never show the JSON
+        const action = parseAction(responseText);
+        if (action) {
+            this._executeAction(action);
+            return;
         }
 
         this._setResponse(responseText.trim());

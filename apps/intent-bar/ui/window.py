@@ -22,8 +22,15 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
 from ..ollama_client import OllamaClient
 from ..spaces_manager import SpacesManager
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent / "services"))
+# services/ sits next to apps/ in the source tree and in the .deb
+# (/usr/lib/axon), and inside the app directory for install.sh
+# (~/.local/share/axon-os/services).
+for _services in (Path(__file__).resolve().parents[3], Path(__file__).resolve().parents[2]):
+    if (_services / "services").is_dir():
+        sys.path.insert(0, str(_services / "services"))
+        break
 from service_utils import confirm_and_exec
+from ui_logic import SHOW, classify_stream_prefix, describe_action, parse_action
 
 try:
     import dbus
@@ -487,18 +494,27 @@ class IntentBarWindow(Adw.Window):
     # ------------------------------------------------------------------
 
     def _do_query(self, query: str) -> None:
-        """Run the Ollama streaming query in a background thread."""
+        """Run the Ollama streaming query in a background thread.
+
+        A reply that may be an action (JSON) is held back until the stream
+        ends, so the user sees "Opening Firefox…" instead of raw JSON.
+        """
         system = self._build_system_prompt()
         self._stream_parts = []
+        showing = False
         try:
             for token in self._ollama.generate_stream(query, system=system):
                 if self._stream_cancelled:
                     break
                 self._stream_parts.append(token)
-                GLib.idle_add(self._append_token, token)
+                if showing:
+                    GLib.idle_add(self._append_token, token)
+                elif classify_stream_prefix("".join(self._stream_parts)) == SHOW:
+                    showing = True
+                    GLib.idle_add(self._append_token, "".join(self._stream_parts))
         except Exception as exc:
             if not self._stream_cancelled:
-                GLib.idle_add(self._append_token, f"\n[error] {exc}")
+                self._stream_parts.append(f"\n[error] {exc}")
         if not self._stream_cancelled:
             GLib.idle_add(self._finish_stream, "".join(self._stream_parts))
 
@@ -514,14 +530,15 @@ class IntentBarWindow(Adw.Window):
         self._entry.set_sensitive(True)
         self._entry.grab_focus()
 
-        # Attempt action JSON parsing
-        stripped = full.strip()
-        try:
-            action: Any = json.loads(stripped)
-            if isinstance(action, dict) and "action" in action:
-                self._execute_action(action)
-        except (json.JSONDecodeError, ValueError):
-            pass
+        action = parse_action(full)
+        if action is not None:
+            self._response_label.set_text(describe_action(action))
+            self._response_label.set_visible(True)
+            self._execute_action(action)
+        elif full.strip():
+            # Covers replies that were held back as possible JSON
+            self._response_label.set_text(full.strip())
+            self._response_label.set_visible(True)
 
         return False
 
