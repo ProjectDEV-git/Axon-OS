@@ -263,7 +263,7 @@ class InstallerWindow(Adw.Window):
                 _cls(dot, "step-dot-current")
                 _cls(lbl, "step-label-current")
             else:
-                dot.set_label("●")
+                dot.set_label("○")  # upcoming: hollow, so state isn't colour alone
 
     def _go(self, name: str) -> None:
         idx = [s[0] for s in _STEPS].index(name)

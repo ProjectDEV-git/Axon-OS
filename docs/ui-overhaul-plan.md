@@ -327,7 +327,10 @@ add a short note under any item you skip or change.
       a 13px label stayed 96 px wide at 1.5×), so app CSS and the Shell tokens now use pt.
       The Intent Bar's chip and hint rows wrap. A GTK test checks the panel and Intent Bar
       still fit at 1.25× and 1.5×. The Shell at large text was not checked in a real session.
-- [ ] Status shown with icon or text as well as colour.
+- [x] Status shown with icon or text as well as colour.
+      Note: fixed the taskbar AI dot (filled online, hollow offline, plus an accessible
+      name) and the installer's upcoming steps (hollow). Errors, status rows, Space chips,
+      risk levels and diagnostics already pair colour with an icon or text.
 
 ### Translation
 - [ ] Wire `services/i18n.py` into the GTK apps and mark user-facing strings with `_()`.

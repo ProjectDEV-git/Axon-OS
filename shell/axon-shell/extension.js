@@ -55,7 +55,7 @@ class AxonAIIndicator extends PanelMenu.Button {
         // Colour plus the accessible name: status never relies on colour alone
         this._statusDot = new St.Label({
             style_class: 'axon-ai-indicator-dot axon-status-error',
-            text: '●',
+            text: '○',
             y_align: Clutter.ActorAlign.CENTER,
         });
 
@@ -112,6 +112,8 @@ class AxonAIIndicator extends PanelMenu.Button {
     }
 
     _setDotColor(online) {
+        // Filled dot when online, hollow when offline: shape as well as colour
+        this._statusDot.set_text(online ? '●' : '○');
         if (online) {
             this._statusDot.remove_style_class_name('axon-status-error');
             this._statusDot.add_style_class_name('axon-status-ok');
