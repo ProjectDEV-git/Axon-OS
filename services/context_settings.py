@@ -179,3 +179,14 @@ def format_context(
 def sends_sensitive(items: list[tuple[str, str]], exclude: set[str] | frozenset[str]) -> bool:
     """True when the items to send include clipboard, terminal or file data."""
     return any(key in SENSITIVE_ITEMS and key not in exclude for key, _ in items)
+
+
+def sent_files(
+    snapshot: dict[str, Any] | None,
+    settings: ContextSettings,
+    exclude: frozenset[str] | set[str] = frozenset(),
+) -> list[str]:
+    """Paths of open files that went out with a message, to list as sources."""
+    if not snapshot or not settings.allows(OPEN_FILES) or OPEN_FILES in exclude:
+        return []
+    return [str(f) for f in snapshot.get("open_files") or []]

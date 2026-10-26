@@ -107,3 +107,9 @@
     color: @axon_error;
     background-color: @axon_hover;
 }
+
+/* Model, response time and sources under an answer */
+.bubble-meta {
+    color: @axon_fg_muted;
+    font-size: 11px;
+}

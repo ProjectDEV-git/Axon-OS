@@ -157,3 +157,12 @@ def test_ai_panel_context_reader(monkeypatch) -> None:
     assert reader.build_context_string() == ""
     reader.context_obj = None
     assert reader.snapshot() == {}
+
+
+def test_sent_files() -> None:
+    from services.context_settings import sent_files
+
+    assert sent_files(SNAPSHOT, ContextSettings()) == SNAPSHOT["open_files"]
+    assert sent_files(SNAPSHOT, ContextSettings(), exclude={OPEN_FILES}) == []
+    assert sent_files(SNAPSHOT, ContextSettings(share_open_files=False)) == []
+    assert sent_files(None, ContextSettings()) == []

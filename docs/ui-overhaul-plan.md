@@ -280,10 +280,16 @@ add a short note under any item you skip or change.
 ### AI panel
 - [x] **Conversation list.** Sidebar or popover using Brain `ListConversations` /
       `GetMessages`, with rename, delete and archive (add Brain methods if missing, with tests).
-- [ ] **Message actions.** Stop generation, regenerate, copy, insert into the focused app
+- [x] **Message actions.** Stop generation, regenerate, copy, insert into the focused app
       (if feasible; otherwise skip and note why).
-- [ ] **Model and latency.** Show the model and response time for each answer.
-- [ ] **Sources.** When local files were used as context, list their paths under the answer.
+      Note: Stop and Copy already existed; Regenerate is added on the newest answer. It
+      re-sends the prompt, so the Brain stores it twice (there is no API to drop a message).
+      "Insert into the focused app" is skipped: Wayland gives apps no safe way to type into
+      another window, and Copy covers the need.
+- [x] **Model and latency.** Show the model and response time for each answer.
+- [x] **Sources.** When local files were used as context, list their paths under the answer.
+      Note: lists the open-file paths that were actually sent (respecting the settings and
+      per-message removals). The Brain doesn't report which files the model relied on.
 - [ ] **Action cards.** Show proposed system changes as cards using the Phase 3
       confirmation component.
 - [ ] **Compact mode.** Layout works at 320 px wide.

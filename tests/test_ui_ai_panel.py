@@ -490,3 +490,37 @@ def test_rename_conversation(monkeypatch: pytest.MonkeyPatch) -> None:
     rec.join()
     assert ("rename", "c1", "2026 taxes") in client.calls
     win.destroy()
+
+
+def test_answer_shows_model_time_sources_and_regenerate(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    reader = SnapshotContext()
+    win = panel_mod.AIPanelWindow(ollama_client=FakeClient(), context_reader=reader)
+    rec.join()
+    pump(GLib)
+    win._send_message("explain main.py")
+    bubble = win._stream_bubble
+    rec.join()
+    pump(GLib)
+    assert bubble._meta_label.get_text().startswith("llama3.2:3b · ")
+    assert bubble._sources_label.get_text() == "Sources: /p/main.py"
+    first_regen = win._regenerate_btn
+    assert first_regen.get_label() == "Regenerate"
+
+    win._send_message("again")
+    rec.join()
+    pump(GLib)
+    assert not first_regen.get_visible()  # only the newest answer offers it
+    newest = win._stream_bubble or win._regenerate_btn
+    assert newest is not None
+
+    # Removing open files for the message means no sources are listed
+    win._exclude_context("open_files")
+    win._send_message("no files please")
+    bubble = win._stream_bubble
+    rec.join()
+    pump(GLib)
+    assert not bubble._sources_label.get_visible()
+    win.destroy()

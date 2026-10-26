@@ -347,3 +347,13 @@ def test_visible_conversations() -> None:
     ]
     assert [c["id"] for c in visible_conversations(convs)] == ["c", "a"]
     assert [c["id"] for c in visible_conversations(convs, True)] == ["b", "c", "a"]
+
+
+def test_latency_and_meta() -> None:
+    from services.ui_logic import answer_meta, format_latency
+
+    assert format_latency(0.85) == "850 ms"
+    assert format_latency(2.44) == "2.4 s"
+    assert format_latency(125) == "2 min 5 s"
+    assert answer_meta("llama3.2:3b", 2.4, 0.6) == "llama3.2:3b · 2.4 s · first words after 600 ms"
+    assert answer_meta("", 0.5) == "Automatic model · 500 ms"

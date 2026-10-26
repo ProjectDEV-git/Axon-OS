@@ -12,6 +12,7 @@ import json
 import re
 import sys
 import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,7 @@ for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().pare
 from ui_logic import (
     ModelOrigin,
     RequestTracker,
+    answer_meta,
     escape_action,
     origin_tooltip,
     routing_origin,
@@ -49,7 +51,13 @@ from ui_logic import (
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
 from axon_gtk_utils import fit_default_size, load_app_css
-from context_settings import ITEM_LABELS, SENSITIVE_ITEMS, sends_sensitive
+from context_settings import (
+    ITEM_LABELS,
+    SENSITIVE_ITEMS,
+    load_settings,
+    sends_sensitive,
+    sent_files,
+)
 from diagnostics import FAIL, INFO, OK, WARN, run_diagnostics
 from status_summary import StatusSummary, build_status
 
@@ -195,6 +203,19 @@ class MessageBubble(Gtk.Box):
         btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         btn_row.set_halign(Gtk.Align.END)
         self._btn_row = btn_row
+
+        # Under answers: model and response time, and files sent as context
+        self._meta_label = Gtk.Label(xalign=0.0)
+        self._meta_label.add_css_class("bubble-meta")
+        self._meta_label.set_visible(False)
+        self._inner.append(self._meta_label)
+        self._sources_label = Gtk.Label(xalign=0.0)
+        self._sources_label.add_css_class("bubble-meta")
+        self._sources_label.set_selectable(True)
+        self._sources_label.set_wrap(True)
+        self._sources_label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        self._sources_label.set_visible(False)
+        self._inner.append(self._sources_label)
         self._copy_btn = Gtk.Button.new_from_icon_name("edit-copy-symbolic")
         self._copy_btn.add_css_class("copy-btn")
         self._copy_btn.add_css_class("flat")
@@ -225,6 +246,18 @@ class MessageBubble(Gtk.Box):
     def get_text(self) -> str:
         """Return the message text received so far."""
         return self._text
+
+    def set_meta(self, text: str) -> None:
+        """Show the model and response time under the answer."""
+        self._meta_label.set_text(text)
+        self._meta_label.set_visible(bool(text))
+
+    def set_sources(self, paths: list[str]) -> None:
+        """List the local files that were sent as context."""
+        home = GLib.get_home_dir()
+        shown = [p.replace(home, "~", 1) if home and p.startswith(home) else p for p in paths]
+        self._sources_label.set_text("Sources: " + ", ".join(shown) if shown else "")
+        self._sources_label.set_visible(bool(shown))
 
     def set_error(self, text: str) -> None:
         """Show *text* as an error: error colour plus an icon."""
@@ -950,6 +983,8 @@ class AIPanelWindow(Adw.Window):
         request_id = self._requests.start()
         self._set_streaming(True)
         self._stream_prompt = text
+        self._stream_started = time.monotonic()
+        self._first_token_at: float | None = None
         self._stream_bubble = self._add_bubble("assistant", "")
 
         exclude = set(self._ctx_excluded)
@@ -1149,8 +1184,14 @@ class AIPanelWindow(Adw.Window):
         if not self._client.is_available():
             GLib.idle_add(self._on_ai_unavailable, request_id)
             return
+        sources: list[str] = []
         if hasattr(self._ctx_reader, "snapshot"):
+            if snapshot is None:
+                snapshot = self._ctx_reader.snapshot()
             ctx = self._ctx_reader.build_context_string(exclude=exclude, snapshot=snapshot)
+            if ctx:
+                settings = getattr(self._ctx_reader, "settings", load_settings)()
+                sources = sent_files(snapshot, settings, exclude)
         else:
             ctx = self._ctx_reader.build_context_string()
         accumulated = ""
@@ -1167,7 +1208,7 @@ class AIPanelWindow(Adw.Window):
             accumulated += error_text
             GLib.idle_add(self._on_chunk, error_text, request_id)
         if not self._stream_cancelled:
-            GLib.idle_add(self._on_stream_done, accumulated, request_id)
+            GLib.idle_add(self._on_stream_done, accumulated, request_id, sources)
 
     def _on_ai_unavailable(self, request_id: int) -> bool:
         if not self._requests.finish(request_id):
@@ -1188,6 +1229,14 @@ class AIPanelWindow(Adw.Window):
         bubble.add_action("Try again", lambda: self._retry(bubble, prompt))
         if offline:
             bubble.add_action("Diagnostics", self._open_diagnostics)
+
+    def _offer_regenerate(self, bubble: MessageBubble, prompt: str) -> None:
+        """Put "Regenerate" on the newest answer only."""
+        old = getattr(self, "_regenerate_btn", None)
+        if old is not None:
+            old.set_visible(False)
+        self._regenerate_btn = bubble.add_action("Regenerate", lambda: self._retry(bubble, prompt))
+        self._regenerate_btn.set_tooltip_text("Ask again for a new answer")
 
     def _retry(self, bubble: MessageBubble, prompt: str) -> None:
         if self._streaming or not prompt:
@@ -1210,12 +1259,16 @@ class AIPanelWindow(Adw.Window):
             pass
 
     def _on_chunk(self, chunk: str, request_id: int) -> bool:
+        if self._requests.is_current(request_id) and self._first_token_at is None:
+            self._first_token_at = time.monotonic()
         if self._requests.is_current(request_id) and self._stream_bubble is not None:
             self._stream_bubble.append_text(chunk)
             self._scroll_to_bottom()
         return False
 
-    def _on_stream_done(self, full_text: str, request_id: int) -> bool:
+    def _on_stream_done(
+        self, full_text: str, request_id: int, sources: list[str] | None = None
+    ) -> bool:
         if not self._requests.finish(request_id):
             return False  # cancelled; the bubble already says so
         self._set_streaming(False)
@@ -1226,6 +1279,17 @@ class AIPanelWindow(Adw.Window):
             body, error = split_error(full_text)
             if error is None:
                 bubble.set_final_text(full_text)
+                now = time.monotonic()
+                first = self._first_token_at
+                bubble.set_meta(
+                    answer_meta(
+                        self._client.model,
+                        now - self._stream_started,
+                        None if first is None else first - self._stream_started,
+                    )
+                )
+                bubble.set_sources(sources or [])
+                self._offer_regenerate(bubble, self._stream_prompt)
             else:
                 self._show_bubble_error(
                     bubble, f"{body}\n\n{error}" if body else error, offline=False

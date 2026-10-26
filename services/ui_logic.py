@@ -403,3 +403,21 @@ def visible_conversations(
     """Conversations for the list: newest first, archived ones only on request."""
     rows = [c for c in conversations if show_archived or not c.get("archived")]
     return sorted(rows, key=lambda c: str(c.get("updated_at") or ""), reverse=True)
+
+
+def format_latency(seconds: float) -> str:
+    """Response time for an answer, e.g. "850 ms" or "2.4 s"."""
+    if seconds < 1:
+        return f"{max(0, round(seconds * 1000))} ms"
+    if seconds < 60:
+        return f"{seconds:.1f} s"
+    minutes, rest = divmod(round(seconds), 60)
+    return f"{minutes} min {rest} s"
+
+
+def answer_meta(model: str, seconds: float, first_token: float | None = None) -> str:
+    """Footer under an answer: model and response time."""
+    parts = [model or "Automatic model", format_latency(seconds)]
+    if first_token is not None and seconds >= 1:
+        parts.append(f"first words after {format_latency(first_token)}")
+    return " · ".join(parts)
