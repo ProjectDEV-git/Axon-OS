@@ -592,3 +592,20 @@ def test_compact_mode_fits_320px() -> None:
     minimum = win.get_content().measure(Gtk.Orientation.HORIZONTAL, -1)[0]
     assert minimum <= 320, minimum
     win.destroy()
+
+
+def test_markup_sets_code_in_monospace_and_leaves_it_literal() -> None:
+    out = panel_mod._apply_markup("Free on `/`; see `**not bold**` and **bold**")
+    assert "<tt>/</tt>" in out
+    assert "<tt>**not bold**</tt>" in out
+    assert "<b>bold</b>" in out
+    block = panel_mod._apply_markup("Run:\n```bash\nls -la *.py\n```\ndone")
+    assert "<tt>ls -la *.py</tt>" in block
+    assert "<i>" not in block  # the * in the code is not italics
+    # Escaped first, and a stray NUL can't break the placeholders
+    assert panel_mod._apply_markup("a < b \x000\x00") == "a &lt; b 0"
+
+
+def test_quick_chips_wrap_instead_of_scrolling(window: Any) -> None:
+    assert isinstance(window._chips_row, Gtk.FlowBox)
+    assert window._chips_row.get_min_children_per_line() >= 2

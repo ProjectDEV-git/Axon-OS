@@ -151,7 +151,12 @@ class AxonUpdaterWindow(Adw.ApplicationWindow):
         self.set_resizable(False)
 
         # ---- Load external CSS ----
-        css_path = Path(__file__).resolve().parent / "axon-updater.css"
+        # Beside the script in the repo; /usr/share/axon when installed
+        candidates = [
+            Path(__file__).resolve().parent / "axon-updater.css",
+            Path("/usr/share/axon/axon-updater.css"),
+        ]
+        css_path = next((p for p in candidates if p.exists()), candidates[0])
         if css_path.exists():
             css_provider = Gtk.CssProvider()
             css_provider.load_from_path(str(css_path))

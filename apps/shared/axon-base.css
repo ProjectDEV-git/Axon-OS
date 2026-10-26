@@ -1,0 +1,38 @@
+/* Shared feel for every Axon GTK app, loaded by axon_gtk_utils.load_app_css
+ * before the app's own stylesheet.
+ *
+ * Pressed controls answer at once (scale on press, Emil Kowalski's rule) and
+ * settle quickly with a strong ease-out; colour changes use ease. GTK skips
+ * transitions when animations are off (Reduced Motion). Values follow
+ * theme/tokens/axon-tokens.json (duration.fast/normal, easing.out). */
+
+button,
+.quick-chip,
+.intent-chip {
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease,
+        transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+button:active,
+.quick-chip:active,
+.intent-chip:active {
+    transform: scale(0.97);
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease,
+        transform 100ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Large titles track tighter; small labels stay at 0 (Apple's size-specific tracking) */
+.title-1,
+.title-2 {
+    letter-spacing: -0.4px;
+}
+
+.title-3,
+.title-4 {
+    letter-spacing: -0.2px;
+}
+
+/* Figures that update or line up use tabular digits */
+.numeric {
+    font-feature-settings: "tnum";
+}

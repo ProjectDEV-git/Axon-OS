@@ -396,3 +396,18 @@ def test_answers_and_errors_are_announced(monkeypatch: pytest.MonkeyPatch) -> No
     assert said[-1] == ("Axon couldn't finish: model crashed", True)
     win.destroy()
     win2.destroy()
+
+
+def test_window_has_no_blank_band(monkeypatch: pytest.MonkeyPatch) -> None:
+    """GTK sizes a window by its height at the minimum width; wrapping rows
+    that stack one item per line there left a tall empty band under the bar."""
+    win = suggestion_window(monkeypatch)
+    width = win.get_default_size()[0]
+    at_minimum = win.measure(Gtk.Orientation.VERTICAL, -1)[1]
+    at_width = win.measure(Gtk.Orientation.VERTICAL, width)[1]
+    assert at_minimum - at_width < 60
+    win._entry.set_text("fire")
+    pump(GLib)
+    win._fit_height()
+    assert win.get_default_size()[1] == win.measure(Gtk.Orientation.VERTICAL, width)[1]
+    win.destroy()

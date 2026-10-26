@@ -66,3 +66,22 @@ def test_announce_is_skipped_without_an_accessibility_bus(monkeypatch) -> None:
     utils.announce(W(), "hello")
     utils.announce(W(), "")
     assert calls == ["hello"]
+
+
+def test_base_css_gives_press_feedback_without_ease_in() -> None:
+    from pathlib import Path
+
+    css = (Path(__file__).resolve().parent.parent / "apps" / "shared" / "axon-base.css").read_text()
+    assert "button:active" in css and "scale(0.97)" in css
+    assert "ease-in " not in css and "ease-in," not in css and "transition: all" not in css
+
+
+def test_no_app_css_transitions_everything() -> None:
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    for css in (root / "apps").rglob("*.css"):
+        text = css.read_text()
+        assert not re.search(r"transition:\s*all\b", text), f"{css}: name the properties"
+        assert not re.search(r"\bease-in\b(?!-out)", text), f"{css}: no ease-in on UI"

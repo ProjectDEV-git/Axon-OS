@@ -113,6 +113,9 @@ def _wrapping_row(spacing: int) -> Gtk.FlowBox:
     row.set_column_spacing(spacing)
     row.set_row_spacing(4)
     row.set_max_children_per_line(12)
+    # At least three per line: otherwise GTK sizes the window for one item
+    # per line and the bar keeps a tall blank band
+    row.set_min_children_per_line(3)
     row.set_homogeneous(False)
     return row
 
@@ -183,6 +186,7 @@ class IntentBarWindow(Adw.Window):
 
         # Clean up streaming and resources on destroy
         self.connect("destroy", self._on_destroy)
+        self.connect("map", lambda *_a: self._queue_fit())
 
     # ------------------------------------------------------------------
     # CSS
@@ -404,6 +408,27 @@ class IntentBarWindow(Adw.Window):
             and not self._results_box.get_visible()
         )
         self._empty_box.set_visible(idle)
+        self._queue_fit()
+
+    def _queue_fit(self) -> None:
+        """Resize to the content after this change has been laid out."""
+        if not getattr(self, "_fit_pending", False):
+            self._fit_pending = True
+            GLib.idle_add(self._fit_height)
+
+    def _fit_height(self) -> bool:
+        """Make the window as tall as its content, so it never keeps a blank band.
+
+        GTK 4 windows grow with their content but never shrink by themselves.
+        """
+        self._fit_pending = False
+        width = self.get_default_size()[0]
+        if width <= 0:
+            width = self.get_width()
+        _minimum, natural, _b1, _b2 = self.measure(Gtk.Orientation.VERTICAL, width)
+        if natural > 0 and natural != self.get_default_size()[1]:
+            self.set_default_size(width, natural)
+        return False
 
     # ------------------------------------------------------------------
     # Signal connections
@@ -761,10 +786,12 @@ class IntentBarWindow(Adw.Window):
         if visible and default is not None:
             self._suggest_list.select_row(default)
         self._update_preview()
+        self._queue_fit()
 
     def _hide_suggestions(self) -> None:
         self._suggest_list.set_visible(False)
         self._preview_label.set_visible(False)
+        self._queue_fit()
 
     @staticmethod
     def _suggestion_row(suggestion: Suggestion) -> Gtk.ListBoxRow:
@@ -963,6 +990,7 @@ class IntentBarWindow(Adw.Window):
             self._results_box.remove(child)
             child = nxt
         self._results_box.set_visible(False)
+        self._queue_fit()
 
     # ------------------------------------------------------------------
     # System prompt
@@ -987,6 +1015,7 @@ class IntentBarWindow(Adw.Window):
         else:
             self._response_label.remove_css_class("response-error")
             self._start_ollama_btn.set_visible(False)
+        self._queue_fit()
 
     def _show_error(self, text: str) -> None:
         self._set_response(text, error=True)

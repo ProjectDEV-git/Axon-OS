@@ -26,8 +26,8 @@ from axon_gtk_utils import load_app_css
 # Shortcut definitions grouped by category
 SHORTCUTS = [
     {
-        "title": "Spaces & Navigation",
-        "icon": "🏠",
+        "title": "Spaces and navigation",
+        "icon": "view-grid-symbolic",
         "bindings": [
             ("Super + 1–9", "Switch to Space 1–9"),
             ("Super + Shift + 1–9", "Move window to Space 1–9"),
@@ -37,8 +37,8 @@ SHORTCUTS = [
         ],
     },
     {
-        "title": "AI & Assistant",
-        "icon": "🧠",
+        "title": "AI and assistant",
+        "icon": "axon-ai-panel-symbolic",
         "bindings": [
             ("Super + Space", "Open Intent Bar (AI command palette)"),
             ("Super + A", "Toggle AI Side Panel"),
@@ -48,7 +48,7 @@ SHORTCUTS = [
     },
     {
         "title": "System",
-        "icon": "⚙️",
+        "icon": "axon-settings-symbolic",
         "bindings": [
             ("Super", "Open Start Menu"),
             ("Super + /", "Show this shortcut overlay"),
@@ -58,8 +58,8 @@ SHORTCUTS = [
         ],
     },
     {
-        "title": "Window Management",
-        "icon": "🪟",
+        "title": "Windows",
+        "icon": "focus-windows-symbolic",
         "bindings": [
             ("Super + ↑", "Maximize window"),
             ("Super + ↓", "Restore / unmaximize"),
@@ -70,7 +70,7 @@ SHORTCUTS = [
     },
     {
         "title": "Axon Terminal",
-        "icon": "💻",
+        "icon": "axon-terminal-symbolic",
         "bindings": [
             ("Ctrl + Shift + T", "New tab"),
             ("Ctrl + Shift + W", "Close tab"),
@@ -112,11 +112,12 @@ class ShortcutsWindow(Adw.ApplicationWindow):
         title_box.set_margin_top(16)
         title_box.set_margin_bottom(8)
 
-        title_icon = Gtk.Label(label="⌨")
+        title_icon = Gtk.Image.new_from_icon_name("axon-shortcuts")
+        title_icon.set_pixel_size(32)
         title_icon.add_css_class("title-icon")
         title_box.append(title_icon)
 
-        title_label = Gtk.Label(label="Axon Keyboard Shortcuts")
+        title_label = Gtk.Label(label="Keyboard shortcuts")
         title_label.add_css_class("overlay-title")
         title_box.append(title_label)
 
@@ -168,7 +169,7 @@ class ShortcutsWindow(Adw.ApplicationWindow):
 
         # Group header
         header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        icon_label = Gtk.Label(label=group["icon"])
+        icon_label = Gtk.Image.new_from_icon_name(group["icon"])
         icon_label.add_css_class("group-icon")
         header_box.append(icon_label)
 
@@ -193,7 +194,10 @@ class ShortcutsWindow(Adw.ApplicationWindow):
             key_label = Gtk.Label(label=keys)
             key_label.add_css_class("key-badge")
             key_label.set_halign(Gtk.Align.START)
-            key_label.set_size_request(200, -1)
+            # Fixed key column so descriptions share one left edge and get
+            # the rest of the width instead of wrapping word by word
+            key_label.set_size_request(150, -1)
+            key_label.set_valign(Gtk.Align.CENTER)
             row.append(key_label)
 
             # Description

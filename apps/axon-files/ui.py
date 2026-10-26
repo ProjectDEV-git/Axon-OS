@@ -20,6 +20,12 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from axon_gtk_utils import fit_default_size, load_app_css
 
+for _base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().parents[1]):
+    if (_base / "services").is_dir():
+        sys.path.insert(0, str(_base / "services"))
+        break
+from i18n import _
+
 
 def load_css():
     """Loads application CSS styling (design tokens first)."""
@@ -211,7 +217,7 @@ class FilesWindow(Adw.ApplicationWindow):
         sidebar_box.get_style_context().add_class("sidebar")
         sidebar_box.set_size_request(200, -1)
 
-        sidebar_title = Gtk.Label(label="NAVIGATION")
+        sidebar_title = Gtk.Label(label=_("Places"))
         sidebar_title.set_halign(Gtk.Align.START)
         sidebar_title.set_margin_top(16)
         sidebar_title.set_margin_bottom(8)

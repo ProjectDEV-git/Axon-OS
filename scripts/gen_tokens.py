@@ -10,6 +10,11 @@ Outputs:
   shell/axon-shell/stylesheet.css           Shell, dark (fallback)
   shell/axon-shell/stylesheet-dark.css      Shell, dark (GNOME 46+ picks it)
   shell/axon-shell/stylesheet-light.css     Shell, light
+  theme/axon-gtk/gtk-dark.css               system GTK 4 theme: GTK's own default
+                                            theme plus the Axon accent, focus ring
+                                            and selection
+  theme/axon-gtk/libadwaita.css             the same accent for libadwaita apps
+                                            (installed as ~/.config/gtk-4.0/gtk.css)
 
 GNOME Shell's St CSS has no variables or @define-color, so the Shell
 stylesheet is rendered from shell/axon-shell/stylesheet.css.in, replacing
@@ -38,6 +43,8 @@ GTK_OUT = {
     "light": ROOT / "apps" / "shared" / "axon-design-tokens-light.css",
     "high-contrast": ROOT / "apps" / "shared" / "axon-design-tokens-hc.css",
 }
+GTK_THEME_OUT = ROOT / "theme" / "axon-gtk" / "gtk-dark.css"
+LIBADWAITA_OUT = ROOT / "theme" / "axon-gtk" / "libadwaita.css"
 SHELL_OUT = {
     ROOT / "shell" / "axon-shell" / "stylesheet.css": "dark",
     ROOT / "shell" / "axon-shell" / "stylesheet-dark.css": "dark",
@@ -111,6 +118,43 @@ def render_shell(template: str, tokens: dict, variant: str) -> str:
     )
 
 
+def gtk_theme_css(tokens: dict) -> str:
+    """The system GTK 4 theme: GTK's built-in default theme with Axon colours.
+
+    GTK's default theme already has neutral greys; only the accent, the focus
+    ring and selections change, so non-libadwaita apps look native.
+    """
+    c = tokens["variants"]["dark"]
+    return (
+        header("GTK 4 theme")
+        + '@import url("resource:///org/gtk/libgtk/theme/Default/Default-dark.css");\n\n'
+        + "/* Focus ring */\n"
+        + f"*:focus-visible {{\n  outline-color: {c['focus_ring']};\n}}\n\n"
+        + "/* Selected text and rows */\n"
+        + f"selection, row:selected {{\n  background-color: {c['accent_subtle']};\n}}\n\n"
+        + "/* The one main action and checked controls */\n"
+        + "button.suggested-action, button.default {\n"
+        + f"  background-color: {c['accent']};\n  color: {c['accent_fg']};\n}}\n\n"
+        + f"button.suggested-action:hover {{\n  background-color: {c['accent_hover']};\n}}\n\n"
+        + "check:checked, radio:checked, switch:checked {\n"
+        + f"  background-color: {c['accent']};\n  color: {c['accent_fg']};\n}}\n\n"
+        + f"link, button.link {{\n  color: {c['accent_text']};\n}}\n"
+    )
+
+
+def libadwaita_css(tokens: dict) -> str:
+    """libadwaita apps ignore the GTK theme but read the user's gtk.css."""
+    light = tokens["variants"]["light"]
+    return (
+        header("libadwaita accent")
+        + "/* Fills that hold white text in both light and dark style; text colours\n"
+        + " * stay libadwaita's own, which already differ per style. */\n"
+        + f"@define-color accent_bg_color {light['accent']};\n"
+        + f"@define-color accent_fg_color {light['accent_fg']};\n"
+        + f"@define-color destructive_bg_color {light['error']};\n"
+    )
+
+
 def generate(tokens: dict | None = None, template: str | None = None) -> dict[Path, str]:
     """Every output file and its expected content."""
     tokens = tokens if tokens is not None else load_tokens()
@@ -118,6 +162,8 @@ def generate(tokens: dict | None = None, template: str | None = None) -> dict[Pa
     out = {path: gtk_css(tokens, variant) for variant, path in GTK_OUT.items()}
     for path, variant in SHELL_OUT.items():
         out[path] = render_shell(template, tokens, variant)
+    out[GTK_THEME_OUT] = gtk_theme_css(tokens)
+    out[LIBADWAITA_OUT] = libadwaita_css(tokens)
     return out
 
 

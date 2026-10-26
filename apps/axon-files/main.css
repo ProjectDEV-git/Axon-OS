@@ -22,7 +22,7 @@
     margin-bottom: 4px;
     color: @axon_fg_secondary;
     font-weight: 500;
-    transition: all 150ms ease;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .sidebar-item:hover {
@@ -72,7 +72,7 @@
     margin-bottom: 4px;
     border: 1px solid transparent;
     background-color: @axon_surface;
-    transition: all 150ms ease;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .file-row:hover {

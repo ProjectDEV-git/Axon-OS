@@ -22,6 +22,14 @@ from gi.repository import Adw, GLib, Gtk
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
 from axon_gtk_utils import fit_default_size, load_app_css
 
+# services/ sits next to apps/ in the source tree and the .deb, and inside
+# the app directory for install.sh
+for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().parents[2]):
+    if (_base / "services").is_dir():
+        sys.path.insert(0, str(_base / "services"))
+        break
+from i18n import _
+
 # Insert axon-brain path so we can run hardware profiler
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "services" / "axon-brain"))
 try:
@@ -194,7 +202,7 @@ class WelcomeWindow(Adw.Window):
         row.set_margin_bottom(16)
         row.set_margin_top(6)
 
-        for _ in self._PAGE_NAMES:
+        for _attempt in self._PAGE_NAMES:
             dot = Gtk.Label(label="●")
             _add_class(dot, "page-indicator-dot")
             dot.set_opacity(0.3)
@@ -245,27 +253,27 @@ class WelcomeWindow(Adw.Window):
         logo.set_margin_bottom(8)
         page.append(logo)
 
-        title = Gtk.Label(label="Welcome to Axon OS")
+        title = Gtk.Label(label=_("Welcome to Axon OS"))
         _add_class(title, "hero-title")
         title.set_wrap(True)
+        title.set_width_chars(18)
         title.set_justify(Gtk.Justification.CENTER)
         page.append(title)
 
-        subtitle = Gtk.Label(label="Your AI-native desktop. Fully private. Entirely local.")
+        # Honest by default: cloud models are supported, so never promise
+        # "local only"; the AI panel and Intent Bar show where each request runs
+        subtitle = Gtk.Label(
+            label=_(
+                "Your AI-native desktop. AI runs on this computer unless you choose a cloud model."
+            )
+        )
         _add_class(subtitle, "hero-subtitle")
         subtitle.set_wrap(True)
+        # A readable measure: without it the column shrinks to one word per line
+        subtitle.set_width_chars(36)
+        subtitle.set_max_width_chars(48)
         subtitle.set_justify(Gtk.Justification.CENTER)
         page.append(subtitle)
-
-        # Chips
-        chips_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        chips_row.set_halign(Gtk.Align.CENTER)
-        chips_row.set_margin_top(20)
-        for chip_text in ["100% Local AI", "Zero Cloud", "GNOME Native"]:
-            chip = Gtk.Label(label=chip_text)
-            _add_class(chip, "chip")
-            chips_row.append(chip)
-        page.append(chips_row)
 
         # Spacer
         spacer = Gtk.Box()
@@ -273,7 +281,7 @@ class WelcomeWindow(Adw.Window):
         page.append(spacer)
 
         # Get Started button
-        btn = Gtk.Button(label="Get Started")
+        btn = Gtk.Button(label=_("Get started"))
         _add_class(btn, "nav-btn-next")
         btn.set_halign(Gtk.Align.CENTER)
         btn.connect("clicked", lambda _: self._go_to("setup"))
@@ -488,7 +496,7 @@ class WelcomeWindow(Adw.Window):
                 return False
 
         _status("Starting Ollama...")
-        for _ in range(30):
+        for _attempt in range(30):
             try:
                 with urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=2):  # nosec B310
                     return True
@@ -907,7 +915,7 @@ class WelcomeWindow(Adw.Window):
         page.set_margin_start(32)
         page.set_margin_end(32)
 
-        title = Gtk.Label(label="What Axon Can Do")
+        title = Gtk.Label(label=_("What Axon can do"))
         _add_class(title, "page-title")
         title.set_halign(Gtk.Align.START)
         page.append(title)
@@ -918,10 +926,26 @@ class WelcomeWindow(Adw.Window):
         grid.set_margin_top(8)
 
         feature_data = [
-            ("⬡", "Intent Bar", "Press Super+Space. Ask anything in natural language."),
-            ("🤖", "AI Panel", "Press Super+A. Your persistent AI assistant."),
-            ("🏠", "Spaces", "Super+1-9. Named workspaces for each project."),
-            ("🔒", "Private", "All AI runs locally. Zero data leaves your machine."),
+            (
+                "axon-intent-bar-symbolic",
+                _("Intent Bar"),
+                _("Press Super+Space. Ask anything in natural language."),
+            ),
+            (
+                "axon-ai-panel-symbolic",
+                _("AI Panel"),
+                _("Press Super+A. Your assistant, with your conversations kept."),
+            ),
+            (
+                "view-grid-symbolic",
+                _("Spaces"),
+                _("Super+1–9. A named workspace for each project."),
+            ),
+            (
+                "security-high-symbolic",
+                _("You choose where AI runs"),
+                _("Local models by default. Axon says when a request would leave this computer."),
+            ),
         ]
 
         positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
@@ -958,7 +982,8 @@ class WelcomeWindow(Adw.Window):
         card.set_hexpand(True)
         _add_class(card, "feature-card")
 
-        icon_lbl = Gtk.Label(label=icon)
+        icon_lbl = Gtk.Image.new_from_icon_name(icon)
+        icon_lbl.set_pixel_size(24)
         _add_class(icon_lbl, "feature-icon")
         icon_lbl.set_halign(Gtk.Align.START)
         card.append(icon_lbl)

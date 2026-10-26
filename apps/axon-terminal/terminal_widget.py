@@ -39,26 +39,27 @@ log = logging.getLogger("axon-terminal")
 # ---------------------------------------------------------------------------
 
 _BG = Gdk.RGBA()
-_BG.parse("#0f0f14")
+_BG.parse("#161616")
 
 _FG = Gdk.RGBA()
-_FG.parse("#e4e4e8")
+_FG.parse("#f2f2f2")
 
 _ACCENT = Gdk.RGBA()
-_ACCENT.parse("#c4b5fd")
+_ACCENT.parse("#7db3ff")
 
-# Terminal 16-colour palette (dark theme matching Axon branding)
+# Terminal 16-colour palette: neutral black and greys from the Axon tokens;
+# the ANSI hues keep their meaning (slot 5 stays magenta)
 _PALETTE: list[Gdk.RGBA] = []
 _PALETTE_HEX = [
-    "#1a1a24",
+    "#1e1e1e",
     "#f87171",
     "#86efac",
     "#fde68a",
     "#93c5fd",
     "#c4b5fd",
     "#67e8f9",
-    "#e4e4e8",
-    "#3a3a4e",
+    "#d6d6d6",
+    "#4a4a4a",
     "#fca5a5",
     "#a7f3d0",
     "#fef08a",

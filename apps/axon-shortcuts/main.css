@@ -11,12 +11,13 @@ window {
 }
 
 .title-icon {
-    font-size: 21pt;
+    margin-right: 4px;
 }
 
 .overlay-title {
-    font-size: 16.5pt;
+    font-size: 18pt;
     font-weight: 700;
+    letter-spacing: -0.4px;
     color: @axon_fg;
 }
 
@@ -29,7 +30,7 @@ window {
 .shortcut-card {
     background-color: @axon_surface;
     border: 1px solid @axon_border;
-    border-radius: 12px;
+    border-radius: 8px;
     transition: border-color 150ms ease;
 }
 
@@ -38,7 +39,7 @@ window {
 }
 
 .group-icon {
-    font-size: 13.5pt;
+    color: @axon_fg_secondary;
 }
 
 .group-title {

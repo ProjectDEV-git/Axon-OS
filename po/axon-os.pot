@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-26 10:22+0000\n"
+"POT-Creation-Date: 2026-10-26 10:37+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -16,6 +16,10 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "(Cancelled)"
+msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Active Chat"
@@ -34,6 +38,10 @@ msgid "Ask anything…"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
+msgid "Axon Brain service is offline or Ollama is not running."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
 msgid "Axon status: checking…"
 msgstr ""
 
@@ -49,6 +57,11 @@ msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py apps/axon-confirm/main.py
 msgid "Cancel"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py apps/intent-bar/ui/window.py
+#: shell/axon-shell/intentbar.js
+msgid "Cancelled"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -123,6 +136,14 @@ msgstr ""
 #: apps/axon-ai-panel/ui/panel.py
 #, python-brace-format
 msgid "Don't send {item} with this message"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Explain error"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Fix bug"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -205,11 +226,20 @@ msgid "Show archived conversations"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Sources: {files}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
 msgid "Stop"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Stop generating (Esc)"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Summarize"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -219,11 +249,19 @@ msgid ""
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
+msgid "Translate"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
 msgid "Try again"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Untitled"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Write code"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -258,6 +296,10 @@ msgstr ""
 
 #: apps/axon-confirm/main.py
 msgid "Run this command?"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Places"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -345,8 +387,9 @@ msgstr ""
 msgid "Sends window titles to the selected model; off shows the window list"
 msgstr ""
 
-#: apps/axon-settings/preferences_window.py services/suggestions.py
-#: shell/axon-shell/spaces.js shell/axon-shell/spaceswitcher.js
+#: apps/axon-settings/preferences_window.py apps/axon-welcome/ui/welcome.py
+#: services/suggestions.py shell/axon-shell/spaces.js
+#: shell/axon-shell/spaceswitcher.js
 msgid "Spaces"
 msgstr ""
 
@@ -365,12 +408,55 @@ msgstr ""
 msgid "{count} saved"
 msgstr ""
 
-#: apps/intent-bar/ui/window.py
-msgid "Ask anything or type a command..."
+#: apps/axon-welcome/ui/welcome.py
+msgid "AI Panel"
 msgstr ""
 
-#: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
-msgid "Cancelled"
+#: apps/axon-welcome/ui/welcome.py
+msgid "Get started"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Intent Bar"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid ""
+"Local models by default. Axon says when a request would leave this computer."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Press Super+A. Your assistant, with your conversations kept."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Press Super+Space. Ask anything in natural language."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Super+1–9. A named workspace for each project."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Welcome to Axon OS"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "What Axon can do"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "You choose where AI runs"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid ""
+"Your AI-native desktop. AI runs on this computer unless you choose a cloud "
+"model."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "Ask anything or type a command..."
 msgstr ""
 
 #: apps/intent-bar/ui/window.py

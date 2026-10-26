@@ -39,7 +39,7 @@ for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().pare
     if (_base / "services").is_dir():
         sys.path.insert(0, str(_base / "services"))
         break
-from i18n import _
+from i18n import N_, _
 from ui_logic import (
     ModelOrigin,
     RequestTracker,
@@ -268,7 +268,9 @@ class MessageBubble(Gtk.Box):
         """List the local files that were sent as context."""
         home = GLib.get_home_dir()
         shown = [p.replace(home, "~", 1) if home and p.startswith(home) else p for p in paths]
-        self._sources_label.set_text("Sources: " + ", ".join(shown) if shown else "")
+        self._sources_label.set_text(
+            _("Sources: {files}").format(files=", ".join(shown)) if shown else ""
+        )
         self._sources_label.set_visible(bool(shown))
 
     def set_error(self, text: str) -> None:
@@ -315,8 +317,19 @@ class MessageBubble(Gtk.Box):
 
 def _apply_markup(text: str) -> str:
     """Convert a subset of Markdown-like markup to Pango markup."""
-    # 1. Escape HTML special characters first
-    escaped = html.escape(text)
+    # 1. Escape HTML special characters first (NUL is the code placeholder)
+    escaped = html.escape(text.replace("\x00", ""))
+
+    # Code (fenced blocks, then `inline`) is set in monospace and kept out of
+    # the bold/italic rules below, so `**x**` inside code stays literal
+    code: list[str] = []
+
+    def keep(match: re.Match[str]) -> str:
+        code.append(match.group(1))
+        return f"\x00{len(code) - 1}\x00"
+
+    escaped = re.sub(r"```[\w+-]*\n?(.*?)\n?```", keep, escaped, flags=re.DOTALL)
+    escaped = re.sub(r"`([^`\n]+)`", keep, escaped)
 
     # 2. Bold: **text**
     escaped = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
@@ -333,7 +346,8 @@ def _apply_markup(text: str) -> str:
         else:
             result_lines.append(line)
 
-    return "\n".join(result_lines)
+    joined = "\n".join(result_lines)
+    return re.sub(r"\x00(\d+)\x00", lambda m: f"<tt>{code[int(m.group(1))]}</tt>", joined)
 
 
 # ---------------------------------------------------------------------------
@@ -368,11 +382,11 @@ class AIPanelWindow(Adw.Window):
     """Main side-panel window for the Axon AI assistant."""
 
     _QUICK_CHIPS: list[str] = [  # noqa: RUF012
-        "Explain Error",
-        "Summarize",
-        "Write Code",
-        "Fix Bug",
-        "Translate",
+        N_("Explain error"),
+        N_("Summarize"),
+        N_("Write code"),
+        N_("Fix bug"),
+        N_("Translate"),
     ]
 
     # First dropdown entry: let the Brain pick a model per request (model "")
@@ -513,23 +527,22 @@ class AIPanelWindow(Adw.Window):
         self._status_loading = False
 
         # ---- Quick action chips --------------------------------------------
-        chips_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        chips_row.set_spacing(6)
-        chips_row.set_margin_start(8)
-        chips_row.set_margin_end(8)
+        # They wrap onto a second row rather than scrolling sideways, where
+        # the last chip was cut off with nothing to say more were hidden.
+        chips_row = Gtk.FlowBox()
+        chips_row.set_selection_mode(Gtk.SelectionMode.NONE)
+        chips_row.set_column_spacing(6)
+        chips_row.set_row_spacing(6)
+        chips_row.set_min_children_per_line(2)
+        chips_row.set_max_children_per_line(5)
+        chips_row.set_homogeneous(False)
+        chips_row.set_margin_start(16)
+        chips_row.set_margin_end(16)
         chips_row.set_margin_top(8)
         chips_row.set_margin_bottom(4)
+        self._chips_row = chips_row
 
-        # Wrap chips in a scrolled window so they don't overflow
-        chips_scroll = Gtk.ScrolledWindow()
-        chips_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
-        chips_scroll.set_child(chips_row)
-        chips_scroll.set_margin_start(8)
-        chips_scroll.set_margin_end(8)
-        chips_scroll.set_margin_top(8)
-        chips_scroll.set_margin_bottom(4)
-
-        for chip_label in self._QUICK_CHIPS:
+        for chip_label in (_(c) for c in self._QUICK_CHIPS):
             chip_btn = Gtk.Button(label=chip_label)
             chip_btn.add_css_class("quick-chip")
             chip_btn.add_css_class("flat")
@@ -539,7 +552,7 @@ class AIPanelWindow(Adw.Window):
             )
             chips_row.append(chip_btn)
 
-        root.append(chips_scroll)
+        root.append(chips_row)
 
         # ---- Chat area -----------------------------------------------------
         self._scroll = Gtk.ScrolledWindow()
@@ -1214,7 +1227,7 @@ class AIPanelWindow(Adw.Window):
         if self._stream_bubble is not None:
             partial = self._stream_bubble.get_text()
             self._stream_bubble.set_final_text(
-                f"{partial}\n\n(Cancelled)" if partial else "Cancelled"
+                partial + "\n\n" + _("(Cancelled)") if partial else _("Cancelled")
             )
             announce(self, announcement("cancelled"))
             self._stream_bubble = None
@@ -1268,7 +1281,7 @@ class AIPanelWindow(Adw.Window):
             bubble = self._stream_bubble
             self._stream_bubble = None
             self._show_bubble_error(
-                bubble, "Axon Brain service is offline or Ollama is not running.", offline=True
+                bubble, _("Axon Brain service is offline or Ollama is not running."), offline=True
             )
         return False
 

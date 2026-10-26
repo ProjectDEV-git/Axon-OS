@@ -234,7 +234,7 @@ class InstallerWindow(Adw.Window):
         side.append(spacer)
 
         foot = _label(
-            "Local-first AI · Your data stays yours", "muted", halign=Gtk.Align.CENTER, wrap=True
+            "Local-first AI · You choose where it runs", "muted", halign=Gtk.Align.CENTER, wrap=True
         )
         foot.set_margin_bottom(20)
         foot.set_margin_start(16)
@@ -340,26 +340,22 @@ class InstallerWindow(Adw.Window):
         outer.append(_label("Welcome to Axon OS", "hero-title", halign=Gtk.Align.CENTER))
         outer.append(
             _label(
-                "The AI-native operating system. Your assistant lives in the OS itself —\n"
-                "local-first, private, and one keystroke away.",
+                "The AI-native operating system. Your assistant lives in the OS itself,\n"
+                "runs on this computer by default, and is one keystroke away.",
                 "hero-subtitle",
                 halign=Gtk.Align.CENTER,
                 wrap=True,
             )
         )
 
-        # 2x2 grid: a single row of four chips forced a 645 px minimum width
-        chips = Gtk.Grid()
-        chips.set_column_spacing(8)
-        chips.set_row_spacing(8)
-        chips.set_column_homogeneous(True)
-        chips.set_halign(Gtk.Align.CENTER)
-        chips.set_margin_top(18)
-        for i, text in enumerate(
-            ("⬡ AI-Centered", "🔒 100% Local Option", "☁ Any Provider", "🐧 GNOME Native")
-        ):
-            chips.attach(_cls(Gtk.Label(label=text), "chip"), i % 2, i // 2, 1, 1)
-        outer.append(chips)
+        outer.append(
+            _label(
+                "Use local models, or connect a cloud provider later in Settings.",
+                "hero-subtitle",
+                halign=Gtk.Align.CENTER,
+                wrap=True,
+            )
+        )
 
         btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         btns.set_halign(Gtk.Align.CENTER)
@@ -510,10 +506,12 @@ class InstallerWindow(Adw.Window):
             bits = [f"signal {signal}%"]
             bits.append("secured" if secured else "open")
             if in_use:
-                bits.append("connected ✓")
+                bits.append("connected")
             row.set_subtitle(" · ".join(bits))
             row.set_activatable(not in_use)
-            icon = Gtk.Label(label="🔒" if secured else "📶")
+            icon = Gtk.Image.new_from_icon_name(
+                "network-wireless-encrypted-symbolic" if secured else "network-wireless-symbolic"
+            )
             row.add_prefix(icon)
             row.connect("activated", self._on_wifi_row, ssid, secured)
             self._wifi_list.append(row)

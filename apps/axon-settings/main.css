@@ -28,7 +28,7 @@ window {
     background-color: @axon_surface;
     border: 1px solid @axon_border;
     border-radius: 12px;
-    transition: all 250ms ease;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .feedback-card.loading {
@@ -59,7 +59,7 @@ window {
     font-weight: 600;
     padding: 10px 16px;
     min-width: 140px;
-    transition: all 150ms ease;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .quick-action-btn:hover {
@@ -79,7 +79,7 @@ window {
     color: @axon_fg;
     font-size: 9.75pt;
     padding: 8px 12px;
-    transition: all 200ms ease;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .settings-input-entry:focus {
@@ -94,7 +94,7 @@ window {
     font-size: 9.75pt;
     font-weight: 600;
     padding: 8px 16px;
-    transition: all 150ms ease;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .settings-apply-btn:hover {

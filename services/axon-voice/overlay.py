@@ -17,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk
 
 _BAR_COUNT = 24
-_ACCENT = (0.545, 0.361, 0.965)  # #8b5cf6 — Axon violet
+_ACCENT = (0.490, 0.702, 1.0)  # #7db3ff, the Axon accent text colour on dark
 
 
 class VoiceOverlay:
@@ -66,13 +66,13 @@ class VoiceOverlay:
         css.load_from_data(
             b"""
             .voice-overlay {
-                background-color: rgba(9, 9, 15, 0.92);
-                border: 1px solid rgba(139, 92, 246, 0.55);
-                border-radius: 24px;
+                background-color: rgba(30, 30, 30, 0.94);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 20px;
             }
             .voice-status {
-                color: #c4b5fd;
-                font-size: 12px;
+                color: #b4b4b4;
+                font-size: 9pt;
             }
             """
         )

@@ -62,6 +62,7 @@ TOKEN_FILES = {
     "light": "axon-design-tokens-light.css",
     "high-contrast": "axon-design-tokens-hc.css",
 }
+BASE_CSS = "axon-base.css"
 _tokens_provider: Gtk.CssProvider | None = None
 _tokens_variant = ""
 _loaded_app_css: set[str] = set()
@@ -105,6 +106,12 @@ def load_app_css(css_path: Path, display: Gdk.Display | None = None) -> None:
             display, _tokens_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
         _apply_token_variant()
+        # Shared press feedback and type details, under each app's own CSS
+        base = Gtk.CssProvider()
+        base.load_from_path(str(SHARED_DIR / BASE_CSS))
+        Gtk.StyleContext.add_provider_for_display(
+            display, base, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
         manager = Adw.StyleManager.get_default()
         manager.connect("notify::dark", _apply_token_variant)
         manager.connect("notify::high-contrast", _apply_token_variant)
