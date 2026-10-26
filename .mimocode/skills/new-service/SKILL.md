@@ -54,7 +54,7 @@ import dbus
 import dbus.service
 from gi.repository import GLib
 
-from services.axon_logger import configure_app_logger
+from axon_logger import configure_app_logger
 from services.constants import DBUS_NAME_<NAME>
 
 # If using ServiceBase:
@@ -107,7 +107,7 @@ if __name__ == "__main__":
 ```
 
 **Key conventions**:
-- Use `configure_app_logger` from `axon_logger.py` for logging
+- Use `configure_app_logger` from the root `axon_logger.py` for logging
 - Import constants from `services/constants.py` (add DBUS_NAME_<NAME> there)
 - Use `dbus.service.method` decorator with explicit `in_signature` and `out_signature`
 - Use `dbus.service.signal` for events
@@ -239,7 +239,7 @@ The existing loop should automatically pick up new services if they follow the n
 
 - `services/service_base.py` — Base class for D-Bus services (optional, use if boilerplate reduction is desired)
 - `services/constants.py` — Shared constants (D-Bus names, paths, limits)
-- `services/axon_logger.py` — Centralized logging
+- `axon_logger.py` (repo root) — Centralized logging
 - `services/service_utils.py` — TTLCache, RateLimiter, decorators
 - `build/config/chroot-setup.sh` — Service registration in chroot
 
