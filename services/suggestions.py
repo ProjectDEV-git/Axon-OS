@@ -12,37 +12,40 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-APPS = "Applications"
-FILES = "Files"
-SETTINGS = "Settings"
-SPACES = "Spaces"
-COMMANDS = "Commands"
-ASK = "Ask AI"
+from i18n import N_, _
+
+# Category ids stay English because code compares them; show them with _().
+APPS = N_("Applications")
+FILES = N_("Files")
+SETTINGS = N_("Settings")
+SPACES = N_("Spaces")
+COMMANDS = N_("Commands")
+ASK = N_("Ask AI")
 CATEGORIES = (APPS, FILES, SETTINGS, SPACES, COMMANDS, ASK)
 
 # (title, GNOME Settings panel, extra search words)
 SETTINGS_PANELS: list[tuple[str, str, str]] = [
-    ("Wi-Fi", "wifi", "network wireless internet"),
-    ("Bluetooth", "bluetooth", "devices headphones"),
-    ("Displays", "display", "screen monitor resolution scale"),
-    ("Sound", "sound", "volume audio speaker microphone"),
-    ("Appearance", "background", "dark light theme wallpaper"),
-    ("Power", "power", "battery sleep"),
-    ("Keyboard", "keyboard", "shortcuts layout"),
-    ("Mouse & Touchpad", "mouse", "pointer touchpad"),
-    ("Privacy", "privacy", "location camera"),
-    ("Accessibility", "universal-access", "a11y large text contrast zoom"),
+    (N_("Wi-Fi"), "wifi", "network wireless internet"),
+    (N_("Bluetooth"), "bluetooth", "devices headphones"),
+    (N_("Displays"), "display", "screen monitor resolution scale"),
+    (N_("Sound"), "sound", "volume audio speaker microphone"),
+    (N_("Appearance"), "background", "dark light theme wallpaper"),
+    (N_("Power"), "power", "battery sleep"),
+    (N_("Keyboard"), "keyboard", "shortcuts layout"),
+    (N_("Mouse & Touchpad"), "mouse", "pointer touchpad"),
+    (N_("Privacy"), "privacy", "location camera"),
+    (N_("Accessibility"), "universal-access", "a11y large text contrast zoom"),
 ]
 
 # (exact allowlisted command, what it shows, extra search words). Running one
 # still goes through the allowlist and the confirmation card.
 SUGGESTED_COMMANDS: list[tuple[str, str, str]] = [
-    ("df -h", "Free disk space", "disk storage space"),
-    ("free -h", "Memory in use", "ram memory"),
-    ("uptime", "How long the computer has been on", "uptime load"),
-    ("uname -a", "System and kernel version", "kernel version system"),
-    ("whoami", "Your user name", "user account"),
-    ("date", "Date and time", "time clock"),
+    ("df -h", N_("Free disk space"), "disk storage space"),
+    ("free -h", N_("Memory in use"), "ram memory"),
+    ("uptime", N_("How long the computer has been on"), "uptime load"),
+    ("uname -a", N_("System and kernel version"), "kernel version system"),
+    ("whoami", N_("Your user name"), "user account"),
+    ("date", N_("Date and time"), "time clock"),
 ]
 
 _MAX_PER_CATEGORY = 3
@@ -59,7 +62,7 @@ class Suggestion:
 
     @property
     def accessible_label(self) -> str:
-        return f"{self.category}: {self.title}. {self.subtitle}"
+        return f"{_(self.category)}: {self.title}. {self.subtitle}"
 
 
 def match_score(query: str, *texts: str) -> int:
@@ -115,16 +118,19 @@ def build_suggestions(
         return [
             Suggestion(
                 FILES,
-                f"Search files for “{target}”",
-                "Semantic search in your files",
+                _("Search files for “{query}”").format(query=target),
+                _("Semantic search in your files"),
                 {"type": "files", "query": target, "explicit": True},
             ),
-            Suggestion(ASK, "Ask Axon AI", q, {"type": "ask", "query": q}),
+            Suggestion(ASK, _("Ask Axon AI"), q, {"type": "ask", "query": q}),
         ]
 
     out += _top(
         [
-            (score, Suggestion(APPS, name, "Application", {"type": "open_app", "app_id": app_id}))
+            (
+                score,
+                Suggestion(APPS, name, _("Application"), {"type": "open_app", "app_id": app_id}),
+            )
             for app_id, name, keywords in apps or []
             if (score := match_score(q, name, keywords)) >= 2
         ],
@@ -133,16 +139,19 @@ def build_suggestions(
     out.append(
         Suggestion(
             FILES,
-            f"Search files for “{q}”",
-            "Semantic search in your files",
+            _("Search files for “{query}”").format(query=q),
+            _("Semantic search in your files"),
             {"type": "files", "query": q},
         )
     )
     out += _top(
         [
-            (score, Suggestion(SETTINGS, title, "Settings", {"type": "settings", "panel": panel}))
+            (
+                score,
+                Suggestion(SETTINGS, _(title), _("Settings"), {"type": "settings", "panel": panel}),
+            )
             for title, panel, words in SETTINGS_PANELS
-            if (score := match_score(q, title, words)) >= 2
+            if (score := match_score(q, title, _(title), words)) >= 2
         ],
         limit,
     )
@@ -152,7 +161,7 @@ def build_suggestions(
                 score,
                 Suggestion(
                     SPACES,
-                    f"{name} Space",
+                    _("{name} Space").format(name=name),
                     f"Super+{i + 1}",
                     {"type": "space", "index": i, "name": name},
                 ),
@@ -166,14 +175,16 @@ def build_suggestions(
         [
             (
                 score,
-                Suggestion(COMMANDS, command, description, {"type": "command", "command": command}),
+                Suggestion(
+                    COMMANDS, command, _(description), {"type": "command", "command": command}
+                ),
             )
             for command, description, words in SUGGESTED_COMMANDS
-            if (score := match_score(q, command, description, words)) >= 2
+            if (score := match_score(q, command, description, _(description), words)) >= 2
         ],
         limit,
     )
-    out.append(Suggestion(ASK, "Ask Axon AI", q, {"type": "ask", "query": q}))
+    out.append(Suggestion(ASK, _("Ask Axon AI"), q, {"type": "ask", "query": q}))
     return out
 
 
@@ -182,16 +193,16 @@ def describe(suggestion: Suggestion) -> str:
     action = suggestion.action
     kind = action.get("type")
     if kind == "open_app":
-        return f"Open {suggestion.title}"
+        return _("Open {app}").format(app=suggestion.title)
     if kind == "files":
-        return f"Search your files for “{action.get('query', '')}”"
+        return _("Search your files for “{query}”").format(query=action.get("query", ""))
     if kind == "settings":
-        return f"Open Settings → {suggestion.title}"
+        return _("Open Settings → {panel}").format(panel=suggestion.title)
     if kind == "space":
-        return f"Switch to {action.get('name', '')} Space"
+        return _("Switch to {name} Space").format(name=action.get("name", ""))
     if kind == "command":
-        return f"Run: {action.get('command', '')} (asks first)"
-    return "Ask Axon AI"
+        return _("Run: {command} (asks first)").format(command=action.get("command", ""))
+    return _("Ask Axon AI")
 
 
 _STRONG = frozenset({APPS, SETTINGS, SPACES, COMMANDS})

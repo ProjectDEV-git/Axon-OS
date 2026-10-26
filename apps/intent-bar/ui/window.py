@@ -36,6 +36,7 @@ from suggestions import describe as describe_suggestion
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
 from axon_gtk_utils import announce, load_app_css, monitor_size
+from i18n import _
 from ui_logic import (
     EXAMPLE_PROMPTS,
     SHOW,
@@ -223,14 +224,14 @@ class IntentBarWindow(Adw.Window):
 
         # Where requests go: "Local · llama3.2:3b" or "Cloud · OpenAI · gpt-4.1".
         # Filled in by _check_available_async; never assumed local.
-        self._model_badge = Gtk.Label(label="Model: checking…")
+        self._model_badge = Gtk.Label(label=_("Model: checking…"))
         self._model_badge.add_css_class("model-badge")
         self._model_badge.set_valign(Gtk.Align.CENTER)
         top_row.append(self._model_badge)
 
         # Recovery button, shown next to the "not running" error. The check
         # is a D-Bus call, so it runs in _check_available_async, not here.
-        self._start_ollama_btn = Gtk.Button(label="Start Ollama")
+        self._start_ollama_btn = Gtk.Button(label=_("Start Ollama"))
         self._start_ollama_btn.add_css_class("start-ollama-btn")
         self._start_ollama_btn.set_valign(Gtk.Align.START)
         self._start_ollama_btn.set_visible(False)
@@ -248,7 +249,7 @@ class IntentBarWindow(Adw.Window):
         root.append(entry_row)
 
         self._entry = Gtk.Entry()
-        self._entry.set_placeholder_text("Ask anything or type a command...")
+        self._entry.set_placeholder_text(_("Ask anything or type a command..."))
         self._entry.set_hexpand(True)
         self._entry.add_css_class("intent-entry")
         entry_row.append(self._entry)
@@ -268,8 +269,8 @@ class IntentBarWindow(Adw.Window):
         self._stop_btn = Gtk.Button.new_from_icon_name("process-stop-symbolic")
         self._stop_btn.add_css_class("flat")
         self._stop_btn.set_valign(Gtk.Align.CENTER)
-        self._stop_btn.set_tooltip_text("Stop (Esc)")
-        self._stop_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Stop request"])
+        self._stop_btn.set_tooltip_text(_("Stop (Esc)"))
+        self._stop_btn.update_property([Gtk.AccessibleProperty.LABEL], [_("Stop request")])
         self._stop_btn.set_visible(False)
         entry_row.append(self._stop_btn)
 
@@ -336,7 +337,7 @@ class IntentBarWindow(Adw.Window):
         self._suggest_list = Gtk.ListBox()
         self._suggest_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self._suggest_list.set_header_func(self._suggestion_header)
-        self._suggest_list.update_property([Gtk.AccessibleProperty.LABEL], ["Suggestions"])
+        self._suggest_list.update_property([Gtk.AccessibleProperty.LABEL], [_("Suggestions")])
         self._suggest_list.connect("row-activated", self._on_suggestion_activated)
         self._suggest_list.connect("row-selected", lambda *_a: self._update_preview())
         self._suggest_list.set_visible(False)
@@ -437,7 +438,7 @@ class IntentBarWindow(Adw.Window):
             # only after that does it close the bar
             if self._pending_action is not None:
                 self._pending_action = None
-                self._set_response("Cancelled")
+                self._set_response(_("Cancelled"))
             elif escape_action(self._requests.busy) == "cancel":
                 self._cancel_request()
             else:
@@ -572,7 +573,7 @@ class IntentBarWindow(Adw.Window):
             return
         self._set_busy(False)
         self._clear_results()
-        self._set_response("Cancelled")
+        self._set_response(_("Cancelled"))
         announce(self, announcement("cancelled"))
         cancel = getattr(self._ollama, "cancel", None)
         if cancel is not None:
@@ -639,7 +640,7 @@ class IntentBarWindow(Adw.Window):
         """Show the offline error with its recovery button."""
         if self._requests.busy:
             return False  # don't overwrite a request that is running
-        self._show_error("Ollama is not running.")
+        self._show_error(_("Ollama is not running."))
         announce(self, announcement("error", "Ollama is not running."), important=True)
         self._start_ollama_btn.set_sensitive(True)
         self._start_ollama_btn.set_visible(True)
@@ -668,7 +669,9 @@ class IntentBarWindow(Adw.Window):
                 # Show what will happen and wait for Enter (Esc cancels)
                 self._pending_action = action
                 self._set_response(
-                    f"{describe_action(action)} Press Enter to confirm, Esc to cancel."
+                    _("{action} Press Enter to confirm, Esc to cancel.").format(
+                        action=describe_action(action)
+                    )
                 )
             return False
         body, error = split_error(full)
@@ -815,7 +818,9 @@ class IntentBarWindow(Adw.Window):
         selected = self._selected_suggestion()
         self._preview_label.set_visible(selected is not None)
         if selected is not None:
-            self._preview_label.set_text(f"Enter: {describe_suggestion(selected)}")
+            self._preview_label.set_text(
+                _("Enter: {action}").format(action=describe_suggestion(selected))
+            )
 
     def _on_suggestion_activated(self, _list: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
         self._suggest_list.select_row(row)
@@ -832,7 +837,7 @@ class IntentBarWindow(Adw.Window):
             if info is not None and info.launch([], None):
                 self.close()
             else:
-                self._show_error(f"Couldn't open {suggestion.title}.")
+                self._show_error(_("Couldn't open {name}.").format(name=suggestion.title))
         elif kind == "settings":
             panel = str(action.get("panel", ""))
             # Only the fixed panel names, never text from the query
@@ -847,7 +852,7 @@ class IntentBarWindow(Adw.Window):
                 )
                 self.close()
             else:
-                self._show_error("GNOME Settings isn't available.")
+                self._show_error(_("GNOME Settings isn't available."))
         elif kind == "space":
             self._switch_space(int(action.get("index", 0)), str(action.get("name", "")))
         elif kind == "command":
@@ -864,7 +869,8 @@ class IntentBarWindow(Adw.Window):
                 obj.SwitchToSpace(index, dbus_interface="org.axonos.Shell", timeout=5)
             except Exception:
                 GLib.idle_add(
-                    self._show_error, f"Couldn't switch to {name}: Axon Shell isn't running."
+                    self._show_error,
+                    _("Couldn't switch to {name}: Axon Shell isn't running.").format(name=name),
                 )
                 return
             GLib.idle_add(self.close)
@@ -880,7 +886,7 @@ class IntentBarWindow(Adw.Window):
         self._set_busy(True)
         self._set_stage(STAGE_SEARCHING)
         self._clear_results()
-        self._set_response(f'Searching your files for "{query}"')
+        self._set_response(_("Searching your files for “{query}”").format(query=query))
         threading.Thread(
             target=self._do_semantic_search, args=(query, request_id), daemon=True
         ).start()
@@ -908,15 +914,19 @@ class IntentBarWindow(Adw.Window):
         self._set_busy(False)
         self._clear_results()
         if error:
-            self._show_error(f"Semantic search unavailable: {error}")
+            self._show_error(_("Semantic search unavailable: {error}").format(error=error))
             return False
         if not results:
-            self._set_response(f'No matching files for "{query}".')
+            self._set_response(_("No matching files for “{query}”.").format(query=query))
             return False
 
         backend = results[0].get("backend", "vector")
         label = "semantic" if backend == "vector" else "keyword"
-        self._set_response(f"Top {len(results)} {label} matches — click to open:")
+        self._set_response(
+            _("Top {count} {kind} matches. Click one to open it:").format(
+                count=len(results), kind=label
+            )
+        )
 
         home = GLib.get_home_dir()
         for item in results:
@@ -989,7 +999,7 @@ class IntentBarWindow(Adw.Window):
             stderr=subprocess.DEVNULL,
         )
         self._start_ollama_btn.set_sensitive(False)
-        self._set_response("Starting Ollama… try again in a moment.")
+        self._set_response(_("Starting Ollama… try again in a moment."))
 
     # ------------------------------------------------------------------
     # Semantic File Search Helpers

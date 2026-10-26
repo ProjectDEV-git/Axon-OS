@@ -25,9 +25,10 @@ def test_icon_only_buttons_have_accessible_labels(path: Path) -> None:
         if not m:
             continue
         name = m.group(1)
-        window = "\n".join(lines[i : i + 12])
+        # Collapse whitespace so a call the formatter split over lines still matches.
+        window = "".join("".join(lines[i : i + 12]).split())
         assert (
-            f"{name}.update_property([Gtk.AccessibleProperty.LABEL]" in window
+            f"{name}.update_property([Gtk.AccessibleProperty.LABEL]".replace(" ", "") in window
         ), f"{path.relative_to(ROOT)}:{i + 1}: icon-only button {name} needs an accessible label"
 
 

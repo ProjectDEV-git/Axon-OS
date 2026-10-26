@@ -22,6 +22,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from i18n import N_
+
 CONFIG_PATH = Path.home() / ".config" / "axon-os" / "context.json"
 
 # Context item keys, in the order they appear in prompts and in the UI.
@@ -36,10 +38,10 @@ ITEM_KEYS = (ACTIVE_APP, OPEN_FILES, TERMINAL, CLIPBOARD)
 SENSITIVE_ITEMS = frozenset({OPEN_FILES, TERMINAL, CLIPBOARD})
 
 ITEM_LABELS = {
-    ACTIVE_APP: "Active app",
-    OPEN_FILES: "Open files",
-    TERMINAL: "Terminal history",
-    CLIPBOARD: "Clipboard",
+    ACTIVE_APP: N_("Active app"),
+    OPEN_FILES: N_("Open files"),
+    TERMINAL: N_("Terminal history"),
+    CLIPBOARD: N_("Clipboard"),
 }
 
 _CLIP_PREVIEW = 120

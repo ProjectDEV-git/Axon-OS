@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from diagnostics import FAIL, INFO, OK, WARN, CheckResult
+from i18n import _
 
 _RANK = {OK: 0, INFO: 0, WARN: 1, FAIL: 2}
 
@@ -41,7 +42,7 @@ def _find(results: list[CheckResult], name: str) -> CheckResult | None:
 def _unit_row(results: list[CheckResult], unit: str, label: str) -> StatusRow:
     result = _find(results, f"{unit}.service")
     if result is None:
-        return StatusRow(label, WARN, "unknown")
+        return StatusRow(label, WARN, _("unknown"))
     return StatusRow(label, result.status, result.summary)
 
 
@@ -59,20 +60,25 @@ def pull_text(pull: dict[str, Any]) -> str:
     done, total = int(pull.get("completed") or 0), int(pull.get("total") or 0)
     if total > 0:
         pct = min(100, round(done * 100 / total))
-        return f"{name}: {pct}% ({_human(done)} of {_human(total)})"
-    return f"{name}: {pull.get('status') or 'starting'}"
+        return _("{name}: {pct}% ({done} of {total})").format(
+            name=name, pct=pct, done=_human(done), total=_human(total)
+        )
+    return f"{name}: {pull.get('status') or _('starting')}"
 
 
 def index_row(search_stats: dict[str, Any] | None, results: list[CheckResult]) -> StatusRow:
     """Semantic file index row from Search ``GetStats`` (or its unit state)."""
     if search_stats is None:
-        unit = _unit_row(results, "axon-search", "Semantic index")
-        return unit if unit.status != OK else StatusRow("Semantic index", INFO, "no details")
+        unit = _unit_row(results, "axon-search", _("Semantic index"))
+        return unit if unit.status != OK else StatusRow(_("Semantic index"), INFO, _("no details"))
     if search_stats.get("indexing"):
-        return StatusRow("Semantic index", INFO, "indexing…")
+        return StatusRow(_("Semantic index"), INFO, _("indexing…"))
     files = int(search_stats.get("files") or 0)
-    kind = "semantic" if search_stats.get("vector_backend") else "keyword"
-    return StatusRow("Semantic index", OK, f"{files:,} files ({kind} search)")
+    if search_stats.get("vector_backend"):
+        detail = _("{files} files (semantic search)").format(files=f"{files:,}")
+    else:
+        detail = _("{files} files (keyword search)").format(files=f"{files:,}")
+    return StatusRow(_("Semantic index"), OK, detail)
 
 
 def build_status(
@@ -91,16 +97,16 @@ def build_status(
     """
     ollama = _find(results, "Ollama")
     rows = [
-        _unit_row(results, "axon-brain", "Axon Brain"),
+        _unit_row(results, "axon-brain", _("Axon Brain")),
         StatusRow("Ollama", ollama.status, ollama.summary)
         if ollama
-        else StatusRow("Ollama", WARN, "unknown"),
-        StatusRow("Model", INFO, model_label),
+        else StatusRow("Ollama", WARN, _("unknown")),
+        StatusRow(_("Model"), INFO, model_label),
     ]
     if pull:
-        rows.append(StatusRow("Download", INFO, pull_text(pull)))
+        rows.append(StatusRow(_("Download"), INFO, pull_text(pull)))
     rows.append(index_row(search_stats, results))
-    rows.append(_unit_row(results, "axon-voice", "Voice"))
+    rows.append(_unit_row(results, "axon-voice", _("Voice")))
 
     problems = sorted(
         (r for r in results if r.status in (WARN, FAIL)), key=lambda r: -_RANK[r.status]
@@ -111,9 +117,9 @@ def build_status(
         worst = max(worst, _RANK[problem.status])
     status = {0: OK, 1: WARN, 2: FAIL}[worst]
     if problem is None and status == OK:
-        headline = "All good"
+        headline = _("All good")
     elif problem is not None:
         headline = f"{problem.name}: {problem.summary}"
     else:
-        headline = "Needs attention"
+        headline = _("Needs attention")
     return StatusSummary(status, headline, rows, problem)

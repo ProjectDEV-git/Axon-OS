@@ -333,7 +333,8 @@ add a short note under any item you skip or change.
       risk levels and diagnostics already pair colour with an icon or text.
 
 ### Translation
-- [ ] Wire `services/i18n.py` into the GTK apps and mark user-facing strings with `_()`.
+- [x] Wire `services/i18n.py` into the GTK apps and mark user-facing strings with `_()`.
+  Note: done for the Intent Bar, AI panel, confirmation card, Settings preferences and the shared helpers (`ui_logic`, `suggestions`, `command_risk`, `context_settings`, `status_summary`); compared constants use `N_()`. Welcome, Installer, Files, Terminal, Settings main, Diagnostics and AI Models still have unmarked strings.
 - [ ] Use the extension's gettext for Shell strings.
 - [ ] Add a `po/` template (`axon-os.pot`) and a script or Make target to refresh it.
 

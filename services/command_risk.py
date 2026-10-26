@@ -10,6 +10,8 @@ from __future__ import annotations
 import shlex
 from dataclasses import dataclass, field
 
+from i18n import N_, _
+
 READ_ONLY = "read_only"
 CHANGES_FILES = "changes_files"
 DELETES_FILES = "deletes_files"
@@ -19,17 +21,17 @@ NEEDS_ROOT = "needs_root"
 LEVELS = (READ_ONLY, CHANGES_FILES, DELETES_FILES, NEEDS_ROOT)
 
 LEVEL_LABELS = {
-    READ_ONLY: "Read-only",
-    CHANGES_FILES: "Changes files",
-    DELETES_FILES: "Deletes files",
-    NEEDS_ROOT: "Needs admin rights",
+    READ_ONLY: N_("Read-only"),
+    CHANGES_FILES: N_("Changes files"),
+    DELETES_FILES: N_("Deletes files"),
+    NEEDS_ROOT: N_("Needs admin rights"),
 }
 
 LEVEL_DESCRIPTIONS = {
-    READ_ONLY: "Shows information. Doesn't change anything on your computer.",
-    CHANGES_FILES: "Can create or change files.",
-    DELETES_FILES: "Can delete files. This may not be undoable.",
-    NEEDS_ROOT: "Runs with administrator rights and can change the whole system.",
+    READ_ONLY: N_("Shows information. Doesn't change anything on your computer."),
+    CHANGES_FILES: N_("Can create or change files."),
+    DELETES_FILES: N_("Can delete files. This may not be undoable."),
+    NEEDS_ROOT: N_("Runs with administrator rights and can change the whole system."),
 }
 
 _ROOT_PREFIXES = frozenset({"sudo", "pkexec", "doas", "su", "run0"})
@@ -69,8 +71,8 @@ _READERS = frozenset(
 )
 # Harmless side effects that change no files.
 _SIDE_EFFECT_ONLY = {
-    "paplay": "Plays a sound.",
-    "notify-send": "Shows a desktop notification.",
+    "paplay": N_("Plays a sound."),
+    "notify-send": N_("Shows a desktop notification."),
 }
 
 
@@ -83,11 +85,11 @@ class CommandRisk:
 
     @property
     def label(self) -> str:
-        return LEVEL_LABELS[self.level]
+        return _(LEVEL_LABELS[self.level])
 
     @property
     def description(self) -> str:
-        return LEVEL_DESCRIPTIONS[self.level]
+        return _(LEVEL_DESCRIPTIONS[self.level])
 
     @property
     def needs_root(self) -> bool:
@@ -107,45 +109,61 @@ def assess(command: str) -> CommandRisk:
     try:
         argv = shlex.split(command)
     except ValueError:
-        return CommandRisk(CHANGES_FILES, ["Axon couldn't read this command."])
+        return CommandRisk(CHANGES_FILES, [_("Axon couldn't read this command.")])
     if not argv:
-        return CommandRisk(CHANGES_FILES, ["Empty command."])
+        return CommandRisk(CHANGES_FILES, [_("Empty command.")])
 
     binary, args = argv[0], argv[1:]
     if binary in _ROOT_PREFIXES:
-        return CommandRisk(NEEDS_ROOT, ["Asks for your password and runs as administrator."])
+        return CommandRisk(NEEDS_ROOT, [_("Asks for your password and runs as administrator.")])
     if binary in _DELETERS:
         targets = _paths(args)
-        return CommandRisk(DELETES_FILES, [f"Deletes: {', '.join(targets) or '(nothing named)'}"])
+        return CommandRisk(
+            DELETES_FILES,
+            [_("Deletes: {paths}").format(paths=", ".join(targets) or _("(nothing named)"))],
+        )
     if binary in _WRITERS:
         targets = _paths(args)
-        return CommandRisk(CHANGES_FILES, [f"Writes: {', '.join(targets) or '(nothing named)'}"])
+        return CommandRisk(
+            CHANGES_FILES,
+            [_("Writes: {paths}").format(paths=", ".join(targets) or _("(nothing named)"))],
+        )
 
     if binary == "sort":
         for i, arg in enumerate(args):
             if arg in ("-o", "--output") and i + 1 < len(args):
-                return CommandRisk(CHANGES_FILES, [f"Writes: {args[i + 1]}"])
+                return CommandRisk(CHANGES_FILES, [_("Writes: {paths}").format(paths=args[i + 1])])
             if arg.startswith("--output="):
-                return CommandRisk(CHANGES_FILES, [f"Writes: {arg.split('=', 1)[1]}"])
+                return CommandRisk(
+                    CHANGES_FILES, [_("Writes: {paths}").format(paths=arg.split("=", 1)[1])]
+                )
             if arg.startswith("-o") and len(arg) > 2:
-                return CommandRisk(CHANGES_FILES, [f"Writes: {arg[2:]}"])
+                return CommandRisk(CHANGES_FILES, [_("Writes: {paths}").format(paths=arg[2:])])
         return CommandRisk(READ_ONLY, _reads(args))
     if binary == "uniq":
         paths = _paths(args)
         if len(paths) >= 2:  # uniq INPUT OUTPUT writes OUTPUT
-            return CommandRisk(CHANGES_FILES, [f"Reads: {paths[0]}", f"Writes: {paths[1]}"])
+            return CommandRisk(
+                CHANGES_FILES,
+                [
+                    _("Reads: {paths}").format(paths=paths[0]),
+                    _("Writes: {paths}").format(paths=paths[1]),
+                ],
+            )
         return CommandRisk(READ_ONLY, _reads(args))
 
     if binary in _SIDE_EFFECT_ONLY:
-        return CommandRisk(READ_ONLY, [_SIDE_EFFECT_ONLY[binary]])
+        return CommandRisk(READ_ONLY, [_(_SIDE_EFFECT_ONLY[binary])])
     if binary in _READERS:
-        return CommandRisk(READ_ONLY, _reads(args) if binary != "echo" else ["Prints text."])
-    return CommandRisk(CHANGES_FILES, ["Axon doesn't know what this command changes."])
+        return CommandRisk(READ_ONLY, _reads(args) if binary != "echo" else [_("Prints text.")])
+    return CommandRisk(CHANGES_FILES, [_("Axon doesn't know what this command changes.")])
 
 
 def _reads(args: list[str]) -> list[str]:
     paths = _paths(args)
-    return [f"Reads: {', '.join(paths)}"] if paths else ["Shows information."]
+    return (
+        [_("Reads: {paths}").format(paths=", ".join(paths))] if paths else [_("Shows information.")]
+    )
 
 
 def can_always_allow(risk: CommandRisk) -> bool:

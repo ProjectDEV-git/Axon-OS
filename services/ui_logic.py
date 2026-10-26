@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from i18n import _
+
 HOLD = "hold"
 SHOW = "show"
 
@@ -105,7 +107,7 @@ def split_error(text: str) -> tuple[str, str | None]:
     if match is None:
         return text.strip(), None
     message = (match.group("tag") or match.group("wrapped") or "").strip()
-    return text[: match.start()].strip(), message or "Something went wrong."
+    return text[: match.start()].strip(), message or _("Something went wrong.")
 
 
 def describe_action(action: dict[str, Any]) -> str:
@@ -113,11 +115,11 @@ def describe_action(action: dict[str, Any]) -> str:
     kind = action.get("action", "")
     if kind == "open_app":
         app = str(action.get("app", "")).strip()
-        return f"Opening {app}…" if app else "Opening app…"
+        return _("Opening {app}…").format(app=app) if app else _("Opening app…")
     if kind == "run_command":
         command = str(action.get("command", "")).strip()
-        return f"Run: {command}" if command else "Run command"
-    return "Axon suggested an action it can't perform here."
+        return _("Run: {command}").format(command=command) if command else _("Run command")
+    return _("Axon suggested an action it can't perform here.")
 
 
 class RequestTracker:
@@ -190,11 +192,11 @@ def fit_to_screen(preferred: int, available: int, margin: int = 48, minimum: int
 
 # Loading stages shown while a request runs. Only show a stage the code has
 # actually reached. Keep in sync with STAGES in shell/axon-shell/ui-logic.js.
-STAGE_CONNECTING = "Connecting to Axon Brain…"
-STAGE_WAITING = "Waiting for model…"
-STAGE_PLANNING = "Planning action…"
-STAGE_SEARCHING = "Searching local files…"
-STAGE_CONFIRM = "Ready for confirmation"
+STAGE_CONNECTING = _("Connecting to Axon Brain…")
+STAGE_WAITING = _("Waiting for model…")
+STAGE_PLANNING = _("Planning action…")
+STAGE_SEARCHING = _("Searching local files…")
+STAGE_CONFIRM = _("Ready for confirmation")
 
 
 def stage_for_stream(text: str) -> str | None:
@@ -209,10 +211,10 @@ def stage_for_stream(text: str) -> str | None:
 # current actions: semantic file search, open_app, an allowlisted command,
 # or a plain answer.
 EXAMPLE_PROMPTS: tuple[str, ...] = (
-    "find the PDF I edited yesterday",
-    "Open Firefox",
-    "How much disk space is free?",
-    "Explain what a symlink is",
+    _("find the PDF I edited yesterday"),
+    _("Open Firefox"),
+    _("How much disk space is free?"),
+    _("Explain what a symlink is"),
 )
 
 
@@ -294,10 +296,10 @@ class ModelOrigin:
     def label(self) -> str:
         """e.g. "Local · llama3.2:3b" or "Cloud · OpenAI · gpt-4.1"."""
         if self.kind == UNKNOWN:
-            return "Model: unknown"
+            return _("Model: unknown")
         if self.kind == LOCAL and self.provider == "Ollama":
-            return f"Local · {self.model}"
-        prefix = {LOCAL: "Local", REMOTE: "Remote", CLOUD: "Cloud"}[self.kind]
+            return _("Local · {model}").format(model=self.model)
+        prefix = {LOCAL: _("Local"), REMOTE: _("Remote"), CLOUD: _("Cloud")}[self.kind]
         return f"{prefix} · {self.provider} · {self.model}"
 
     @property
@@ -376,25 +378,29 @@ def routing_origin(
 def origin_tooltip(origin: ModelOrigin) -> str:
     """One sentence explaining where requests go."""
     if origin.kind == LOCAL:
-        return "Runs on this computer. Nothing is sent over the internet."
+        return _("Runs on this computer. Nothing is sent over the internet.")
     if origin.kind == REMOTE:
-        return f"Requests go to {origin.provider} on another computer on your network."
+        return _("Requests go to {provider} on another computer on your network.").format(
+            provider=origin.provider
+        )
     if origin.kind == CLOUD:
-        return f"Requests are sent to {origin.provider} over the internet."
-    return "Couldn't check where the model runs, so assume requests may leave this computer."
+        return _("Requests are sent to {provider} over the internet.").format(
+            provider=origin.provider
+        )
+    return _("Couldn't check where the model runs, so assume requests may leave this computer.")
 
 
 def format_command_output(text: str, max_lines: int = 40, max_chars: int = 4000) -> str:
     """Trim command output for the Intent Bar, saying what was cut."""
     text = text.rstrip()
     if not text:
-        return "(no output)"
+        return _("(no output)")
     lines = text.splitlines()
     cut = len(lines) > max_lines
     shown = "\n".join(lines[:max_lines])
     if len(shown) > max_chars:
         shown, cut = shown[:max_chars], True
-    return f"{shown}\n… (output shortened)" if cut else shown
+    return f"{shown}\n{_('… (output shortened)')}" if cut else shown
 
 
 def visible_conversations(
@@ -417,9 +423,9 @@ def format_latency(seconds: float) -> str:
 
 def answer_meta(model: str, seconds: float, first_token: float | None = None) -> str:
     """Footer under an answer: model and response time."""
-    parts = [model or "Automatic model", format_latency(seconds)]
+    parts = [model or _("Automatic model"), format_latency(seconds)]
     if first_token is not None and seconds >= 1:
-        parts.append(f"first words after {format_latency(first_token)}")
+        parts.append(_("first words after {time}").format(time=format_latency(first_token)))
     return " · ".join(parts)
 
 
@@ -432,11 +438,15 @@ def announcement(kind: str, text: str = "") -> str:
     """
     first = " ".join(text.split())[:120]
     if kind == "answer":
-        return f"Axon answered: {first}" if first else "Axon answered."
+        return _("Axon answered: {text}").format(text=first) if first else _("Axon answered.")
     if kind == "error":
-        return f"Axon couldn't finish: {first}" if first else "Axon couldn't finish."
+        return (
+            _("Axon couldn't finish: {text}").format(text=first)
+            if first
+            else _("Axon couldn't finish.")
+        )
     if kind == "command":
-        return "Command finished." if text.strip() != "Not run." else "Command not run."
+        return _("Command finished.") if text.strip() != _("Not run.") else _("Command not run.")
     if kind == "cancelled":
-        return "Cancelled."
-    return first or "Done."
+        return _("Cancelled.")
+    return first or _("Done.")

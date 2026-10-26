@@ -32,6 +32,7 @@ from command_risk import (
     assess,
     can_always_allow,
 )
+from i18n import _
 
 APPROVED = 0
 DECLINED = 1
@@ -77,7 +78,7 @@ def build_window(app: object, command: str, context: str, timeout: int) -> objec
             super().__init__(application=app)
             self.result = DECLINED  # fail closed: only a click changes this
             self._remaining = max(1, timeout)
-            self.set_title("Run this command?")
+            self.set_title(_("Run this command?"))
             self.set_default_size(460, -1)
             self.set_resizable(False)
 
@@ -99,7 +100,7 @@ def build_window(app: object, command: str, context: str, timeout: int) -> objec
             body.set_margin_bottom(18)
             toolbar.set_content(body)
 
-            heading = Gtk.Label(label="Axon AI wants to run this command", xalign=0.0)
+            heading = Gtk.Label(label=_("Axon AI wants to run this command"), xalign=0.0)
             heading.add_css_class("title-3")
             body.append(heading)
             if context:
@@ -123,7 +124,7 @@ def build_window(app: object, command: str, context: str, timeout: int) -> objec
             risk_row.add_prefix(icon)
             details.append(risk_row)
             admin = Adw.ActionRow(
-                title="Admin rights", subtitle="Needed" if risk.needs_root else "Not needed"
+                title=_("Admin rights"), subtitle=_("Needed") if risk.needs_root else "Not needed"
             )
             admin.set_use_markup(False)
             details.append(admin)
@@ -135,7 +136,7 @@ def build_window(app: object, command: str, context: str, timeout: int) -> objec
 
             self.always_check: Gtk.CheckButton | None = None
             if can_always_allow(risk):
-                self.always_check = Gtk.CheckButton(label="Always allow this exact command")
+                self.always_check = Gtk.CheckButton(label=_("Always allow this exact command"))
                 body.append(self.always_check)
 
             self.countdown = Gtk.Label(xalign=0.0)
@@ -144,9 +145,9 @@ def build_window(app: object, command: str, context: str, timeout: int) -> objec
 
             buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
             buttons.set_halign(Gtk.Align.END)
-            self.cancel_btn = Gtk.Button(label="Cancel")
+            self.cancel_btn = Gtk.Button(label=_("Cancel"))
             self.cancel_btn.connect("clicked", lambda _b: self.decline())
-            self.allow_btn = Gtk.Button(label="Allow Once")
+            self.allow_btn = Gtk.Button(label=_("Allow Once"))
             self.allow_btn.add_css_class(
                 "destructive-action" if risk.level != READ_ONLY else "suggested-action"
             )
@@ -190,7 +191,9 @@ def build_window(app: object, command: str, context: str, timeout: int) -> objec
                 self._timer = 0
                 self.decline()  # timeout counts as "no"
                 return False
-            self.countdown.set_text(f"Cancels automatically in {self._remaining} s")
+            self.countdown.set_text(
+                _("Cancels automatically in {seconds} s").format(seconds=self._remaining)
+            )
             self._remaining -= 1
             return True
 

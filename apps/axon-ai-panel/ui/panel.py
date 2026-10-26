@@ -39,6 +39,7 @@ for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().pare
     if (_base / "services").is_dir():
         sys.path.insert(0, str(_base / "services"))
         break
+from i18n import _
 from ui_logic import (
     ModelOrigin,
     RequestTracker,
@@ -226,8 +227,8 @@ class MessageBubble(Gtk.Box):
         self._copy_btn = Gtk.Button.new_from_icon_name("edit-copy-symbolic")
         self._copy_btn.add_css_class("copy-btn")
         self._copy_btn.add_css_class("flat")
-        self._copy_btn.set_tooltip_text("Copy to clipboard")
-        self._copy_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Copy message"])
+        self._copy_btn.set_tooltip_text(_("Copy to clipboard"))
+        self._copy_btn.update_property([Gtk.AccessibleProperty.LABEL], [_("Copy message")])
         self._copy_btn.connect("clicked", self._on_copy_clicked)
         btn_row.append(self._copy_btn)
         self._inner.append(btn_row)
@@ -440,22 +441,22 @@ class AIPanelWindow(Adw.Window):
         self._model_dropdown.set_selected(self._model_index(self._client.model))
         self._model_dropdown.connect("notify::selected", self._on_model_changed)
 
-        self._model_dropdown.set_tooltip_text("Model")
-        self._model_dropdown.update_property([Gtk.AccessibleProperty.LABEL], ["Model"])
+        self._model_dropdown.set_tooltip_text(_("Model"))
+        self._model_dropdown.update_property([Gtk.AccessibleProperty.LABEL], [_("Model")])
 
         # Clear history button
         self._clear_btn = Gtk.Button.new_from_icon_name("user-trash-symbolic")
         self._clear_btn.add_css_class("clear-btn")
         self._clear_btn.add_css_class("flat")
-        self._clear_btn.set_tooltip_text("Clear conversation")
-        self._clear_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Clear conversation"])
+        self._clear_btn.set_tooltip_text(_("Clear conversation"))
+        self._clear_btn.update_property([Gtk.AccessibleProperty.LABEL], [_("Clear conversation")])
         self._clear_btn.connect("clicked", self._on_clear_clicked)
 
         # Conversation list: switch, rename, archive, delete, start new
         self._conv_button = Gtk.MenuButton(icon_name="view-list-symbolic")
         self._conv_button.add_css_class("flat")
-        self._conv_button.set_tooltip_text("Conversations")
-        self._conv_button.update_property([Gtk.AccessibleProperty.LABEL], ["Conversations"])
+        self._conv_button.set_tooltip_text(_("Conversations"))
+        self._conv_button.update_property([Gtk.AccessibleProperty.LABEL], [_("Conversations")])
         self._conv_popover = Gtk.Popover()
         self._conv_popover.connect("show", lambda _p: self._refresh_conversations())
         self._conv_button.set_popover(self._conv_popover)
@@ -468,7 +469,7 @@ class AIPanelWindow(Adw.Window):
         root.append(header)
 
         # Where requests go. Never says "local" until the model is checked.
-        self._origin_label = Gtk.Label(label="Model: checking…", xalign=0.0)
+        self._origin_label = Gtk.Label(label=_("Model: checking…"), xalign=0.0)
         self._origin_label.add_css_class("origin-label")
         self._origin_label.set_ellipsize(Pango.EllipsizeMode.END)
         self._origin_label.set_margin_start(16)
@@ -481,7 +482,7 @@ class AIPanelWindow(Adw.Window):
         self._status_expander.set_margin_end(12)
         status_title = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self._status_icon = Gtk.Image.new_from_icon_name("content-loading-symbolic")
-        self._status_headline = Gtk.Label(label="Axon status: checking…", xalign=0.0)
+        self._status_headline = Gtk.Label(label=_("Axon status: checking…"), xalign=0.0)
         self._status_headline.set_ellipsize(Pango.EllipsizeMode.END)
         status_title.append(self._status_icon)
         status_title.append(self._status_headline)
@@ -499,9 +500,9 @@ class AIPanelWindow(Adw.Window):
         status_body.append(self._status_fix)
         status_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         status_buttons.set_halign(Gtk.Align.END)
-        refresh = Gtk.Button(label="Check Again")
+        refresh = Gtk.Button(label=_("Check Again"))
         refresh.connect("clicked", lambda _b: self._refresh_status())
-        diagnostics = Gtk.Button(label="Full Diagnostics")
+        diagnostics = Gtk.Button(label=_("Full Diagnostics"))
         diagnostics.connect("clicked", lambda _b: self._open_diagnostics())
         status_buttons.append(refresh)
         status_buttons.append(diagnostics)
@@ -564,7 +565,7 @@ class AIPanelWindow(Adw.Window):
         ctx_row.add_css_class("context-row")
         ctx_row.set_margin_start(12)
         ctx_row.set_margin_end(12)
-        self._ctx_title = Gtk.Label(label="Context: checking…", xalign=0.0)
+        self._ctx_title = Gtk.Label(label=_("Context: checking…"), xalign=0.0)
         self._ctx_title.add_css_class("context-title")
         self._ctx_title.set_valign(Gtk.Align.CENTER)
         ctx_row.append(self._ctx_title)
@@ -573,10 +574,10 @@ class AIPanelWindow(Adw.Window):
         self._ctx_flow.set_hexpand(True)
         self._ctx_flow.set_max_children_per_line(6)
         ctx_row.append(self._ctx_flow)
-        ctx_settings_btn = Gtk.Button(label="Settings")
+        ctx_settings_btn = Gtk.Button(label=_("Settings"))
         ctx_settings_btn.add_css_class("flat")
         ctx_settings_btn.set_valign(Gtk.Align.CENTER)
-        ctx_settings_btn.set_tooltip_text("Choose what context Axon may send")
+        ctx_settings_btn.set_tooltip_text(_("Choose what context Axon may send"))
         ctx_settings_btn.connect("clicked", lambda _b: self._open_settings_action("preferences"))
         ctx_row.append(ctx_settings_btn)
         root.append(ctx_row)
@@ -595,16 +596,16 @@ class AIPanelWindow(Adw.Window):
 
         self._entry = Gtk.Entry()
         self._entry.set_hexpand(True)
-        self._entry.set_placeholder_text("Ask anything…")
+        self._entry.set_placeholder_text(_("Ask anything…"))
         self._entry.connect("activate", self._on_entry_activate)
 
-        self._send_btn = Gtk.Button(label="Send")
+        self._send_btn = Gtk.Button(label=_("Send"))
         self._send_btn.add_css_class("suggested-action")
         self._send_btn.connect("clicked", self._on_send_clicked)
 
         # Replaces Send while an answer is streaming
-        self._stop_btn = Gtk.Button(label="Stop")
-        self._stop_btn.set_tooltip_text("Stop generating (Esc)")
+        self._stop_btn = Gtk.Button(label=_("Stop"))
+        self._stop_btn.set_tooltip_text(_("Stop generating (Esc)"))
         self._stop_btn.connect("clicked", lambda _b: self._cancel_stream())
         self._stop_btn.set_visible(False)
 
@@ -746,11 +747,13 @@ class AIPanelWindow(Adw.Window):
     def _on_clear_clicked(self, btn: Gtk.Button) -> None:
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading="Clear Conversation",
-            body="This will remove all messages in the current conversation. This cannot be undone.",
+            heading=_("Clear Conversation"),
+            body=_(
+                "This will remove all messages in the current conversation. This cannot be undone."
+            ),
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("clear", "Clear")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("clear", _("Clear"))
         dialog.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
@@ -770,9 +773,9 @@ class AIPanelWindow(Adw.Window):
                     bubble = self._add_bubble(role, content)
                     bubble.set_final_text(content)
             else:
-                self._conv_id = self._client.create_conversation(title="Active Chat")
+                self._conv_id = self._client.create_conversation(title=_("Active Chat"))
         except Exception:
-            self._conv_id = self._client.create_conversation(title="Active Chat")
+            self._conv_id = self._client.create_conversation(title=_("Active Chat"))
 
     def _on_clear_confirmed(self, dialog: Adw.MessageDialog, response: str) -> None:
         if response == "clear":
@@ -780,7 +783,7 @@ class AIPanelWindow(Adw.Window):
                 self._client.delete_conversation(self._conv_id)
             except Exception:
                 pass
-            self._conv_id = self._client.create_conversation(title="Active Chat")
+            self._conv_id = self._client.create_conversation(title=_("Active Chat"))
             child = self._messages_box.get_first_child()
             while child is not None:
                 next_child = child.get_next_sibling()
@@ -798,17 +801,17 @@ class AIPanelWindow(Adw.Window):
         box.set_margin_start(6)
         box.set_margin_end(6)
         top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        new_btn = Gtk.Button(label="New Conversation")
+        new_btn = Gtk.Button(label=_("New Conversation"))
         new_btn.connect("clicked", lambda _b: self._new_conversation())
         top.append(new_btn)
-        self._show_archived = Gtk.CheckButton(label="Archived")
-        self._show_archived.set_tooltip_text("Show archived conversations")
+        self._show_archived = Gtk.CheckButton(label=_("Archived"))
+        self._show_archived.set_tooltip_text(_("Show archived conversations"))
         self._show_archived.connect("toggled", lambda _c: self._refresh_conversations())
         top.append(self._show_archived)
         box.append(top)
         self._conv_list = Gtk.ListBox()
         self._conv_list.set_selection_mode(Gtk.SelectionMode.NONE)
-        self._conv_list.update_property([Gtk.AccessibleProperty.LABEL], ["Conversations"])
+        self._conv_list.update_property([Gtk.AccessibleProperty.LABEL], [_("Conversations")])
         self._conv_list.connect("row-activated", self._on_conversation_activated)
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -836,7 +839,7 @@ class AIPanelWindow(Adw.Window):
         self._conv_rows = visible_conversations(convs, self._show_archived.get_active())
         self._conv_list.remove_all()
         if not self._conv_rows:
-            empty = Gtk.Label(label="No conversations yet")
+            empty = Gtk.Label(label=_("No conversations yet"))
             empty.add_css_class("dim-label")
             empty.set_margin_top(12)
             empty.set_margin_bottom(12)
@@ -918,7 +921,7 @@ class AIPanelWindow(Adw.Window):
         if self._streaming:
             return
         self._conv_popover.popdown()
-        self._conv_id = self._client.create_conversation(title="New Chat")
+        self._conv_id = self._client.create_conversation(title=_("New Chat"))
         self._clear_bubbles()
         self._entry.grab_focus()
 
@@ -963,11 +966,13 @@ class AIPanelWindow(Adw.Window):
     def _confirm_delete(self, conv: dict[str, Any]) -> None:
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading="Delete Conversation?",
-            body=f"“{conv.get('title') or 'Untitled'}” will be removed. This can't be undone.",
+            heading=_("Delete Conversation?"),
+            body=_("“{title}” will be removed. This can't be undone.").format(
+                title=conv.get("title") or _("Untitled")
+            ),
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("delete", "Delete")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("delete", _("Delete"))
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
@@ -1070,7 +1075,9 @@ class AIPanelWindow(Adw.Window):
         summary = build_status(results, self.current_origin().label, stats, pull)
         self._status = summary
         self._status_icon.set_from_icon_name(_STATUS_ICONS[summary.status])
-        self._status_headline.set_text(f"Axon status: {summary.headline}")
+        self._status_headline.set_text(
+            _("Axon status: {headline}").format(headline=summary.headline)
+        )
         self._status_list.remove_all()
         for row in summary.rows:
             line = Adw.ActionRow(title=row.name, subtitle=row.text)
@@ -1082,7 +1089,7 @@ class AIPanelWindow(Adw.Window):
             self._status_list.append(line)
         problem = summary.problem
         if problem is not None and problem.hint:
-            self._status_fix.set_text(f"Fix: {problem.hint}")
+            self._status_fix.set_text(_("Fix: {hint}").format(hint=problem.hint))
             self._status_fix.set_visible(True)
         else:
             self._status_fix.set_visible(False)
@@ -1124,11 +1131,11 @@ class AIPanelWindow(Adw.Window):
         self._ctx_flow.remove_all()
         shown = [(k, d) for k, d in self._ctx_items if k not in self._ctx_excluded]
         if not self._ctx_enabled:
-            self._ctx_title.set_text("Context: off")
+            self._ctx_title.set_text(_("Context: off"))
         elif not shown:
-            self._ctx_title.set_text("Context: none")
+            self._ctx_title.set_text(_("Context: none"))
         else:
-            self._ctx_title.set_text("Context:")
+            self._ctx_title.set_text(_("Context:"))
         for key, desc in shown:
             chip = Gtk.Button()
             chip.add_css_class("context-chip")
@@ -1136,9 +1143,11 @@ class AIPanelWindow(Adw.Window):
             box.append(Gtk.Label(label=desc))
             box.append(Gtk.Image.new_from_icon_name("window-close-symbolic"))
             chip.set_child(box)
-            what = ITEM_LABELS.get(key, key).lower()
-            chip.set_tooltip_text(f"Don't send {what} with this message")
-            chip.update_property([Gtk.AccessibleProperty.LABEL], [f"Don't send {desc}"])
+            what = _(ITEM_LABELS.get(key, key)).lower()
+            chip.set_tooltip_text(_("Don't send {item} with this message").format(item=what))
+            chip.update_property(
+                [Gtk.AccessibleProperty.LABEL], [_("Don't send {item}").format(item=desc)]
+            )
             chip.connect("clicked", lambda _b, k=key: self._exclude_context(k))
             self._ctx_flow.append(chip)
 
@@ -1157,21 +1166,21 @@ class AIPanelWindow(Adw.Window):
     def _confirm_cloud_send(self, text: str) -> None:
         origin = self.current_origin()
         labels = [
-            ITEM_LABELS[k].lower()
+            _(ITEM_LABELS[k]).lower()
             for k, _d in self._ctx_items
             if k in SENSITIVE_ITEMS and k not in self._ctx_excluded
         ]
         dialog = Adw.MessageDialog(
             transient_for=self,
-            heading="Send desktop context to the cloud?",
+            heading=_("Send desktop context to the cloud?"),
             body=(
                 f"{origin_tooltip(origin)} This message would include your "
                 f"{', '.join(labels)}. You won't be asked again in this conversation."
             ),
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("without", "Send Without It")
-        dialog.add_response("send", "Send")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("without", _("Send Without It"))
+        dialog.add_response("send", _("Send"))
         dialog.set_response_appearance("send", Adw.ResponseAppearance.DESTRUCTIVE)
         # Closing the dialog sends nothing
         dialog.set_default_response("cancel")
@@ -1268,9 +1277,9 @@ class AIPanelWindow(Adw.Window):
         bubble.set_error(message)
         announce(self, announcement("error", message), important=True)
         prompt = self._stream_prompt
-        bubble.add_action("Try again", lambda: self._retry(bubble, prompt))
+        bubble.add_action(_("Try again"), lambda: self._retry(bubble, prompt))
         if offline:
-            bubble.add_action("Diagnostics", self._open_diagnostics)
+            bubble.add_action(_("Diagnostics"), self._open_diagnostics)
 
     # ------------------------------------------------------------------
     # Action cards: system changes the AI proposes
@@ -1308,20 +1317,20 @@ class AIPanelWindow(Adw.Window):
                 Gtk.Label(label=f"{risk.label}. {risk.description}", xalign=0.0, wrap=True)
             )
             card.append(risk_row)
-            run = Gtk.Button(label="Review and Run…")
-            run.set_tooltip_text("Opens the confirmation card first")
+            run = Gtk.Button(label=_("Review and Run…"))
+            run.set_tooltip_text(_("Opens the confirmation card first"))
             run.connect("clicked", lambda _b: self._run_card_command(bubble, card, command))
             primary = run
         elif kind == "open_app":
             name = str(action.get("app", ""))
-            primary = Gtk.Button(label=f"Open {name}")
+            primary = Gtk.Button(label=_("Open {app}").format(app=name))
             primary.connect("clicked", lambda _b: self._open_card_app(bubble, card, name))
         else:
-            bubble.set_final_text("Axon suggested an action it can't perform here.")
+            bubble.set_final_text(_("Axon suggested an action it can't perform here."))
             return
         buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         buttons.set_halign(Gtk.Align.END)
-        dismiss = Gtk.Button(label="Dismiss")
+        dismiss = Gtk.Button(label=_("Dismiss"))
         dismiss.add_css_class("flat")
         dismiss.connect("clicked", lambda _b: card.set_visible(False))
         primary.add_css_class("suggested-action")
@@ -1371,7 +1380,11 @@ class AIPanelWindow(Adw.Window):
                 launched = bool(info.launch([], None))
                 break
         self._card_result(
-            bubble, card, f"Opened {name}." if launched else f"No installed app called “{name}”."
+            bubble,
+            card,
+            (_("Opened {app}.") if launched else _("No installed app called “{app}”.")).format(
+                app=name
+            ),
         )
 
     def _offer_regenerate(self, bubble: MessageBubble, prompt: str) -> None:
@@ -1379,8 +1392,10 @@ class AIPanelWindow(Adw.Window):
         old = getattr(self, "_regenerate_btn", None)
         if old is not None:
             old.set_visible(False)
-        self._regenerate_btn = bubble.add_action("Regenerate", lambda: self._retry(bubble, prompt))
-        self._regenerate_btn.set_tooltip_text("Ask again for a new answer")
+        self._regenerate_btn = bubble.add_action(
+            _("Regenerate"), lambda: self._retry(bubble, prompt)
+        )
+        self._regenerate_btn.set_tooltip_text(_("Ask again for a new answer"))
 
     def _retry(self, bubble: MessageBubble, prompt: str) -> None:
         if self._streaming or not prompt:

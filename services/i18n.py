@@ -73,6 +73,15 @@ def _lazy(text: str) -> str:
 _ = _lazy
 
 
+def N_(text: str) -> str:
+    """Mark *text* for translation without translating it now.
+
+    Use for constants that code compares; translate them with ``_()`` when
+    they are shown.
+    """
+    return text
+
+
 def translate(text: str) -> str:
     """Translate a string using the default domain.
 
