@@ -20,7 +20,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 # Shared GTK helpers live in apps/shared next to every app
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
-from axon_gtk_utils import fit_default_size
+from axon_gtk_utils import close_on_escape, fit_default_size
 
 # Repo root in a checkout, /usr/lib/axon when installed: both hold services/.
 _AXON_ROOT = str(Path(__file__).resolve().parent.parent.parent)
@@ -57,14 +57,17 @@ class DiagnosticsWindow(Adw.ApplicationWindow):
         header.pack_start(self._run_btn)
         self._save_btn = Gtk.Button(icon_name="document-save-symbolic")
         self._save_btn.set_tooltip_text("Save report to a file")
+        self._save_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Save report"])
         self._save_btn.connect("clicked", self._on_save)
         header.pack_end(self._save_btn)
         self._copy_btn = Gtk.Button(icon_name="edit-copy-symbolic")
         self._copy_btn.set_tooltip_text("Copy report")
+        self._copy_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Copy report"])
         self._copy_btn.connect("clicked", self._on_copy)
         header.pack_end(self._copy_btn)
         toolbar.add_top_bar(header)
 
+        close_on_escape(self)
         self._page = Adw.PreferencesPage()
         toolbar.set_content(self._page)
         self._groups: list[Adw.PreferencesGroup] = []

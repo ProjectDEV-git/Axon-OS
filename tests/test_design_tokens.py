@@ -123,3 +123,20 @@ def test_every_shell_style_class_has_a_rule() -> None:
     template = (ROOT / "shell" / "axon-shell" / "stylesheet.css.in").read_text()
     missing = sorted(c for c in classes if f".{c}" not in template)
     assert not missing, missing
+
+
+def test_focusable_shell_widgets_have_a_focus_ring() -> None:
+    template = (ROOT / "shell" / "axon-shell" / "stylesheet.css.in").read_text()
+    for cls in (
+        "axon-chip",
+        "axon-intentbar-stop",
+        "axon-dock-icon",
+        "axon-startmenu-app-item",
+        "axon-startmenu-file-item",
+        "axon-startmenu-power-btn",
+        "axon-dock-menu-item",
+        "axon-space-chip",
+        "axon-suggestion",
+    ):
+        rule = re.search(rf"\.{cls}:focus[^{{]*\{{\n(.*?)\n\}}", template, re.DOTALL)
+        assert rule and "{{color.focus_ring}}" in rule.group(1), cls

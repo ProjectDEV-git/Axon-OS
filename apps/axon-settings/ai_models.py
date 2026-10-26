@@ -25,7 +25,7 @@ from gi.repository import Adw, Gio, GLib, Gtk
 
 # Shared GTK helpers live in apps/shared next to every app
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
-from axon_gtk_utils import fit_default_size
+from axon_gtk_utils import close_on_escape, fit_default_size
 
 TIERS = (
     ("general", "Everyday model", "Chat, questions and writing"),
@@ -130,6 +130,7 @@ class ProviderDialog(Adw.Window):
     ) -> None:
         super().__init__(transient_for=parent, modal=True)
         fit_default_size(self, 480, 640)
+        close_on_escape(self)
         self._provider = provider or {}
         self._on_save = on_save
         is_new = provider is None
@@ -341,6 +342,7 @@ class AIModelsWindow(Adw.PreferencesWindow):
         )
         reload_btn = Gtk.Button(icon_name="view-refresh-symbolic", valign=Gtk.Align.CENTER)
         reload_btn.set_tooltip_text("Reload model lists")
+        reload_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Reload model lists"])
         reload_btn.connect("clicked", lambda _b: self.refresh(refresh_models=True))
         group.set_header_suffix(reload_btn)
 
@@ -454,6 +456,7 @@ class AIModelsWindow(Adw.PreferencesWindow):
         )
         add_btn = Gtk.Button(icon_name="list-add-symbolic", valign=Gtk.Align.CENTER)
         add_btn.set_tooltip_text("Add a provider or company endpoint")
+        add_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Add provider"])
         add_btn.connect("clicked", lambda _b: self._edit_provider(None))
         group.set_header_suffix(add_btn)
         for provider in data.get("providers", []):

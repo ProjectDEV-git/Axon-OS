@@ -172,6 +172,8 @@ class StartMenuPopup extends St.BoxLayout {
         const lockBtn = new St.Button({
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-lock-screen-symbolic', icon_size: 16 }),
+            can_focus: true,
+            accessible_name: 'Lock screen',
         });
         lockBtn.connect('clicked', () => {
             this.hide();
@@ -181,6 +183,8 @@ class StartMenuPopup extends St.BoxLayout {
         const restartBtn = new St.Button({
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-reboot-symbolic', icon_size: 16 }),
+            can_focus: true,
+            accessible_name: 'Restart',
         });
         restartBtn.connect('clicked', () => {
             this.hide();
@@ -190,6 +194,8 @@ class StartMenuPopup extends St.BoxLayout {
         const shutdownBtn = new St.Button({
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-shutdown-symbolic', icon_size: 16 }),
+            can_focus: true,
+            accessible_name: 'Power off',
         });
         shutdownBtn.connect('clicked', () => {
             this.hide();

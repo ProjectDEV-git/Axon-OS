@@ -116,3 +116,17 @@ def load_app_css(css_path: Path, display: Gdk.Display | None = None) -> None:
         display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1
     )
     _loaded_app_css.add(key)
+
+
+def close_on_escape(window: Gtk.Window) -> None:
+    """Let Escape close a secondary window, as GNOME dialogs do."""
+    keys = Gtk.EventControllerKey()
+
+    def on_key(_ctrl: Gtk.EventControllerKey, keyval: int, _code: int, _state: object) -> bool:
+        if keyval == Gdk.KEY_Escape:
+            window.close()
+            return True
+        return False
+
+    keys.connect("key-pressed", on_key)
+    window.add_controller(keys)

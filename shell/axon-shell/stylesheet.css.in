@@ -126,6 +126,10 @@
     background-color: {{color.hover}};
 }
 
+.axon-suggestion:focus {
+    border: {{focus.width}} solid {{color.focus_ring}};
+}
+
 /* Selected row: background plus a border, not colour alone */
 .axon-suggestion-selected {
     background-color: {{color.accent_subtle}};
@@ -289,7 +293,8 @@
     padding: {{space.sm}} {{space.lg}};
 }
 
-.axon-startmenu-search-container:focus {
+.axon-startmenu-search-container:focus,
+.axon-startmenu-search:focus {
     border: {{focus.width}} solid {{color.focus_ring}};
 }
 
@@ -551,6 +556,7 @@
 }
 
 .axon-dock-menu-item {
+    border: {{focus.width}} solid transparent;
     padding: {{space.md}} {{space.xl}};
     border-radius: {{radius.sm}};
     color: {{color.fg}};
@@ -567,6 +573,7 @@
 
 .axon-dock-menu-item:focus {
     background-color: {{color.accent_subtle}};
+    border: {{focus.width}} solid {{color.focus_ring}};
 }
 
 .axon-dock-menu-title {

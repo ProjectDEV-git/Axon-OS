@@ -49,6 +49,7 @@ class AxonSettingsWindow(Adw.ApplicationWindow):
         header.add_css_class("settings-header")
         diagnostics_btn = Gtk.Button(icon_name="utilities-system-monitor-symbolic")
         diagnostics_btn.set_tooltip_text("Diagnostics: check that everything is working")
+        diagnostics_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Diagnostics"])
         diagnostics_btn.connect("clicked", lambda _b: self.open_diagnostics())
         header.pack_start(diagnostics_btn)
         prefs_btn = Gtk.Button(icon_name="preferences-system-symbolic")

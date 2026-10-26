@@ -309,10 +309,15 @@ add a short note under any item you skip or change.
       right; nothing here could be tested in the container.
 
 ### Accessibility
-- [ ] Every Shell popup and GTK app can be fully used with the keyboard (Tab order, arrows
+- [x] Every Shell popup and GTK app can be fully used with the keyboard (Tab order, arrows
       in lists, Escape closes).
-- [ ] Visible focus ring everywhere (from the token file).
-- [ ] Accessible names on every icon-only button and on dynamic content (responses, status).
+      Note: added Escape to Preferences, Diagnostics and the provider dialog, and Up/Down +
+      Escape + initial focus to the dock's context menu (whose status text also never
+      updated: `set_text` on an St.Button). Not tried with a keyboard in a real Shell.
+- [x] Visible focus ring everywhere (from the token file).
+- [x] Accessible names on every icon-only button and on dynamic content (responses, status).
+      Note: a static test now fails on icon-only GTK buttons without an accessible label and
+      on icon St.Buttons without `accessible_name`.
 - [ ] Announce when an AI action finishes or fails.
 - [ ] Text scaling: layouts survive 1.25× and 1.5× "Large Text".
 - [ ] Status shown with icon or text as well as colour.

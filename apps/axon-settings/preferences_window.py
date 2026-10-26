@@ -18,7 +18,7 @@ from gi.repository import Adw, Gio, GLib, Gtk
 
 # Shared GTK helpers live in apps/shared next to every app
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
-from axon_gtk_utils import fit_default_size
+from axon_gtk_utils import close_on_escape, fit_default_size
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shell_settings import describe_rule, load_shell_settings
@@ -53,6 +53,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         toolbar.add_top_bar(Adw.HeaderBar())
         self.set_content(toolbar)
 
+        close_on_escape(self)
         self._page = Adw.PreferencesPage()
         toolbar.set_content(self._page)
         self._page.add(self._build_privacy_group())

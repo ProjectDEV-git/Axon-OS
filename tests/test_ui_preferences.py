@@ -10,7 +10,7 @@ import pytest
 from tests.gtk_helpers import ROOT, load_module, pump, require_gtk
 
 Gtk, Adw, GLib = require_gtk()
-from gi.repository import Gio
+from gi.repository import Gdk, Gio
 
 shell_settings = load_module("axon_shell_settings", "apps/axon-settings/shell_settings.py")
 prefs = load_module("axon_preferences_window", "apps/axon-settings/preferences_window.py")
@@ -97,3 +97,20 @@ def test_always_allowed_commands_listed_and_cleared(tmp_path: Path) -> None:
     assert command_approvals.load_approvals(path) == []
     assert [r.get_title() for r in win._approval_rows] == ["None"]
     win.destroy()
+
+
+def test_escape_closes_preferences(tmp_path: Path) -> None:
+    win = prefs.PreferencesWindow(
+        shell_settings=memory_settings(),
+        context_path=tmp_path / "c.json",
+        approvals_path=tmp_path / "a.json",
+    )
+    closed: list[bool] = []
+    win.connect("close-request", lambda _w: closed.append(True) or False)
+    win.present()
+    pump(GLib)
+    controllers = win.observe_controllers()
+    keys = [controllers.get_item(i) for i in range(controllers.get_n_items())]
+    key_ctrl = next(c for c in keys if isinstance(c, Gtk.EventControllerKey))
+    key_ctrl.emit("key-pressed", Gdk.KEY_Escape, 0, 0)
+    assert closed == [True]

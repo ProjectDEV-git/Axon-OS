@@ -682,6 +682,25 @@ export default class DockManager {
             style_class: 'axon-dock-menu',
             vertical:    true,
             reactive:    true,
+            accessible_name: `${icon._label || 'Application'} menu`,
+        });
+        // Keyboard: Up/Down move between items, Escape closes
+        this._contextMenu.connect('key-press-event', (_actor, ev) => {
+            const key = ev.get_key_symbol();
+            if (key === Clutter.KEY_Escape) {
+                this.closeActiveMenu();
+                icon.grab_key_focus();
+                return Clutter.EVENT_STOP;
+            }
+            if (key === Clutter.KEY_Up || key === Clutter.KEY_Down) {
+                const items = this._contextMenu.get_children()
+                    .filter(c => c instanceof St.Button && c.reactive);
+                const at = items.findIndex(c => c.has_key_focus());
+                const next = key === Clutter.KEY_Up ? at - 1 : at + 1;
+                items[(next + items.length) % items.length]?.grab_key_focus();
+                return Clutter.EVENT_STOP;
+            }
+            return Clutter.EVENT_PROPAGATE;
         });
 
         const titleLabel = new St.Label({
@@ -696,6 +715,7 @@ export default class DockManager {
                 label: 'Close Window',
                 x_align: Clutter.ActorAlign.START,
                 reactive: true,
+                can_focus: true,
             });
             closeBtn.connect('clicked', () => {
                 icon._app.request_quit();
@@ -717,6 +737,9 @@ export default class DockManager {
 
         Main.uiGroup.add_child(this._contextMenu);
         this._repositionMenu(icon);
+        // Put keyboard focus in the menu so it can be used without a mouse
+        const firstItem = this._contextMenu.get_children().find(c => c instanceof St.Button && c.reactive);
+        (firstItem ?? this._contextMenu).grab_key_focus();
 
         let contextStr = 'Active workspace.';
         if (this._contextProxy) {
@@ -742,7 +765,7 @@ export default class DockManager {
 
     _requestAIPredictedActions(icon, contextStr, loadingItem) {
         if (!this._brainProxy) {
-            if (loadingItem && loadingItem.set_text) loadingItem.set_text('AI Brain service offline');
+            if (loadingItem) loadingItem.set_label('AI Brain service offline');
             return;
         }
 
@@ -772,6 +795,7 @@ export default class DockManager {
                                 label: '⬡ ' + act,
                                 x_align: Clutter.ActorAlign.START,
                                 reactive: true,
+                                can_focus: true,
                             });
                             btn.connect('clicked', () => {
                                 this._executeAIAction(act, icon);
@@ -781,13 +805,13 @@ export default class DockManager {
                         });
                         this._repositionMenu(icon);
                     } else {
-                        if (loadingItem && loadingItem.set_text) loadingItem.set_text('No shortcuts suggested');
+                        if (loadingItem) loadingItem.set_label('No shortcuts suggested');
                     }
                 } catch (e) {
-                    if (loadingItem && loadingItem.set_text) loadingItem.set_text('No shortcuts suggested');
+                    if (loadingItem) loadingItem.set_label('No shortcuts suggested');
                 }
             } else {
-                if (loadingItem && loadingItem.set_text) loadingItem.set_text('AI suggestion failed');
+                if (loadingItem) loadingItem.set_label('AI suggestion failed');
             }
         });
     }

@@ -55,6 +55,7 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
         # New tab button
         new_tab_btn = Gtk.Button(icon_name="tab-new-symbolic")
         new_tab_btn.set_tooltip_text("New tab (Ctrl+Shift+T)")
+        new_tab_btn.update_property([Gtk.AccessibleProperty.LABEL], ["New tab"])
         new_tab_btn.connect("clicked", self._on_new_tab)
         header.pack_start(new_tab_btn)
 
