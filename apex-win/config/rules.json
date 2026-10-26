@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "name": "Notepad++",
+      "tier": "tier1",
+      "network": false,
+      "gpu": false,
+      "trusted": false
+    },
+    {
+      "hash": "0000000000000000000000000000000000000000000000000000000000000001",
+      "name": "Steam",
+      "tier": "tier2",
+      "network": true,
+      "gpu": true,
+      "trusted": false
+    },
+    {
+      "hash": "0000000000000000000000000000000000000000000000000000000000000002",
+      "name": "Autodesk Fusion 360",
+      "tier": "tier0",
+      "network": true,
+      "gpu": true,
+      "trusted": true,
+      "dxvk": true,
+      "winetricks": ["dotnet48", "vcrun2019", "corefonts", "d3dx9"],
+      "env": {
+        "MESA_GL_VERSION_OVERRIDE": "4.5",
+        "STAGING_SHARED_MEMORY": "1"
+      },
+      "wine_variant": "staging"
+    }
+  ],
+  "defaults": {
+    "unmapped_tier": "tier0",
+    "untrusted_path_tier": "tier2",
+    "network_default": false,
+    "gpu_default": false
+  }
+}

@@ -1,0 +1,28 @@
+[Unit]
+Description=Windows TAP Bridge for Wine sandbox networking
+Documentation=https://github.com/Gaming-RF/APEX-WIN
+After=network.target
+
+[Service]
+Type=simple
+ExecStartPre=/sbin/modprobe tun
+# -f: stay in the foreground. The binary used to fork unconditionally, which
+# with Type=simple made systemd consider the service exited.
+# Bare name: systemd (>= 239) searches /usr/local/bin and /usr/bin, and
+# install.sh (PREFIX=/usr/local) and the Makefile (PREFIX=/usr) disagree.
+ExecStart=win-tap-bridge -f
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# PrivateDevices=yes hides /dev/net/tun, so TUNSETIFF always failed.
+DeviceAllow=/dev/net/tun rw
+DevicePolicy=closed
+ReadWritePaths=/var/run
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

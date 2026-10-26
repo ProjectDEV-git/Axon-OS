@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.apex-win.daemon</string>
+
+	<!--
+	@BINDIR@ must be substituted with the real install prefix's bin
+	directory before this file is installed (by scripts/install-macos.sh).
+	launchd's ProgramArguments does not do $PATH lookup the way a shell
+	would, and it must be an absolute path, so a placeholder here would
+	silently fail rather than fail loudly if left unsubstituted. Homebrew
+	uses /opt/homebrew/bin on Apple Silicon and /usr/local/bin on Intel; a
+	single hardcoded path here would be wrong for one of the two.
+	-->
+	<key>ProgramArguments</key>
+	<array>
+		<string>@BINDIR@/win-sandbox-runner</string>
+		<string>--daemon</string>
+	</array>
+
+	<!--
+	RunAtLoad + KeepAlive: start once at login and restart on unexpected
+	exit, the launchd analogue of the systemd unit's
+	"WantedBy=multi-user.target" + "Restart=on-failure". SuccessfulExit
+	false means "only restart on crash", matching systemd's on-failure (not
+	on Restart=always, which would also relaunch after a clean "stop" command).
+	-->
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+
+	<!--
+	This is a LaunchAgent (~/Library/LaunchAgents), not a LaunchDaemon
+	(/Library/LaunchDaemons): it must run as the logged-in user, not root.
+
+	On Linux the daemon runs as root because it registers a binfmt_misc
+	handler in /proc/sys/fs/binfmt_misc, which requires root, and that
+	handler is what makes bare "./game.exe" transparently re-exec through
+	win-sandbox-runner. macOS has no binfmt_misc equivalent, so nothing here
+	needs or should run as root; see crates/win-sandbox-runner/src/daemon.rs
+	run_daemon()'s platform split on the geteuid() check for the Rust side
+	of this same decision.
+
+	Concretely, this means the double-click experience on macOS does NOT
+	depend on this daemon at all: double-click routes through
+	APEX-WIN.app -> Launch Services -> the exe flag, which loads rules/app-db
+	fresh on every launch and dispatches directly, the same as Linux's own
+	Path A (see HANDOFF.md). This daemon exists purely as a CLI convenience
+	for a user who runs `win-sandbox-runner some.exe` (a positional-arg
+	invocation, not the exe flag) repeatedly from Terminal and wants the app
+	database and rules pre-loaded rather than re-read from disk on every
+	invocation, mirroring Linux's Path B minus the actual kernel-level
+	interception, which has no macOS equivalent.
+	-->
+
+	<key>StandardOutPath</key>
+	<string>/tmp/win-sandbox-runner.daemon.log</string>
+	<key>StandardErrorPath</key>
+	<string>/tmp/win-sandbox-runner.daemon.log</string>
+</dict>
+</plist>

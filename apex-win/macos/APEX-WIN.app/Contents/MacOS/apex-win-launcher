@@ -1,0 +1,44 @@
+#!/bin/bash
+# apex-win-launcher: Launch Services entry point for APEX-WIN.app.
+#
+# This is the bundle's CFBundleExecutable (Contents/Info.plist). When a user
+# double-clicks a .exe (or uses "Open With" -> APEX-WIN), Launch Services
+# starts this script with the opened file's path as $1 -- confirmed via
+# Apple's own CFBundleExecutable docs plus the long-established Platypus
+# tool, which exists specifically because this "path as argv" behavior is
+# real and stable for non-Cocoa app bundle executables (see
+# Documentation.md's "Accepting files and dragged items": "the paths of
+# dropped or opened files are passed to the script as arguments").
+#
+# This mirrors scripts/apex-win.desktop's Exec=win-sandbox-runner --exe %f
+# on Linux: a thin forwarding shim, no logic of its own. dispatch/tier/Wine
+# is win-sandbox-runner's job on both platforms.
+set -euo pipefail
+
+# win-sandbox-runner is expected on PATH (e.g. installed via Homebrew or
+# `cargo install`) or at a fixed prefix; check both rather than assuming
+# either, since macOS installs are not standardized on either /usr/local or
+# /opt/homebrew (Apple Silicon vs Intel default prefixes differ).
+RUNNER=""
+for candidate in \
+    "$(command -v win-sandbox-runner 2>/dev/null || true)" \
+    "/opt/homebrew/bin/win-sandbox-runner" \
+    "/usr/local/bin/win-sandbox-runner"
+do
+    if [[ -n "$candidate" && -x "$candidate" ]]; then
+        RUNNER="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$RUNNER" ]]; then
+    osascript -e 'display alert "APEX-WIN is not installed" message "win-sandbox-runner was not found on PATH or in /opt/homebrew/bin or /usr/local/bin. Install APEX-WIN first." as critical'
+    exit 1
+fi
+
+if [[ $# -lt 1 ]]; then
+    osascript -e 'display alert "No file specified" message "APEX-WIN was opened without a .exe file. Use Open With on a Windows executable instead." as critical'
+    exit 1
+fi
+
+exec "$RUNNER" --exe "$1"

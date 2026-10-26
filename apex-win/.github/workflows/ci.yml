@@ -1,0 +1,194 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Fail fast on warnings rather than letting them accumulate.
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: build / test / lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # win-sandbox-gui links against GTK4 and libadwaita, so the runner needs
+      # the -dev packages or the build fails at pkg-config, not at compile.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev libadwaita-1-dev pkg-config
+
+      # rust-version in Cargo.toml is 1.75. Pin to stable and let dependabot or
+      # a human bump it deliberately, rather than drifting with the runner image.
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      # --all-targets so tests and benches are linted too. Several real bugs in
+      # this project were only visible in test code.
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace --verbose
+
+      - name: Build release
+        run: cargo build --release --workspace
+
+  # The tiers need Landlock, bubblewrap, Wine and an X display, none of which
+  # exist on a stock runner. These scripts are written to skip (exit 0) when
+  # their prerequisites are missing, so this job proves the harness itself is
+  # not broken. Real tier verification happens on a desktop.
+  integration-smoke:
+    name: integration scripts (skip-safe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev libadwaita-1-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build debug binary
+        run: cargo build -p win-sandbox-runner
+
+      - name: Shell syntax check
+        run: |
+          for f in scripts/*.sh tests/integration/*.sh; do
+            bash -n "$f" || exit 1
+          done
+          echo "all shell scripts parse"
+
+      - name: Run integration scripts
+        run: |
+          for t in tests/integration/*.sh; do
+            echo "--- $t ---"
+            bash "$t" || exit 1
+          done
+
+  # win-sandbox-runner's core (dispatch/rules/appdb/wizard/hasher/config/
+  # env_sanitize/tier0/netopt/nvidia/prefix) is portable and runs Tier 0
+  # (direct Wine, no OS sandbox) on macOS. Tier 1/2/3 (Landlock, bubblewrap,
+  # OverlayFS) are Linux-only and cfg-gated out entirely in main.rs — see the
+  # comment there. win-sandbox-gui is excluded: it hard-links GTK4/libadwaita,
+  # which have no macOS build story here, so this job builds by package
+  # (-p win-sandbox-runner -p win-sandbox-common), not --workspace.
+  check-macos:
+    name: build / test / lint (macOS, sandbox core only)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # This is the load-bearing check for everything else in this job: if
+      # sandbox-exec does not actually confine a process on this runner, the
+      # Seatbelt-backed Tier 1/2 code below is worthless no matter how
+      # correct it looks. Proves it with a real deny-by-default profile: a
+      # write inside the allowed dir must succeed, a write outside it must
+      # fail. Not a string check on profile syntax — an actual enforcement
+      # test.
+      - name: Seatbelt enforcement smoke test
+        run: |
+          set -e
+          ALLOWED="$RUNNER_TEMP/seatbelt-allowed"
+          DENIED="$RUNNER_TEMP/seatbelt-denied"
+          mkdir -p "$ALLOWED" "$DENIED"
+
+          cat > "$RUNNER_TEMP/smoke.sb" <<EOF
+          (version 1)
+          (deny default)
+          (allow file-read*)
+          (allow process-exec)
+          (allow process-fork)
+          (allow file-write*
+              (subpath "$ALLOWED"))
+          EOF
+
+          echo "-> write inside the allowed dir must succeed"
+          sandbox-exec -f "$RUNNER_TEMP/smoke.sb" /usr/bin/touch "$ALLOWED/ok" \
+            || { echo "FAIL: sandbox-exec blocked an explicitly-allowed write"; exit 1; }
+          test -f "$ALLOWED/ok" || { echo "FAIL: allowed write did not land"; exit 1; }
+
+          echo "-> write outside the allowed dir must fail"
+          if sandbox-exec -f "$RUNNER_TEMP/smoke.sb" /usr/bin/touch "$DENIED/blocked" 2>/dev/null; then
+            echo "FAIL: sandbox-exec did not block a write outside the allowlist"
+            exit 1
+          fi
+          test -f "$DENIED/blocked" && { echo "FAIL: denied write landed on disk anyway"; exit 1; }
+
+          echo "PASS: sandbox-exec enforces deny-default with a scoped allowlist"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt -p win-sandbox-runner -p win-sandbox-common --check
+
+      - name: Clippy
+        run: cargo clippy -p win-sandbox-runner -p win-sandbox-common --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test -p win-sandbox-runner -p win-sandbox-common --verbose
+
+      - name: Build release
+        run: cargo build --release -p win-sandbox-runner -p win-sandbox-common
+
+      # End-to-end proof that the Rust-generated Seatbelt profiles behave the
+      # same way the hand-written smoke test did: enforced, not decorative.
+      - name: Seatbelt tier profile enforcement test
+        run: |
+          set -e
+          BIN=target/release/win-sandbox-runner
+          PREFIX="$RUNNER_TEMP/seatbelt-prefix"
+          OUTSIDE="$RUNNER_TEMP/seatbelt-outside"
+          mkdir -p "$PREFIX" "$OUTSIDE"
+
+          echo "-> --print-seatbelt-profile emits a profile referencing the prefix"
+          "$BIN" --print-seatbelt-profile --tier 1 --wine-prefix "$PREFIX" \
+            > "$RUNNER_TEMP/tier1.sb"
+          grep -q "$PREFIX" "$RUNNER_TEMP/tier1.sb" \
+            || { echo "FAIL: generated profile does not reference the prefix path"; exit 1; }
+
+          echo "-> Tier 1 profile: write inside the prefix succeeds"
+          sandbox-exec -f "$RUNNER_TEMP/tier1.sb" /usr/bin/touch "$PREFIX/ok" \
+            || { echo "FAIL: Tier 1 profile blocked a write inside the wine prefix"; exit 1; }
+
+          echo "-> Tier 1 profile: write outside the prefix fails"
+          if sandbox-exec -f "$RUNNER_TEMP/tier1.sb" /usr/bin/touch "$OUTSIDE/blocked" 2>/dev/null; then
+            echo "FAIL: Tier 1 profile did not confine writes to the prefix"
+            exit 1
+          fi
+
+          echo "-> Tier 2 profile additionally blocks outbound network"
+          "$BIN" --print-seatbelt-profile --tier 2 --wine-prefix "$PREFIX" \
+            > "$RUNNER_TEMP/tier2.sb"
+          if sandbox-exec -f "$RUNNER_TEMP/tier2.sb" /usr/bin/curl -s --max-time 3 https://1.1.1.1 >/dev/null 2>&1; then
+            echo "FAIL: Tier 2 profile allowed an outbound connection"
+            exit 1
+          fi
+
+          echo "PASS: generated Tier 1/2 profiles enforce their documented guarantees"
