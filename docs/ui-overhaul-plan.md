@@ -337,7 +337,8 @@ add a short note under any item you skip or change.
   Note: done for the Intent Bar, AI panel, confirmation card, Settings preferences and the shared helpers (`ui_logic`, `suggestions`, `command_risk`, `context_settings`, `status_summary`); compared constants use `N_()`. Welcome, Installer, Files, Terminal, Settings main, Diagnostics and AI Models still have unmarked strings.
 - [x] Use the extension's gettext for Shell strings.
   Note: `metadata.json` sets `gettext-domain: axon-os`; `extension.js` passes `this.gettext` to `setTranslator()` in `ui-logic.js`, and the Shell modules use its `_t()` (same `{name}` msgids as Python). Untested in a real Shell session; space names and D-Bus prompts to the model stay English.
-- [ ] Add a `po/` template (`axon-os.pot`) and a script or Make target to refresh it.
+- [x] Add a `po/` template (`axon-os.pot`) and a script or Make target to refresh it.
+  Note: `scripts/update-pot.sh` (needs `gettext`; `--check` for CI); `tests/test_po_template.py` checks every marked literal is in the template with its file. No translations yet.
 
 ---
 
@@ -367,3 +368,11 @@ tested in a real GNOME session.
   of Python, a flatter Shell look with the accent kept for AI/active/focus, live light/dark
   switching in GTK apps and reduced motion. Not tested in a real GNOME session: how the new
   Shell stylesheet looks, the light Shell variant, and the Shell's reduced-motion paths.
+- 2026-10-26 — Phase 5 done except optional Space previews / drag and drop (skipped, see
+  note). Categorised Intent Bar suggestions with an action preview; AI panel conversation
+  list, regenerate/copy, model and latency, sources, action cards and a compact mode; Space
+  chips with window counts and a Super+J quick switcher; keyboard, focus, accessible names,
+  announcements, Large Text and status shown without colour alone; strings marked for
+  translation with a `po/axon-os.pot` template. Not tested in a real GNOME session: the
+  Shell suggestion list, Space chips and switcher, Orca announcements, Large Text in the
+  Shell, and Shell translations loading from the extension's gettext domain.

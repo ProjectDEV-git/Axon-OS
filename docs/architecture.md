@@ -75,6 +75,8 @@ The Brain is the central AI gateway for the entire operating system. It is a D-B
 | `SendMessage(conv_id, message, context, model, stream)` | `ssssb → s` | Sends a message in a conversation |
 | `ClassifyIntent(text)` | `s → s` | Classifies natural language into system actions |
 | `ClassifyWindow(title, wm_class)` | `ss → s` | Routes a window to a named workspace |
+| `ClassifyWindowDetailed(title, wm_class)` | `ss → s` | JSON `{space, confidence, source}`; the Shell asks the user when confidence is low |
+| `ArchiveConversation(conv_id, archived)` | `sb → b` | Hides or restores a conversation in the AI panel list; `False` if it doesn't exist |
 
 ### Axon Context (`org.axonos.Context`)
 
@@ -106,6 +108,24 @@ Spaces are persistent, named workspaces with AI-powered window auto-routing. Whe
 | Personal | Email, calendar |
 | Terminal | Terminal emulators |
 | Notes | Obsidian, Notion, text editors |
+
+### Axon Shell (`org.axonos.Shell`)
+
+The GNOME Shell extension owns this name on the session bus while it is enabled, at
+`/org/axonos/Shell`.
+
+| D-Bus Method | Signature | Purpose |
+|-------------|-----------|---------|
+| `SwitchToSpace(index)` | `i → ` | Switches to Space *index* (0-based), as Super+1…9 does |
+
+## Translations
+
+User-facing strings use the `axon-os` gettext domain. Python code marks them with
+`_()` from `services/i18n.py` (`N_()` for constants that code compares); the Shell
+extension uses `_t()` from `ui-logic.js`, which `extension.js` connects to the
+extension's gettext. Both use `{name}` placeholders, so shared strings have one msgid.
+`scripts/update-pot.sh` refreshes `po/axon-os.pot`, and `tests/test_po_template.py`
+fails when a marked string is missing from it.
 
 ## Intent Bar
 

@@ -63,7 +63,8 @@ def pull_text(pull: dict[str, Any]) -> str:
         return _("{name}: {pct}% ({done} of {total})").format(
             name=name, pct=pct, done=_human(done), total=_human(total)
         )
-    return f"{name}: {pull.get('status') or _('starting')}"
+    status = pull.get("status") or _("starting")
+    return f"{name}: {status}"
 
 
 def index_row(search_stats: dict[str, Any] | None, results: list[CheckResult]) -> StatusRow:

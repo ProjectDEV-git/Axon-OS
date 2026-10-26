@@ -400,7 +400,7 @@ def format_command_output(text: str, max_lines: int = 40, max_chars: int = 4000)
     shown = "\n".join(lines[:max_lines])
     if len(shown) > max_chars:
         shown, cut = shown[:max_chars], True
-    return f"{shown}\n{_('… (output shortened)')}" if cut else shown
+    return shown + "\n" + _("… (output shortened)") if cut else shown
 
 
 def visible_conversations(
