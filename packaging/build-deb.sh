@@ -90,10 +90,12 @@ done
 # GTK theme and wallpaper
 install -Dm644 "${SRC}/theme/axon-gtk/gtk-dark.css" "${R}/usr/share/themes/axon-gtk/gtk-4.0/gtk.css"
 install -Dm644 "${SRC}/theme/axon-gtk/index.theme" "${R}/usr/share/themes/axon-gtk/index.theme"
-if [[ -f "${SRC}/theme/wallpapers/axon-aurora.png" ]]; then
-    install -Dm644 "${SRC}/theme/wallpapers/axon-aurora.png" \
-        "${R}/usr/share/backgrounds/axon/axon-aurora.png"
-fi
+for png in "${SRC}"/theme/wallpapers/*.png; do
+    install -Dm644 "${png}" "${R}/usr/share/backgrounds/axon/${png##*/}"
+done
+# Lists them in Settings > Appearance; Neural follows light and dark style
+install -Dm644 "${SRC}/theme/wallpapers/axon-backgrounds.xml" \
+    "${R}/usr/share/gnome-background-properties/axon-backgrounds.xml"
 
 # ── Helper scripts ───────────────────────────────────────────────────────────
 B="${R}/usr/local/bin"

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
+<wallpapers>
+  <wallpaper deleted="false">
+    <name>Axon Neural</name>
+    <filename>/usr/share/backgrounds/axon/axon-neural-light.png</filename>
+    <filename-dark>/usr/share/backgrounds/axon/axon-neural-dark.png</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#f0f0f1</pcolor>
+    <scolor>#121213</scolor>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>Axon Aurora</name>
+    <filename>/usr/share/backgrounds/axon/axon-aurora.png</filename>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#07070c</pcolor>
+    <scolor>#07070c</scolor>
+  </wallpaper>
+</wallpapers>

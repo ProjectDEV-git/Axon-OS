@@ -591,12 +591,12 @@ cursor-size=24
 text-scaling-factor=1.0
 
 [org.gnome.desktop.background]
-picture-uri='file:///usr/share/backgrounds/axon/axon-aurora.png'
-picture-uri-dark='file:///usr/share/backgrounds/axon/axon-aurora.png'
+picture-uri='file:///usr/share/backgrounds/axon/axon-neural-light.png'
+picture-uri-dark='file:///usr/share/backgrounds/axon/axon-neural-dark.png'
 picture-options='zoom'
 
 [org.gnome.desktop.screensaver]
-picture-uri='file:///usr/share/backgrounds/axon/axon-aurora.png'
+picture-uri='file:///usr/share/backgrounds/axon/axon-neural-dark.png'
 
 [org.gnome.desktop.wm.preferences]
 num-workspaces=9
