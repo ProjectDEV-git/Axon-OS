@@ -72,8 +72,42 @@ def test_scales_are_px_or_ms() -> None:
     for group in ("space", "radius"):
         assert all(re.fullmatch(r"\d+px", v) for v in TOKENS[group].values()), group
     # pt, not px: px font sizes don't follow GNOME's Large Text setting
-    assert all(re.fullmatch(r"\d+pt", v) for v in TOKENS["font_size"].values())
+    assert all(re.fullmatch(r"\d+(\.\d+)?pt", v) for v in TOKENS["font_size"].values())
     assert all(re.fullmatch(r"\d+ms", v) for v in TOKENS["duration"].values())
+
+
+def test_type_floor_and_tracking() -> None:
+    # Nothing under 11px (8.25pt); large type tracks tighter, small type looser
+    sizes = {k: float(v[:-2]) for k, v in TOKENS["font_size"].items()}
+    assert min(sizes.values()) >= 8.25
+    track = {k: float(v[:-2]) for k, v in TOKENS["letter_spacing"].items()}
+    assert track["display"] < track["title"] < track["body"] <= track["small"]
+
+
+def test_motion_tokens_follow_the_rules() -> None:
+    durations = {k: int(v[:-2]) for k, v in TOKENS["duration"].items()}
+    assert durations["instant"] <= 60  # surfaces opened from the keyboard
+    assert max(durations.values()) <= 300  # UI motion stays under 300 ms
+    for curve in TOKENS["easing"].values():
+        assert curve.startswith("cubic-bezier(")
+    assert "in" not in TOKENS["easing"], "no ease-in curve for UI"
+
+
+def test_greys_are_neutral() -> None:
+    # True neutral darks and lights: no navy, slate or violet tint in the greys
+    for variant in ("dark", "light"):
+        for name in ("bg", "surface", "surface_raised", "fg", "fg_secondary", "fg_muted"):
+            r, g, b = _rgb(VARIANTS[variant][name])
+            assert max(r, g, b) - min(r, g, b) <= 2, f"{variant} {name} is tinted"
+
+
+def test_accent_is_not_violet_or_indigo() -> None:
+    import colorsys
+
+    for variant in VARIANTS.values():
+        r, g, b = _rgb(variant["accent"])
+        hue = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)[0] * 360
+        assert not 230 <= hue <= 300, f"accent hue {hue:.0f} is violet/indigo"
 
 
 def _gen_module():
@@ -97,7 +131,7 @@ def test_gtk_tokens_keep_legacy_names() -> None:
     css = gen.gtk_css(TOKENS, "light")
     for legacy in ("bg_primary", "text_primary", "accent", "border", "accent_light"):
         assert f"@define-color {legacy} @axon_" in css
-    assert "@define-color axon_accent #7c3aed;" in css
+    assert "@define-color axon_accent #1d64d8;" in css
 
 
 def test_unknown_placeholder_fails_loudly() -> None:

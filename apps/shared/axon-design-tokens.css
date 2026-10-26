@@ -3,27 +3,29 @@
 
 /* Variant: dark */
 
-@define-color axon_bg #16161e;
-@define-color axon_surface #1e1e28;
-@define-color axon_surface_raised #272733;
-@define-color axon_popup rgba(24, 24, 32, 0.98);
-@define-color axon_fg #e8e8f0;
-@define-color axon_fg_secondary #a6a6bc;
-@define-color axon_fg_muted #9292aa;
-@define-color axon_border rgba(255, 255, 255, 0.10);
-@define-color axon_border_strong rgba(255, 255, 255, 0.20);
+@define-color axon_bg #161616;
+@define-color axon_surface #1e1e1e;
+@define-color axon_surface_raised #282828;
+@define-color axon_popup rgba(36, 36, 36, 0.98);
+@define-color axon_material rgba(30, 30, 30, 0.72);
+@define-color axon_material_edge rgba(255, 255, 255, 0.12);
+@define-color axon_fg #f2f2f2;
+@define-color axon_fg_secondary #b4b4b4;
+@define-color axon_fg_muted #9a9a9a;
+@define-color axon_border rgba(255, 255, 255, 0.08);
+@define-color axon_border_strong rgba(255, 255, 255, 0.16);
 @define-color axon_hover rgba(255, 255, 255, 0.06);
-@define-color axon_active rgba(255, 255, 255, 0.11);
-@define-color axon_accent #7c3aed;
-@define-color axon_accent_hover #6d28d9;
+@define-color axon_active rgba(255, 255, 255, 0.10);
+@define-color axon_accent #2b6fde;
+@define-color axon_accent_hover #245fc2;
 @define-color axon_accent_fg #ffffff;
-@define-color axon_accent_text #c4b5fd;
-@define-color axon_accent_subtle rgba(139, 92, 246, 0.16);
-@define-color axon_success #34d399;
-@define-color axon_warning #fbbf24;
-@define-color axon_error #f87171;
-@define-color axon_info #60a5fa;
-@define-color axon_focus_ring #a78bfa;
+@define-color axon_accent_text #7db3ff;
+@define-color axon_accent_subtle rgba(43, 111, 222, 0.20);
+@define-color axon_success #4cc488;
+@define-color axon_warning #e8b54a;
+@define-color axon_error #f4808a;
+@define-color axon_info #7db3ff;
+@define-color axon_focus_ring #5c9dff;
 
 /* Names used by older app stylesheets */
 @define-color bg_primary @axon_bg;

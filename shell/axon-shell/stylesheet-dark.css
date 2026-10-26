@@ -13,8 +13,8 @@
 /* ── Shared ─────────────────────────────────────────────────────────────── */
 
 .axon-hint-label {
-    color: #9292aa;
-    font-size: 8pt;
+    color: #9a9a9a;
+    font-size: 8.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
@@ -23,7 +23,7 @@
 }
 
 .axon-separator {
-    background-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(255, 255, 255, 0.08);
     height: 1px;
     margin: 2px 0;
 }
@@ -36,8 +36,8 @@
 .axon-chip {
     border-radius: 9999px;
     background-color: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    color: #a6a6bc;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #b4b4b4;
     padding: 4px 12px;
     font-size: 9pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
@@ -45,41 +45,41 @@
 }
 
 .axon-chip:hover {
-    background-color: rgba(255, 255, 255, 0.11);
-    color: #e8e8f0;
+    background-color: rgba(255, 255, 255, 0.10);
+    color: #f2f2f2;
 }
 
 .axon-chip:focus {
-    border: 2px solid #a78bfa;
+    border: 2px solid #5c9dff;
 }
 
 /* Status shown with an icon or word as well as colour */
-.axon-status-ok { color: #34d399; }
-.axon-status-warn { color: #fbbf24; }
-.axon-status-error { color: #f87171; }
+.axon-status-ok { color: #4cc488; }
+.axon-status-warn { color: #e8b54a; }
+.axon-status-error { color: #f4808a; }
 
 /* ── Intent Bar ─────────────────────────────────────────────────────────── */
 
 .axon-intentbar {
-    background-color: rgba(24, 24, 32, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.20);
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    background-color: rgba(36, 36, 36, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.40);
     padding: 16px 24px 12px 24px;
 }
 
 .axon-intentbar-input,
 .axon-intentbar-input StEntry {
     background-color: transparent;
-    color: #e8e8f0;
-    font-size: 15pt;
+    color: #f2f2f2;
+    font-size: 13.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     border: none;
     border-radius: 0;
     box-shadow: none;
-    caret-color: #c4b5fd;
+    caret-color: #7db3ff;
     padding: 4px 0;
-    selection-background-color: rgba(139, 92, 246, 0.16);
+    selection-background-color: rgba(43, 111, 222, 0.20);
 }
 
 .axon-intentbar-input:focus,
@@ -91,25 +91,25 @@
 
 /* Where the model runs: AI-related, so it may use the accent */
 .axon-origin-label {
-    color: #c4b5fd;
-    font-size: 8pt;
+    color: #7db3ff;
+    font-size: 8.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     margin-bottom: 8px;
 }
 
 .axon-intentbar-stop {
-    color: #a6a6bc;
+    color: #b4b4b4;
     border-radius: 8px;
     padding: 6px;
 }
 
 .axon-intentbar-stop:hover {
-    color: #e8e8f0;
+    color: #f2f2f2;
     background-color: rgba(255, 255, 255, 0.06);
 }
 
 .axon-intentbar-stop:focus {
-    border: 2px solid #a78bfa;
+    border: 2px solid #5c9dff;
 }
 
 .axon-suggestions {
@@ -120,9 +120,9 @@
 .axon-suggestion {
     border-radius: 6px;
     padding: 6px 8px;
-    color: #e8e8f0;
+    color: #f2f2f2;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
-    font-size: 10pt;
+    font-size: 10.5pt;
     text-align: left;
 }
 
@@ -131,17 +131,17 @@
 }
 
 .axon-suggestion:focus {
-    border: 2px solid #a78bfa;
+    border: 2px solid #5c9dff;
 }
 
 /* Selected row: background plus a border, not colour alone */
 .axon-suggestion-selected {
-    background-color: rgba(139, 92, 246, 0.16);
-    border: 1px solid #a78bfa;
+    background-color: rgba(43, 111, 222, 0.20);
+    border: 1px solid #5c9dff;
 }
 
 .axon-suggestion-title {
-    color: #e8e8f0;
+    color: #f2f2f2;
 }
 
 .axon-intentbar-empty {
@@ -149,13 +149,13 @@
 }
 
 .axon-response {
-    color: #e8e8f0;
-    font-size: 10pt;
+    color: #f2f2f2;
+    font-size: 10.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
 .axon-response-scroll {
-    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     margin-top: 12px;
     padding-top: 12px;
     max-height: 320px;
@@ -163,7 +163,7 @@
 
 .axon-response-error,
 .axon-response-error-icon {
-    color: #f87171;
+    color: #f4808a;
 }
 
 .axon-response-error-icon {
@@ -173,8 +173,8 @@
 /* ── Taskbar ────────────────────────────────────────────────────────────── */
 
 .axon-taskbar {
-    background-color: #16161e;
-    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    background-color: #161616;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding: 0 16px;
     spacing: 0;
 }
@@ -208,16 +208,16 @@
 }
 
 .axon-dock-icon:focus {
-    border: 2px solid #a78bfa;
+    border: 2px solid #5c9dff;
 }
 
 .axon-taskbar-icon-svg {
-    color: #a6a6bc;
+    color: #b4b4b4;
 }
 
 /* Running-app marker: active state, so the accent */
 .axon-dock-dot {
-    background-color: #c4b5fd;
+    background-color: #7db3ff;
     border-radius: 6px;
     width: 14px;
     height: 3px;
@@ -225,15 +225,15 @@
 }
 
 .axon-dock-separator {
-    background-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(255, 255, 255, 0.08);
     width: 1px;
     height: 24px;
     margin: 0 8px;
 }
 
 .axon-taskbar-clock {
-    color: #e8e8f0;
-    font-size: 8pt;
+    color: #f2f2f2;
+    font-size: 8.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 500;
     text-align: center;
@@ -241,11 +241,11 @@
 }
 
 .axon-dock-tooltip {
-    background-color: #272733;
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    background-color: #282828;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 6px;
-    color: #e8e8f0;
-    font-size: 8pt;
+    color: #f2f2f2;
+    font-size: 8.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 500;
     padding: 4px 8px;
@@ -255,7 +255,7 @@
     width: 10px;
     height: 48px;
     background-color: transparent;
-    border-left: 1px solid rgba(255, 255, 255, 0.10);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .axon-taskbar-showdesktop:hover {
@@ -269,7 +269,7 @@
 }
 
 .axon-ai-indicator-icon {
-    color: #c4b5fd;
+    color: #7db3ff;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-size: 9pt;
     font-weight: 600;
@@ -282,24 +282,24 @@
 /* ── Start Menu (size is set from JS to fit the work area) ──────────────── */
 
 .axon-startmenu {
-    background-color: rgba(24, 24, 32, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.20);
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    background-color: rgba(36, 36, 36, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.40);
     padding: 24px;
 }
 
 .axon-startmenu-search-container {
     margin-bottom: 16px;
-    background-color: #1e1e28;
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    background-color: #1e1e1e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
     padding: 6px 12px;
 }
 
 .axon-startmenu-search-container:focus,
 .axon-startmenu-search:focus {
-    border: 2px solid #a78bfa;
+    border: 2px solid #5c9dff;
 }
 
 .axon-startmenu-search,
@@ -307,8 +307,8 @@
     background-color: transparent;
     border: none;
     box-shadow: none;
-    color: #e8e8f0;
-    font-size: 11pt;
+    color: #f2f2f2;
+    font-size: 12pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
@@ -318,8 +318,8 @@
 }
 
 .axon-startmenu-section-title {
-    color: #a6a6bc;
-    font-size: 8pt;
+    color: #b4b4b4;
+    font-size: 8.5pt;
     font-weight: 700;
     margin-bottom: 12px;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
@@ -349,19 +349,19 @@
 .axon-startmenu-app-item:focus,
 .axon-startmenu-file-item:focus,
 .axon-startmenu-power-btn:focus {
-    border: 2px solid #a78bfa;
+    border: 2px solid #5c9dff;
 }
 
 .axon-startmenu-app-label {
-    color: #e8e8f0;
-    font-size: 8pt;
+    color: #f2f2f2;
+    font-size: 8.5pt;
     margin-top: 6px;
     text-align: center;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
 .axon-startmenu-files-column {
-    border-left: 1px solid rgba(255, 255, 255, 0.10);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
     padding-left: 16px;
 }
 
@@ -382,17 +382,17 @@
 }
 
 .axon-startmenu-file-label {
-    color: #e8e8f0;
+    color: #f2f2f2;
     font-size: 9pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
 .axon-startmenu-file-icon {
-    color: #a6a6bc;
+    color: #b4b4b4;
 }
 
 .axon-startmenu-no-files {
-    color: #9292aa;
+    color: #9a9a9a;
     font-size: 9pt;
     padding: 8px;
     font-style: italic;
@@ -400,7 +400,7 @@
 }
 
 .axon-startmenu-footer {
-    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     padding-top: 16px;
     spacing: 12px;
 }
@@ -410,12 +410,12 @@
 }
 
 .axon-startmenu-avatar {
-    color: #a6a6bc;
+    color: #b4b4b4;
 }
 
 .axon-startmenu-username {
-    color: #e8e8f0;
-    font-size: 10pt;
+    color: #f2f2f2;
+    font-size: 10.5pt;
     font-weight: 600;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
@@ -426,54 +426,54 @@
 
 .axon-startmenu-power-btn {
     background-color: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 6px;
     padding: 8px;
-    color: #a6a6bc;
+    color: #b4b4b4;
 }
 
 .axon-startmenu-power-btn:hover {
     background-color: rgba(255, 255, 255, 0.06);
-    color: #e8e8f0;
+    color: #f2f2f2;
 }
 
 /* ── Space OSD ──────────────────────────────────────────────────────────── */
 
 .axon-space-osd {
-    background-color: rgba(24, 24, 32, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.20);
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    background-color: rgba(36, 36, 36, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.40);
     padding: 16px 24px;
     min-width: 200px;
 }
 
 /* The number takes the Space's own colour from JS (user data) */
 .axon-space-osd-number {
-    font-size: 36pt;
+    font-size: 24pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 700;
 }
 
 .axon-space-osd-name {
-    font-size: 15pt;
+    font-size: 13.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 600;
-    color: #e8e8f0;
+    color: #f2f2f2;
     margin-top: 4px;
 }
 
 .axon-space-osd-index {
     font-size: 9pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
-    color: #a6a6bc;
+    color: #b4b4b4;
     margin-top: 6px;
 }
 
 .axon-space-osd-summary {
-    font-size: 10pt;
+    font-size: 10.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
-    color: #a6a6bc;
+    color: #b4b4b4;
     margin-top: 8px;
 }
 
@@ -490,7 +490,7 @@
     border-radius: 6px;
     border: 1px solid transparent;
     border-bottom: 2px solid transparent;
-    color: #a6a6bc;
+    color: #b4b4b4;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-size: 9pt;
 }
@@ -500,20 +500,20 @@
 }
 
 .axon-space-chip:focus {
-    border: 2px solid #a78bfa;
+    border: 2px solid #5c9dff;
 }
 
 /* Active: bold number and an underline bar, not colour alone */
 .axon-space-chip-active {
-    color: #e8e8f0;
+    color: #f2f2f2;
     font-weight: 700;
-    background-color: rgba(255, 255, 255, 0.11);
-    border-bottom: 2px solid #c4b5fd;
+    background-color: rgba(255, 255, 255, 0.10);
+    border-bottom: 2px solid #7db3ff;
 }
 
 /* Empty: dimmed and no window count */
 .axon-space-chip-empty {
-    color: #9292aa;
+    color: #9a9a9a;
 }
 
 .axon-space-chip-number {
@@ -521,13 +521,13 @@
 }
 
 .axon-space-chip-badge {
-    font-size: 8pt;
+    font-size: 8.5pt;
     margin-left: 2px;
-    color: #a6a6bc;
+    color: #b4b4b4;
 }
 
 .axon-space-chip-attention .axon-space-chip-badge {
-    color: #fbbf24;
+    color: #e8b54a;
     font-weight: 700;
 }
 
@@ -543,7 +543,7 @@
 }
 
 .axon-space-label {
-    color: #e8e8f0;
+    color: #f2f2f2;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-size: 9pt;
 }
@@ -551,10 +551,10 @@
 /* ── Dock context menu (AI predicted actions) ───────────────────────────── */
 
 .axon-dock-menu {
-    background-color: rgba(24, 24, 32, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.20);
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    background-color: rgba(36, 36, 36, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.40);
     padding: 6px;
     spacing: 4px;
 }
@@ -563,8 +563,8 @@
     border: 2px solid transparent;
     padding: 8px 16px;
     border-radius: 6px;
-    color: #e8e8f0;
-    font-size: 10pt;
+    color: #f2f2f2;
+    font-size: 10.5pt;
     font-weight: 500;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     text-align: left;
@@ -576,14 +576,14 @@
 }
 
 .axon-dock-menu-item:focus {
-    background-color: rgba(139, 92, 246, 0.16);
-    border: 2px solid #a78bfa;
+    background-color: rgba(43, 111, 222, 0.20);
+    border: 2px solid #5c9dff;
 }
 
 .axon-dock-menu-title {
     padding: 6px 16px;
-    color: #a6a6bc;
-    font-size: 8pt;
+    color: #b4b4b4;
+    font-size: 8.5pt;
     font-weight: 700;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }

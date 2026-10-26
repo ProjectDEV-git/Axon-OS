@@ -47,8 +47,8 @@ def test_app_css_follows_light_and_dark(tmp_path) -> None:
     manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
     dark = fg()
     manager.set_color_scheme(Adw.ColorScheme.DEFAULT)
-    assert light == "rgb(30,30,40)"  # tokens: light fg #1e1e28
-    assert dark == "rgb(232,232,240)"  # tokens: dark fg #e8e8f0
+    assert light == "rgb(22,22,22)"  # tokens: light fg #161616
+    assert dark == "rgb(242,242,242)"  # tokens: dark fg #f2f2f2
     win.destroy()
 
 

@@ -7,6 +7,8 @@
 @define-color axon_surface #000000;
 @define-color axon_surface_raised #1a1a1a;
 @define-color axon_popup #000000;
+@define-color axon_material #000000;
+@define-color axon_material_edge #ffffff;
 @define-color axon_fg #ffffff;
 @define-color axon_fg_secondary #ffffff;
 @define-color axon_fg_muted #dcdcdc;
@@ -14,11 +16,11 @@
 @define-color axon_border_strong #ffffff;
 @define-color axon_hover rgba(255, 255, 255, 0.20);
 @define-color axon_active rgba(255, 255, 255, 0.30);
-@define-color axon_accent #c4b5fd;
-@define-color axon_accent_hover #ddd6fe;
+@define-color axon_accent #8cc2ff;
+@define-color axon_accent_hover #b8d9ff;
 @define-color axon_accent_fg #000000;
-@define-color axon_accent_text #ddd6fe;
-@define-color axon_accent_subtle rgba(196, 181, 253, 0.28);
+@define-color axon_accent_text #b8d9ff;
+@define-color axon_accent_subtle rgba(140, 194, 255, 0.28);
 @define-color axon_success #4ade80;
 @define-color axon_warning #fde047;
 @define-color axon_error #fca5a5;
