@@ -13,6 +13,17 @@ Gtk, Adw, GLib = require_gtk()
 panel_mod = load_module("axon_ai_panel_ui", "apps/axon-ai-panel/ui/panel.py")
 
 
+class FakeReport:
+    def __init__(self, results: list[Any]) -> None:
+        self.results = results
+
+
+@pytest.fixture(autouse=True)
+def _no_real_diagnostics(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The status section must not run systemctl/HTTP checks in tests."""
+    monkeypatch.setattr(panel_mod, "run_diagnostics", lambda only=None: FakeReport([]))
+
+
 class FakeClient:
     """Stands in for the Brain D-Bus client."""
 
@@ -365,4 +376,31 @@ def test_cloud_dialog_builds_and_defaults_to_cancel(monkeypatch: pytest.MonkeyPa
     assert dialog.get_default_response() == "cancel"
     assert "clipboard" in dialog.get_body() and "OpenAI" in dialog.get_body()
     dialog.destroy()
+    win.destroy()
+
+
+def test_status_section_shows_problem_and_fix(monkeypatch: pytest.MonkeyPatch) -> None:
+    from diagnostics import FAIL, OK, CheckResult
+
+    from tests.gtk_helpers import ThreadRecorder
+
+    results = [
+        CheckResult("Axon services", "axon-brain.service", OK, "running"),
+        CheckResult(
+            "AI", "Ollama", FAIL, "Ollama is not responding", hint="sudo systemctl start ollama"
+        ),
+    ]
+    monkeypatch.setattr(panel_mod, "run_diagnostics", lambda only=None: FakeReport(results))
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = FakeClient()
+    client.search_stats = lambda: {"files": 10}  # type: ignore[attr-defined]
+    client.pull_progress = {"model": "llama3.2", "completed": 1, "total": 2, "status": "pulling"}  # type: ignore[attr-defined]
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    rec.join()
+    pump(GLib)
+    assert win._status_headline.get_text() == "Axon status: Ollama: Ollama is not responding"
+    assert win._status_expander.get_expanded()
+    assert win._status_fix.get_text() == "Fix: sudo systemctl start ollama"
+    names = [r.name for r in win._status.rows]
+    assert names == ["Axon Brain", "Ollama", "Model", "Download", "Semantic index", "Voice"]
     win.destroy()

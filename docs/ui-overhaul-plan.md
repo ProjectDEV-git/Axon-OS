@@ -206,11 +206,14 @@ add a short note under any item you skip or change.
       `services/command_approvals.py` and is re-checked on every use. zenity stays as the
       fallback when the card isn't installed. A test now checks the Shell and Python
       allowlists are identical.
-- [ ] **Axon status surface.** Add one place (a Shell top-bar indicator/popover, or a
+- [x] **Axon status surface.** Add one place (a Shell top-bar indicator/popover, or a
       section at the top of the AI panel) showing: Brain service, Ollama, active model,
       model download progress if available, semantic index progress if available, voice
       service, and the last error with its fix. Reuse `services/diagnostics.py` and Brain
       `GetStatus` instead of new checks. Link to the full Diagnostics window.
+      Note: built as a collapsible section at the top of the AI panel. It runs the
+      `services` and `ai` diagnostics checks, Search `GetStats` (index has no percentage,
+      so it shows "indexing…" or a file count) and the Brain `PullProgress` signal.
 
 ## Phase 4 — One design system
 

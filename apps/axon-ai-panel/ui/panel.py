@@ -49,6 +49,17 @@ from ui_logic import (
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
 from axon_gtk_utils import fit_default_size
 from context_settings import ITEM_LABELS, SENSITIVE_ITEMS, sends_sensitive
+from diagnostics import FAIL, INFO, OK, WARN, run_diagnostics
+from status_summary import StatusSummary, build_status
+
+_STATUS_ICONS = {
+    OK: "emblem-ok-symbolic",
+    INFO: "dialog-information-symbolic",
+    WARN: "dialog-warning-symbolic",
+    FAIL: "dialog-error-symbolic",
+}
+# Text next to each icon, so status never relies on colour alone
+_STATUS_WORDS = {OK: "OK", INFO: "Info", WARN: "Warning", FAIL: "Problem"}
 
 try:
     from ollama_client import OllamaClient  # type: ignore[import]
@@ -501,6 +512,42 @@ class AIPanelWindow(Adw.Window):
         self._origin_label.set_margin_end(16)
         root.append(self._origin_label)
 
+        # ---- Axon status (Brain, Ollama, model, index, voice, last error) ----
+        self._status_expander = Gtk.Expander()
+        self._status_expander.set_margin_start(12)
+        self._status_expander.set_margin_end(12)
+        status_title = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self._status_icon = Gtk.Image.new_from_icon_name("content-loading-symbolic")
+        self._status_headline = Gtk.Label(label="Axon status: checking…", xalign=0.0)
+        self._status_headline.set_ellipsize(Pango.EllipsizeMode.END)
+        status_title.append(self._status_icon)
+        status_title.append(self._status_headline)
+        self._status_expander.set_label_widget(status_title)
+        status_body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        status_body.set_margin_top(6)
+        self._status_list = Gtk.ListBox()
+        self._status_list.add_css_class("boxed-list")
+        self._status_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        status_body.append(self._status_list)
+        self._status_fix = Gtk.Label(xalign=0.0)
+        self._status_fix.set_wrap(True)
+        self._status_fix.set_selectable(True)
+        self._status_fix.set_visible(False)
+        status_body.append(self._status_fix)
+        status_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        status_buttons.set_halign(Gtk.Align.END)
+        refresh = Gtk.Button(label="Check Again")
+        refresh.connect("clicked", lambda _b: self._refresh_status())
+        diagnostics = Gtk.Button(label="Full Diagnostics")
+        diagnostics.connect("clicked", lambda _b: self._open_diagnostics())
+        status_buttons.append(refresh)
+        status_buttons.append(diagnostics)
+        status_body.append(status_buttons)
+        self._status_expander.set_child(status_body)
+        root.append(self._status_expander)
+        self._status: StatusSummary | None = None
+        self._status_loading = False
+
         # ---- Quick action chips --------------------------------------------
         chips_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         chips_row.set_spacing(6)
@@ -617,6 +664,7 @@ class AIPanelWindow(Adw.Window):
         # Initialize D-Bus conversation session
         self._init_conversation()
         self._refresh_context()
+        self._refresh_status()
 
     # ------------------------------------------------------------------
     # Model management
@@ -830,6 +878,53 @@ class AIPanelWindow(Adw.Window):
             daemon=True,
         )
         thread.start()
+
+    # ------------------------------------------------------------------
+    # Axon status
+    # ------------------------------------------------------------------
+
+    def _refresh_status(self) -> None:
+        """Re-run the services/AI diagnostics checks in a worker."""
+        if self._status_loading:
+            return
+        self._status_loading = True
+        threading.Thread(target=self._load_status_worker, daemon=True).start()
+
+    def _load_status_worker(self) -> None:
+        try:
+            results = run_diagnostics(only=["services", "ai"]).results
+        except Exception:
+            results = []
+        search_stats = getattr(self._client, "search_stats", None)
+        stats = search_stats() if search_stats is not None else None
+        pull = getattr(self._client, "pull_progress", None)
+        GLib.idle_add(self._show_status, results, stats, pull)
+
+    def _show_status(self, results: list[Any], stats: Any, pull: Any) -> bool:
+        self._status_loading = False
+        summary = build_status(results, self.current_origin().label, stats, pull)
+        self._status = summary
+        self._status_icon.set_from_icon_name(_STATUS_ICONS[summary.status])
+        self._status_headline.set_text(f"Axon status: {summary.headline}")
+        self._status_list.remove_all()
+        for row in summary.rows:
+            line = Adw.ActionRow(title=row.name, subtitle=row.text)
+            line.set_use_markup(False)
+            icon = Gtk.Image.new_from_icon_name(_STATUS_ICONS[row.status])
+            icon.set_tooltip_text(_STATUS_WORDS[row.status])
+            icon.update_property([Gtk.AccessibleProperty.LABEL], [_STATUS_WORDS[row.status]])
+            line.add_prefix(icon)
+            self._status_list.append(line)
+        problem = summary.problem
+        if problem is not None and problem.hint:
+            self._status_fix.set_text(f"Fix: {problem.hint}")
+            self._status_fix.set_visible(True)
+        else:
+            self._status_fix.set_visible(False)
+        # Open the section by itself when something is wrong
+        if summary.status == FAIL:
+            self._status_expander.set_expanded(True)
+        return False
 
     # ------------------------------------------------------------------
     # Context row and cloud warning
@@ -1057,6 +1152,7 @@ class AIPanelWindow(Adw.Window):
             self.set_visible(False)
         else:
             self._refresh_context()
+            self._refresh_status()
             self.present()
 
     # ------------------------------------------------------------------
