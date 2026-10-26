@@ -8,11 +8,13 @@ import Pango from 'gi://Pango';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
+import {announce} from './a11y.js';
 import Shell from 'gi://Shell';
 import {
     EXAMPLE_PROMPTS,
     RequestTracker,
     SETTINGS_PANELS,
+    announcement,
     STAGES,
     buildSuggestions,
     defaultSuggestionIndex,
@@ -447,7 +449,9 @@ export default class IntentBar {
 
     _runCommand(command) {
         const shown = confirmAndRun(command, '', out => {
-            this._setResponse(out === null ? 'Not run.' : formatCommandOutput(out));
+            const text = out === null ? 'Not run.' : formatCommandOutput(out);
+            this._setResponse(text);
+            announce(announcement('command', text));
         });
         if (!shown) {
             this._setResponse('Blocked: command not in allowlist or contains unsafe characters.',
@@ -609,6 +613,7 @@ export default class IntentBar {
             return;
         this._setBusy(false);
         this._setResponse('Cancelled');
+        announce(announcement('cancelled'));
     }
 
     // Wraps a Brain callback so replies to cancelled requests are ignored.
@@ -619,6 +624,7 @@ export default class IntentBar {
         if (error) {
             logError(error, 'AxonShell: Brain Generate failed');
             this._setResponse(`Axon Brain failed: ${error.message}`, {error: true, recovery: true});
+            announce(announcement('error', error.message));
             return;
         }
         this._handleResponse(result ? result[0] : null);
@@ -713,10 +719,13 @@ export default class IntentBar {
         }
 
         const {body, error} = splitError(responseText);
-        if (error)
+        if (error) {
             this._setResponse(body ? `${body}\n\n${error}` : error, {error: true, recovery: true});
-        else
+            announce(announcement('error', error));
+        } else {
             this._setResponse(body);
+            announce(announcement('answer', body));
+        }
     }
 
     _executeAction(action) {

@@ -421,3 +421,22 @@ def answer_meta(model: str, seconds: float, first_token: float | None = None) ->
     if first_token is not None and seconds >= 1:
         parts.append(f"first words after {format_latency(first_token)}")
     return " · ".join(parts)
+
+
+def announcement(kind: str, text: str = "") -> str:
+    """Short screen-reader message when an AI request finishes or fails.
+
+    Args:
+        kind: "answer", "error", "command", "cancelled" or "action".
+        text: The answer, error or command output.
+    """
+    first = " ".join(text.split())[:120]
+    if kind == "answer":
+        return f"Axon answered: {first}" if first else "Axon answered."
+    if kind == "error":
+        return f"Axon couldn't finish: {first}" if first else "Axon couldn't finish."
+    if kind == "command":
+        return "Command finished." if text.strip() != "Not run." else "Command not run."
+    if kind == "cancelled":
+        return "Cancelled."
+    return first or "Done."

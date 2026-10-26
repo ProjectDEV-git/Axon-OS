@@ -50,3 +50,19 @@ def test_app_css_follows_light_and_dark(tmp_path) -> None:
     assert light == "rgb(30,30,40)"  # tokens: light fg #1e1e28
     assert dark == "rgb(232,232,240)"  # tokens: dark fg #e8e8f0
     win.destroy()
+
+
+def test_announce_is_skipped_without_an_accessibility_bus(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class W:
+        def announce(self, text: str, _priority: object) -> None:
+            calls.append(text)
+
+    monkeypatch.setattr(utils, "_a11y_bus", False)
+    utils.announce(W(), "hello")
+    assert calls == []
+    monkeypatch.setattr(utils, "_a11y_bus", True)
+    utils.announce(W(), "hello")
+    utils.announce(W(), "")
+    assert calls == ["hello"]

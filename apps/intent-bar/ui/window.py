@@ -35,7 +35,7 @@ from suggestions import SETTINGS_PANELS, Suggestion, build_suggestions, default_
 from suggestions import describe as describe_suggestion
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from axon_gtk_utils import load_app_css, monitor_size
+from axon_gtk_utils import announce, load_app_css, monitor_size
 from ui_logic import (
     EXAMPLE_PROMPTS,
     SHOW,
@@ -45,6 +45,7 @@ from ui_logic import (
     STAGE_WAITING,
     ModelOrigin,
     RequestTracker,
+    announcement,
     classify_stream_prefix,
     describe_action,
     escape_action,
@@ -560,6 +561,7 @@ class IntentBarWindow(Adw.Window):
         self._set_busy(False)
         self._clear_results()
         self._set_response("Cancelled")
+        announce(self, announcement("cancelled"))
         cancel = getattr(self._ollama, "cancel", None)
         if cancel is not None:
             threading.Thread(target=cancel, daemon=True).start()
@@ -626,6 +628,7 @@ class IntentBarWindow(Adw.Window):
         if self._requests.busy:
             return False  # don't overwrite a request that is running
         self._show_error("Ollama is not running.")
+        announce(self, announcement("error", "Ollama is not running."), important=True)
         self._start_ollama_btn.set_sensitive(True)
         self._start_ollama_btn.set_visible(True)
         return False
@@ -659,9 +662,11 @@ class IntentBarWindow(Adw.Window):
         body, error = split_error(full)
         if error is not None:
             self._show_error(f"{body}\n\n{error}" if body else error)
+            announce(self, announcement("error", error), important=True)
         elif body:
             # Covers replies that were held back as possible JSON
             self._set_response(body)
+            announce(self, announcement("answer", body))
 
         return False
 
@@ -700,16 +705,21 @@ class IntentBarWindow(Adw.Window):
                 command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
             )
             if proc is None:
-                GLib.idle_add(self._set_response, "Not run.")
+                GLib.idle_add(self._command_done, "Not run.")
                 return
             try:
                 out, _ = proc.communicate(timeout=15)
             except subprocess.TimeoutExpired:
                 proc.kill()
                 out = "(stopped after 15 seconds)"
-            GLib.idle_add(self._set_response, format_command_output(out or ""))
+            GLib.idle_add(self._command_done, format_command_output(out or ""))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _command_done(self, text: str) -> bool:
+        self._set_response(text)
+        announce(self, announcement("command", text))
+        return False
 
     # ------------------------------------------------------------------
     # Suggestions while typing

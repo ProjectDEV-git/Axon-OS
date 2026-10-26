@@ -228,3 +228,10 @@ test('filterSpaces', async () => {
     assert.deepEqual(filterSpaces('inbox', spaces), [{index: 1, name: 'Web', window: 'Inbox - Firefox', windowIndex: 0}]);
     assert.deepEqual(filterSpaces('zzz', spaces), []);
 });
+
+test('announcement', async () => {
+    const {announcement} = await import('./ui-logic.mjs');
+    assert.equal(announcement('answer', 'Four.\n\nMore'), 'Axon answered: Four. More');
+    assert.equal(announcement('command', 'Not run.'), 'Command not run.');
+    assert.equal(announcement('cancelled'), 'Cancelled.');
+});

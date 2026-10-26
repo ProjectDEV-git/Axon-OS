@@ -381,3 +381,18 @@ def test_command_output_is_shown(monkeypatch: pytest.MonkeyPatch) -> None:
     assert win._response_label.get_text() == "Not run."
     assert sp  # subprocess is used for the PIPE flags in the real call
     win.destroy()
+
+
+def test_answers_and_errors_are_announced(monkeypatch: pytest.MonkeyPatch) -> None:
+    said: list[tuple[str, bool]] = []
+    monkeypatch.setattr(
+        window_mod, "announce", lambda _w, text, important=False: said.append((text, important))
+    )
+    win = make_window(["Four."])
+    run_query(win, monkeypatch)
+    assert said[-1] == ("Axon answered: Four.", False)
+    win2 = make_window(["\n[error] model crashed"])
+    run_query(win2, monkeypatch)
+    assert said[-1] == ("Axon couldn't finish: model crashed", True)
+    win.destroy()
+    win2.destroy()

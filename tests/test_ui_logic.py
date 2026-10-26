@@ -357,3 +357,15 @@ def test_latency_and_meta() -> None:
     assert format_latency(125) == "2 min 5 s"
     assert answer_meta("llama3.2:3b", 2.4, 0.6) == "llama3.2:3b · 2.4 s · first words after 600 ms"
     assert answer_meta("", 0.5) == "Automatic model · 500 ms"
+
+
+def test_announcement() -> None:
+    from services.ui_logic import announcement
+
+    assert announcement("answer", "Four.\n\nMore text") == "Axon answered: Four. More text"
+    assert announcement("answer", "") == "Axon answered."
+    assert announcement("error", "Ollama is not running.").startswith("Axon couldn't finish:")
+    assert announcement("command", "/dev/sda1 100G") == "Command finished."
+    assert announcement("command", "Not run.") == "Command not run."
+    assert announcement("cancelled") == "Cancelled."
+    assert len(announcement("answer", "x" * 500)) < 140

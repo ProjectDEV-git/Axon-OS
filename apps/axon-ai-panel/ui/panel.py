@@ -42,6 +42,7 @@ for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().pare
 from ui_logic import (
     ModelOrigin,
     RequestTracker,
+    announcement,
     answer_meta,
     describe_action,
     escape_action,
@@ -54,7 +55,7 @@ from ui_logic import (
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from axon_gtk_utils import fit_default_size, load_app_css
+from axon_gtk_utils import announce, fit_default_size, load_app_css
 from command_risk import assess
 from context_settings import (
     ITEM_LABELS,
@@ -1206,6 +1207,7 @@ class AIPanelWindow(Adw.Window):
             self._stream_bubble.set_final_text(
                 f"{partial}\n\n(Cancelled)" if partial else "Cancelled"
             )
+            announce(self, announcement("cancelled"))
             self._stream_bubble = None
         self._entry.grab_focus()
         cancel = getattr(self._client, "cancel", None)
@@ -1264,6 +1266,7 @@ class AIPanelWindow(Adw.Window):
     def _show_bubble_error(self, bubble: MessageBubble, message: str, offline: bool) -> None:
         """Turn *bubble* into an error with recovery buttons."""
         bubble.set_error(message)
+        announce(self, announcement("error", message), important=True)
         prompt = self._stream_prompt
         bubble.add_action("Try again", lambda: self._retry(bubble, prompt))
         if offline:
@@ -1348,6 +1351,7 @@ class AIPanelWindow(Adw.Window):
 
     def _card_result(self, bubble: MessageBubble, card: Gtk.Box, text: str) -> bool:
         card.set_visible(False)
+        announce(self, announcement("command", text))
         result = Gtk.Label(xalign=0.0)
         result.set_text(text)
         result.set_selectable(True)
@@ -1434,6 +1438,7 @@ class AIPanelWindow(Adw.Window):
                 )
                 bubble.set_sources(sources or [])
                 self._offer_regenerate(bubble, self._stream_prompt)
+                announce(self, announcement("answer", bubble.get_text()))
             else:
                 self._show_bubble_error(
                     bubble, f"{body}\n\n{error}" if body else error, offline=False

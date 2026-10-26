@@ -318,7 +318,10 @@ add a short note under any item you skip or change.
 - [x] Accessible names on every icon-only button and on dynamic content (responses, status).
       Note: a static test now fails on icon-only GTK buttons without an accessible label and
       on icon St.Buttons without `accessible_name`.
-- [ ] Announce when an AI action finishes or fails.
+- [x] Announce when an AI action finishes or fails.
+      Note: GTK uses `announce()` (GTK 4.14+), only when the AT-SPI bus answers, because
+      4.14 segfaults without one (reproduced under Xvfb). The Shell uses the NOTIFICATION-role
+      trick from `a11y.js`. Neither was checked with Orca.
 - [ ] Text scaling: layouts survive 1.25× and 1.5× "Large Text".
 - [ ] Status shown with icon or text as well as colour.
 

@@ -726,3 +726,15 @@ export function filterSpaces(query, spaces) {
     });
     return out;
 }
+
+/** Short screen-reader message when a request ends (twin of announcement()). */
+export function announcement(kind, text = '') {
+    const first = String(text ?? '').split(/\s+/).filter(Boolean).join(' ').slice(0, 120);
+    switch (kind) {
+    case 'answer': return first ? `Axon answered: ${first}` : 'Axon answered.';
+    case 'error': return first ? `Axon couldn't finish: ${first}` : "Axon couldn't finish.";
+    case 'command': return String(text).trim() !== 'Not run.' ? 'Command finished.' : 'Command not run.';
+    case 'cancelled': return 'Cancelled.';
+    default: return first || 'Done.';
+    }
+}

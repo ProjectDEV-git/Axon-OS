@@ -6,6 +6,7 @@ to the apps in the source tree, the .deb and install.sh layouts.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -14,7 +15,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 # services/ is beside apps/ (source tree, .deb) or inside the install dir.
 for _base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().parents[1]):
@@ -130,3 +131,48 @@ def close_on_escape(window: Gtk.Window) -> None:
 
     keys.connect("key-pressed", on_key)
     window.add_controller(keys)
+
+
+_a11y_bus: bool | None = None
+
+
+def accessibility_bus_available() -> bool:
+    """True when the AT-SPI accessibility bus answers (cached).
+
+    GTK 4.14's announce() crashes when there is no accessibility bus (seen
+    with no session bus at all), so announcements are only sent when the bus
+    is there and GTK_A11Y isn't "none".
+    """
+    global _a11y_bus
+    if _a11y_bus is None:
+        _a11y_bus = False
+        if os.environ.get("GTK_A11Y", "") != "none":
+            try:
+                bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+                bus.call_sync(
+                    "org.a11y.Bus",
+                    "/org/a11y/bus",
+                    "org.a11y.Bus",
+                    "GetAddress",
+                    None,
+                    GLib.VariantType.new("(s)"),
+                    Gio.DBusCallFlags.NONE,
+                    500,
+                    None,
+                )
+                _a11y_bus = True
+            except Exception:
+                _a11y_bus = False
+    return _a11y_bus
+
+
+def announce(widget: Gtk.Widget, text: str, important: bool = False) -> None:
+    """Ask screen readers to read *text* (GTK 4.14+; a no-op on older GTK)."""
+    if not text or not hasattr(widget, "announce") or not accessibility_bus_available():
+        return
+    priority = (
+        Gtk.AccessibleAnnouncementPriority.HIGH
+        if important
+        else Gtk.AccessibleAnnouncementPriority.MEDIUM
+    )
+    widget.announce(text, priority)
