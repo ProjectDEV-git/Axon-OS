@@ -204,15 +204,15 @@ test('spaceChipState never relies on colour alone', async () => {
     const {spaceChipState} = await import('./ui-logic.mjs');
     const active = spaceChipState(0, 'Code', true, 3, false);
     assert.equal(active.number, '1');
-    assert.equal(active.badge, '3');
+    assert.equal(active.marker, 'windows');
     assert.ok(active.styleClasses.includes('axon-space-chip-active'));
     assert.equal(active.accessibleName, 'Space 1: Code, 3 windows, current');
     const empty = spaceChipState(4, 'Media', false, 0, false);
     assert.ok(empty.styleClasses.includes('axon-space-chip-empty'));
-    assert.equal(empty.badge, '');
+    assert.equal(empty.marker, 'none');
     assert.equal(empty.accessibleName, 'Space 5: Media, empty');
     const urgent = spaceChipState(2, 'Chat', false, 1, true);
-    assert.equal(urgent.badge, '1!');
+    assert.equal(urgent.marker, 'attention');
     assert.match(urgent.accessibleName, /1 window, needs attention$/);
 });
 
@@ -300,4 +300,24 @@ test('accent stylesheet follows the accent, scheme and contrast', async () => {
     assert.equal(accentStylesheet('bogus', 'prefer-dark', false), null);
     assert.equal(gnomeAccent('graphite'), 'slate');
     assert.equal(gnomeAccent('teal'), 'teal');
+});
+
+test('taskbarApps puts pinned apps first and keeps each app once', async () => {
+    const {taskbarApps} = await import('./ui-logic.mjs');
+    const apps = taskbarApps(['files', 'terminal'], ['editor', 'terminal', '', 'editor']);
+    assert.deepEqual(apps, [
+        {id: 'files', pinned: true, running: false},
+        {id: 'terminal', pinned: true, running: true},
+        {id: 'editor', pinned: false, running: true},
+    ]);
+    assert.deepEqual(taskbarApps([], []), []);
+});
+
+test('pinnedStartApps prefers installed favourites, then the defaults', async () => {
+    const {pinnedStartApps} = await import('./ui-logic.mjs');
+    const installed = id => id !== 'missing';
+    assert.deepEqual(pinnedStartApps(['b', 'missing', 'b', 'a'], ['x'], installed), ['b', 'a']);
+    assert.deepEqual(pinnedStartApps(['missing'], ['x', 'missing', 'y'], installed), ['x', 'y']);
+    assert.deepEqual(pinnedStartApps([], ['1', '2', '3'], installed, 2), ['1', '2']);
+    assert.deepEqual(pinnedStartApps([], [], installed), []);
 });

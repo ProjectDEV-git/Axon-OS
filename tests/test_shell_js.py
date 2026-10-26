@@ -127,3 +127,13 @@ def test_calculator_matches_python(tmp_path: Path) -> None:
     )
     js = json.loads(result.stdout)
     assert js == [calculate(q) for q in queries]
+
+
+def test_st_widgets_get_spacing_from_css() -> None:
+    """St.BoxLayout has no "spacing" property: passing one throws in GNOME 46 and
+    stopped the whole extension from enabling. Spacing goes in CSS or `style`."""
+    import re
+
+    for path in sorted(SHELL_DIR.glob("*.js")):
+        bad = re.findall(r"^\s*spacing:\s*\d+\s*,?$|[{,]\s*spacing:\s*\d+", path.read_text(), re.M)
+        assert not bad, f"{path.name}: {bad}"

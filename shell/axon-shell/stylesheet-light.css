@@ -247,13 +247,40 @@
     margin: 0 8px;
 }
 
-.axon-taskbar-clock {
+/* GNOME's own date menu and Quick Settings, adopted into the taskbar. Their
+ * usual styles hang off #panel, which they are no longer inside. */
+.axon-taskbar .panel-button {
     color: #161616;
-    font-size: 8.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    font-size: 9pt;
     font-weight: 500;
-    text-align: center;
-    margin: 0 8px;
+    border-radius: 8px;
+    padding: 0 8px;
+    margin: 6px 0;
+    background-color: transparent;
+    transition-duration: 100ms;
+}
+
+.axon-taskbar .panel-button:hover {
+    background-color: rgba(0, 0, 0, 0.045);
+}
+
+.axon-taskbar .panel-button:active,
+.axon-taskbar .panel-button:checked {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.axon-taskbar .panel-button:focus {
+    border: 2px solid #1d64d8;
+}
+
+.axon-taskbar .system-status-icon {
+    icon-size: 16px;
+    padding: 0 1px;
+}
+
+.axon-taskbar .panel-status-indicators-box {
+    spacing: 4px;
 }
 
 .axon-dock-tooltip {
@@ -515,7 +542,6 @@
     padding: 2px 6px;
     border-radius: 6px;
     border: 1px solid transparent;
-    border-bottom: 2px solid transparent;
     color: #555555;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-size: 9pt;
@@ -529,15 +555,14 @@
     border: 2px solid #1d64d8;
 }
 
-/* Active: bold number and an underline bar, not colour alone */
+/* Active: bold number on a filled pill, not colour alone */
 .axon-space-chip-active {
     color: #161616;
     font-weight: 700;
     background-color: rgba(0, 0, 0, 0.08);
-    border-bottom: 2px solid #1858c2;
 }
 
-/* Empty: dimmed and no window count */
+/* Empty: dimmed and no dot */
 .axon-space-chip-empty {
     color: #666666;
 }
@@ -546,20 +571,26 @@
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
-/* The window count sits in its own small pill, so "1" with 3 windows
- * never reads as "13" */
-.axon-space-chip-badge {
-    font-size: 8.5pt;
-    margin-left: 4px;
-    padding: 0 4px;
+/* A dot under the number when the Space has windows; a wider bar in the
+ * warning colour when one of them wants attention */
+.axon-space-chip-dot {
+    width: 4px;
+    height: 4px;
+    margin-top: 2px;
     border-radius: 9999px;
-    background-color: rgba(0, 0, 0, 0.045);
-    color: #555555;
 }
 
-.axon-space-chip-attention .axon-space-chip-badge {
-    color: #8a5800;
-    font-weight: 700;
+.axon-space-chip-dot-windows {
+    background-color: #666666;
+}
+
+.axon-space-chip-active .axon-space-chip-dot-windows {
+    background-color: #1858c2;
+}
+
+.axon-space-chip-dot-attention {
+    width: 12px;
+    background-color: #8a5800;
 }
 
 /* ── Space indicator in the top panel ───────────────────────────────────── */
@@ -600,6 +631,13 @@
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     text-align: left;
     background-color: transparent;
+}
+
+/* Loading and error lines among the AI shortcuts: plain text, not a button */
+.axon-dock-menu-status {
+    color: #666666;
+    font-size: 9pt;
+    font-weight: 400;
 }
 
 .axon-dock-menu-item:hover {

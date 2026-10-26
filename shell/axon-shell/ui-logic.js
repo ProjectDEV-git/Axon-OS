@@ -920,16 +920,18 @@ export function formatCommandOutput(text, maxLines = 40, maxChars = 4000) {
 
 /**
  * How one Space chip in the taskbar looks and reads. States differ by more
- * than colour: the active Space is bold with an underline bar, a Space with
- * windows shows their count, an empty one is dimmed, and "!" marks a window
- * that wants attention.
+ * than colour: the active Space is bold on a filled pill, a Space with
+ * windows has a dot under its number, an empty one is dimmed with no dot, and
+ * a window that wants attention widens the dot into a bar. The window count
+ * is in the accessible name, so the chip itself stays a single number.
  *
  * @param {number} index - 0-based (chip shows index + 1, matching Super+1…9)
  * @param {string} name - Space name
  * @param {boolean} active - is the current Space
  * @param {number} windowCount - normal windows on it
  * @param {boolean} attention - a window on it demands attention
- * @returns {{number: string, badge: string, styleClasses: string[], accessibleName: string}}
+ * @returns {{number: string, marker: string, styleClasses: string[], accessibleName: string}}
+ *   marker is 'none', 'windows' or 'attention'.
  */
 export function spaceChipState(index, name, active, windowCount, attention) {
     const styleClasses = ['axon-space-chip'];
@@ -939,9 +941,7 @@ export function spaceChipState(index, name, active, windowCount, attention) {
         styleClasses.push('axon-space-chip-empty');
     if (attention)
         styleClasses.push('axon-space-chip-attention');
-    let badge = windowCount > 0 ? String(windowCount) : '';
-    if (attention)
-        badge = `${badge}!`;
+    const marker = attention ? 'attention' : windowCount > 0 ? 'windows' : 'none';
     const windows = windowCount === 0 ? _t('empty')
         : windowCount === 1 ? _t('1 window') : _t('{count} windows', {count: windowCount});
     const parts = [_t('Space {number}: {name}', {number: index + 1, name}), windows];
@@ -949,7 +949,46 @@ export function spaceChipState(index, name, active, windowCount, attention) {
         parts.push(_t('current'));
     if (attention)
         parts.push(_t('needs attention'));
-    return {number: String(index + 1), badge, styleClasses, accessibleName: parts.join(', ')};
+    return {number: String(index + 1), marker, styleClasses, accessibleName: parts.join(', ')};
+}
+
+/**
+ * The taskbar's app order: pinned apps (GNOME favourites) first in their
+ * pinned order, then running apps that aren't pinned, in the order given.
+ * Empty and repeated ids are dropped.
+ *
+ * @param {string[]} pinnedIds - favourite app ids, in order
+ * @param {string[]} runningIds - running app ids
+ * @returns {{id: string, pinned: boolean, running: boolean}[]}
+ */
+export function taskbarApps(pinnedIds, runningIds) {
+    const pinned = new Set(pinnedIds);
+    const running = new Set(runningIds);
+    const seen = new Set();
+    const out = [];
+    for (const id of [...pinnedIds, ...runningIds]) {
+        if (!id || seen.has(id))
+            continue;
+        seen.add(id);
+        out.push({id, pinned: pinned.has(id), running: running.has(id)});
+    }
+    return out;
+}
+
+/**
+ * The Start Menu's pinned apps: the user's favourites when they have any that
+ * are installed, otherwise the Axon defaults that are installed.
+ *
+ * @param {string[]} favoriteIds - favourite app ids, in order
+ * @param {string[]} defaultIds - Axon's default picks, in order
+ * @param {(id: string) => boolean} installed - whether an app id resolves
+ * @param {number} limit - most apps to show
+ * @returns {string[]}
+ */
+export function pinnedStartApps(favoriteIds, defaultIds, installed, limit = 9) {
+    const pick = ids => [...new Set(ids)].filter(id => id && installed(id)).slice(0, limit);
+    const favorites = pick(favoriteIds);
+    return favorites.length > 0 ? favorites : pick(defaultIds);
 }
 
 /**

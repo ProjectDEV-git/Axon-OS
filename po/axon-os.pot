@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-26 11:08+0000\n"
+"POT-Creation-Date: 2026-10-26 11:30+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1810,10 +1810,6 @@ msgid "… (output shortened)"
 msgstr ""
 
 #: shell/axon-shell/dock.js
-msgid "Clock"
-msgstr ""
-
-#: shell/axon-shell/dock.js
 msgid "Start Menu"
 msgstr ""
 
@@ -1830,7 +1826,19 @@ msgid "{app} menu"
 msgstr ""
 
 #: shell/axon-shell/dock.js
-msgid "Close Window"
+msgid "Pin to Taskbar"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Unpin from Taskbar"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Quit"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Loading AI shortcuts…"
 msgstr ""
 
 #: shell/axon-shell/dock.js
@@ -1971,6 +1979,10 @@ msgstr ""
 
 #: shell/axon-shell/startmenu.js
 msgid "Power off"
+msgstr ""
+
+#: shell/axon-shell/startmenu.js
+msgid "No pinned apps. Type to search all apps."
 msgstr ""
 
 #: shell/axon-shell/startmenu.js

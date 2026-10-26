@@ -243,13 +243,40 @@
     margin: 0 {{space.md}};
 }
 
-.axon-taskbar-clock {
+/* GNOME's own date menu and Quick Settings, adopted into the taskbar. Their
+ * usual styles hang off #panel, which they are no longer inside. */
+.axon-taskbar .panel-button {
     color: {{color.fg}};
-    font-size: {{font_size.xs}};
     font-family: {{font.family}};
+    font-size: {{font_size.sm}};
     font-weight: {{font_weight.medium}};
-    text-align: center;
-    margin: 0 {{space.md}};
+    border-radius: {{radius.md}};
+    padding: 0 {{space.md}};
+    margin: {{space.sm}} 0;
+    background-color: transparent;
+    transition-duration: {{duration.fast}};
+}
+
+.axon-taskbar .panel-button:hover {
+    background-color: {{color.hover}};
+}
+
+.axon-taskbar .panel-button:active,
+.axon-taskbar .panel-button:checked {
+    background-color: {{color.active}};
+}
+
+.axon-taskbar .panel-button:focus {
+    border: {{focus.width}} solid {{color.focus_ring}};
+}
+
+.axon-taskbar .system-status-icon {
+    icon-size: 16px;
+    padding: 0 1px;
+}
+
+.axon-taskbar .panel-status-indicators-box {
+    spacing: {{space.xs}};
 }
 
 .axon-dock-tooltip {
@@ -511,7 +538,6 @@
     padding: {{space.xxs}} {{space.sm}};
     border-radius: {{radius.sm}};
     border: 1px solid transparent;
-    border-bottom: 2px solid transparent;
     color: {{color.fg_secondary}};
     font-family: {{font.family}};
     font-size: {{font_size.sm}};
@@ -525,15 +551,14 @@
     border: {{focus.width}} solid {{color.focus_ring}};
 }
 
-/* Active: bold number and an underline bar, not colour alone */
+/* Active: bold number on a filled pill, not colour alone */
 .axon-space-chip-active {
     color: {{color.fg}};
     font-weight: {{font_weight.bold}};
     background-color: {{color.active}};
-    border-bottom: 2px solid {{color.accent_text}};
 }
 
-/* Empty: dimmed and no window count */
+/* Empty: dimmed and no dot */
 .axon-space-chip-empty {
     color: {{color.fg_muted}};
 }
@@ -542,20 +567,26 @@
     font-family: {{font.family}};
 }
 
-/* The window count sits in its own small pill, so "1" with 3 windows
- * never reads as "13" */
-.axon-space-chip-badge {
-    font-size: {{font_size.xs}};
-    margin-left: {{space.xs}};
-    padding: 0 {{space.xs}};
+/* A dot under the number when the Space has windows; a wider bar in the
+ * warning colour when one of them wants attention */
+.axon-space-chip-dot {
+    width: 4px;
+    height: 4px;
+    margin-top: {{space.xxs}};
     border-radius: {{radius.pill}};
-    background-color: {{color.hover}};
-    color: {{color.fg_secondary}};
 }
 
-.axon-space-chip-attention .axon-space-chip-badge {
-    color: {{color.warning}};
-    font-weight: {{font_weight.bold}};
+.axon-space-chip-dot-windows {
+    background-color: {{color.fg_muted}};
+}
+
+.axon-space-chip-active .axon-space-chip-dot-windows {
+    background-color: {{color.accent_text}};
+}
+
+.axon-space-chip-dot-attention {
+    width: 12px;
+    background-color: {{color.warning}};
 }
 
 /* ── Space indicator in the top panel ───────────────────────────────────── */
@@ -596,6 +627,13 @@
     font-family: {{font.family}};
     text-align: left;
     background-color: transparent;
+}
+
+/* Loading and error lines among the AI shortcuts: plain text, not a button */
+.axon-dock-menu-status {
+    color: {{color.fg_muted}};
+    font-size: {{font_size.sm}};
+    font-weight: {{font_weight.regular}};
 }
 
 .axon-dock-menu-item:hover {

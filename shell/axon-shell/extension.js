@@ -293,6 +293,19 @@ export default class AxonShellExtension extends Extension {
             if (Main.panel) {
                 Main.panel.hide();
             }
+
+            // The Axon taskbar replaces the Overview dash, and the session
+            // starts on the desktop rather than in the Overview
+            Main.overview.dash?.hide();
+            if (Main.layoutManager._startingUp) {
+                if ('startInOverview' in Main.layoutManager)
+                    Main.layoutManager.startInOverview = false;
+                this._startupId = Main.layoutManager.connect('startup-complete', () => {
+                    Main.overview.hide();
+                    Main.layoutManager.disconnect(this._startupId);
+                    this._startupId = 0;
+                });
+            }
         } catch (e) {
             console.error('AxonShell: enable() failed, restoring panel:', e);
             // Restore the panel so the desktop doesn't go black
@@ -557,6 +570,11 @@ export default class AxonShellExtension extends Extension {
 
     disable() {
         setTranslator(null);
+        if (this._startupId) {
+            Main.layoutManager.disconnect(this._startupId);
+            this._startupId = 0;
+        }
+        Main.overview.dash?.show();
         try {
             if (this._voiceOverlayProc) {
                 this._voiceOverlayProc.force_exit();

@@ -29,9 +29,15 @@ export default class AccentManager {
             [this._a11y, this._a11y.connect('changed::high-contrast', apply)],
         ];
         // GNOME replaces the theme object when the Shell theme reloads, which
-        // drops extra stylesheets: load ours again into the new one.
+        // drops extra stylesheets: load ours again into the new one. Loading a
+        // stylesheet also emits "changed", so react only to a new theme object.
         this._context = St.ThemeContext.get_for_stage(global.stage);
+        this._theme = this._context.get_theme();
         this._contextId = this._context.connect('changed', () => {
+            const theme = this._context.get_theme();
+            if (theme === this._theme)
+                return;
+            this._theme = theme;
             this._file = null;
             this._apply();
         });
@@ -47,6 +53,7 @@ export default class AccentManager {
             this._context.disconnect(this._contextId);
         this._context = null;
         this._contextId = 0;
+        this._theme = null;
         this._settings = null;
         this._interface = null;
         this._a11y = null;

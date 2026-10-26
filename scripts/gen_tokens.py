@@ -164,6 +164,9 @@ def accent_rules(template: str) -> str:
     for selector, body in _RULE.findall(_COMMENT.sub("", hidden)):
         body = re.sub(r"@@([^@]+)@@", r"{{\1}}", body)
         decls = [line.strip() for line in body.split(";") if _ACCENT_TOKEN.search(line)]
+        # St keeps the extension's main stylesheet ahead of later ones on equal
+        # specificity, so the override marks its declarations important to win.
+        decls = [d if d.endswith("!important") else f"{d} !important" for d in decls]
         if decls:
             out.append(selector.strip() + " {\n" + "".join(f"    {d};\n" for d in decls) + "}\n")
     return "\n".join(out)

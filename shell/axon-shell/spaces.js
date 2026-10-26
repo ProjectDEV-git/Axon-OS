@@ -154,9 +154,9 @@ const BrainProxy = Gio.DBusProxy.makeProxyWrapper(BrainInterface);
 const MAX_CHIPS = 9; // Super+1…9
 
 /**
- * Numbered Space chips for the taskbar: 1–9 like Super+1…9, with each
- * Space's window count, an attention marker and distinct active / inactive
- * / empty states (shape and text as well as colour).
+ * Numbered Space chips for the taskbar: 1–9 like Super+1…9, with a dot for
+ * a Space that has windows, a wider bar for one that wants attention and
+ * distinct active / inactive / empty states (shape as well as colour).
  */
 export class SpaceStrip {
     constructor(spacesManager) {
@@ -230,10 +230,17 @@ export class SpaceStrip {
             const windows = ws ? ws.list_windows().filter(w => !w.is_skip_taskbar()) : [];
             const state = spaceChipState(i, space.name, i === activeIndex, windows.length,
                 windows.some(w => this._attention.has(w)));
-            const box = new St.BoxLayout({vertical: false, y_align: Clutter.ActorAlign.CENTER});
-            box.add_child(new St.Label({text: state.number, style_class: 'axon-space-chip-number'}));
-            if (state.badge)
-                box.add_child(new St.Label({text: state.badge, style_class: 'axon-space-chip-badge'}));
+            const box = new St.BoxLayout({vertical: true, y_align: Clutter.ActorAlign.CENTER});
+            box.add_child(new St.Label({
+                text: state.number,
+                style_class: 'axon-space-chip-number',
+                x_align: Clutter.ActorAlign.CENTER,
+            }));
+            // Always present so every chip has the same height
+            box.add_child(new St.Widget({
+                style_class: `axon-space-chip-dot axon-space-chip-dot-${state.marker}`,
+                x_align: Clutter.ActorAlign.CENTER,
+            }));
             const chip = new St.Button({
                 style_class: state.styleClasses.join(' '),
                 child: box,

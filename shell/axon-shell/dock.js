@@ -20,9 +20,9 @@ import Shell from 'gi://Shell';
 import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
-import Atk from 'gi://Atk';
 import Graphene from 'gi://Graphene';
 
+import * as AppFavorites from 'resource:///org/gnome/shell/ui/appFavorites.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import StartMenuPopup from './startmenu.js';
@@ -32,6 +32,7 @@ import {
     PRESS_SCALE,
     _t,
     motionDuration,
+    taskbarApps,
     taskbarGeometry,
     tooltipDelay,
     useMaterial,
@@ -77,45 +78,12 @@ const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
 
 const TASKBAR_HEIGHT     = 48;   // px, the visible bar
 const TASKBAR_INSET      = 8;    // px it floats above and inside the screen edges
-const ICON_SIZE          = 32;   // px, taskbar icon size
+const ICON_SIZE          = 32;   // px, app icons in the taskbar
+const SYMBOLIC_SIZE      = 20;   // px, the start and search glyphs
 const LAUNCH_LIFT        = 1.08; // launch feedback: a gentle lift, no bounce
 
 // When the last dock tooltip closed, so neighbours open without a delay
 let lastTooltipHidden = null;
-
-// ─── Clock Label ───────────────────────────────────────────────────────────────
-
-const TaskbarClock = GObject.registerClass(
-class TaskbarClock extends St.Label {
-    _init() {
-        super._init({
-            style_class: 'axon-taskbar-clock',
-            text: '',
-            y_align: Clutter.ActorAlign.CENTER,
-            accessible_name: _t('Clock'),
-            accessible_role: Atk.Role.LABEL,
-        });
-        this._updateTime();
-        this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, () => {
-            this._updateTime();
-            return GLib.SOURCE_CONTINUE;
-        });
-    }
-
-    _updateTime() {
-        let now = GLib.DateTime.new_now_local();
-        // Two-line layout: HH:MM AM/PM \n MM/DD/YYYY
-        this.set_text(now.format('%I:%M %p\n%m/%d/%Y'));
-    }
-
-    destroy() {
-        if (this._timerId) {
-            GLib.source_remove(this._timerId);
-            this._timerId = null;
-        }
-        super.destroy();
-    }
-});
 
 // ─── DockIcon ──────────────────────────────────────────────────────────────────
 
@@ -144,9 +112,10 @@ class DockIcon extends St.Button {
         if (this._app) {
             iconWidget = this._app.create_icon_texture(ICON_SIZE);
         } else if (opts.icon) {
+            // Symbolic glyphs (start, search) sit at text size, not app-icon size
             iconWidget = new St.Icon({
                 gicon:     opts.icon,
-                icon_size: ICON_SIZE,
+                icon_size: SYMBOLIC_SIZE,
                 style_class: 'axon-taskbar-icon-svg',
             });
         } else {
@@ -387,6 +356,7 @@ export default class DockManager {
             if (qsParent) qsParent.remove_child(quickSettings);
             const qsHome = this._quickSettingsOrigParent || Main.panel._rightBox;
             qsHome.add_child(quickSettings);
+            quickSettings.x_expand = this._quickSettingsExpand ?? quickSettings.x_expand;
             this._quickSettingsOrigParent = null;
         }
         const dateMenu = this._actor ? this._actor._dateMenuHolder : null;
@@ -395,6 +365,7 @@ export default class DockManager {
             if (dmParent) dmParent.remove_child(dateMenu);
             const dmHome = this._dateMenuOrigParent || Main.panel._centerBox;
             dmHome.add_child(dateMenu);
+            dateMenu.x_expand = this._dateMenuExpand ?? dateMenu.x_expand;
             this._dateMenuOrigParent = null;
         }
 
@@ -499,13 +470,11 @@ export default class DockManager {
             style_class: 'axon-taskbar-right',
             vertical: false,
             y_align: Clutter.ActorAlign.CENTER,
-            spacing: 12,
         });
         bar.add_child(rightBox);
 
-        // Clock Label
-        const clock = new TaskbarClock();
-        rightBox.add_child(clock);
+        // The clock is GNOME's own date menu, adopted below: it follows the
+        // 12/24-hour setting and holds the calendar and notifications.
 
         // Migrate native Quick Settings (network/volume/power aggregate).
         // Remember the original parent so disable() can restore the exact
@@ -516,6 +485,9 @@ export default class DockManager {
             const parent = nativeQS.get_parent();
             if (parent) parent.remove_child(nativeQS);
             rightBox.add_child(nativeQS);
+            // In the top panel it stretches; in the taskbar it hugs its icons
+            this._quickSettingsExpand = nativeQS.x_expand;
+            nativeQS.x_expand = false;
             this._actor._quickSettingsHolder = nativeQS;
             this._quickSettingsOrigParent = parent;
         }
@@ -526,6 +498,8 @@ export default class DockManager {
             const parent = nativeDate.get_parent();
             if (parent) parent.remove_child(nativeDate);
             rightBox.add_child(nativeDate);
+            this._dateMenuExpand = nativeDate.x_expand;
+            nativeDate.x_expand = false;
             this._actor._dateMenuHolder = nativeDate;
             this._dateMenuOrigParent = parent;
         }
@@ -542,9 +516,11 @@ export default class DockManager {
         bar.add_child(showDesktopBtn);
 
         // Register with Chrome Manager so windows respect taskbar boundary
+        // Struts follow the actor's geometry; trackFullscreen hides it over
+        // fullscreen windows (GNOME 46 has no "trackPosition" option)
         Main.layoutManager.addChrome(this._actor, {
             affectsStruts: true,
-            trackPosition: true,
+            trackFullscreen: true,
         });
 
         // Translucent material unless Reduce Transparency or High Contrast is on
@@ -577,18 +553,27 @@ export default class DockManager {
         }
         this._iconMap.clear();
 
-        const running = this._appSystem.get_running();
-        for (const app of running) {
-            this._addApp(app);
-        }
+        // Pinned apps (GNOME favourites) first, then the other running apps
+        const pinned = AppFavorites.getAppFavorites().getFavorites();
+        const running = this._appSystem.get_running().filter(app => !this._hidden(app));
+        const byId = new Map([...pinned, ...running].map(app => [app.get_id(), app]));
+        for (const entry of taskbarApps(pinned.map(app => app.get_id()), running.map(app => app.get_id())))
+            this._addApp(byId.get(entry.id), entry.running);
     }
 
-    _addApp(app) {
-        if (this._iconMap.has(app)) return;
+    // The live-session installer only shows when it is pinned
+    _hidden(app) {
+        return app.get_name() === 'Axon OS Installer' &&
+            !AppFavorites.getAppFavorites().isFavorite(app.get_id());
+    }
 
-        // Skip adding the system installers or tools if running in background
-        const appName = app.get_name();
-        if (appName === "Axon OS Installer") return;
+    _addApp(app, running = true) {
+        const existing = this._iconMap.get(app);
+        if (existing) {
+            existing.setRunning(running);
+            return;
+        }
+        if (this._hidden(app)) return;
 
         const dockIcon = new DockIcon({
             app:      app,
@@ -596,7 +581,7 @@ export default class DockManager {
             callback: () => this._activateApp(app),
             dockManager: this,
         });
-        dockIcon.setRunning(true);
+        dockIcon.setRunning(running);
         this._iconRow.add_child(dockIcon);
         this._iconMap.set(app, dockIcon);
     }
@@ -654,6 +639,9 @@ export default class DockManager {
             'window-created',
             this._onWindowCreated.bind(this)
         );
+
+        this._favoritesChangedId = AppFavorites.getAppFavorites().connect(
+            'changed', () => this._populate());
     }
 
     _disconnectSignals() {
@@ -664,6 +652,10 @@ export default class DockManager {
         if (this._windowCreatedId) {
             global.display.disconnect(this._windowCreatedId);
             this._windowCreatedId = null;
+        }
+        if (this._favoritesChangedId) {
+            AppFavorites.getAppFavorites().disconnect(this._favoritesChangedId);
+            this._favoritesChangedId = null;
         }
     }
 
@@ -677,7 +669,11 @@ export default class DockManager {
                 return GLib.SOURCE_REMOVE;
             });
         } else if (state === Shell.AppState.STOPPED) {
-            this._removeApp(app);
+            // A pinned app stays, without its running dot
+            if (AppFavorites.getAppFavorites().isFavorite(app.get_id()))
+                this._iconMap.get(app)?.setRunning(false);
+            else
+                this._removeApp(app);
         }
     }
 
@@ -761,26 +757,47 @@ export default class DockManager {
         this._contextMenu.add_child(titleLabel);
 
         if (icon._app) {
-            const closeBtn = new St.Button({
+            const favorites = AppFavorites.getAppFavorites();
+            const appId = icon._app.get_id();
+            const pinned = favorites.isFavorite(appId);
+            const pinBtn = new St.Button({
                 style_class: 'axon-dock-menu-item',
-                label: _t('Close Window'),
+                label: pinned ? _t('Unpin from Taskbar') : _t('Pin to Taskbar'),
                 x_align: Clutter.ActorAlign.START,
                 reactive: true,
                 can_focus: true,
             });
-            closeBtn.connect('clicked', () => {
-                icon._app.request_quit();
+            pinBtn.connect('clicked', () => {
                 this.closeActiveMenu();
+                if (pinned)
+                    favorites.removeFavorite(appId);
+                else
+                    favorites.addFavorite(appId);
             });
-            this._contextMenu.add_child(closeBtn);
+            this._contextMenu.add_child(pinBtn);
+
+            if (icon._app.get_n_windows() > 0) {
+                const closeBtn = new St.Button({
+                    style_class: 'axon-dock-menu-item',
+                    label: _t('Quit'),
+                    x_align: Clutter.ActorAlign.START,
+                    reactive: true,
+                    can_focus: true,
+                });
+                closeBtn.connect('clicked', () => {
+                    icon._app.request_quit();
+                    this.closeActiveMenu();
+                });
+                this._contextMenu.add_child(closeBtn);
+            }
 
             const sep = new St.Widget({ style_class: 'axon-dock-separator', style: 'height: 1px; width: 90%;' });
             this._contextMenu.add_child(sep);
         }
 
         const loadingItem = new St.Button({
-            style_class: 'axon-dock-menu-item',
-            label: '⬡ Loading AI shortcuts…',
+            style_class: 'axon-dock-menu-item axon-dock-menu-status',
+            label: _t('Loading AI shortcuts…'),
             x_align: Clutter.ActorAlign.START,
             reactive: false,
         });

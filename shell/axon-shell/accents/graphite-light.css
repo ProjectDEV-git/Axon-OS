@@ -3,60 +3,64 @@
 /* Accent: graphite, variant: light */
 
 .axon-chip:focus {
-    border: 2px solid #6a717c;
+    border: 2px solid #6a717c !important;
 }
 
 .axon-intentbar-input,
 .axon-intentbar-input StEntry {
-    caret-color: #606771;
-    selection-background-color: rgba(106, 113, 124, 0.10);
+    caret-color: #606771 !important;
+    selection-background-color: rgba(106, 113, 124, 0.10) !important;
 }
 
 .axon-origin-label {
-    color: #606771;
+    color: #606771 !important;
 }
 
 .axon-intentbar-stop:focus {
-    border: 2px solid #6a717c;
+    border: 2px solid #6a717c !important;
 }
 
 .axon-suggestion:focus {
-    border: 2px solid #6a717c;
+    border: 2px solid #6a717c !important;
 }
 
 .axon-suggestion-selected {
-    background-color: rgba(106, 113, 124, 0.10);
-    border: 1px solid #6a717c;
+    background-color: rgba(106, 113, 124, 0.10) !important;
+    border: 1px solid #6a717c !important;
 }
 
 .axon-dock-icon:focus {
-    border: 2px solid #6a717c;
+    border: 2px solid #6a717c !important;
+}
+
+.axon-taskbar .panel-button:focus {
+    border: 2px solid #6a717c !important;
 }
 
 .axon-ai-indicator-icon {
-    color: #606771;
+    color: #606771 !important;
 }
 
 .axon-startmenu-search-container:focus,
 .axon-startmenu-search:focus {
-    border: 2px solid #6a717c;
+    border: 2px solid #6a717c !important;
 }
 
 .axon-startmenu-app-item:focus,
 .axon-startmenu-file-item:focus,
 .axon-startmenu-power-btn:focus {
-    border: 2px solid #6a717c;
+    border: 2px solid #6a717c !important;
 }
 
 .axon-space-chip:focus {
-    border: 2px solid #6a717c;
+    border: 2px solid #6a717c !important;
 }
 
-.axon-space-chip-active {
-    border-bottom: 2px solid #606771;
+.axon-space-chip-active .axon-space-chip-dot-windows {
+    background-color: #606771 !important;
 }
 
 .axon-dock-menu-item:focus {
-    background-color: rgba(106, 113, 124, 0.10);
-    border: 2px solid #6a717c;
+    background-color: rgba(106, 113, 124, 0.10) !important;
+    border: 2px solid #6a717c !important;
 }

@@ -5,8 +5,16 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 
+import * as AppFavorites from 'resource:///org/gnome/shell/ui/appFavorites.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {ENTER_SCALE, MOTION, _t, fitToWorkArea, motionDuration} from './ui-logic.js';
+import {
+    ENTER_SCALE,
+    MOTION,
+    _t,
+    fitToWorkArea,
+    motionDuration,
+    pinnedStartApps,
+} from './ui-logic.js';
 
 // Animation length; 0 when the user turned animations off (reduced motion)
 const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
@@ -168,7 +176,7 @@ class StartMenuPopup extends St.BoxLayout {
         const powerBox = new St.BoxLayout({
             style_class: 'axon-startmenu-power-box',
             vertical: false,
-            spacing: 12,
+            style: 'spacing: 12px;',
         });
 
         const lockBtn = new St.Button({
@@ -312,7 +320,7 @@ class StartMenuPopup extends St.BoxLayout {
         // Clear grid
         this._appsGrid.destroy_all_children();
 
-        const defaultApps = [
+        const defaultIds = [
             'axon-welcome.desktop',
             'axon-ai-panel.desktop',
             'axon-terminal.desktop',
@@ -323,16 +331,29 @@ class StartMenuPopup extends St.BoxLayout {
             'io.missioncenter.MissionCenter.desktop',
         ];
 
-        let row = new St.BoxLayout({ vertical: false, spacing: 10 });
+        // The user's favourites (the apps pinned to the taskbar), or Axon's
+        // defaults before they have pinned anything
+        const favoriteIds = AppFavorites.getAppFavorites().getFavorites().map(app => app.get_id());
+        const appIds = pinnedStartApps(favoriteIds, defaultIds,
+            id => this._appSystem.lookup_app(id) !== null);
+        if (appIds.length === 0) {
+            this._appsGrid.add_child(new St.Label({
+                text: _t('No pinned apps. Type to search all apps.'),
+                style_class: 'axon-startmenu-no-files',
+            }));
+            return;
+        }
+
+        let row = new St.BoxLayout({ vertical: false, style: 'spacing: 10px;' });
         this._appsGrid.add_child(row);
         let count = 0;
 
-        defaultApps.forEach(appId => {
+        appIds.forEach(appId => {
             const app = this._appSystem.lookup_app(appId);
             if (!app) return;
 
             if (count > 0 && count % 3 === 0) {
-                row = new St.BoxLayout({ vertical: false, spacing: 10 });
+                row = new St.BoxLayout({ vertical: false, style: 'spacing: 10px;' });
                 this._appsGrid.add_child(row);
             }
 
@@ -388,6 +409,10 @@ class StartMenuPopup extends St.BoxLayout {
             row.add_child(btn);
             count++;
         });
+        // Fill the last row so its apps stay in the grid's columns
+        const columns = 3;
+        for (let i = count % columns; count > 0 && i > 0 && i < columns; i++)
+            row.add_child(new St.Widget({x_expand: true}));
     }
 
     _populateRecentFiles() {
@@ -423,7 +448,7 @@ class StartMenuPopup extends St.BoxLayout {
                                 reactive: true,
                                 x_expand: true,
                             });
-                            const box = new St.BoxLayout({ vertical: false, spacing: 8 });
+                            const box = new St.BoxLayout({ vertical: false, style: 'spacing: 8px;' });
                             const icon = new St.Icon({
                                 icon_name: 'document-open-symbolic',
                                 icon_size: 16,
@@ -494,7 +519,7 @@ class StartMenuPopup extends St.BoxLayout {
         this._appsGrid.destroy_all_children();
         const apps = this._installedApps();
         let count = 0;
-        let row = new St.BoxLayout({ vertical: false, spacing: 10 });
+        let row = new St.BoxLayout({ vertical: false, style: 'spacing: 10px;' });
         this._appsGrid.add_child(row);
 
         apps.forEach(app => {
@@ -502,7 +527,7 @@ class StartMenuPopup extends St.BoxLayout {
             const desc = (app.get_description() || '').toLowerCase();
             if (name.includes(text) || desc.includes(text)) {
                 if (count > 0 && count % 3 === 0) {
-                    row = new St.BoxLayout({ vertical: false, spacing: 10 });
+                    row = new St.BoxLayout({ vertical: false, style: 'spacing: 10px;' });
                     this._appsGrid.add_child(row);
                 }
 
