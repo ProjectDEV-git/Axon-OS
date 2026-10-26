@@ -217,7 +217,7 @@ add a short note under any item you skip or change.
 
 ## Phase 4 — One design system
 
-- [ ] **Single token source.** Create one file (e.g. `theme/tokens/axon-tokens.json` or
+- [x] **Single token source.** Create one file (e.g. `theme/tokens/axon-tokens.json` or
       SCSS) holding: colours, semantic states (success/warning/error/info), spacing scale,
       corner radii, typography sizes/weights, shadows, focus ring, animation durations, with
       dark, light and high-contrast variants.

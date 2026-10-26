@@ -1,0 +1,74 @@
+"""Checks on the single design-token source, theme/tokens/axon-tokens.json."""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+TOKENS = json.loads((ROOT / "theme" / "tokens" / "axon-tokens.json").read_text())
+VARIANTS = TOKENS["variants"]
+
+
+def _rgb(value: str, background: tuple[float, float, float] | None = None) -> tuple[float, ...]:
+    """Parse #rrggbb or rgba(); blend alpha over *background* (0-255 floats)."""
+    if value.startswith("#"):
+        return tuple(int(value[i : i + 2], 16) for i in (1, 3, 5))
+    m = re.match(r"rgba?\(([^)]*)\)", value)
+    assert m, value
+    parts = [float(p) for p in m.group(1).split(",")]
+    r, g, b = parts[:3]
+    a = parts[3] if len(parts) > 3 else 1.0
+    if background is None or a == 1.0:
+        return (r, g, b)
+    br, bg_, bb = background
+    return (r * a + br * (1 - a), g * a + bg_ * (1 - a), b * a + bb * (1 - a))
+
+
+def _luminance(rgb: tuple[float, ...]) -> float:
+    def channel(c: float) -> float:
+        c /= 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (channel(c) for c in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast(fg: str, bg: str) -> float:
+    back = _rgb(bg)
+    a, b = _luminance(_rgb(fg, back)), _luminance(back)
+    hi, lo = max(a, b), min(a, b)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def test_variants_define_the_same_tokens() -> None:
+    keys = {name: set(v) for name, v in VARIANTS.items()}
+    assert set(keys) == {"dark", "light", "high-contrast"}
+    assert keys["dark"] == keys["light"] == keys["high-contrast"]
+
+
+@pytest.mark.parametrize("variant", sorted(VARIANTS))
+@pytest.mark.parametrize("surface", ["bg", "surface", "surface_raised"])
+def test_text_contrast_meets_wcag_aa(variant: str, surface: str) -> None:
+    colours = VARIANTS[variant]
+    minimum = 7.0 if variant == "high-contrast" else 4.5
+    for text in ("fg", "fg_secondary", "fg_muted", "accent_text", "error", "success", "warning"):
+        ratio = contrast(colours[text], colours[surface])
+        assert ratio >= minimum, f"{variant}: {text} on {surface} is {ratio:.2f}:1"
+
+
+@pytest.mark.parametrize("variant", sorted(VARIANTS))
+def test_text_on_accent_and_focus_ring(variant: str) -> None:
+    colours = VARIANTS[variant]
+    assert contrast(colours["accent_fg"], colours["accent"]) >= 4.5
+    # Non-text contrast (WCAG 1.4.11): focus ring vs the window background
+    assert contrast(colours["focus_ring"], colours["bg"]) >= 3.0
+
+
+def test_scales_are_px_or_ms() -> None:
+    for group in ("font_size", "space", "radius"):
+        assert all(re.fullmatch(r"\d+px", v) for v in TOKENS[group].values()), group
+    assert all(re.fullmatch(r"\d+ms", v) for v in TOKENS["duration"].values())

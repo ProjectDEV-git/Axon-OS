@@ -1,0 +1,119 @@
+{
+  "$comment": "Axon OS design tokens: the single source for colours, spacing, radii, type, shadows, focus ring and motion. Edit this file, then run: python3 scripts/gen_tokens.py",
+  "font": {
+    "family": "\"Inter\", \"Cantarell\", \"Ubuntu\", system-ui, sans-serif",
+    "mono": "\"JetBrains Mono\", \"Ubuntu Mono\", \"DejaVu Sans Mono\", monospace"
+  },
+  "font_size": {
+    "xs": "11px",
+    "sm": "12px",
+    "md": "13px",
+    "lg": "15px",
+    "xl": "20px",
+    "xxl": "28px",
+    "display": "48px"
+  },
+  "font_weight": {
+    "regular": "400",
+    "medium": "500",
+    "semibold": "600",
+    "bold": "700"
+  },
+  "space": {
+    "xxs": "2px",
+    "xs": "4px",
+    "sm": "6px",
+    "md": "8px",
+    "lg": "12px",
+    "xl": "16px",
+    "xxl": "24px"
+  },
+  "radius": {
+    "sm": "6px",
+    "md": "8px",
+    "lg": "12px",
+    "pill": "9999px"
+  },
+  "duration": {
+    "fast": "100ms",
+    "normal": "150ms",
+    "slow": "250ms"
+  },
+  "focus": {
+    "width": "2px"
+  },
+  "variants": {
+    "dark": {
+      "bg": "#16161e",
+      "surface": "#1e1e28",
+      "surface_raised": "#272733",
+      "popup": "rgba(24, 24, 32, 0.98)",
+      "fg": "#e8e8f0",
+      "fg_secondary": "#a6a6bc",
+      "fg_muted": "#9292aa",
+      "border": "rgba(255, 255, 255, 0.10)",
+      "border_strong": "rgba(255, 255, 255, 0.20)",
+      "hover": "rgba(255, 255, 255, 0.06)",
+      "active": "rgba(255, 255, 255, 0.11)",
+      "accent": "#7c3aed",
+      "accent_hover": "#6d28d9",
+      "accent_fg": "#ffffff",
+      "accent_text": "#c4b5fd",
+      "accent_subtle": "rgba(139, 92, 246, 0.16)",
+      "success": "#34d399",
+      "warning": "#fbbf24",
+      "error": "#f87171",
+      "info": "#60a5fa",
+      "focus_ring": "#a78bfa",
+      "shadow": "0 4px 16px rgba(0, 0, 0, 0.35)"
+    },
+    "light": {
+      "bg": "#f7f7f9",
+      "surface": "#ffffff",
+      "surface_raised": "#efeff3",
+      "popup": "rgba(255, 255, 255, 0.99)",
+      "fg": "#1e1e28",
+      "fg_secondary": "#52526a",
+      "fg_muted": "#5e5e74",
+      "border": "rgba(0, 0, 0, 0.12)",
+      "border_strong": "rgba(0, 0, 0, 0.24)",
+      "hover": "rgba(0, 0, 0, 0.05)",
+      "active": "rgba(0, 0, 0, 0.09)",
+      "accent": "#7c3aed",
+      "accent_hover": "#6d28d9",
+      "accent_fg": "#ffffff",
+      "accent_text": "#6d28d9",
+      "accent_subtle": "rgba(124, 58, 237, 0.10)",
+      "success": "#15703f",
+      "warning": "#946200",
+      "error": "#c01c28",
+      "info": "#1c64c8",
+      "focus_ring": "#7c3aed",
+      "shadow": "0 4px 16px rgba(0, 0, 0, 0.12)"
+    },
+    "high-contrast": {
+      "bg": "#000000",
+      "surface": "#000000",
+      "surface_raised": "#1a1a1a",
+      "popup": "#000000",
+      "fg": "#ffffff",
+      "fg_secondary": "#ffffff",
+      "fg_muted": "#dcdcdc",
+      "border": "#ffffff",
+      "border_strong": "#ffffff",
+      "hover": "rgba(255, 255, 255, 0.20)",
+      "active": "rgba(255, 255, 255, 0.30)",
+      "accent": "#c4b5fd",
+      "accent_hover": "#ddd6fe",
+      "accent_fg": "#000000",
+      "accent_text": "#ddd6fe",
+      "accent_subtle": "rgba(196, 181, 253, 0.28)",
+      "success": "#4ade80",
+      "warning": "#fde047",
+      "error": "#fca5a5",
+      "info": "#93c5fd",
+      "focus_ring": "#ffffff",
+      "shadow": "none"
+    }
+  }
+}
