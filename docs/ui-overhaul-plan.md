@@ -278,3 +278,9 @@ tested in a real GNOME session.
   node tests. GTK smoke tests (`tests/test_ui_*.py`) run under `xvfb-run` and skip without
   a display. Not tested in a real GNOME session: the Shell Intent Bar (scroll view, Stop
   button, error row, Diagnostics button) and the Space OSD announcement with Orca.
+- 2026-10-26 — Phase 2 done. Spaces now notify on moves (Undo / Always / Never), keep
+  per-app rules, can be turned off, ask when the new `ClassifyWindowDetailed` is unsure,
+  and show an instant OSD summary. Intent Bars got loading stages and an empty state;
+  windows fit small screens. New Axon Settings → Preferences window. Not tested in a real
+  GNOME session: notifications and their actions (`notify.js`, GNOME 45 vs 46+ APIs),
+  window moves/undo, the OSD AI summary timing, Shell empty state and Start Menu sizing.
