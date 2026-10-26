@@ -2,7 +2,6 @@
 .git
 .github
 .githooks
-.jules
 .mimocode
 .mypy_cache
 .pytest_cache
