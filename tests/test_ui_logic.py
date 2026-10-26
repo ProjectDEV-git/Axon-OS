@@ -238,3 +238,89 @@ def test_intent_bar_width(monitor: int, expected: int) -> None:
     from services.ui_logic import intent_bar_width
 
     assert intent_bar_width(monitor) == expected
+
+
+class TestModelOrigin:
+    PROVIDERS = [  # noqa: RUF012
+        {"id": "ollama", "label": "Ollama", "base_url": "http://localhost:11434"},
+        {"id": "openai", "label": "OpenAI", "base_url": "https://api.openai.com/v1"},
+        {"id": "lmstudio", "label": "LM Studio", "base_url": "http://127.0.0.1:1234/v1"},
+        {"id": "nas", "label": "NAS", "base_url": "http://192.168.1.20:11434"},
+    ]
+
+    def test_bare_name_is_local_ollama(self) -> None:
+        from services.ui_logic import LOCAL, model_origin
+
+        o = model_origin("llama3.2:3b", self.PROVIDERS)
+        assert o.kind == LOCAL and o.label == "Local · llama3.2:3b"
+        assert not o.leaves_computer
+
+    def test_cloud_ref(self) -> None:
+        from services.ui_logic import CLOUD, model_origin
+
+        o = model_origin("@openai/gpt-4.1", self.PROVIDERS)
+        assert o.kind == CLOUD and o.label == "Cloud · OpenAI · gpt-4.1"
+        assert o.leaves_computer
+
+    def test_cloud_without_provider_list_is_never_local(self) -> None:
+        from services.ui_logic import CLOUD, model_origin
+
+        o = model_origin("@anthropic/claude-sonnet")
+        assert o.kind == CLOUD and o.provider == "Anthropic"
+        assert model_origin("@custom/x").kind == CLOUD
+
+    def test_local_server_and_lan(self) -> None:
+        from services.ui_logic import LOCAL, REMOTE, model_origin
+
+        assert model_origin("@lmstudio/qwen", self.PROVIDERS).label == "Local · LM Studio · qwen"
+        assert model_origin("@lmstudio/qwen", self.PROVIDERS).kind == LOCAL
+        assert model_origin("@nas/llama3", self.PROVIDERS).kind == REMOTE
+
+    def test_remote_ollama(self) -> None:
+        from services.ui_logic import REMOTE, model_origin
+
+        providers = [{"id": "ollama", "label": "Ollama", "base_url": "http://gpu-box.local:11434"}]
+        assert model_origin("llama3", providers).kind == REMOTE
+
+    def test_openrouter_model_with_slash(self) -> None:
+        from services.ui_logic import model_origin
+
+        o = model_origin("@openrouter/anthropic/claude-sonnet-4.5")
+        assert o.provider == "OpenRouter" and o.model == "anthropic/claude-sonnet-4.5"
+
+    @pytest.mark.parametrize(
+        ("url", "kind"),
+        [
+            ("http://localhost:11434", "local"),
+            ("http://[::1]:8080", "local"),
+            ("http://10.0.0.5", "remote"),
+            ("http://host.docker.internal:11434", "remote"),
+            ("https://api.anthropic.com", "cloud"),
+            ("https://8.8.8.8", "cloud"),
+        ],
+    )
+    def test_host_kind(self, url: str, kind: str) -> None:
+        from services.ui_logic import host_kind
+
+        assert host_kind(url) == kind
+
+    def test_auto_routing_uses_least_private_tier(self) -> None:
+        from services.ui_logic import CLOUD, LOCAL, routing_origin
+
+        local_tiers = {"speed_model": "llama3.2:1b", "general_model": "llama3.2:3b"}
+        o = routing_origin("", local_tiers, self.PROVIDERS)
+        assert o.kind == LOCAL and o.model == "llama3.2:3b"
+        mixed = dict(local_tiers, deep_model="@openai/gpt-4.1")
+        o = routing_origin("", mixed, self.PROVIDERS)
+        assert o.kind == CLOUD and o.provider == "OpenAI"
+        assert routing_origin("@openai/gpt-4.1", local_tiers, self.PROVIDERS).kind == CLOUD
+        unknown = routing_origin("", {}, None)
+        assert unknown.label == "Model: unknown" and unknown.leaves_computer
+
+
+def test_origin_tooltip() -> None:
+    from services.ui_logic import CLOUD, LOCAL, UNKNOWN, ModelOrigin, origin_tooltip
+
+    assert "this computer" in origin_tooltip(ModelOrigin(LOCAL, "Ollama", "x"))
+    assert "OpenAI over the internet" in origin_tooltip(ModelOrigin(CLOUD, "OpenAI", "x"))
+    assert "may leave" in origin_tooltip(ModelOrigin(UNKNOWN, "", ""))

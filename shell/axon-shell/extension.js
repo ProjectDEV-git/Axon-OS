@@ -162,6 +162,12 @@ const BrainGenerateInterface = `
     <method name="GetStatus">
       <arg type="s" name="status_json" direction="out"/>
     </method>
+    <method name="ListProviders">
+      <arg type="s" name="providers_json" direction="out"/>
+    </method>
+    <method name="GetModelSettings">
+      <arg type="s" name="settings_json" direction="out"/>
+    </method>
   </interface>
 </node>
 `;

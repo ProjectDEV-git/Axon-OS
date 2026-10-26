@@ -383,3 +383,105 @@ export function fitToWorkArea(width, height, workArea, margin = 20,
         height: Math.max(minimum.height, Math.min(height, workArea.height - 2 * margin)),
     };
 }
+
+// ── Where the model runs (twin of model_origin() in services/ui_logic.py) ───
+
+const PROVIDER_LABELS = {
+    ollama: 'Ollama',
+    openai: 'OpenAI',
+    anthropic: 'Anthropic',
+    gemini: 'Google Gemini',
+    openrouter: 'OpenRouter',
+};
+const ORIGIN_RANK = {local: 0, remote: 1, cloud: 2};
+
+function isPrivateIPv4(host) {
+    const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+    if (!m)
+        return null;
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 127)
+        return 'local';
+    if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+        (a === 169 && b === 254))
+        return 'remote';
+    return 'cloud';
+}
+
+/**
+ * Classify a provider URL as local, remote (LAN) or cloud.
+ *
+ * @param {string} baseUrl
+ * @returns {'local'|'remote'|'cloud'}
+ */
+export function hostKind(baseUrl) {
+    const m = /^[a-z]+:\/\/(\[[^\]]+\]|[^/:]+)/i.exec(String(baseUrl ?? ''));
+    let host = m ? m[1].toLowerCase() : '';
+    if (host.startsWith('['))
+        host = host.slice(1, -1);
+    if (!host || host === 'localhost' || host.endsWith('.localhost') || host === '::1')
+        return 'local';
+    const v4 = isPrivateIPv4(host);
+    if (v4)
+        return v4;
+    if (host.includes(':'))
+        return /^(fc|fd|fe80)/.test(host) ? 'remote' : 'cloud';
+    if (/\.(local|lan|internal|home\.arpa)$/.test(host) || !host.includes('.'))
+        return 'remote';
+    return 'cloud';
+}
+
+/**
+ * Where a model runs. A `@provider/model` ref with no provider info counts
+ * as cloud: never claim local without checking.
+ *
+ * @param {string} modelId
+ * @param {object[]|null} providers - Brain ListProviders().providers
+ * @returns {{kind: string, provider: string, model: string, label: string}}
+ */
+export function modelOrigin(modelId, providers = null) {
+    const id = String(modelId ?? '');
+    let providerId = 'ollama';
+    let model = id;
+    if (id.startsWith('@') && id.includes('/')) {
+        const slash = id.indexOf('/');
+        providerId = id.slice(1, slash);
+        model = id.slice(slash + 1);
+    }
+    const cfg = (providers ?? []).find(p => String(p.id) === providerId);
+    const provider = String(cfg?.label || PROVIDER_LABELS[providerId] || providerId);
+    let kind;
+    if (cfg?.base_url)
+        kind = hostKind(cfg.base_url);
+    else
+        kind = providerId === 'ollama' ? 'local' : 'cloud';
+    model = model || 'default model';
+    let label;
+    if (kind === 'local' && provider === 'Ollama')
+        label = `Local · ${model}`;
+    else
+        label = `${{local: 'Local', remote: 'Remote', cloud: 'Cloud'}[kind]} · ${provider} · ${model}`;
+    return {kind, provider, model, label};
+}
+
+/**
+ * Origin including the Brain's automatic tier choice ('' model): the least
+ * private tier decides.
+ *
+ * @param {string} modelId
+ * @param {object} tiers - GetModelSettings() result
+ * @param {object[]|null} providers
+ */
+export function routingOrigin(modelId, tiers = {}, providers = null) {
+    if (modelId)
+        return modelOrigin(modelId, providers);
+    const names = Object.values(tiers ?? {}).filter(Boolean);
+    if (names.length === 0) {
+        // Unknown tiers could include a cloud model: don't say "local"
+        return {kind: 'unknown', provider: '', model: '', label: 'Model: unknown'};
+    }
+    const general = tiers.general_model || names[0];
+    const worst = names.map(n => modelOrigin(n, providers))
+        .reduce((a, b) => (ORIGIN_RANK[b.kind] > ORIGIN_RANK[a.kind] ? b : a));
+    return worst.kind === 'local' ? modelOrigin(general, providers) : worst;
+}

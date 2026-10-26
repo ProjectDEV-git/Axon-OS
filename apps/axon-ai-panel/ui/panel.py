@@ -37,7 +37,14 @@ for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().pare
     if (_base / "services").is_dir():
         sys.path.insert(0, str(_base / "services"))
         break
-from ui_logic import RequestTracker, escape_action, split_error
+from ui_logic import (
+    ModelOrigin,
+    RequestTracker,
+    escape_action,
+    origin_tooltip,
+    routing_origin,
+    split_error,
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
 from axon_gtk_utils import fit_default_size
@@ -322,6 +329,11 @@ class AIPanelWindow(Adw.Window):
     .bubble-error image {
         color: #f87171;
     }
+    .origin-label {
+        color: #9090b8;
+        font-size: 11px;
+        margin-bottom: 4px;
+    }
     .thinking-label {
         color: #8b5cf6;
         font-size: 13px;
@@ -384,6 +396,9 @@ class AIPanelWindow(Adw.Window):
         "Translate",
     ]
 
+    # First dropdown entry: let the Brain pick a model per request (model "")
+    _AUTO_LABEL = "Automatic"
+
     _DEFAULT_MODELS: list[str] = [  # noqa: RUF012
         "llama3.2:3b",
         "mistral:7b",
@@ -443,11 +458,14 @@ class AIPanelWindow(Adw.Window):
 
         # Model dropdown
         self._model_store = Gtk.StringList()
+        self._model_store.append(self._AUTO_LABEL)
         for m in self._DEFAULT_MODELS:
             self._model_store.append(m)
+        self._providers: list[dict[str, Any]] | None = None
+        self._tiers: dict[str, str] = {}
 
         self._model_dropdown = Gtk.DropDown(model=self._model_store)
-        self._model_dropdown.set_selected(0)
+        self._model_dropdown.set_selected(self._model_index(self._client.model))
         self._model_dropdown.connect("notify::selected", self._on_model_changed)
 
         self._model_dropdown.set_tooltip_text("Model")
@@ -465,6 +483,13 @@ class AIPanelWindow(Adw.Window):
         header.append(self._model_dropdown)
         header.append(self._clear_btn)
         root.append(header)
+
+        # Where requests go. Never says "local" until the model is checked.
+        self._origin_label = Gtk.Label(label="Model: checking…", xalign=0.0)
+        self._origin_label.add_css_class("origin-label")
+        self._origin_label.set_margin_start(16)
+        self._origin_label.set_margin_end(16)
+        root.append(self._origin_label)
 
         # ---- Quick action chips --------------------------------------------
         chips_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -558,13 +583,44 @@ class AIPanelWindow(Adw.Window):
     # ------------------------------------------------------------------
 
     def _fetch_models(self) -> None:
-        """Fetch available models from Ollama and update the dropdown."""
+        """Worker: fetch models and provider info, then update the header."""
+        routing_info = getattr(self._client, "routing_info", None)
+        try:
+            providers, tiers = routing_info() if routing_info is not None else (None, {})
+        except Exception:
+            providers, tiers = None, {}
+        GLib.idle_add(self._set_routing_info, providers, tiers)
         try:
             models = self._client.list_models()
             if models:
                 GLib.idle_add(self._populate_model_dropdown, models)
         except Exception:
             pass
+
+    def _set_routing_info(
+        self, providers: list[dict[str, Any]] | None, tiers: dict[str, str]
+    ) -> bool:
+        self._providers = providers
+        self._tiers = tiers
+        self._update_origin()
+        return False
+
+    def current_origin(self) -> ModelOrigin:
+        """Where the next request goes, from the selected model."""
+        return routing_origin(self._client.model, self._tiers, self._providers)
+
+    def _update_origin(self) -> None:
+        origin = self.current_origin()
+        self._origin_label.set_text(origin.label)
+        self._origin_label.set_tooltip_text(origin_tooltip(origin))
+
+    def _model_index(self, model: str) -> int:
+        if not model:
+            return 0
+        for i in range(self._model_store.get_n_items()):
+            if self._model_store.get_string(i) == model:
+                return i
+        return 0
 
     def _populate_model_dropdown(self, models: list[str]) -> bool:
         # Build a combined deduplicated list
@@ -575,20 +631,23 @@ class AIPanelWindow(Adw.Window):
                 all_models.append(m)
                 existing.add(m)
 
-        # Rebuild the StringList
+        # Rebuild the StringList, keeping the current choice
+        current = self._client.model
         new_store = Gtk.StringList()
+        new_store.append(self._AUTO_LABEL)
         for m in all_models:
             new_store.append(m)
         self._model_store = new_store
         self._model_dropdown.set_model(new_store)
-        self._model_dropdown.set_selected(0)
+        self._model_dropdown.set_selected(self._model_index(current))
         return False
 
     def _on_model_changed(self, dropdown: Gtk.DropDown, _param: Any) -> None:
+        index = dropdown.get_selected()
         selected_item = dropdown.get_selected_item()
         if selected_item is not None:
-            model_name: str = selected_item.get_string()
-            self._client.model = model_name
+            self._client.model = "" if index == 0 else selected_item.get_string()
+            self._update_origin()
 
     # ------------------------------------------------------------------
     # Keyboard

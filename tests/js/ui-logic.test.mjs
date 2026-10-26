@@ -140,3 +140,27 @@ test('responsive sizing', async () => {
         {width: 560, height: 360});
     assert.deepEqual(m.fitToWorkArea(620, 520, null), {width: 620, height: 520});
 });
+
+test('model origin matches the Python twin', async () => {
+    const m = await import('./ui-logic.mjs');
+    const providers = [
+        {id: 'ollama', label: 'Ollama', base_url: 'http://localhost:11434'},
+        {id: 'openai', label: 'OpenAI', base_url: 'https://api.openai.com/v1'},
+        {id: 'lmstudio', label: 'LM Studio', base_url: 'http://127.0.0.1:1234/v1'},
+        {id: 'nas', label: 'NAS', base_url: 'http://192.168.1.20:11434'},
+    ];
+    assert.equal(m.modelOrigin('llama3.2:3b', providers).label, 'Local · llama3.2:3b');
+    assert.equal(m.modelOrigin('@openai/gpt-4.1', providers).label, 'Cloud · OpenAI · gpt-4.1');
+    assert.equal(m.modelOrigin('@anthropic/x').kind, 'cloud');
+    assert.equal(m.modelOrigin('@lmstudio/q', providers).label, 'Local · LM Studio · q');
+    assert.equal(m.modelOrigin('@nas/l', providers).kind, 'remote');
+    assert.equal(m.modelOrigin('@openrouter/anthropic/claude').model, 'anthropic/claude');
+    for (const [url, kind] of [['http://localhost:1', 'local'], ['http://[::1]:8', 'local'],
+        ['http://10.0.0.5', 'remote'], ['http://host.docker.internal:1', 'remote'],
+        ['https://api.anthropic.com', 'cloud'], ['https://8.8.8.8', 'cloud']])
+        assert.equal(m.hostKind(url), kind, url);
+    const tiers = {speed_model: 'llama3.2:1b', general_model: 'llama3.2:3b'};
+    assert.equal(m.routingOrigin('', tiers, providers).label, 'Local · llama3.2:3b');
+    assert.equal(m.routingOrigin('', {...tiers, deep_model: '@openai/gpt-4.1'}, providers).kind, 'cloud');
+    assert.equal(m.routingOrigin('', {}, null).label, 'Model: unknown');
+});

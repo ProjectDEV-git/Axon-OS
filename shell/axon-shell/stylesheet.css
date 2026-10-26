@@ -437,3 +437,9 @@
 .axon-response-error-icon {
     margin-right: 8px;
 }
+
+.axon-origin-label {
+    color: #9090b8;
+    font-size: 11px;
+    margin-bottom: 8px;
+}

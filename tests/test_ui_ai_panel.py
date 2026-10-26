@@ -219,3 +219,37 @@ def test_default_height_fits_the_monitor(window: Any) -> None:
     _, monitor_h = axon_gtk_utils.monitor_size(window.get_display())
     assert monitor_h > 0
     assert height <= max(320, monitor_h - 48)
+
+
+class CloudClient(FakeClient):
+    def routing_info(self) -> tuple[list[dict[str, Any]], dict[str, str]]:
+        providers = [
+            {"id": "ollama", "label": "Ollama", "base_url": "http://localhost:11434"},
+            {"id": "openai", "label": "OpenAI", "base_url": "https://api.openai.com/v1"},
+        ]
+        return providers, {"general_model": "llama3.2:3b", "deep_model": "@openai/gpt-4.1"}
+
+    def list_models(self) -> list[str]:
+        return ["@openai/gpt-4.1"]
+
+
+def test_origin_label_never_claims_local_for_cloud(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = CloudClient()
+    client.model = ""
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    assert win._origin_label.get_text() == "Model: checking…"
+    rec.join()
+    pump(GLib)
+    # Automatic routing may use the cloud deep model
+    assert win._origin_label.get_text() == "Cloud · OpenAI · gpt-4.1"
+    win._model_dropdown.set_selected(win._model_index("llama3.2:3b"))
+    assert client.model == "llama3.2:3b"
+    assert win._origin_label.get_text() == "Local · llama3.2:3b"
+    win._model_dropdown.set_selected(win._model_index("@openai/gpt-4.1"))
+    assert win._origin_label.get_text().startswith("Cloud · OpenAI")
+    win._model_dropdown.set_selected(0)
+    assert client.model == ""
+    win.destroy()

@@ -17,6 +17,7 @@ import {
     parseAction,
     pushHistory,
     recentForEmptyState,
+    routingOrigin,
     splitError,
 } from './ui-logic.js';
 
@@ -54,6 +55,7 @@ export default class IntentBar {
         this._brainProxy = null;
         this._stopButton = null;
         this._emptyBox = null;
+        this._originLabel = null;
         // Queries from this session, newest first, for the empty state
         this._history = [];
         // The running Brain request; Escape or Stop cancels it
@@ -75,6 +77,7 @@ export default class IntentBar {
         this._brainProxy = null;
         this._stopButton = null;
         this._emptyBox = null;
+        this._originLabel = null;
         this._entry = null;
         this._responseLabel = null;
         this._responseScroll = null;
@@ -91,6 +94,15 @@ export default class IntentBar {
             visible: false,
             track_hover: true,
         });
+
+        // Where requests go ("Local · llama3.2:3b" / "Cloud · OpenAI · gpt-4.1").
+        // Refreshed on every show(); never assumed local.
+        this._originLabel = new St.Label({
+            style_class: 'axon-origin-label',
+            text: 'Model: checking…',
+            x_align: Clutter.ActorAlign.END,
+        });
+        this._actor.add_child(this._originLabel);
 
         // Input field
         this._entry = new St.Entry({
@@ -208,6 +220,7 @@ export default class IntentBar {
         this._entry.set_text('');
         this._buildEmptyState();
         this._updateEmptyState();
+        this._refreshOrigin();
 
         this._positionCenter();
         this._actor.show();
@@ -277,6 +290,38 @@ export default class IntentBar {
         const connected = this._brainProxy || this._extension._brainProxy;
         this._setResponse(connected ? STAGES.waiting : STAGES.connecting);
         this._callBrain(query, requestId);
+    }
+
+    _refreshOrigin() {
+        const proxy = this._extension._brainProxy;
+        const show = origin => {
+            if (this._originLabel)
+                this._originLabel.set_text(origin.label);
+        };
+        if (!proxy || typeof proxy.GetModelSettingsRemote !== 'function') {
+            show(routingOrigin('', {}, null));
+            return;
+        }
+        proxy.GetModelSettingsRemote((tiersResult, tiersError) => {
+            let tiers = {};
+            try {
+                if (!tiersError && tiersResult)
+                    tiers = JSON.parse(tiersResult[0]);
+            } catch (_e) {
+                tiers = {};
+            }
+            proxy.ListProvidersRemote((provResult, provError) => {
+                let providers = null;
+                try {
+                    if (!provError && provResult)
+                        providers = JSON.parse(provResult[0]).providers ?? null;
+                } catch (_e) {
+                    providers = null;
+                }
+                // The Shell bar sends model '' so the Brain picks a tier
+                show(routingOrigin('', tiers, providers));
+            });
+        });
     }
 
     _buildEmptyState() {

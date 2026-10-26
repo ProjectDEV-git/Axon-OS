@@ -7,11 +7,14 @@ the parts it needs in ``shell/axon-shell/ui-logic.js``; keep the two in sync.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 HOLD = "hold"
 SHOW = "show"
@@ -259,3 +262,122 @@ def intent_bar_width(monitor_width: int) -> int:
     if monitor_width <= 0:
         return 660
     return max(480, min(820, round(monitor_width * 0.45)))
+
+
+# ── Where the model runs ────────────────────────────────────────────────────
+
+LOCAL = "local"  # on this computer
+REMOTE = "remote"  # another machine on the local network
+CLOUD = "cloud"  # an internet service
+UNKNOWN = "unknown"  # the Brain couldn't tell us; assume it may leave the computer
+
+_PROVIDER_LABELS = {
+    "ollama": "Ollama",
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "gemini": "Google Gemini",
+    "openrouter": "OpenRouter",
+}
+_ORIGIN_RANK = {LOCAL: 0, REMOTE: 1, CLOUD: 2}
+
+
+@dataclass(frozen=True)
+class ModelOrigin:
+    """Where a model runs, for the local/cloud indicator."""
+
+    kind: str
+    provider: str
+    model: str
+
+    @property
+    def label(self) -> str:
+        """e.g. "Local · llama3.2:3b" or "Cloud · OpenAI · gpt-4.1"."""
+        if self.kind == UNKNOWN:
+            return "Model: unknown"
+        if self.kind == LOCAL and self.provider == "Ollama":
+            return f"Local · {self.model}"
+        prefix = {LOCAL: "Local", REMOTE: "Remote", CLOUD: "Cloud"}[self.kind]
+        return f"{prefix} · {self.provider} · {self.model}"
+
+    @property
+    def leaves_computer(self) -> bool:
+        """True when prompts (and any context) are sent to another machine."""
+        return self.kind != LOCAL
+
+
+def host_kind(base_url: str) -> str:
+    """Classify a provider URL as local, remote (LAN) or cloud."""
+    host = (urlparse(base_url).hostname or "").lower()
+    if host in ("localhost", "") or host.endswith(".localhost"):
+        return LOCAL
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        if host.endswith((".local", ".lan", ".internal", ".home.arpa")) or "." not in host:
+            return REMOTE
+        return CLOUD
+    if ip.is_loopback:
+        return LOCAL
+    if ip.is_private or ip.is_link_local:
+        return REMOTE
+    return CLOUD
+
+
+def model_origin(model_id: str, providers: list[dict[str, Any]] | None = None) -> ModelOrigin:
+    """Where *model_id* runs.
+
+    Bare names are Ollama models; ``@provider/model`` refs belong to that
+    provider. When the provider list is unknown, a ``@`` ref counts as cloud:
+    never claim a model is local without checking.
+
+    Args:
+        model_id: A model id as passed to the Brain.
+        providers: Brain ``ListProviders`` output (``id``, ``label``, ``base_url``).
+    """
+    by_id = {str(p.get("id")): p for p in providers or []}
+    if model_id.startswith("@") and "/" in model_id:
+        provider_id, model = model_id[1:].split("/", 1)
+    else:
+        provider_id, model = "ollama", model_id
+    cfg = by_id.get(provider_id)
+    label = str((cfg or {}).get("label") or _PROVIDER_LABELS.get(provider_id, provider_id))
+    if cfg is not None and cfg.get("base_url"):
+        kind = host_kind(str(cfg["base_url"]))
+    else:
+        kind = LOCAL if provider_id == "ollama" else CLOUD
+    return ModelOrigin(kind, label, model or "default model")
+
+
+def routing_origin(
+    model_id: str,
+    tiers: dict[str, str] | None = None,
+    providers: list[dict[str, Any]] | None = None,
+) -> ModelOrigin:
+    """Origin for a request, including the Brain's automatic model choice.
+
+    An empty *model_id* lets the Brain pick a tier (speed, general or deep)
+    per request, so the least private tier decides the indicator.
+    """
+    if model_id:
+        return model_origin(model_id, providers)
+    names = [m for m in (tiers or {}).values() if m]
+    if not names:
+        # Unknown tiers could include a cloud model: don't say "local"
+        return ModelOrigin(UNKNOWN, "", "")
+    general = (tiers or {}).get("general_model") or names[0]
+    origins = [model_origin(m, providers) for m in names]
+    worst = max(origins, key=lambda o: _ORIGIN_RANK[o.kind])
+    if worst.kind == LOCAL:
+        return model_origin(general, providers)
+    return worst
+
+
+def origin_tooltip(origin: ModelOrigin) -> str:
+    """One sentence explaining where requests go."""
+    if origin.kind == LOCAL:
+        return "Runs on this computer. Nothing is sent over the internet."
+    if origin.kind == REMOTE:
+        return f"Requests go to {origin.provider} on another computer on your network."
+    if origin.kind == CLOUD:
+        return f"Requests are sent to {origin.provider} over the internet."
+    return "Couldn't check where the model runs, so assume requests may leave this computer."

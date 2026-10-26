@@ -166,11 +166,15 @@ add a short note under any item you skip or change.
 
 ## Phase 3 — Trust: privacy, context, safety, status
 
-- [ ] **Local vs cloud indicator.** Axon supports cloud models (`@openai/...`,
+- [x] **Local vs cloud indicator.** Axon supports cloud models (`@openai/...`,
       `@anthropic/...`, see `docs/ai-providers.md`). Add a pure helper that tells local
       Ollama models from cloud ones, and show "Local · llama3.2:3b" or "Cloud · OpenAI ·
       gpt-4.1" in the AI panel header and the Intent Bar. Never say "no cloud connection"
       when a cloud model is selected.
+      Note: also covers custom providers on localhost (Local), LAN servers (Remote) and the
+      Brain's automatic tier choice (model `""`): the least private tier decides, and unknown
+      tiers show "Model: unknown". The AI panel dropdown gained an honest "Automatic" entry;
+      it used to show `llama3.2:3b` while sending `""`.
 - [ ] **Context controls (backend).** Add settings for what context may be sent:
       clipboard, terminal history, open files, active app, plus a master on/off. Make
       `apps/axon-ai-panel/context_reader.py::build_context_string` (and any Shell/Brain

@@ -98,6 +98,26 @@ class OllamaClient:
         except Exception:
             return []
 
+    def routing_info(self) -> tuple[list[dict[str, Any]] | None, dict[str, str]]:
+        """Providers and per-tier models, for the local/cloud indicator.
+
+        Blocking D-Bus calls; run off the GTK thread. Returns ``(None, {})``
+        pieces that could not be read, so callers never guess "local".
+        """
+        providers: list[dict[str, Any]] | None = None
+        tiers: dict[str, str] = {}
+        try:
+            providers = list(json.loads(self._get_brain().ListProviders()).get("providers", []))
+        except Exception:
+            providers = None
+        try:
+            tiers = {
+                str(k): str(v) for k, v in json.loads(self._get_brain().GetModelSettings()).items()
+            }
+        except Exception:
+            tiers = {}
+        return providers, tiers
+
     # ------------------------------------------------------------------
     # Generate (single-turn completion)
     # ------------------------------------------------------------------

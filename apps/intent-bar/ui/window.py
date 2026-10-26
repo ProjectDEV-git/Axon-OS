@@ -40,15 +40,18 @@ from ui_logic import (
     STAGE_CONNECTING,
     STAGE_SEARCHING,
     STAGE_WAITING,
+    ModelOrigin,
     RequestTracker,
     classify_stream_prefix,
     describe_action,
     escape_action,
     intent_bar_width,
     load_history,
+    origin_tooltip,
     parse_action,
     push_history,
     recent_for_empty_state,
+    routing_origin,
     save_history,
     split_error,
     stage_for_stream,
@@ -330,7 +333,9 @@ class IntentBarWindow(Adw.Window):
         spacer.set_hexpand(True)
         top_row.append(spacer)
 
-        self._model_badge = Gtk.Label(label=self._ollama.model)
+        # Where requests go: "Local · llama3.2:3b" or "Cloud · OpenAI · gpt-4.1".
+        # Filled in by _check_available_async; never assumed local.
+        self._model_badge = Gtk.Label(label="Model: checking…")
         self._model_badge.add_css_class("model-badge")
         self._model_badge.set_valign(Gtk.Align.CENTER)
         top_row.append(self._model_badge)
@@ -683,9 +688,17 @@ class IntentBarWindow(Adw.Window):
             GLib.idle_add(self._finish_stream, "".join(parts), request_id)
 
     def _check_available_async(self) -> None:
-        """Worker thread: show "Start Ollama" when the AI is offline."""
+        """Worker thread: fill the origin badge; show "Start Ollama" if offline."""
+        routing_info = getattr(self._ollama, "routing_info", None)
+        providers, tiers = routing_info() if routing_info is not None else (None, {})
+        GLib.idle_add(self._set_origin, routing_origin(self._ollama.model, tiers, providers))
         if not self._ollama.is_available():
             GLib.idle_add(self._show_ai_offline)
+
+    def _set_origin(self, origin: ModelOrigin) -> bool:
+        self._model_badge.set_text(origin.label)
+        self._model_badge.set_tooltip_text(origin_tooltip(origin))
+        return False
 
     def _on_ai_unavailable(self, request_id: int) -> bool:
         """GTK thread: the query found the AI offline."""
