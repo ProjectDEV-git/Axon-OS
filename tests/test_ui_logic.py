@@ -142,3 +142,30 @@ def test_escape_action() -> None:
 
     assert escape_action(True) == "cancel"
     assert escape_action(False) == "close"
+
+
+class TestSplitError:
+    def test_no_error(self) -> None:
+        from services.ui_logic import split_error
+
+        assert split_error(" Hello ") == ("Hello", None)
+        assert split_error("Logs often say [error] mid-line") == (
+            "Logs often say [error] mid-line",
+            None,
+        )
+
+    def test_error_only(self) -> None:
+        from services.ui_logic import split_error
+
+        assert split_error("[error] Ollama is not running.") == ("", "Ollama is not running.")
+        assert split_error("\n[Error: timed out]") == ("", "timed out")
+
+    def test_partial_answer_then_error(self) -> None:
+        from services.ui_logic import split_error
+
+        assert split_error("Part one\n[error] connection lost") == ("Part one", "connection lost")
+
+    def test_empty_marker(self) -> None:
+        from services.ui_logic import split_error
+
+        assert split_error("[error]") == ("", "Something went wrong.")

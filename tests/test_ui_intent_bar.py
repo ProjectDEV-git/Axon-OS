@@ -180,3 +180,18 @@ def test_escape_cancels_first_then_closes(monkeypatch: pytest.MonkeyPatch) -> No
     press_escape(win)
     assert closed == [True]
     win.destroy()
+
+
+def test_errors_have_icon_style_and_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    win = make_window(["Partial", "\n[error] connection lost"])
+    run_query(win, monkeypatch)
+    assert win._response_label.has_css_class("response-error")
+    assert win._error_icon.get_visible()
+    assert win._response_label.get_text() == "Partial\n\nconnection lost"
+    win._set_response("fine")
+    assert not win._response_label.has_css_class("response-error")
+    assert not win._error_icon.get_visible()
+    win._show_ai_offline()
+    assert win._start_ollama_btn.get_visible()
+    assert win._response_label.get_text() == "Ollama is not running."
+    win.destroy()

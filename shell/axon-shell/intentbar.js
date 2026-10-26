@@ -8,13 +8,24 @@ import Pango from 'gi://Pango';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
-import {RequestTracker, escapeAction, parseAction} from './ui-logic.js';
+import {RequestTracker, escapeAction, parseAction, splitError} from './ui-logic.js';
 
 function logError(error, message) {
     if (message) {
         console.error(`${message}: ${error.message || error}`);
     } else {
         console.error(error.message || error);
+    }
+}
+
+// Opens Axon Settings → Diagnostics (desktop action "diagnostics").
+function openDiagnostics() {
+    try {
+        const info = Gio.DesktopAppInfo.new('axon-settings.desktop');
+        if (info)
+            info.launch_action('diagnostics', global.create_app_launch_context(0, -1));
+    } catch (e) {
+        logError(e, 'AxonShell: could not open Diagnostics');
     }
 }
 
@@ -121,8 +132,31 @@ export default class IntentBar {
 
         // Long answers scroll inside the bar (max-height in the stylesheet)
         // instead of growing it off the bottom of the screen.
+        // Errors get an icon and a recovery button, not just a colour
+        this._errorIcon = new St.Icon({
+            icon_name: 'dialog-error-symbolic',
+            icon_size: 16,
+            style_class: 'axon-response-error-icon',
+            visible: false,
+            y_align: Clutter.ActorAlign.START,
+        });
+        this._recoveryButton = new St.Button({
+            style_class: 'axon-chip',
+            label: 'Diagnostics',
+            can_focus: true,
+            visible: false,
+            y_align: Clutter.ActorAlign.START,
+        });
+        this._recoveryButton.connect('clicked', () => {
+            this.hide();
+            openDiagnostics();
+        });
+        const responseRow = new St.BoxLayout({vertical: false, x_expand: true});
+        responseRow.add_child(this._errorIcon);
+        responseRow.add_child(this._responseLabel);
+        responseRow.add_child(this._recoveryButton);
         const responseBox = new St.BoxLayout({vertical: true, x_expand: true});
-        responseBox.add_child(this._responseLabel);
+        responseBox.add_child(responseRow);
         this._responseScroll = new St.ScrollView({
             style_class: 'axon-response-scroll',
             hscrollbar_policy: St.PolicyType.NEVER,
@@ -241,7 +275,7 @@ export default class IntentBar {
         this._setBusy(false);
         if (error) {
             logError(error, 'AxonShell: Brain Generate failed');
-            this._setResponse(`Error: ${error.message}`);
+            this._setResponse(`Axon Brain failed: ${error.message}`, {error: true, recovery: true});
             return;
         }
         this._handleResponse(result ? result[0] : null);
@@ -298,7 +332,8 @@ export default class IntentBar {
                         logError(error, 'AxonShell: could not reach Brain service');
                         if (this._requests.finish(requestId)) {
                             this._setBusy(false);
-                            this._setResponse('AI service unavailable. Is Axon Brain running?');
+                            this._setResponse('AI service unavailable. Is Axon Brain running?',
+                                {error: true, recovery: true});
                         }
                         return;
                     }
@@ -313,7 +348,8 @@ export default class IntentBar {
             logError(e, 'AxonShell: could not reach Brain service');
             if (this._requests.finish(requestId)) {
                 this._setBusy(false);
-                this._setResponse('AI service unavailable. Is Axon Brain running?');
+                this._setResponse('AI service unavailable. Is Axon Brain running?',
+                                {error: true, recovery: true});
             }
         }
     }
@@ -331,7 +367,11 @@ export default class IntentBar {
             return;
         }
 
-        this._setResponse(responseText.trim());
+        const {body, error} = splitError(responseText);
+        if (error)
+            this._setResponse(body ? `${body}\n\n${error}` : error, {error: true, recovery: true});
+        else
+            this._setResponse(body);
     }
 
     _executeAction(action) {
@@ -339,7 +379,7 @@ export default class IntentBar {
             if (action.action === 'open_app' && action.app) {
                 const appName = String(action.app).trim();
                 if (!launchAppById(appName)) {
-                    this._setResponse(`No installed app called "${appName}".`);
+                    this._setResponse(`No installed app called "${appName}".`, {error: true});
                     return;
                 }
                 this._setResponse(`Opening ${appName}…`);
@@ -349,7 +389,8 @@ export default class IntentBar {
                 });
             } else if (action.action === 'run_command' && action.command) {
                 if (!confirmAndRun(action.command)) {
-                    this._setResponse('Blocked: command not in allowlist or contains unsafe characters.');
+                    this._setResponse('Blocked: command not in allowlist or contains unsafe characters.',
+                        {error: true});
                     return;
                 }
                 this._setResponse(`Asking before running: ${action.command}`);
@@ -358,19 +399,25 @@ export default class IntentBar {
                     return GLib.SOURCE_REMOVE;
                 });
             } else {
-                this._setResponse('Unknown action received from AI.');
+                this._setResponse('Unknown action received from AI.', {error: true});
             }
         } catch (e) {
             logError(e, 'AxonShell: could not execute action');
-            this._setResponse(`Failed to execute: ${e.message}`);
+            this._setResponse(`Failed to execute: ${e.message}`, {error: true});
         }
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    _setResponse(text) {
+    _setResponse(text, {error = false, recovery = false} = {}) {
         if (!this._responseLabel) return;
         this._responseLabel.set_text(text);
+        this._errorIcon.visible = error;
+        this._recoveryButton.visible = error && recovery;
+        if (error)
+            this._responseLabel.add_style_class_name('axon-response-error');
+        else
+            this._responseLabel.remove_style_class_name('axon-response-error');
         this._responseScroll.show();
         // Re-center after content change
         GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {

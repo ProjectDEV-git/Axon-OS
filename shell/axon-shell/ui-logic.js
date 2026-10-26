@@ -65,6 +65,24 @@ export function parseAction(text) {
     return null;
 }
 
+const ERROR_RE = /(?:^|\n)[ \t]*(?:\[error\][ \t]*([\s\S]*)|\[error:[ \t]*([\s\S]*?)\])/i;
+
+/**
+ * Split a reply into normal text and an error message ("[error] msg" or
+ * "[Error: msg]" at the start of a line). Twin of split_error().
+ *
+ * @param {string} text - complete reply
+ * @returns {{body: string, error: string|null}}
+ */
+export function splitError(text) {
+    const s = String(text ?? '');
+    const m = ERROR_RE.exec(s);
+    if (!m)
+        return {body: s.trim(), error: null};
+    const message = (m[1] ?? m[2] ?? '').trim();
+    return {body: s.slice(0, m.index).trim(), error: message || 'Something went wrong.'};
+}
+
 /**
  * A short, friendly line for an action instead of its JSON.
  *

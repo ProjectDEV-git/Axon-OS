@@ -167,3 +167,46 @@ def test_header_uses_symbolic_icons_and_no_duplicate_badge(window: Any) -> None:
     bubble = panel_mod.MessageBubble("assistant", "hi")
     assert bubble._copy_btn.get_icon_name() == "edit-copy-symbolic"
     assert bubble._copy_btn.get_tooltip_text() == "Copy to clipboard"
+
+
+def test_offline_error_bubble_offers_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = FakeClient(available=False)
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    win._send_message("hi")
+    bubble = win._stream_bubble
+    rec.join()
+    pump(GLib)
+    assert bubble._inner.has_css_class("bubble-error")
+    assert bubble._error_icon.get_visible()
+    labels = []
+    child = bubble._btn_row.get_first_child()
+    while child is not None:
+        labels.append(child.get_label())
+        child = child.get_next_sibling()
+    assert "Try again" in labels and "Diagnostics" in labels
+
+    client.available = True
+    win._retry(bubble, "hi")
+    assert bubble.get_parent() is None  # replaced by a fresh answer
+    rec.join()
+    pump(GLib)
+    assert client.sent == ["hi"]
+    win.destroy()
+
+
+def test_stream_error_marker_becomes_error_bubble(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = FakeClient(chunks=["Half", "\n[error] model crashed"])
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    win._send_message("hi")
+    bubble = win._stream_bubble
+    rec.join()
+    pump(GLib)
+    assert bubble._inner.has_css_class("bubble-error")
+    assert bubble.get_text() == "Half\n\nmodel crashed"
+    win.destroy()

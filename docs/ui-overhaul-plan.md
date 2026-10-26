@@ -94,10 +94,12 @@ add a short note under any item you skip or change.
       keeping the tooltips.
       Note: also fixed the terminal's `✕` dismiss button. Buttons that pair a glyph with
       text ("← Back", "⬡ AI") were left as they are.
-- [ ] **Errors look like normal answers.** Errors are plain text such as
+- [x] **Errors look like normal answers.** Errors are plain text such as
       `[error] Ollama is not running...` in the normal response colour. Add an `error` style
       (error colour plus an icon) and keep the recovery button next to it (e.g. Start Ollama).
       Apply it in both Intent Bars and the AI panel.
+      Note: recovery is "Start Ollama" (GTK Intent Bar), "Diagnostics" (Shell bar, opens
+      Axon Settings → Diagnostics) and "Try again" / "Diagnostics" (AI panel).
 - [ ] **AI panel too tall for small screens.** `set_default_size(420, 860)` on an
       undecorated window doesn't fit 768 px-high displays. Size it from the monitor's
       work area (e.g. height = min(860, work-area height − 48)).

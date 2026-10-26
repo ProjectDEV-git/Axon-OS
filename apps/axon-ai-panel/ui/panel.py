@@ -21,7 +21,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Adw, Gdk, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
 
 # ---------------------------------------------------------------------------
 # Import OllamaClient from the intent-bar app, falling back to a built-in
@@ -37,7 +37,7 @@ for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().pare
     if (_base / "services").is_dir():
         sys.path.insert(0, str(_base / "services"))
         break
-from ui_logic import RequestTracker, escape_action
+from ui_logic import RequestTracker, escape_action, split_error
 
 try:
     from ollama_client import OllamaClient  # type: ignore[import]
@@ -157,11 +157,21 @@ class MessageBubble(Gtk.Box):
         self._label.set_xalign(0.0)
         self._label.set_selectable(True)
         self._label.set_max_width_chars(44)
-        self._inner.append(self._label)
+        self._label.set_hexpand(True)
 
-        # Copy button row
-        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        # Shown only for errors, so they don't rely on colour alone
+        self._error_icon = Gtk.Image.new_from_icon_name("dialog-error-symbolic")
+        self._error_icon.set_valign(Gtk.Align.START)
+        self._error_icon.set_visible(False)
+        text_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        text_row.append(self._error_icon)
+        text_row.append(self._label)
+        self._inner.append(text_row)
+
+        # Button row: recovery actions (errors only) and copy
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         btn_row.set_halign(Gtk.Align.END)
+        self._btn_row = btn_row
         self._copy_btn = Gtk.Button.new_from_icon_name("edit-copy-symbolic")
         self._copy_btn.add_css_class("copy-btn")
         self._copy_btn.add_css_class("flat")
@@ -192,6 +202,21 @@ class MessageBubble(Gtk.Box):
     def get_text(self) -> str:
         """Return the message text received so far."""
         return self._text
+
+    def set_error(self, text: str) -> None:
+        """Show *text* as an error: error colour plus an icon."""
+        self._text = text
+        self._label.set_text(text)
+        self._error_icon.set_visible(True)
+        self._inner.add_css_class("bubble-error")
+
+    def add_action(self, label: str, callback: Any) -> Gtk.Button:
+        """Add a recovery button (e.g. "Try again") before the copy button."""
+        btn = Gtk.Button(label=label)
+        btn.add_css_class("bubble-action")
+        btn.connect("clicked", lambda _b: callback())
+        self._btn_row.prepend(btn)
+        return btn
 
     def append_text(self, chunk: str) -> None:
         """Append *chunk* to the bubble label (used during streaming)."""
@@ -287,6 +312,13 @@ class AIPanelWindow(Adw.Window):
         color: #e8e8f4;
         padding: 11px 15px;
     }
+    .bubble-error {
+        border-color: rgba(248, 113, 113, 0.6);
+        color: #fca5a5;
+    }
+    .bubble-error image {
+        color: #f87171;
+    }
     .thinking-label {
         color: #8b5cf6;
         font-size: 13px;
@@ -368,6 +400,7 @@ class AIPanelWindow(Adw.Window):
         self._stream_bubble: MessageBubble | None = None
         self._stream_cancelled = False
         self._requests = RequestTracker()
+        self._stream_prompt = ""
         self._conv_id: str = ""
 
         # Apply CSS (guard against re-registration)
@@ -664,8 +697,13 @@ class AIPanelWindow(Adw.Window):
 
         self._entry.set_text("")
         self._add_bubble("user", text)
+        self._start_request(text)
+
+    def _start_request(self, text: str) -> None:
+        """Stream an answer to *text* into a new assistant bubble."""
         request_id = self._requests.start()
         self._set_streaming(True)
+        self._stream_prompt = text
         self._stream_bubble = self._add_bubble("assistant", "")
 
         # The availability check and context lookup are D-Bus/HTTP calls:
@@ -730,11 +768,35 @@ class AIPanelWindow(Adw.Window):
             return False
         self._set_streaming(False)
         if self._stream_bubble is not None:
-            self._stream_bubble.set_final_text(
-                "Axon Brain service is offline or Ollama is not running."
-            )
+            bubble = self._stream_bubble
             self._stream_bubble = None
+            self._show_bubble_error(
+                bubble, "Axon Brain service is offline or Ollama is not running.", offline=True
+            )
         return False
+
+    def _show_bubble_error(self, bubble: MessageBubble, message: str, offline: bool) -> None:
+        """Turn *bubble* into an error with recovery buttons."""
+        bubble.set_error(message)
+        prompt = self._stream_prompt
+        bubble.add_action("Try again", lambda: self._retry(bubble, prompt))
+        if offline:
+            bubble.add_action("Diagnostics", self._open_diagnostics)
+
+    def _retry(self, bubble: MessageBubble, prompt: str) -> None:
+        if self._streaming or not prompt:
+            return
+        self._messages_box.remove(bubble)
+        self._start_request(prompt)
+
+    def _open_diagnostics(self) -> None:
+        """Open the Diagnostics window in Axon Settings, if installed."""
+        try:
+            info = Gio.DesktopAppInfo.new("axon-settings.desktop")
+            if info is not None:
+                info.launch_action("diagnostics", None)
+        except Exception:
+            pass
 
     def _on_chunk(self, chunk: str, request_id: int) -> bool:
         if self._requests.is_current(request_id) and self._stream_bubble is not None:
@@ -747,8 +809,15 @@ class AIPanelWindow(Adw.Window):
             return False  # cancelled; the bubble already says so
         self._set_streaming(False)
         if self._stream_bubble is not None:
-            self._stream_bubble.set_final_text(full_text)
+            bubble = self._stream_bubble
             self._stream_bubble = None
+            body, error = split_error(full_text)
+            if error is None:
+                bubble.set_final_text(full_text)
+            else:
+                self._show_bubble_error(
+                    bubble, f"{body}\n\n{error}" if body else error, offline=False
+                )
         return False
 
     # ------------------------------------------------------------------

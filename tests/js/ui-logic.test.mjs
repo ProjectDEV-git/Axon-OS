@@ -57,3 +57,12 @@ test('RequestTracker drops cancelled and superseded requests', async () => {
     assert.ok(t.finish(c));
     assert.ok(!t.cancel());
 });
+
+test('splitError matches the Python twin', async () => {
+    const {splitError} = await import('./ui-logic.mjs');
+    assert.deepEqual(splitError(' Hi '), {body: 'Hi', error: null});
+    assert.deepEqual(splitError('Logs say [error] here'), {body: 'Logs say [error] here', error: null});
+    assert.deepEqual(splitError('[Error: timed out]'), {body: '', error: 'timed out'});
+    assert.deepEqual(splitError('Part\n[error] lost'), {body: 'Part', error: 'lost'});
+    assert.deepEqual(splitError('[error]'), {body: '', error: 'Something went wrong.'});
+});

@@ -37,6 +37,7 @@ from ui_logic import (
     describe_action,
     escape_action,
     parse_action,
+    split_error,
 )
 
 try:
@@ -99,6 +100,15 @@ _CSS = b"""
 .response-label {
     color: #9090b8;
     font-size: 13px;
+}
+
+/* ---- Errors: colour plus an icon, never colour alone ---- */
+.response-error {
+    color: #f87171;
+}
+
+.response-error-icon {
+    color: #f87171;
 }
 
 /* ---- Space badge ---- */
@@ -303,14 +313,12 @@ class IntentBarWindow(Adw.Window):
         self._model_badge.set_valign(Gtk.Align.CENTER)
         top_row.append(self._model_badge)
 
+        # Recovery button, shown next to the "not running" error. The check
+        # is a D-Bus call, so it runs in _check_available_async, not here.
         self._start_ollama_btn = Gtk.Button(label="Start Ollama")
         self._start_ollama_btn.add_css_class("start-ollama-btn")
-        self._start_ollama_btn.set_valign(Gtk.Align.CENTER)
-        # Shown by _check_available_async if the AI turns out to be offline;
-        # the check is a D-Bus call, so it never runs on the GTK thread.
+        self._start_ollama_btn.set_valign(Gtk.Align.START)
         self._start_ollama_btn.set_visible(False)
-        top_row.append(self._start_ollama_btn)
-        threading.Thread(target=self._check_available_async, daemon=True).start()
 
         # ---- Row 2: separator -------------------------------------------
         sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -379,11 +387,21 @@ class IntentBarWindow(Adw.Window):
         self._response_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self._response_scroll.set_max_content_height(_RESPONSE_MAX_HEIGHT)
         self._response_scroll.set_propagate_natural_height(True)
-        self._response_scroll.set_child(self._response_label)
+        self._error_icon = Gtk.Image.new_from_icon_name("dialog-error-symbolic")
+        self._error_icon.add_css_class("response-error-icon")
+        self._error_icon.set_valign(Gtk.Align.START)
+        self._error_icon.set_visible(False)
+        self._response_label.set_hexpand(True)
+        response_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        response_row.append(self._error_icon)
+        response_row.append(self._response_label)
+        response_row.append(self._start_ollama_btn)
+        self._response_scroll.set_child(response_row)
         self._response_label.bind_property(
             "visible", self._response_scroll, "visible", GObject.BindingFlags.SYNC_CREATE
         )
         root.append(self._response_scroll)
+        threading.Thread(target=self._check_available_async, daemon=True).start()
 
         # ---- Row 6b: semantic search results ----------------------------
         self._results_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -508,8 +526,7 @@ class IntentBarWindow(Adw.Window):
         # Prepare UI for streaming (the availability check runs in the worker)
         request_id = self._requests.start()
         self._set_busy(True)
-        self._response_label.set_text("")
-        self._response_label.set_visible(False)
+        self._set_response("")
         self._push_history(query)
         self._history_idx = -1
 
@@ -537,8 +554,7 @@ class IntentBarWindow(Adw.Window):
             return
         self._set_busy(False)
         self._clear_results()
-        self._response_label.set_text("Cancelled")
-        self._response_label.set_visible(True)
+        self._set_response("Cancelled")
         cancel = getattr(self._ollama, "cancel", None)
         if cancel is not None:
             threading.Thread(target=cancel, daemon=True).start()
@@ -578,14 +594,22 @@ class IntentBarWindow(Adw.Window):
     def _check_available_async(self) -> None:
         """Worker thread: show "Start Ollama" when the AI is offline."""
         if not self._ollama.is_available():
-            GLib.idle_add(self._start_ollama_btn.set_visible, True)
+            GLib.idle_add(self._show_ai_offline)
 
     def _on_ai_unavailable(self, request_id: int) -> bool:
         """GTK thread: the query found the AI offline."""
         if not self._requests.finish(request_id):
             return False
         self._set_busy(False)
-        self._show_error("[error] Ollama is not running. Click 'Start Ollama'.")
+        self._show_ai_offline()
+        return False
+
+    def _show_ai_offline(self) -> bool:
+        """Show the offline error with its recovery button."""
+        if self._requests.busy:
+            return False  # don't overwrite a request that is running
+        self._show_error("Ollama is not running.")
+        self._start_ollama_btn.set_sensitive(True)
         self._start_ollama_btn.set_visible(True)
         return False
 
@@ -593,8 +617,7 @@ class IntentBarWindow(Adw.Window):
         """Append a streaming token to the response label (GTK main thread)."""
         if not self._requests.is_current(request_id):
             return False
-        self._response_label.set_text(self._response_label.get_text() + token)
-        self._response_label.set_visible(True)
+        self._set_response(self._response_label.get_text() + token)
         return False
 
     def _finish_stream(self, full: str, request_id: int) -> bool:
@@ -605,13 +628,15 @@ class IntentBarWindow(Adw.Window):
 
         action = parse_action(full)
         if action is not None:
-            self._response_label.set_text(describe_action(action))
-            self._response_label.set_visible(True)
+            self._set_response(describe_action(action))
             self._execute_action(action)
-        elif full.strip():
+            return False
+        body, error = split_error(full)
+        if error is not None:
+            self._show_error(f"{body}\n\n{error}" if body else error)
+        elif body:
             # Covers replies that were held back as possible JSON
-            self._response_label.set_text(full.strip())
-            self._response_label.set_visible(True)
+            self._set_response(body)
 
         return False
 
@@ -649,8 +674,7 @@ class IntentBarWindow(Adw.Window):
         request_id = self._requests.start()
         self._set_busy(True)
         self._clear_results()
-        self._response_label.set_text(f'Searching your files for "{query}"...')
-        self._response_label.set_visible(True)
+        self._set_response(f'Searching your files for "{query}"...')
         threading.Thread(
             target=self._do_semantic_search, args=(query, request_id), daemon=True
         ).start()
@@ -678,16 +702,15 @@ class IntentBarWindow(Adw.Window):
         self._set_busy(False)
         self._clear_results()
         if error:
-            self._show_error(f"[error] Semantic search unavailable: {error}")
+            self._show_error(f"Semantic search unavailable: {error}")
             return False
         if not results:
-            self._show_error(f'No matching files for "{query}".')
+            self._set_response(f'No matching files for "{query}".')
             return False
 
         backend = results[0].get("backend", "vector")
         label = "semantic" if backend == "vector" else "keyword"
-        self._response_label.set_text(f"Top {len(results)} {label} matches — click to open:")
-        self._response_label.set_visible(True)
+        self._set_response(f"Top {len(results)} {label} matches — click to open:")
 
         home = GLib.get_home_dir()
         for item in results:
@@ -738,9 +761,19 @@ class IntentBarWindow(Adw.Window):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _show_error(self, text: str) -> None:
+    def _set_response(self, text: str, error: bool = False) -> None:
+        """Show *text* below the entry; errors get an icon and the error colour."""
         self._response_label.set_text(text)
-        self._response_label.set_visible(True)
+        self._response_label.set_visible(bool(text))
+        self._error_icon.set_visible(error)
+        if error:
+            self._response_label.add_css_class("response-error")
+        else:
+            self._response_label.remove_css_class("response-error")
+            self._start_ollama_btn.set_visible(False)
+
+    def _show_error(self, text: str) -> None:
+        self._set_response(text, error=True)
 
     def _on_start_ollama(self, _btn: Gtk.Button) -> None:
         """Attempt to launch the Ollama daemon."""
@@ -750,7 +783,7 @@ class IntentBarWindow(Adw.Window):
             stderr=subprocess.DEVNULL,
         )
         self._start_ollama_btn.set_sensitive(False)
-        self._show_error("Starting Ollama... please wait a moment and try again.")
+        self._set_response("Starting Ollama… try again in a moment.")
 
     # ------------------------------------------------------------------
     # Semantic File Search Helpers

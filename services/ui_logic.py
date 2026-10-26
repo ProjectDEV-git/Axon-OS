@@ -16,6 +16,12 @@ SHOW = "show"
 
 _FENCE = "```"
 _FENCE_RE = re.compile(r"^```[A-Za-z0-9_-]*\s*\n?(.*?)\n?```\s*$", re.DOTALL)
+# Error markers the clients put into a reply: "[error] msg" or "[Error: msg]",
+# at the start of the text or of a line.
+_ERROR_RE = re.compile(
+    r"(?:^|\n)[ \t]*(?:\[error\][ \t]*(?P<tag>.*)|\[error:[ \t]*(?P<wrapped>.*?)\])",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def classify_stream_prefix(text: str) -> str:
@@ -79,6 +85,22 @@ def parse_action(text: str) -> dict[str, Any] | None:
     if isinstance(obj, dict) and isinstance(obj.get("action"), str):
         return obj
     return None
+
+
+def split_error(text: str) -> tuple[str, str | None]:
+    """Split a reply into the normal text and an error message, if any.
+
+    Args:
+        text: A complete reply, possibly ending in an ``[error] ...`` marker.
+
+    Returns:
+        ``(body, error)`` where *error* is None when there is no marker.
+    """
+    match = _ERROR_RE.search(text)
+    if match is None:
+        return text.strip(), None
+    message = (match.group("tag") or match.group("wrapped") or "").strip()
+    return text[: match.start()].strip(), message or "Something went wrong."
 
 
 def describe_action(action: dict[str, Any]) -> str:

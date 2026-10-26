@@ -431,3 +431,12 @@
     color: #e8e8f4;
     background-color: rgba(255, 255, 255, 0.08);
 }
+
+.axon-response-error,
+.axon-response-error-icon {
+    color: #f87171;
+}
+
+.axon-response-error-icon {
+    margin-right: 8px;
+}
