@@ -74,3 +74,36 @@ def test_chip_keeps_existing_text(window: Any) -> None:
     assert window._entry.get_text() == "Translate: this paragraph"
     window._on_chip_clicked("Translate: ")
     assert window._entry.get_text() == "Translate: this paragraph"
+
+
+def test_offline_check_runs_in_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    import threading
+
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    client = FakeClient(available=False)
+    seen: list[str] = []
+    client.is_available = lambda: seen.append(threading.current_thread().name) or False  # type: ignore[method-assign]
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    win._send_message("hi")
+    assert win._streaming  # UI responds at once; the check happens later
+    rec.join()
+    pump(GLib)
+    assert seen and threading.main_thread().name not in seen
+    assert not win._streaming
+    win.destroy()
+
+
+def test_message_streams_into_bubble(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(panel_mod, monkeypatch)
+    win = panel_mod.AIPanelWindow(ollama_client=FakeClient(), context_reader=FakeContext())
+    win._send_message("hi")
+    bubble = win._stream_bubble
+    rec.join()
+    pump(GLib)
+    assert bubble._text == "Hello there"
+    assert win._client.sent == ["hi"]
+    win.destroy()

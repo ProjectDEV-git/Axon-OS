@@ -297,8 +297,11 @@ class IntentBarWindow(Adw.Window):
         self._start_ollama_btn = Gtk.Button(label="Start Ollama")
         self._start_ollama_btn.add_css_class("start-ollama-btn")
         self._start_ollama_btn.set_valign(Gtk.Align.CENTER)
-        self._start_ollama_btn.set_visible(not self._ollama.is_available())
+        # Shown by _check_available_async if the AI turns out to be offline;
+        # the check is a D-Bus call, so it never runs on the GTK thread.
+        self._start_ollama_btn.set_visible(False)
         top_row.append(self._start_ollama_btn)
+        threading.Thread(target=self._check_available_async, daemon=True).start()
 
         # ---- Row 2: separator -------------------------------------------
         sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -480,12 +483,7 @@ class IntentBarWindow(Adw.Window):
             self._start_semantic_search(query[5:].strip())
             return
 
-        if not self._ollama.is_available():
-            self._show_error("[error] Ollama is not running. Click 'Start Ollama'.")
-            self._start_ollama_btn.set_visible(True)
-            return
-
-        # Prepare UI for streaming
+        # Prepare UI for streaming (the availability check runs in the worker)
         self._spinner.start()
         self._response_label.set_text("")
         self._response_label.set_visible(False)
@@ -510,6 +508,9 @@ class IntentBarWindow(Adw.Window):
         A reply that may be an action (JSON) is held back until the stream
         ends, so the user sees "Opening Firefox…" instead of raw JSON.
         """
+        if not self._ollama.is_available():
+            GLib.idle_add(self._on_ai_unavailable)
+            return
         system = self._build_system_prompt()
         self._stream_parts = []
         showing = False
@@ -528,6 +529,20 @@ class IntentBarWindow(Adw.Window):
                 self._stream_parts.append(f"\n[error] {exc}")
         if not self._stream_cancelled:
             GLib.idle_add(self._finish_stream, "".join(self._stream_parts))
+
+    def _check_available_async(self) -> None:
+        """Worker thread: show "Start Ollama" when the AI is offline."""
+        if not self._ollama.is_available():
+            GLib.idle_add(self._start_ollama_btn.set_visible, True)
+
+    def _on_ai_unavailable(self) -> bool:
+        """GTK thread: the query found the AI offline."""
+        self._spinner.stop()
+        self._entry.set_sensitive(True)
+        self._entry.grab_focus()
+        self._show_error("[error] Ollama is not running. Click 'Start Ollama'.")
+        self._start_ollama_btn.set_visible(True)
+        return False
 
     def _append_token(self, token: str) -> bool:
         """Append a streaming token to the response label (GTK main thread)."""

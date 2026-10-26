@@ -74,7 +74,7 @@ add a short note under any item you skip or change.
       `Gtk.ScrolledWindow` with `set_max_content_height(...)` and
       `set_propagate_natural_height(True)`. Shell: put the response in an `St.ScrollView`
       with a `max-height` in the stylesheet.
-- [ ] **UI freezes while checking if the AI is available.** `is_available()` runs on the
+- [x] **UI freezes while checking if the AI is available.** `is_available()` runs on the
       main thread before every query (a D-Bus call in `apps/intent-bar`, an HTTP request with
       a 2 s timeout in the AI panel). Move it to the worker thread, or cache the result and
       refresh it in the background.

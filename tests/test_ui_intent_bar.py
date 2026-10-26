@@ -95,3 +95,35 @@ def test_long_answer_scrolls_instead_of_growing() -> None:
     win._response_label.set_visible(False)
     assert not win._response_scroll.get_visible()
     win.destroy()
+
+
+class RecordingOllama(FakeOllama):
+    def __init__(self, available: bool) -> None:
+        super().__init__(["ok"], available)
+        self.checked_on: list[str] = []
+
+    def is_available(self) -> bool:
+        import threading
+
+        self.checked_on.append(threading.current_thread().name)
+        return self.available
+
+
+def test_availability_checked_off_main_thread(monkeypatch: pytest.MonkeyPatch) -> None:
+    import threading
+
+    from tests.gtk_helpers import ThreadRecorder
+
+    rec = ThreadRecorder(window_mod, monkeypatch)
+    ollama = RecordingOllama(available=False)
+    win = window_mod.IntentBarWindow(ollama_client=ollama, spaces_manager=FakeSpaces())
+    win._entry.set_text("hello")
+    win._on_activate(win._entry)
+    rec.join()
+    pump(GLib)
+    main = threading.main_thread().name
+    assert ollama.checked_on and main not in ollama.checked_on
+    assert win._start_ollama_btn.get_visible()
+    assert "not running" in win._response_label.get_text()
+    assert win._entry.get_sensitive()
+    win.destroy()

@@ -67,3 +67,24 @@ def load_intent_bar_window() -> ModuleType:
             pkg.__path__ = [str(path)]
             sys.modules[name] = pkg
     return importlib.import_module("intent_bar.ui.window")
+
+
+class ThreadRecorder:
+    """Replaces ``module.threading.Thread`` to keep and later join workers."""
+
+    def __init__(self, module: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+        import threading
+
+        self.threads: list[threading.Thread] = []
+        real = threading.Thread
+
+        def make(*args: Any, **kwargs: Any) -> threading.Thread:
+            t = real(*args, **kwargs)
+            self.threads.append(t)
+            return t
+
+        monkeypatch.setattr(module.threading, "Thread", make)
+
+    def join(self) -> None:
+        for t in self.threads:
+            t.join(timeout=5)

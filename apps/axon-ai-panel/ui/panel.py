@@ -654,20 +654,15 @@ class AIPanelWindow(Adw.Window):
 
         self._entry.set_text("")
         self._add_bubble("user", text)
-
-        if not self._client.is_available():
-            err_text = "Axon Brain service is offline or Ollama is not running."
-            self._add_bubble("assistant", err_text)
-            return
-
-        ctx_string = self._ctx_reader.build_context_string()
         self._set_streaming(True)
         self._stream_bubble = self._add_bubble("assistant", "")
 
+        # The availability check and context lookup are D-Bus/HTTP calls:
+        # they run in the worker so the panel never freezes.
         model = self._client.model
         thread = threading.Thread(
             target=self._stream_response,
-            args=(text, ctx_string, model),
+            args=(text, model),
             daemon=True,
         )
         thread.start()
@@ -680,7 +675,11 @@ class AIPanelWindow(Adw.Window):
         else:
             self._spinner.stop()
 
-    def _stream_response(self, text: str, ctx: str, model: str) -> None:
+    def _stream_response(self, text: str, model: str) -> None:
+        if not self._client.is_available():
+            GLib.idle_add(self._on_ai_unavailable)
+            return
+        ctx = self._ctx_reader.build_context_string()
         accumulated = ""
         try:
             for chunk in self._client.send_message_stream(
@@ -698,6 +697,15 @@ class AIPanelWindow(Adw.Window):
         finally:
             if not self._stream_cancelled:
                 GLib.idle_add(self._on_stream_done, accumulated)
+
+    def _on_ai_unavailable(self) -> bool:
+        self._set_streaming(False)
+        if self._stream_bubble is not None:
+            self._stream_bubble.set_final_text(
+                "Axon Brain service is offline or Ollama is not running."
+            )
+            self._stream_bubble = None
+        return False
 
     def _on_chunk(self, chunk: str) -> bool:
         if self._stream_bubble is not None:
