@@ -21,6 +21,10 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, Gtk
 
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import fit_default_size
+
 # Ensure sibling modules are importable when running as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -34,7 +38,7 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
 
         self.set_title("Axon Terminal")
-        self.set_default_size(900, 600)
+        fit_default_size(self, 900, 600)
         self.set_icon_name("utilities-terminal")
 
         # ---- Load CSS (guard against re-registration) ----------------------

@@ -126,3 +126,17 @@ test('history helpers', async () => {
     assert.deepEqual(m.recentForEmptyState(['x', m.EXAMPLE_PROMPTS[0], 'x', 'y', 'z', 'w']),
         ['x', 'y', 'z']);
 });
+
+test('responsive sizing', async () => {
+    const m = await import('./ui-logic.mjs');
+    assert.equal(m.intentBarWidth(1024), 480);
+    assert.equal(m.intentBarWidth(1366), 615);
+    assert.equal(m.intentBarWidth(1920), 820);
+    assert.equal(m.intentBarWidth(0), 660);
+    // 1280x800 at 125% is 1024x640 logical, minus a 48 px taskbar
+    assert.deepEqual(m.fitToWorkArea(620, 520, {width: 1024, height: 592}),
+        {width: 620, height: 520});
+    assert.deepEqual(m.fitToWorkArea(620, 520, {width: 600, height: 400}),
+        {width: 560, height: 360});
+    assert.deepEqual(m.fitToWorkArea(620, 520, null), {width: 620, height: 520});
+});

@@ -151,14 +151,18 @@ add a short note under any item you skip or change.
       (mode 0600); the Shell keeps its history for the session.
 
 ### Responsive sizing
-- [ ] **Intent Bar width.** Replace `min-width: 680px` with a width computed from the
+- [x] **Intent Bar width.** Replace `min-width: 680px` with a width computed from the
       monitor: clamp(480 px, 45% of monitor width, 820 px), set from JS using the monitor
       the bar opens on.
-- [ ] **Start Menu size.** Replace fixed `width: 620px; height: 520px` with sizes clamped to
+- [x] **Start Menu size.** Replace fixed `width: 620px; height: 520px` with sizes clamped to
       the monitor's work area.
-- [ ] **Other fixed sizes.** Check dock icon sizes, OSD sizes and GTK `set_default_size`
+- [x] **Other fixed sizes.** Check dock icon sizes, OSD sizes and GTK `set_default_size`
       calls for windows that don't fit a 1366×768 screen at 100% scale or a 1280×800 screen
       at 125% scale. Fix those that don't.
+      Note: Files (1000×680), Terminal (900×600), Welcome (640×600), Installer (1060×720),
+      AI Models, Diagnostics and Preferences now go through `fit_default_size()`
+      (`apps/shared/axon_gtk_utils.py`). Dock (48 px bar, 32 px icons) and the Space OSD
+      already fit 1024×640 logical.
 
 ## Phase 3 — Trust: privacy, context, safety, status
 

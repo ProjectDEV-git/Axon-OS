@@ -4,6 +4,7 @@
 import shutil
 import stat
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -14,6 +15,10 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 from file_indexer import FileIndexer, format_size, format_timestamp
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import fit_default_size
 
 _css_loaded = False
 
@@ -158,7 +163,7 @@ class FilesWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title("Axon Files")
-        self.set_default_size(1000, 680)
+        fit_default_size(self, 1000, 680)
 
         self.indexer = FileIndexer()
         self.current_dir = None

@@ -179,6 +179,7 @@ class TestSplitError:
         (860, 640, 592),  # 1280x800 at 125% scale is 640 logical px tall
         (860, 300, 320),  # never below the minimum
         (860, 0, 860),  # unknown monitor
+        (200, 1080, 200),  # a small preferred size is kept
     ],
 )
 def test_fit_to_screen(preferred: int, available: int, expected: int) -> None:
@@ -228,3 +229,12 @@ class TestHistory:
         assert load_history(bad) == []
         bad.write_text('["ok", 3, "  "]')
         assert load_history(bad) == ["ok"]
+
+
+@pytest.mark.parametrize(
+    ("monitor", "expected"), [(1024, 480), (1366, 615), (1920, 820), (3840, 820), (0, 660)]
+)
+def test_intent_bar_width(monitor: int, expected: int) -> None:
+    from services.ui_logic import intent_bar_width
+
+    assert intent_bar_width(monitor) == expected

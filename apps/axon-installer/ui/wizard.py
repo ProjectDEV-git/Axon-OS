@@ -23,6 +23,10 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk
 
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from axon_gtk_utils import fit_default_size
+
 ENGINE_PATH = Path(__file__).resolve().parents[1] / "install_engine.py"
 ENGINE_WRAPPER = "/usr/local/bin/axon-install-engine"
 
@@ -209,7 +213,7 @@ class InstallerWindow(Adw.Window):
     def __init__(self, app: Adw.Application):
         super().__init__(application=app)
         self.set_title("Install Axon OS")
-        self.set_default_size(1060, 720)
+        fit_default_size(self, 1060, 720)
 
         # On small screens (e.g. 1366x768 laptops), maximise so the wizard
         # always fits without being clipped.

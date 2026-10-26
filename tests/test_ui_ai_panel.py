@@ -213,7 +213,9 @@ def test_stream_error_marker_becomes_error_bubble(monkeypatch: pytest.MonkeyPatc
 
 
 def test_default_height_fits_the_monitor(window: Any) -> None:
+    import axon_gtk_utils
+
     _, height = window.get_default_size()
-    monitor_h = panel_mod._monitor_height(window.get_display())
+    _, monitor_h = axon_gtk_utils.monitor_size(window.get_display())
     assert monitor_h > 0
     assert height <= max(320, monitor_h - 48)

@@ -18,6 +18,10 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import fit_default_size
+
 # Repo root in a checkout, /usr/lib/axon when installed: both hold services/.
 _AXON_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 if _AXON_ROOT not in sys.path:
@@ -39,7 +43,7 @@ class DiagnosticsWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs: object) -> None:
         super().__init__(**kwargs)
         self.set_title("Diagnostics")
-        self.set_default_size(620, 680)
+        fit_default_size(self, 620, 680)
         self._report: Report | None = None
 
         self._toasts = Adw.ToastOverlay()

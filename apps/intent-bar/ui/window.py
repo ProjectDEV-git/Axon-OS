@@ -31,6 +31,9 @@ for _services in (Path(__file__).resolve().parents[3], Path(__file__).resolve().
         break
 from constants import AXON_DIR
 from service_utils import confirm_and_exec
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from axon_gtk_utils import monitor_size
 from ui_logic import (
     EXAMPLE_PROMPTS,
     SHOW,
@@ -41,6 +44,7 @@ from ui_logic import (
     classify_stream_prefix,
     describe_action,
     escape_action,
+    intent_bar_width,
     load_history,
     parse_action,
     push_history,
@@ -267,7 +271,8 @@ class IntentBarWindow(Adw.Window):
         self._requests = RequestTracker()
 
         self.set_decorated(False)
-        self.set_default_size(660, -1)
+        # clamp(480 px, 45% of the monitor, 820 px)
+        self.set_default_size(intent_bar_width(monitor_size(self.get_display())[0]), -1)
         self.set_size_request(480, -1)  # minimum width so it still fits small screens
         self.add_css_class("intent-bar-window")
 

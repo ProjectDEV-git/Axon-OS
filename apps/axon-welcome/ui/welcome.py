@@ -18,6 +18,10 @@ import dbus
 from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository import Adw, GLib, Gtk
 
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from axon_gtk_utils import fit_default_size
+
 # Insert axon-brain path so we can run hardware profiler
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "services" / "axon-brain"))
 try:
@@ -178,7 +182,7 @@ class WelcomeWindow(Adw.Window):
 
         # Window properties
         self.set_title("Welcome to Axon OS")
-        self.set_default_size(640, 600)
+        fit_default_size(self, 640, 600)
         self.set_decorated(True)
 
         # Load CSS (guard against re-registration)

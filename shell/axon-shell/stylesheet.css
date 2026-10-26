@@ -11,7 +11,6 @@
     border: 1px solid rgba(139, 92, 246, 0.45);
     border-radius: 16px;
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.85);
-    min-width: 680px;
     padding: 20px 24px 16px 24px;
 }
 
@@ -188,8 +187,6 @@
     border-radius: 12px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.90);
     padding: 24px;
-    width: 620px;
-    height: 520px;
 }
 
 /* Search bar inside Start Menu */

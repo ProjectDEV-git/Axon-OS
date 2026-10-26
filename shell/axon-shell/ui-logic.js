@@ -348,3 +348,38 @@ export function recentForEmptyState(history, limit = 3) {
     }
     return out;
 }
+
+// ── Responsive sizing ───────────────────────────────────────────────────────
+
+/**
+ * Intent Bar width: 45% of the monitor, clamped to 480–820 px
+ * (twin of intent_bar_width()).
+ *
+ * @param {number} monitorWidth - logical px
+ * @returns {number}
+ */
+export function intentBarWidth(monitorWidth) {
+    if (!(monitorWidth > 0))
+        return 660;
+    return Math.max(480, Math.min(820, Math.round(monitorWidth * 0.45)));
+}
+
+/**
+ * Fit a popup into a work area, keeping a margin on each side.
+ *
+ * @param {number} width - preferred width
+ * @param {number} height - preferred height
+ * @param {{width: number, height: number}} workArea - logical px
+ * @param {number} [margin] - px kept free on each side
+ * @param {{width: number, height: number}} [minimum]
+ * @returns {{width: number, height: number}}
+ */
+export function fitToWorkArea(width, height, workArea, margin = 20,
+    minimum = {width: 320, height: 320}) {
+    if (!workArea || !(workArea.width > 0) || !(workArea.height > 0))
+        return {width, height};
+    return {
+        width: Math.max(minimum.width, Math.min(width, workArea.width - 2 * margin)),
+        height: Math.max(minimum.height, Math.min(height, workArea.height - 2 * margin)),
+    };
+}

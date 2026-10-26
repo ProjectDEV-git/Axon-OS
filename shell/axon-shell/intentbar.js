@@ -13,6 +13,7 @@ import {
     RequestTracker,
     STAGES,
     escapeAction,
+    intentBarWidth,
     parseAction,
     pushHistory,
     recentForEmptyState,
@@ -251,14 +252,11 @@ export default class IntentBar {
 
     _positionCenter() {
         if (!this._actor) return;
-        const monitor = Main.layoutManager.primaryMonitor;
+        // The monitor the user is on (pointer/focus), not always the primary
+        const monitor = Main.layoutManager.currentMonitor || Main.layoutManager.primaryMonitor;
         if (!monitor) return;
 
-        // Let the actor measure itself first
-        const [minW, natW] = this._actor.get_preferred_width(-1);
-        const [minH, natH] = this._actor.get_preferred_height(natW);
-
-        const width = Math.max(natW, 600);
+        const width = intentBarWidth(monitor.width);
         const x = monitor.x + Math.floor((monitor.width - width) / 2);
         const y = monitor.y + Math.floor(monitor.height * 0.28);
 

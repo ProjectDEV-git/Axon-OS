@@ -177,11 +177,12 @@ def fit_to_screen(preferred: int, available: int, margin: int = 48, minimum: int
         minimum: Never go below this, even on tiny screens.
 
     Returns:
-        ``max(minimum, min(preferred, available - margin))``.
+        ``min(preferred, available - margin)``, but never below *minimum*
+        (or *preferred*, if that is smaller).
     """
     if available <= 0:
         return preferred
-    return max(minimum, min(preferred, available - margin))
+    return max(min(minimum, preferred), min(preferred, available - margin))
 
 
 # Loading stages shown while a request runs. Only show a stage the code has
@@ -251,3 +252,10 @@ def save_history(path: Path, history: list[str]) -> None:
             json.dump(history, fh)
     except OSError:
         pass  # history is a convenience; never break the bar over it
+
+
+def intent_bar_width(monitor_width: int) -> int:
+    """Intent Bar width: 45% of the monitor, clamped to 480–820 px."""
+    if monitor_width <= 0:
+        return 660
+    return max(480, min(820, round(monitor_width * 0.45)))

@@ -11,8 +11,10 @@ service; keys and tokens stay in the system keyring and never pass back here.
 from __future__ import annotations
 
 import json
+import sys
 import threading
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import gi
@@ -20,6 +22,10 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk
+
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import fit_default_size
 
 TIERS = (
     ("general", "Everyday model", "Chat, questions and writing"),
@@ -123,7 +129,7 @@ class ProviderDialog(Adw.Window):
         on_save: Callable[[dict[str, Any]], None],
     ) -> None:
         super().__init__(transient_for=parent, modal=True)
-        self.set_default_size(480, 640)
+        fit_default_size(self, 480, 640)
         self._provider = provider or {}
         self._on_save = on_save
         is_new = provider is None
@@ -248,7 +254,7 @@ class AIModelsWindow(Adw.PreferencesWindow):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.set_title("AI Models")
-        self.set_default_size(640, 720)
+        fit_default_size(self, 640, 720)
         self._client = BrainClient()
         self._poll_ids: dict[str, int] = {}
         self._code_dialogs: dict[str, Adw.MessageDialog] = {}

@@ -6,6 +6,12 @@ import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {fitToWorkArea} from './ui-logic.js';
+
+// Preferred Start Menu size; shrunk to fit small work areas
+const MENU_WIDTH = 620;
+const MENU_HEIGHT = 520;
+const FILES_COLUMN_WIDTH = 280;
 
 const StartMenuPopup = GObject.registerClass(
 class StartMenuPopup extends St.BoxLayout {
@@ -110,7 +116,7 @@ class StartMenuPopup extends St.BoxLayout {
         this._filesColumn = new St.BoxLayout({
             style_class: 'axon-startmenu-files-column',
             vertical: true,
-            width: 280,
+            width: FILES_COLUMN_WIDTH,
         });
         contentBox.add_child(this._filesColumn);
 
@@ -250,15 +256,18 @@ class StartMenuPopup extends St.BoxLayout {
     }
 
     _reposition() {
-        const monitor = Main.layoutManager.primaryMonitor;
+        const monitor = Main.layoutManager.currentMonitor || Main.layoutManager.primaryMonitor;
         if (!monitor) return;
 
-        const [, natW] = this.get_preferred_width(-1);
-        const [, natH] = this.get_preferred_height(natW);
+        // The taskbar sets struts, so the work area already excludes it
+        const workArea = Main.layoutManager.getWorkAreaForMonitor(monitor.index);
+        const {width, height} = fitToWorkArea(MENU_WIDTH, MENU_HEIGHT, workArea);
+        this.set_size(width, height);
+        this._filesColumn.width = Math.min(FILES_COLUMN_WIDTH, Math.floor(width * 0.42));
 
-        // Position bottom-left, floating slightly above taskbar (height ~48px)
-        const x = monitor.x + 20;
-        const y = monitor.y + monitor.height - natH - 60;
+        // Bottom-left of the work area, floating just above the taskbar
+        const x = workArea.x + 20;
+        const y = workArea.y + workArea.height - height - 12;
 
         this.set_position(x, y);
     }
