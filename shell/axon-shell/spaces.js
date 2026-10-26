@@ -338,51 +338,25 @@ export default class SpacesManager {
                 x_align: Clutter.ActorAlign.CENTER,
                 y_align: Clutter.ActorAlign.CENTER,
                 reactive: false,
-                style: [
-                    'background: rgba(17,17,25,0.92);',
-                    'border: 1px solid rgba(139,92,246,0.35);',
-                    'border-radius: 16px;',
-                    'padding: 20px 36px;',
-                    'min-width: 160px;',
-                ].join(' '),
             });
 
             const numberLabel = new St.Label({
                 style_class: 'axon-space-osd-number',
                 text: String(idx + 1),
                 x_align: Clutter.ActorAlign.CENTER,
-                style: [
-                    `color: ${space.color};`,
-                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                    'font-size: 48px;',
-                    'font-weight: 700;',
-                    'line-height: 1;',
-                ].join(' '),
+                style: `color: ${space.color};`,
             });
 
             const nameLabel = new St.Label({
                 style_class: 'axon-space-osd-name',
                 text: space.name,
                 x_align: Clutter.ActorAlign.CENTER,
-                style: [
-                    'color: #e8e8f4;',
-                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                    'font-size: 18px;',
-                    'font-weight: 600;',
-                    'margin-top: 4px;',
-                ].join(' '),
             });
 
             const indexLabel = new St.Label({
                 style_class: 'axon-space-osd-index',
-                text: `Space ${idx + 1} of 9`,
+                text: `Space ${idx + 1} of ${this._spaces.length}`,
                 x_align: Clutter.ActorAlign.CENTER,
-                style: [
-                    'color: #9090b8;',
-                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                    'font-size: 12px;',
-                    'margin-top: 6px;',
-                ].join(' '),
             });
 
             // Instant summary from the window list; the AI summary is opt-in
@@ -395,13 +369,6 @@ export default class SpacesManager {
                 style_class: 'axon-space-osd-summary',
                 text: windowSummary(windows.map(w => this._appName(w))),
                 x_align: Clutter.ActorAlign.CENTER,
-                style: [
-                    'color: #a78bfa;',
-                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                    'font-size: 13px;',
-                    'font-weight: 500;',
-                    'margin-top: 8px;',
-                ].join(' '),
             });
 
             osd.add_child(numberLabel);

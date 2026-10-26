@@ -2,36 +2,84 @@
  * Do not edit: change the tokens or the template and run the script. */
 /* Variant: dark */
 
-/* =============================================================================
-   Axon OS — GNOME Shell Extension Stylesheet
-   Design System: Windows 10/11 Fluent Modern Glass (Acrylic)
-   ============================================================================= */
+/* Axon OS GNOME Shell extension stylesheet (template).
+ *
+ * Edit this file, not stylesheet*.css: scripts/gen_tokens.py fills the
+ * {{...}} placeholders from theme/tokens/axon-tokens.json and writes the
+ * dark and light stylesheets. Follows GNOME's flat look: solid surfaces,
+ * neutral borders, one small shadow for popups, and the accent only for
+ * focus, active/selected items and AI. */
 
-/* =============================================================================
-   INTENT BAR
-   ============================================================================= */
+/* ── Shared ─────────────────────────────────────────────────────────────── */
+
+.axon-hint-label {
+    color: #9292aa;
+    font-size: 11px;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+}
+
+.axon-hint-bar {
+    margin-top: 8px;
+}
+
+.axon-separator {
+    background-color: rgba(255, 255, 255, 0.10);
+    height: 1px;
+    margin: 2px 0;
+}
+
+.axon-chips-row {
+    spacing: 8px;
+    margin: 4px 0 8px 0;
+}
+
+.axon-chip {
+    border-radius: 9999px;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: #a6a6bc;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    transition-duration: 100ms;
+}
+
+.axon-chip:hover {
+    background-color: rgba(255, 255, 255, 0.11);
+    color: #e8e8f0;
+}
+
+.axon-chip:focus {
+    border: 2px solid #a78bfa;
+}
+
+/* Status shown with an icon or word as well as colour */
+.axon-status-ok { color: #34d399; }
+.axon-status-warn { color: #fbbf24; }
+.axon-status-error { color: #f87171; }
+
+/* ── Intent Bar ─────────────────────────────────────────────────────────── */
+
 .axon-intentbar {
-    background-color: rgba(9, 9, 15, 0.92);
-    border: 1px solid rgba(139, 92, 246, 0.45);
-    border-radius: 16px;
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.85);
-    padding: 20px 24px 16px 24px;
+    background-color: rgba(24, 24, 32, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    padding: 16px 24px 12px 24px;
 }
 
 .axon-intentbar-input,
-.axon-intentbar-input StEntry,
-.axon-intentbar-input > StEntry {
+.axon-intentbar-input StEntry {
     background-color: transparent;
-    background: transparent;
-    color: #e8e8f4;
+    color: #e8e8f0;
     font-size: 20px;
-    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     border: none;
     border-radius: 0;
     box-shadow: none;
-    caret-color: #8b5cf6;
+    caret-color: #c4b5fd;
     padding: 4px 0;
-    selection-background-color: rgba(139, 92, 246, 0.28);
+    selection-background-color: rgba(139, 92, 246, 0.16);
 }
 
 .axon-intentbar-input:focus,
@@ -41,64 +89,60 @@
     background-color: transparent;
 }
 
+/* Where the model runs: AI-related, so it may use the accent */
+.axon-origin-label {
+    color: #c4b5fd;
+    font-size: 11px;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    margin-bottom: 8px;
+}
+
+.axon-intentbar-stop {
+    color: #a6a6bc;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+.axon-intentbar-stop:hover {
+    color: #e8e8f0;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.axon-intentbar-stop:focus {
+    border: 2px solid #a78bfa;
+}
+
+.axon-intentbar-empty {
+    margin-top: 8px;
+}
+
 .axon-response {
-    color: #9090b8;
+    color: #e8e8f0;
     font-size: 13px;
-    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
 .axon-response-scroll {
-    border-top: 1px solid #2a2a42;
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
     margin-top: 12px;
     padding-top: 12px;
     max-height: 320px;
 }
 
-.axon-chips-row {
-    spacing: 8px;
-    margin-top: 12px;
+.axon-response-error,
+.axon-response-error-icon {
+    color: #f87171;
 }
 
-.axon-chip {
-    border-radius: 9999px;
-    background-color: rgba(139, 92, 246, 0.08);
-    border: 1px solid rgba(139, 92, 246, 0.35);
-    color: #8b5cf6;
-    padding: 4px 14px;
-    font-size: 12px;
-    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
+.axon-response-error-icon {
+    margin-right: 8px;
 }
 
-.axon-chip:hover {
-    background-color: #8b5cf6;
-    color: #ffffff;
-    border-color: #8b5cf6;
-}
+/* ── Taskbar ────────────────────────────────────────────────────────────── */
 
-.axon-hint-bar {
-    spacing: 16px;
-    margin-top: 8px;
-}
-
-.axon-hint-label {
-    color: #50507a;
-    font-size: 11px;
-    font-family: "Inter", "Ubuntu", system-ui, sans-serif;
-}
-
-.axon-separator {
-    background-color: #2a2a42;
-    height: 1px;
-    margin: 2px 0;
-}
-
-/* =============================================================================
-   TASKBAR — Windows-style full-width bottom panel
-   ============================================================================= */
 .axon-taskbar {
-    background-color: rgba(15, 15, 25, 0.84);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.60);
+    background-color: #16161e;
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
     padding: 0 16px;
     spacing: 0;
 }
@@ -116,13 +160,12 @@
     spacing: 4px;
 }
 
-/* Icons & Grid cells */
 .axon-dock-icon {
     border-radius: 6px;
     padding: 4px;
     width: 40px;
     height: 40px;
-    transition-duration: 120ms;
+    transition-duration: 100ms;
     background-color: transparent;
     border: 1px solid transparent;
     margin: 4px 0;
@@ -130,109 +173,127 @@
 
 .axon-dock-icon:hover {
     background-color: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.08);
 }
 
 .axon-dock-icon:focus {
-    background-color: rgba(139, 92, 246, 0.15);
-    border-color: rgba(139, 92, 246, 0.40);
+    border: 2px solid #a78bfa;
 }
 
-/* Taskbar icon specific styling for SVG icons */
 .axon-taskbar-icon-svg {
-    color: #a78bfa;
+    color: #a6a6bc;
 }
 
-/* Underline Active/Running Indicator */
+/* Running-app marker: active state, so the accent */
 .axon-dock-dot {
-    background-color: #8b5cf6;
-    border-radius: 2px;
+    background-color: #c4b5fd;
+    border-radius: 6px;
     width: 14px;
     height: 3px;
     margin: 2px auto 0 auto;
 }
 
 .axon-dock-separator {
-    background-color: rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.10);
     width: 1px;
     height: 24px;
     margin: 0 8px;
 }
 
-/* Clock */
 .axon-taskbar-clock {
-    color: #e2e8f0;
+    color: #e8e8f0;
     font-size: 11px;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 500;
     text-align: center;
-    line-height: 1.2;
     margin: 0 8px;
 }
 
 .axon-dock-tooltip {
-    background-color: #0b0b12;
+    background-color: #272733;
     border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.70);
-    color: #f1f5f9;
+    color: #e8e8f0;
     font-size: 11px;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 500;
     padding: 4px 8px;
 }
 
-/* =============================================================================
-   START MENU — Windows 11 style centered popup
-   ============================================================================= */
+.axon-taskbar-showdesktop {
+    width: 10px;
+    height: 48px;
+    background-color: transparent;
+    border-left: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.axon-taskbar-showdesktop:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* AI status in the taskbar: a word and a dot, never colour alone */
+.axon-ai-indicator {
+    margin: 0 8px;
+    spacing: 4px;
+}
+
+.axon-ai-indicator-icon {
+    color: #c4b5fd;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.axon-ai-indicator-dot {
+    font-size: 10px;
+}
+
+/* ── Start Menu (size is set from JS to fit the work area) ──────────────── */
+
 .axon-startmenu {
-    background-color: rgba(13, 13, 22, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background-color: rgba(24, 24, 32, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.20);
     border-radius: 12px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.90);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     padding: 24px;
 }
 
-/* Search bar inside Start Menu */
 .axon-startmenu-search-container {
-    margin-bottom: 20px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-bottom: 2px solid #8b5cf6;
-    border-radius: 6px;
+    margin-bottom: 16px;
+    background-color: #1e1e28;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
     padding: 6px 12px;
 }
 
-.axon-startmenu-search {
-    background-color: transparent;
-    color: #f8fafc;
-    font-size: 14px;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+.axon-startmenu-search-container:focus {
+    border: 2px solid #a78bfa;
 }
 
+.axon-startmenu-search,
 .axon-startmenu-search StEntry {
     background-color: transparent;
     border: none;
     box-shadow: none;
+    color: #e8e8f0;
+    font-size: 15px;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
-/* Content Split Column Layout */
 .axon-startmenu-content {
     spacing: 24px;
     margin-bottom: 16px;
 }
 
 .axon-startmenu-section-title {
-    color: #94a3b8;
+    color: #a6a6bc;
     font-size: 11px;
     font-weight: 700;
-    text-transform: uppercase;
     margin-bottom: 12px;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
-/* App Grid (Left column) */
-.axon-startmenu-apps-column {
+.axon-startmenu-apps-column,
+.axon-startmenu-files-column {
     spacing: 8px;
 }
 
@@ -250,22 +311,25 @@
 
 .axon-startmenu-app-item:hover {
     background-color: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.axon-startmenu-app-item:focus,
+.axon-startmenu-file-item:focus,
+.axon-startmenu-power-btn:focus {
+    border: 2px solid #a78bfa;
 }
 
 .axon-startmenu-app-label {
-    color: #e2e8f0;
+    color: #e8e8f0;
     font-size: 11px;
     margin-top: 6px;
     text-align: center;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
-/* Recent Files (Right column) */
 .axon-startmenu-files-column {
-    spacing: 8px;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-    padding-left: 20px;
+    border-left: 1px solid rgba(255, 255, 255, 0.10);
+    padding-left: 16px;
 }
 
 .axon-startmenu-files-list {
@@ -276,52 +340,51 @@
     border-radius: 6px;
     padding: 8px 12px;
     background-color: transparent;
+    border: 1px solid transparent;
     text-align: left;
 }
 
 .axon-startmenu-file-item:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.06);
 }
 
 .axon-startmenu-file-label {
-    color: #cbd5e1;
+    color: #e8e8f0;
     font-size: 12px;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
 .axon-startmenu-file-icon {
-    color: #8b5cf6;
+    color: #a6a6bc;
 }
 
 .axon-startmenu-no-files {
-    color: #64748b;
+    color: #9292aa;
     font-size: 12px;
-    padding: 10px;
+    padding: 8px;
     font-style: italic;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
-/* Footer with Avatar & Power Options */
 .axon-startmenu-footer {
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
     padding-top: 16px;
-    margin-top: auto;
     spacing: 12px;
 }
 
 .axon-startmenu-user {
-    spacing: 10px;
+    spacing: 8px;
 }
 
 .axon-startmenu-avatar {
-    color: #8b5cf6;
+    color: #a6a6bc;
 }
 
 .axon-startmenu-username {
-    color: #f1f5f9;
+    color: #e8e8f0;
     font-size: 13px;
     font-weight: 600;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
 .axon-startmenu-power-box {
@@ -329,121 +392,109 @@
 }
 
 .axon-startmenu-power-btn {
-    background-color: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: 6px;
-    padding: 8px 10px;
-    color: #94a3b8;
+    padding: 8px;
+    color: #a6a6bc;
 }
 
 .axon-startmenu-power-btn:hover {
-    background-color: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.30);
-    color: #ef4444;
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #e8e8f0;
 }
 
-/* =============================================================================
-   SPACE OSD OVERLAY
-   ============================================================================= */
+/* ── Space OSD ──────────────────────────────────────────────────────────── */
+
 .axon-space-osd {
-    background-color: rgba(9, 9, 15, 0.92);
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    border-radius: 20px;
-    padding: 24px 48px;
-    min-width: 280px;
+    background-color: rgba(24, 24, 32, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    padding: 16px 24px;
+    min-width: 200px;
+}
+
+/* The number takes the Space's own colour from JS (user data) */
+.axon-space-osd-number {
+    font-size: 48px;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    font-weight: 700;
 }
 
 .axon-space-osd-name {
-    font-size: 28px;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-    color: #e8e8f4;
-    font-weight: bold;
+    font-size: 20px;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    font-weight: 600;
+    color: #e8e8f0;
+    margin-top: 4px;
 }
 
 .axon-space-osd-index {
+    font-size: 12px;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    color: #a6a6bc;
+    margin-top: 6px;
+}
+
+.axon-space-osd-summary {
     font-size: 13px;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-    color: #9090b8;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    color: #a6a6bc;
+    margin-top: 8px;
 }
 
-.axon-space-osd-number {
-    font-size: 48px;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-    color: #8b5cf6;
-    font-weight: bold;
+/* ── Space indicator in the top panel ───────────────────────────────────── */
+
+.axon-space-indicator {
+    spacing: 4px;
 }
 
-/* =============================================================================
-   DOCK CONTEXT MENU (AI Predicted Actions)
-   ============================================================================= */
+/* The dot takes the Space's own colour from JS; the label carries the name */
+.axon-space-dot {
+    font-size: 10px;
+}
+
+.axon-space-label {
+    color: #e8e8f0;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
+    font-size: 12px;
+}
+
+/* ── Dock context menu (AI predicted actions) ───────────────────────────── */
+
 .axon-dock-menu {
-    background-color: rgba(13, 13, 26, 0.95);
-    border: 1px solid rgba(139, 92, 246, 0.4);
+    background-color: rgba(24, 24, 32, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.20);
     border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     padding: 6px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
     spacing: 4px;
 }
 
 .axon-dock-menu-item {
     padding: 8px 16px;
     border-radius: 6px;
-    color: #e4e4e8;
+    color: #e8e8f0;
     font-size: 13px;
     font-weight: 500;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     text-align: left;
     background-color: transparent;
 }
 
 .axon-dock-menu-item:hover {
-    background-color: rgba(139, 92, 246, 0.22);
-    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.axon-dock-menu-item:focus {
+    background-color: rgba(139, 92, 246, 0.16);
 }
 
 .axon-dock-menu-title {
     padding: 6px 16px;
-    color: #9090b8;
+    color: #a6a6bc;
     font-size: 11px;
     font-weight: 700;
-    text-transform: uppercase;
-    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-}
-
-/* Show Desktop strip (Windows Aero Peek) */
-.axon-taskbar-showdesktop {
-    width: 10px;
-    height: 48px;
-    background-color: transparent;
-    border-left: 1px solid rgba(255, 255, 255, 0.15);
-}
-.axon-taskbar-showdesktop:hover {
-    background-color: rgba(255, 255, 255, 0.12);
-}
-
-.axon-intentbar-stop {
-    color: #9090b8;
-    border-radius: 8px;
-    padding: 6px;
-}
-
-.axon-intentbar-stop:hover,
-.axon-intentbar-stop:focus {
-    color: #e8e8f4;
-    background-color: rgba(255, 255, 255, 0.08);
-}
-
-.axon-response-error,
-.axon-response-error-icon {
-    color: #f87171;
-}
-
-.axon-response-error-icon {
-    margin-right: 8px;
-}
-
-.axon-origin-label {
-    color: #9090b8;
-    font-size: 11px;
-    margin-bottom: 8px;
+    font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }

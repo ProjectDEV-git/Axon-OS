@@ -238,9 +238,9 @@ add a short note under any item you skip or change.
       `apps/shared/axon_gtk_utils.py` loads the tokens as their own provider first, so the
       variant can be swapped at runtime (Phase 4, "Follow system appearance"). The terminal's
       ANSI palette and default Space colours are data, not CSS, and stay as they are.
-- [ ] **Shell stylesheet on tokens.** Replace every hardcoded colour, radius and spacing
+- [x] **Shell stylesheet on tokens.** Replace every hardcoded colour, radius and spacing
       value in `shell/axon-shell/stylesheet.css` with generated token values.
-- [ ] **Drop the "Windows glass" look.** Remove the "Windows 10/11 Fluent Modern Glass
+- [x] **Drop the "Windows glass" look.** Remove the "Windows 10/11 Fluent Modern Glass
       (Acrylic)" design-system header. Reduce heavy transparency and large shadows, use
       fewer floating rounded boxes, and follow GNOME/libadwaita spacing and hierarchy.
 - [ ] **Use purple sparingly.** Reserve the accent for active, selected and AI-related

@@ -106,3 +106,20 @@ def test_unknown_placeholder_fails_loudly() -> None:
         "a { color: {{color.bg}}; }", TOKENS, "high-contrast"
     )
     assert "padding: 8px;" in gen.render_shell("a { padding: {{space.md}}; }", TOKENS, "dark")
+
+
+def test_shell_template_uses_tokens_for_colours() -> None:
+    template = (ROOT / "shell" / "axon-shell" / "stylesheet.css.in").read_text()
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b", template), "use {{color.*}} tokens"
+    assert "rgba(" not in template, "use {{color.*}} tokens"
+    assert "Windows" not in template and "Acrylic" not in template
+
+
+def test_every_shell_style_class_has_a_rule() -> None:
+    js = " ".join(p.read_text() for p in (ROOT / "shell" / "axon-shell").glob("*.js"))
+    used = set(re.findall(r"style_class: '([^']+)'", js))
+    used |= set(re.findall(r"add_style_class_name\('([^']+)'\)", js))
+    classes = {c for group in used for c in group.split() if c.startswith("axon-")}
+    template = (ROOT / "shell" / "axon-shell" / "stylesheet.css.in").read_text()
+    missing = sorted(c for c in classes if f".{c}" not in template)
+    assert not missing, missing

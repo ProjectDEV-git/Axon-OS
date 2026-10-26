@@ -43,27 +43,19 @@ class AxonAIIndicator extends PanelMenu.Button {
             vertical: false,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
-            style: 'margin: 0 10px;',
         });
 
         this._iconLabel = new St.Label({
             style_class: 'axon-ai-indicator-icon',
             text: '⬡ AI',
             y_align: Clutter.ActorAlign.CENTER,
-            style: [
-                'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                'font-size: 12px;',
-                'font-weight: 600;',
-                'color: #8b5cf6;',
-                'margin-right: 5px;',
-            ].join(' '),
         });
 
+        // Colour plus the accessible name: status never relies on colour alone
         this._statusDot = new St.Label({
-            style_class: 'axon-ai-indicator-dot',
+            style_class: 'axon-ai-indicator-dot axon-status-error',
             text: '●',
             y_align: Clutter.ActorAlign.CENTER,
-            style: 'color: #ef4444; font-size: 10px;',
         });
 
         box.add_child(this._iconLabel);
@@ -119,8 +111,14 @@ class AxonAIIndicator extends PanelMenu.Button {
     }
 
     _setDotColor(online) {
-        const color = online ? '#10b981' : '#ef4444';
-        this._statusDot.set_style(`color: ${color}; font-size: 10px;`);
+        if (online) {
+            this._statusDot.remove_style_class_name('axon-status-error');
+            this._statusDot.add_style_class_name('axon-status-ok');
+        } else {
+            this._statusDot.remove_style_class_name('axon-status-ok');
+            this._statusDot.add_style_class_name('axon-status-error');
+        }
+        this.accessible_name = online ? 'Axon AI: online' : 'Axon AI: offline';
     }
 
     destroy() {
