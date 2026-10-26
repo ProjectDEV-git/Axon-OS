@@ -13,7 +13,8 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gdk, Gtk
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gdk, Gtk
 
 # services/ is beside apps/ (source tree, .deb) or inside the install dir.
 for _base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().parents[1]):
@@ -61,7 +62,27 @@ TOKEN_FILES = {
     "high-contrast": "axon-design-tokens-hc.css",
 }
 _tokens_provider: Gtk.CssProvider | None = None
+_tokens_variant = ""
 _loaded_app_css: set[str] = set()
+
+
+def token_variant(dark: bool, high_contrast: bool) -> str:
+    """Token file variant for the system appearance."""
+    if high_contrast:
+        return "high-contrast"
+    return "dark" if dark else "light"
+
+
+def _apply_token_variant(*_args: object) -> None:
+    """(Re)load the token file that matches Adw.StyleManager right now."""
+    global _tokens_variant
+    if _tokens_provider is None:
+        return
+    manager = Adw.StyleManager.get_default()
+    variant = token_variant(manager.get_dark(), manager.get_high_contrast())
+    if variant != _tokens_variant:
+        _tokens_provider.load_from_path(str(SHARED_DIR / TOKEN_FILES[variant]))
+        _tokens_variant = variant
 
 
 def load_app_css(css_path: Path, display: Gdk.Display | None = None) -> None:
@@ -69,8 +90,9 @@ def load_app_css(css_path: Path, display: Gdk.Display | None = None) -> None:
 
     App CSS refers to colours as ``@axon_*`` (see apps/shared/
     axon-design-tokens.css, generated from theme/tokens/axon-tokens.json).
-    Tokens and app CSS are separate providers, so the token variant can
-    change at runtime without reloading the app CSS. Each file loads once.
+    The token variant follows the system appearance through
+    Adw.StyleManager (light, dark, high contrast) and is swapped live when
+    it changes; app CSS stays loaded. Each file loads once.
     """
     global _tokens_provider
     display = display or Gdk.Display.get_default()
@@ -78,10 +100,13 @@ def load_app_css(css_path: Path, display: Gdk.Display | None = None) -> None:
         return
     if _tokens_provider is None:
         _tokens_provider = Gtk.CssProvider()
-        _tokens_provider.load_from_path(str(SHARED_DIR / TOKEN_FILES["dark"]))
         Gtk.StyleContext.add_provider_for_display(
             display, _tokens_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
+        _apply_token_variant()
+        manager = Adw.StyleManager.get_default()
+        manager.connect("notify::dark", _apply_token_variant)
+        manager.connect("notify::high-contrast", _apply_token_variant)
     key = str(css_path)
     if key in _loaded_app_css:
         return

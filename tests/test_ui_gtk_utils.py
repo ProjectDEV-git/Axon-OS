@@ -17,3 +17,36 @@ def test_fit_default_size_clamps_to_monitor() -> None:
     assert win.get_default_size() == (width, height)
     assert utils.fit_default_size(win, 400, 300) == (400, 300)  # small sizes are kept
     win.destroy()
+
+
+def test_token_variant() -> None:
+    assert utils.token_variant(dark=True, high_contrast=False) == "dark"
+    assert utils.token_variant(dark=False, high_contrast=False) == "light"
+    assert utils.token_variant(dark=True, high_contrast=True) == "high-contrast"
+
+
+def test_app_css_follows_light_and_dark(tmp_path) -> None:
+    css = tmp_path / "app.css"
+    css.write_text("label.axon-test { color: @axon_fg; }")
+    utils.load_app_css(css)
+    manager = Adw.StyleManager.get_default()
+    win = Gtk.Window()
+    label = Gtk.Label(label="x")
+    label.add_css_class("axon-test")
+    win.set_child(label)
+    win.present()
+
+    def fg() -> str:
+        from tests.gtk_helpers import pump
+
+        pump(GLib)
+        return label.get_color().to_string()
+
+    manager.set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
+    light = fg()
+    manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+    dark = fg()
+    manager.set_color_scheme(Adw.ColorScheme.DEFAULT)
+    assert light == "rgb(30,30,40)"  # tokens: light fg #1e1e28
+    assert dark == "rgb(232,232,240)"  # tokens: dark fg #e8e8f0
+    win.destroy()

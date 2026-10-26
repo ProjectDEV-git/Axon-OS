@@ -248,8 +248,13 @@ add a short note under any item you skip or change.
       Note: done for the Shell, the four moved stylesheets and the Files, Settings,
       Shortcuts and Terminal `main.css`, which are now on tokens too. The system GTK theme
       (`theme/axon-gtk/gtk-dark.css`, 838 lines) was not reworked in this pass.
-- [ ] **Follow system appearance.** GTK apps follow `Adw.StyleManager` (light/dark) and
+- [x] **Follow system appearance.** GTK apps follow `Adw.StyleManager` (light/dark) and
       high contrast. The Shell follows `org.gnome.desktop.interface color-scheme`.
+      Note: GTK apps swap the token file live from `Adw.StyleManager` (tested under Xvfb).
+      The Shell needs no code: GNOME 45 and 46 load `stylesheet-dark.css` /
+      `stylesheet-light.css` by colour scheme and reload on change (checked in
+      `extensionSystem.js`). The Shell has no high-contrast variant; GNOME doesn't load one
+      for extensions.
 - [ ] **Reduced motion.** Respect `org.gnome.desktop.interface enable-animations` in all
       Shell animations and GTK transitions.
 
