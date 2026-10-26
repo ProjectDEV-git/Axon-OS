@@ -376,3 +376,14 @@ tested in a real GNOME session.
   translation with a `po/axon-os.pot` template. Not tested in a real GNOME session: the
   Shell suggestion list, Space chips and switcher, Orca announcements, Large Text in the
   Shell, and Shell translations loading from the extension's gettext domain.
+- 2026-10-26 — Design overhaul from the apple-design, emil-design-eng and taste skills
+  (rules and decisions in docs/design-system.md): neutral tokens and a calm blue accent;
+  Shell motion rules (no ease-in or bounce, 50 ms keyboard surfaces, press feedback,
+  interruptible Start Menu, centred dock scaling); an original generated icon set; a
+  floating translucent taskbar with Reduce Transparency; Axon Neural wallpapers; one flat
+  mark for Plymouth, GRUB and the installer; GTK's own theme plus the Axon accent as the
+  system theme (WhiteSur now opt-in); honest copy (no "local only" promises); new
+  features: an Intent Bar calculator and accent colours. Not tested in a real GNOME
+  session: the floating taskbar and its struts, the Shell accent override loading and
+  reloading, Reduce Transparency, the Start Menu and tooltip motion, and how Plymouth and
+  GRUB look on real hardware.
