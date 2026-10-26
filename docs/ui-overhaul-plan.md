@@ -221,11 +221,14 @@ add a short note under any item you skip or change.
       SCSS) holding: colours, semantic states (success/warning/error/info), spacing scale,
       corner radii, typography sizes/weights, shadows, focus ring, animation durations, with
       dark, light and high-contrast variants.
-- [ ] **Generator.** GNOME Shell's St CSS has no `@define-color` or CSS variables, so the
+- [x] **Generator.** GNOME Shell's St CSS has no `@define-color` or CSS variables, so the
       Shell can't import the GTK token file. Write `scripts/gen_tokens.py` that generates
       `apps/shared/axon-design-tokens.css` (GTK `@define-color`) and the Shell stylesheet
       (e.g. from a `stylesheet.css.in` template). Add a test that fails when generated
       files are out of date.
+      Note: also writes `axon-design-tokens-light.css` / `-hc.css` and the Shell's
+      `stylesheet-dark.css` / `stylesheet-light.css`, which GNOME 46+ loads by color scheme
+      (checked in gnome-shell's `extensionSystem.js`). `stylesheet.css` stays as the fallback.
 - [ ] **Move embedded CSS out of Python.** Move the CSS strings in
       `apps/intent-bar/ui/window.py`, `apps/axon-ai-panel/ui/panel.py`,
       `apps/axon-welcome/ui/welcome.py` and `apps/axon-installer/ui/wizard.py` into `.css`

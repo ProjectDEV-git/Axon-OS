@@ -1,32 +1,42 @@
-/*
- * axon-design-tokens.css — Unified design tokens for Axon OS.
- *
- * Import this file from each app's CSS to guarantee visual consistency.
- * All apps should reference @define-color names instead of hardcoded values.
- */
+/* GTK colour tokens generated from theme/tokens/axon-tokens.json by scripts/gen_tokens.py.
+ * Do not edit: change the tokens or the template and run the script. */
 
-/* ---- Backgrounds ---- */
-@define-color bg_primary #0f0f14;
-@define-color bg_secondary #11111e;
-@define-color bg_surface #12121c;
+/* Variant: dark */
 
-/* ---- Text ---- */
-@define-color text_primary #e8e8f4;
-@define-color text_secondary #9090b8;
-@define-color text_muted #50507a;
+@define-color axon_bg #16161e;
+@define-color axon_surface #1e1e28;
+@define-color axon_surface_raised #272733;
+@define-color axon_popup rgba(24, 24, 32, 0.98);
+@define-color axon_fg #e8e8f0;
+@define-color axon_fg_secondary #a6a6bc;
+@define-color axon_fg_muted #9292aa;
+@define-color axon_border rgba(255, 255, 255, 0.10);
+@define-color axon_border_strong rgba(255, 255, 255, 0.20);
+@define-color axon_hover rgba(255, 255, 255, 0.06);
+@define-color axon_active rgba(255, 255, 255, 0.11);
+@define-color axon_accent #7c3aed;
+@define-color axon_accent_hover #6d28d9;
+@define-color axon_accent_fg #ffffff;
+@define-color axon_accent_text #c4b5fd;
+@define-color axon_accent_subtle rgba(139, 92, 246, 0.16);
+@define-color axon_success #34d399;
+@define-color axon_warning #fbbf24;
+@define-color axon_error #f87171;
+@define-color axon_info #60a5fa;
+@define-color axon_focus_ring #a78bfa;
 
-/* ---- Accent (purple) ---- */
-@define-color accent #8b5cf6;
-@define-color accent_hover #7c3aed;
-@define-color accent_active #6d28d9;
-
-/* ---- Borders ---- */
-@define-color border #2a2a42;
-
-/* ---- Semantic ---- */
-@define-color success #10b981;
-@define-color error #ef4444;
-
-/* ---- Accent variant (terminal / secondary) ---- */
-@define-color accent_light #c4b5fd;
-@define-color cyan #22d3ee;
+/* Names used by older app stylesheets */
+@define-color bg_primary @axon_bg;
+@define-color bg_secondary @axon_surface;
+@define-color bg_surface @axon_surface_raised;
+@define-color text_primary @axon_fg;
+@define-color text_secondary @axon_fg_secondary;
+@define-color text_muted @axon_fg_muted;
+@define-color accent @axon_accent;
+@define-color accent_hover @axon_accent_hover;
+@define-color accent_active @axon_accent_hover;
+@define-color accent_light @axon_accent_text;
+@define-color border @axon_border;
+@define-color success @axon_success;
+@define-color error @axon_error;
+@define-color cyan @axon_info;

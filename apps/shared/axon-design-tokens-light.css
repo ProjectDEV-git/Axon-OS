@@ -1,0 +1,42 @@
+/* GTK colour tokens generated from theme/tokens/axon-tokens.json by scripts/gen_tokens.py.
+ * Do not edit: change the tokens or the template and run the script. */
+
+/* Variant: light */
+
+@define-color axon_bg #f7f7f9;
+@define-color axon_surface #ffffff;
+@define-color axon_surface_raised #efeff3;
+@define-color axon_popup rgba(255, 255, 255, 0.99);
+@define-color axon_fg #1e1e28;
+@define-color axon_fg_secondary #52526a;
+@define-color axon_fg_muted #5e5e74;
+@define-color axon_border rgba(0, 0, 0, 0.12);
+@define-color axon_border_strong rgba(0, 0, 0, 0.24);
+@define-color axon_hover rgba(0, 0, 0, 0.05);
+@define-color axon_active rgba(0, 0, 0, 0.09);
+@define-color axon_accent #7c3aed;
+@define-color axon_accent_hover #6d28d9;
+@define-color axon_accent_fg #ffffff;
+@define-color axon_accent_text #6d28d9;
+@define-color axon_accent_subtle rgba(124, 58, 237, 0.10);
+@define-color axon_success #15703f;
+@define-color axon_warning #946200;
+@define-color axon_error #c01c28;
+@define-color axon_info #1c64c8;
+@define-color axon_focus_ring #7c3aed;
+
+/* Names used by older app stylesheets */
+@define-color bg_primary @axon_bg;
+@define-color bg_secondary @axon_surface;
+@define-color bg_surface @axon_surface_raised;
+@define-color text_primary @axon_fg;
+@define-color text_secondary @axon_fg_secondary;
+@define-color text_muted @axon_fg_muted;
+@define-color accent @axon_accent;
+@define-color accent_hover @axon_accent_hover;
+@define-color accent_active @axon_accent_hover;
+@define-color accent_light @axon_accent_text;
+@define-color border @axon_border;
+@define-color success @axon_success;
+@define-color error @axon_error;
+@define-color cyan @axon_info;

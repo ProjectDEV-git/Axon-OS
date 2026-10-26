@@ -72,3 +72,37 @@ def test_scales_are_px_or_ms() -> None:
     for group in ("font_size", "space", "radius"):
         assert all(re.fullmatch(r"\d+px", v) for v in TOKENS[group].values()), group
     assert all(re.fullmatch(r"\d+ms", v) for v in TOKENS["duration"].values())
+
+
+def _gen_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gen_tokens", ROOT / "scripts" / "gen_tokens.py")
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_generated_files_are_up_to_date() -> None:
+    gen = _gen_module()
+    stale = gen.stale(gen.generate())
+    assert not stale, f"run python3 scripts/gen_tokens.py (stale: {[str(p) for p in stale]})"
+
+
+def test_gtk_tokens_keep_legacy_names() -> None:
+    gen = _gen_module()
+    css = gen.gtk_css(TOKENS, "light")
+    for legacy in ("bg_primary", "text_primary", "accent", "border", "accent_light"):
+        assert f"@define-color {legacy} @axon_" in css
+    assert "@define-color axon_accent #7c3aed;" in css
+
+
+def test_unknown_placeholder_fails_loudly() -> None:
+    gen = _gen_module()
+    with pytest.raises(KeyError):
+        gen.render_shell("a { color: {{color.nope}}; }", TOKENS, "dark")
+    assert "color: #000000;" in gen.render_shell(
+        "a { color: {{color.bg}}; }", TOKENS, "high-contrast"
+    )
+    assert "padding: 8px;" in gen.render_shell("a { padding: {{space.md}}; }", TOKENS, "dark")
