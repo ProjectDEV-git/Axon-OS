@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-26 08:24+0000\n"
+"POT-Creation-Date: 2026-10-26 10:22+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -264,6 +264,10 @@ msgstr ""
 msgid "AI summary when switching Spaces"
 msgstr ""
 
+#: apps/axon-settings/preferences_window.py services/suggestions.py
+msgid "Appearance"
+msgstr ""
+
 #: apps/axon-settings/preferences_window.py
 msgid "Ask again for this command"
 msgstr ""
@@ -292,6 +296,10 @@ msgstr ""
 msgid ""
 "Desktop context helps answers fit what you are doing. With a cloud model it "
 "leaves this computer, and Axon asks before the first time."
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Draw the taskbar on a solid surface. High Contrast does this too"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -326,6 +334,10 @@ msgid ""
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
+msgid "Reduce transparency"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
 msgid "Send desktop context"
 msgstr ""
 
@@ -341,6 +353,11 @@ msgstr ""
 #: apps/axon-settings/preferences_window.py
 #, python-brace-format
 msgid "Stop allowing {command}"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid ""
+"These settings need the Axon Shell extension, which isn't installed here."
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -580,10 +597,6 @@ msgstr ""
 
 #: services/suggestions.py
 msgid "Accessibility"
-msgstr ""
-
-#: services/suggestions.py
-msgid "Appearance"
 msgstr ""
 
 #: services/suggestions.py shell/axon-shell/dock.js
@@ -953,6 +966,10 @@ msgid "Space"
 msgstr ""
 
 #: shell/axon-shell/spaces.js
+msgid "Space {number} of {total}"
+msgstr ""
+
+#: shell/axon-shell/spaces.js
 msgid "Axon moved this window to its Space."
 msgstr ""
 
@@ -1001,11 +1018,11 @@ msgid "Search apps, files or ask AI..."
 msgstr ""
 
 #: shell/axon-shell/startmenu.js
-msgid "Pinned Apps"
+msgid "Pinned apps"
 msgstr ""
 
 #: shell/axon-shell/startmenu.js
-msgid "Recommended Files"
+msgid "Recent files"
 msgstr ""
 
 #: shell/axon-shell/startmenu.js
@@ -1074,4 +1091,20 @@ msgstr ""
 
 #: shell/axon-shell/ui-logic.js
 msgid "default model"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "empty"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "Space {number}: {name}"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "current"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "needs attention"
 msgstr ""

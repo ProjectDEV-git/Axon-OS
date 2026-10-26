@@ -261,3 +261,17 @@ test('motion timings follow the rules', async () => {
     assert.equal(tooltipDelay(10_000, 9_700), 0);
     assert.equal(tooltipDelay(10_000, 9_000), 400);
 });
+
+test('the taskbar floats inside the screen edge and turns solid on request', async () => {
+    const {taskbarGeometry, useMaterial} = await import('./ui-logic.mjs');
+    const monitor = {x: 0, y: 0, width: 1920, height: 1080};
+    // The chrome actor touches the bottom edge (struts) and is the bar plus the gap
+    assert.deepEqual(taskbarGeometry(monitor, 48, 8), {x: 0, y: 1024, width: 1920, height: 56, inset: 8});
+    // Tiny screens stay flush
+    assert.equal(taskbarGeometry({x: 0, y: 0, width: 640, height: 480}, 48, 8).inset, 0);
+    // A second monitor keeps its own origin
+    assert.equal(taskbarGeometry({x: 1920, y: 0, width: 1280, height: 1024}, 48, 8).y, 968);
+    assert.equal(useMaterial(false, false), true);
+    assert.equal(useMaterial(true, false), false);
+    assert.equal(useMaterial(false, true), false);
+});

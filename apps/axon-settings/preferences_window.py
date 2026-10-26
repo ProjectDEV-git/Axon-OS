@@ -60,6 +60,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         self._page.add(self._build_privacy_group())
         self._page.add(self._build_approvals_group())
         self._page.add(self._build_spaces_group())
+        self._page.add(self._build_appearance_group())
 
     # -- Privacy: what context the AI receives ------------------------------
 
@@ -189,6 +190,24 @@ class PreferencesWindow(Adw.ApplicationWindow):
         self._rule_rows: list[Gtk.Widget] = []
         self._shell.connect("changed::space-rules", lambda *_a: self._refresh_rules())
         self._refresh_rules()
+        return group
+
+    # -- Appearance --------------------------------------------------------
+
+    def _build_appearance_group(self) -> Adw.PreferencesGroup:
+        group = Adw.PreferencesGroup(title=_("Appearance"))
+        if self._shell is None:
+            group.set_description(
+                _("These settings need the Axon Shell extension, which isn't installed here.")
+            )
+            return group
+        solid = Adw.SwitchRow(
+            title=_("Reduce transparency"),
+            subtitle=_("Draw the taskbar on a solid surface. High Contrast does this too"),
+        )
+        self._shell.bind("reduce-transparency", solid, "active", Gio.SettingsBindFlags.DEFAULT)
+        group.add(solid)
+        self._reduce_transparency_row = solid
         return group
 
     def _rules(self) -> dict[str, str]:

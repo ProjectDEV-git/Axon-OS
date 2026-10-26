@@ -107,7 +107,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         const appsTitle = new St.Label({
             style_class: 'axon-startmenu-section-title',
-            text: _t('Pinned Apps'),
+            text: _t('Pinned apps'),
         });
         this._appsColumn.add_child(appsTitle);
 
@@ -127,7 +127,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         const filesTitle = new St.Label({
             style_class: 'axon-startmenu-section-title',
-            text: _t('Recommended Files'),
+            text: _t('Recent files'),
         });
         this._filesColumn.add_child(filesTitle);
 

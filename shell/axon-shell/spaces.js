@@ -32,16 +32,17 @@ const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
 // ─── Default space definitions ────────────────────────────────────────────────
 
+// One lightness and saturation family, hues spread so neighbours read apart
 const DEFAULT_SPACES = [
-    { name: 'Code',     color: '#8b5cf6' },
-    { name: 'Web',      color: '#22d3ee' },
-    { name: 'Chat',     color: '#10b981' },
-    { name: 'Files',    color: '#f59e0b' },
-    { name: 'Media',    color: '#ef4444' },
-    { name: 'Work',     color: '#ec4899' },
-    { name: 'Personal', color: '#06b6d4' },
-    { name: 'Terminal', color: '#84cc16' },
-    { name: 'Notes',    color: '#f97316' },
+    { name: 'Code',     color: '#5189d6' },
+    { name: 'Web',      color: '#59cbcf' },
+    { name: 'Chat',     color: '#64c48c' },
+    { name: 'Files',    color: '#dfad49' },
+    { name: 'Media',    color: '#da5a4e' },
+    { name: 'Work',     color: '#cf5994' },
+    { name: 'Personal', color: '#8194a7' },
+    { name: 'Terminal', color: '#8cc464' },
+    { name: 'Notes',    color: '#df8749' },
 ];
 
 // Wait this long before asking the AI for an OSD summary, so quick
@@ -51,7 +52,7 @@ const OSD_AI_SUMMARY_DELAY_MS = 600;
 // ─── SpaceDefinition ──────────────────────────────────────────────────────────
 
 class SpaceDefinition {
-    constructor({ id, name, color = '#a78bfa', appIds = [], lastActive = null }) {
+    constructor({ id, name, color = '#5189d6', appIds = [], lastActive = null }) {
         this.id = id;
         this.name = name;
         this.color = color;
@@ -460,11 +461,17 @@ export default class SpacesManager {
                 reactive: false,
             });
 
+            // The number stays in the text colour (a Space colour can be too
+            // light to read on the popup); the colour is a swatch under it.
             const numberLabel = new St.Label({
                 style_class: 'axon-space-osd-number',
                 text: String(idx + 1),
                 x_align: Clutter.ActorAlign.CENTER,
-                style: `color: ${space.color};`,
+            });
+            const swatch = new St.Widget({
+                style_class: 'axon-space-osd-swatch',
+                style: `background-color: ${space.color};`,
+                x_align: Clutter.ActorAlign.CENTER,
             });
 
             const nameLabel = new St.Label({
@@ -475,7 +482,7 @@ export default class SpacesManager {
 
             const indexLabel = new St.Label({
                 style_class: 'axon-space-osd-index',
-                text: `Space ${idx + 1} of ${this._spaces.length}`,
+                text: _t('Space {number} of {total}', {number: idx + 1, total: this._spaces.length}),
                 x_align: Clutter.ActorAlign.CENTER,
             });
 
@@ -492,6 +499,7 @@ export default class SpacesManager {
             });
 
             osd.add_child(numberLabel);
+            osd.add_child(swatch);
             osd.add_child(nameLabel);
             osd.add_child(indexLabel);
             osd.add_child(summaryLabel);
@@ -608,7 +616,7 @@ export default class SpacesManager {
         this._showSpaceOSD(this._spaces[idx], idx);
     }
 
-    createSpace(name, color = '#a78bfa') {
+    createSpace(name, color = '#5189d6') {
         const space = new SpaceDefinition({
             id: GLib.uuid_string_random(),
             name,

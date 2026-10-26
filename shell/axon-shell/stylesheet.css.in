@@ -2,9 +2,10 @@
  *
  * Edit this file, not stylesheet*.css: scripts/gen_tokens.py fills the
  * {{...}} placeholders from theme/tokens/axon-tokens.json and writes the
- * dark and light stylesheets. Follows GNOME's flat look: solid surfaces,
- * neutral borders, one small shadow for popups, and the accent only for
- * focus, active/selected items and AI. */
+ * dark and light stylesheets. Calm and native: neutral surfaces, one
+ * translucent material for the floating taskbar (solid with Reduce
+ * Transparency or High Contrast), shadows only on what floats, tighter
+ * tracking on large type, and the accent only for focus, selection and AI. */
 
 /* ── Shared ─────────────────────────────────────────────────────────────── */
 
@@ -69,6 +70,7 @@
     background-color: transparent;
     color: {{color.fg}};
     font-size: {{font_size.xl}};
+    letter-spacing: {{letter_spacing.title}};
     font-family: {{font.family}};
     border: none;
     border-radius: 0;
@@ -168,11 +170,25 @@
 
 /* ── Taskbar ────────────────────────────────────────────────────────────── */
 
+/* The chrome frame on the screen edge; the bar floats inside it */
+.axon-taskbar-frame {
+    background-color: transparent;
+}
+
 .axon-taskbar {
-    background-color: {{color.bg}};
-    border-top: 1px solid {{color.border}};
-    padding: 0 {{space.xl}};
+    background-color: {{color.material}};
+    border: 1px solid {{color.border}};
+    border-top-color: {{color.material_edge}};
+    border-radius: {{radius.lg}};
+    box-shadow: {{shadow}};
+    padding: 0 {{space.md}};
     spacing: 0;
+}
+
+/* Reduce Transparency / High Contrast: a solid, clearly edged surface */
+.axon-taskbar-solid {
+    background-color: {{color.surface}};
+    border: 1px solid {{color.border_strong}};
 }
 
 .axon-taskbar-left {
@@ -189,7 +205,7 @@
 }
 
 .axon-dock-icon {
-    border-radius: {{radius.sm}};
+    border-radius: {{radius.md}};
     padding: {{space.xs}};
     width: 40px;
     height: 40px;
@@ -211,12 +227,12 @@
     color: {{color.fg_secondary}};
 }
 
-/* Running-app marker: active state, so the accent */
+/* Running-app marker: a small neutral dot (status, not decoration) */
 .axon-dock-dot {
-    background-color: {{color.accent_text}};
-    border-radius: {{radius.sm}};
-    width: 14px;
-    height: 3px;
+    background-color: {{color.fg_secondary}};
+    border-radius: {{radius.pill}};
+    width: 4px;
+    height: 4px;
     margin: {{space.xxs}} auto 0 auto;
 }
 
@@ -240,6 +256,7 @@
     background-color: {{color.surface_raised}};
     border: 1px solid {{color.border}};
     border-radius: {{radius.sm}};
+    box-shadow: {{shadow}};
     color: {{color.fg}};
     font-size: {{font_size.xs}};
     font-family: {{font.family}};
@@ -248,8 +265,10 @@
 }
 
 .axon-taskbar-showdesktop {
-    width: 10px;
-    height: 48px;
+    width: 8px;
+    height: 32px;
+    margin-left: {{space.sm}};
+    border-radius: {{radius.sm}};
     background-color: transparent;
     border-left: 1px solid {{color.border}};
 }
@@ -315,8 +334,8 @@
 
 .axon-startmenu-section-title {
     color: {{color.fg_secondary}};
-    font-size: {{font_size.xs}};
-    font-weight: {{font_weight.bold}};
+    font-size: {{font_size.sm}};
+    font-weight: {{font_weight.semibold}};
     margin-bottom: {{space.lg}};
     font-family: {{font.family}};
 }
@@ -391,7 +410,6 @@
     color: {{color.fg_muted}};
     font-size: {{font_size.sm}};
     padding: {{space.md}};
-    font-style: italic;
     font-family: {{font.family}};
 }
 
@@ -444,11 +462,19 @@
     min-width: 200px;
 }
 
-/* The number takes the Space's own colour from JS (user data) */
 .axon-space-osd-number {
     font-size: {{font_size.display}};
     font-family: {{font.family}};
     font-weight: {{font_weight.bold}};
+    letter-spacing: {{letter_spacing.display}};
+}
+
+/* The Space's own colour (user data, set from JS) as a swatch, not as text */
+.axon-space-osd-swatch {
+    width: 24px;
+    height: 4px;
+    border-radius: {{radius.pill}};
+    margin-top: {{space.xs}};
 }
 
 .axon-space-osd-name {
@@ -516,9 +542,14 @@
     font-family: {{font.family}};
 }
 
+/* The window count sits in its own small pill, so "1" with 3 windows
+ * never reads as "13" */
 .axon-space-chip-badge {
     font-size: {{font_size.xs}};
-    margin-left: {{space.xxs}};
+    margin-left: {{space.xs}};
+    padding: 0 {{space.xs}};
+    border-radius: {{radius.pill}};
+    background-color: {{color.hover}};
     color: {{color.fg_secondary}};
 }
 
@@ -579,7 +610,7 @@
 .axon-dock-menu-title {
     padding: {{space.sm}} {{space.xl}};
     color: {{color.fg_secondary}};
-    font-size: {{font_size.xs}};
-    font-weight: {{font_weight.bold}};
+    font-size: {{font_size.sm}};
+    font-weight: {{font_weight.semibold}};
     font-family: {{font.family}};
 }

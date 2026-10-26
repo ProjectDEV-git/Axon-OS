@@ -114,3 +114,16 @@ def test_escape_closes_preferences(tmp_path: Path) -> None:
     key_ctrl = next(c for c in keys if isinstance(c, Gtk.EventControllerKey))
     key_ctrl.emit("key-pressed", Gdk.KEY_Escape, 0, 0)
     assert closed == [True]
+
+
+def test_reduce_transparency_switch_writes_the_shell_key(tmp_path: Path) -> None:
+    settings = memory_settings()
+    win = prefs.PreferencesWindow(
+        shell_settings=settings,
+        context_path=tmp_path / "c.json",
+        approvals_path=tmp_path / "a.json",
+    )
+    assert settings.get_boolean("reduce-transparency") is False
+    win._reduce_transparency_row.set_active(True)
+    assert settings.get_boolean("reduce-transparency") is True
+    win.destroy()

@@ -27,7 +27,15 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import StartMenuPopup from './startmenu.js';
 import {SpaceStrip} from './spaces.js';
-import {MOTION, PRESS_SCALE, _t, motionDuration, tooltipDelay} from './ui-logic.js';
+import {
+    MOTION,
+    PRESS_SCALE,
+    _t,
+    motionDuration,
+    taskbarGeometry,
+    tooltipDelay,
+    useMaterial,
+} from './ui-logic.js';
 
 // Animation length; 0 when the user turned animations off (reduced motion)
 const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
@@ -67,7 +75,8 @@ const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const TASKBAR_HEIGHT     = 48;   // px, taskbar height
+const TASKBAR_HEIGHT     = 48;   // px, the visible bar
+const TASKBAR_INSET      = 8;    // px it floats above and inside the screen edges
 const ICON_SIZE          = 32;   // px, taskbar icon size
 const LAUNCH_LIFT        = 1.08; // launch feedback: a gentle lift, no bounce
 
@@ -394,6 +403,13 @@ export default class DockManager {
             this._spaceStrip = null;
         }
 
+        for (const [settings, id] of this._materialIds ?? [])
+            settings.disconnect(id);
+        this._materialIds = null;
+        this._settings = null;
+        this._a11ySettings = null;
+        this._bar = null;
+
         if (this._actor) {
             Main.layoutManager.removeChrome(this._actor);
             this._actor.destroy();
@@ -413,13 +429,22 @@ export default class DockManager {
     }
 
     _buildUI() {
-        // Full width bottom taskbar container
-        this._actor = new St.BoxLayout({
+        // The chrome actor sits on the bottom edge so GNOME reserves its
+        // strut; the visible bar floats inside it (see taskbarGeometry).
+        this._actor = new St.Bin({
+            style_class: 'axon-taskbar-frame',
+            x_expand: true,
+        });
+        const bar = new St.BoxLayout({
             style_class: 'axon-taskbar',
             vertical:    false,
             reactive:    true,
             track_hover: true,
+            x_expand:    true,
+            y_expand:    true,
         });
+        this._actor.set_child(bar);
+        this._bar = bar;
 
         // 1. Left container: Start button and Search/Intent icon
         const leftBox = new St.BoxLayout({
@@ -427,7 +452,7 @@ export default class DockManager {
             vertical: false,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._actor.add_child(leftBox);
+        bar.add_child(leftBox);
 
         // Start Menu button
         const startBtn = new DockIcon({
@@ -455,7 +480,7 @@ export default class DockManager {
 
         // Spacer to push apps to center
         const centerSpacerLeft = new St.Widget({ x_expand: true });
-        this._actor.add_child(centerSpacerLeft);
+        bar.add_child(centerSpacerLeft);
 
         // 2. Center container: App icons (pinned and running)
         this._iconRow = new St.BoxLayout({
@@ -463,11 +488,11 @@ export default class DockManager {
             vertical: false,
             y_align:  Clutter.ActorAlign.CENTER,
         });
-        this._actor.add_child(this._iconRow);
+        bar.add_child(this._iconRow);
 
         // Spacer to push tray to far right
         const centerSpacerRight = new St.Widget({ x_expand: true });
-        this._actor.add_child(centerSpacerRight);
+        bar.add_child(centerSpacerRight);
 
         // 3. Right container: Clock + System Indicators (stealing native items)
         const rightBox = new St.BoxLayout({
@@ -476,7 +501,7 @@ export default class DockManager {
             y_align: Clutter.ActorAlign.CENTER,
             spacing: 12,
         });
-        this._actor.add_child(rightBox);
+        bar.add_child(rightBox);
 
         // Clock Label
         const clock = new TaskbarClock();
@@ -514,7 +539,7 @@ export default class DockManager {
             accessible_name: _t('Show Desktop'),
         });
         showDesktopBtn.connect('clicked', () => this._toggleShowDesktop());
-        this._actor.add_child(showDesktopBtn);
+        bar.add_child(showDesktopBtn);
 
         // Register with Chrome Manager so windows respect taskbar boundary
         Main.layoutManager.addChrome(this._actor, {
@@ -522,7 +547,28 @@ export default class DockManager {
             trackPosition: true,
         });
 
+        // Translucent material unless Reduce Transparency or High Contrast is on
+        this._settings = this._extension.getSettings();
+        this._a11ySettings = new Gio.Settings({schema_id: 'org.gnome.desktop.a11y.interface'});
+        this._materialIds = [
+            [this._settings, this._settings.connect('changed::reduce-transparency', () => this._updateMaterial())],
+            [this._a11ySettings, this._a11ySettings.connect('changed::high-contrast', () => this._updateMaterial())],
+        ];
+        this._updateMaterial();
+
         this._reposition();
+    }
+
+    _updateMaterial() {
+        if (!this._bar)
+            return;
+        const material = useMaterial(
+            this._settings.get_boolean('reduce-transparency'),
+            this._a11ySettings.get_boolean('high-contrast'));
+        if (material)
+            this._bar.remove_style_class_name('axon-taskbar-solid');
+        else
+            this._bar.add_style_class_name('axon-taskbar-solid');
     }
 
     _populate() {
@@ -653,8 +699,10 @@ export default class DockManager {
         const monitor = Main.layoutManager.primaryMonitor;
         if (!monitor) return;
 
-        this._actor.set_position(monitor.x, monitor.y + monitor.height - TASKBAR_HEIGHT);
-        this._actor.set_size(monitor.width, TASKBAR_HEIGHT);
+        const geo = taskbarGeometry(monitor, TASKBAR_HEIGHT, TASKBAR_INSET);
+        this._actor.set_position(geo.x, geo.y);
+        this._actor.set_size(geo.width, geo.height);
+        this._actor.set_style(`padding: 0 ${geo.inset}px ${geo.inset}px ${geo.inset}px;`);
     }
 
     _show() {

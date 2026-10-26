@@ -7,7 +7,7 @@
 @define-color axon_surface #1e1e1e;
 @define-color axon_surface_raised #282828;
 @define-color axon_popup rgba(36, 36, 36, 0.98);
-@define-color axon_material rgba(30, 30, 30, 0.72);
+@define-color axon_material rgba(30, 30, 30, 0.86);
 @define-color axon_material_edge rgba(255, 255, 255, 0.12);
 @define-color axon_fg #f2f2f2;
 @define-color axon_fg_secondary #b4b4b4;

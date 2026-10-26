@@ -588,6 +588,35 @@ export function tooltipDelay(now, lastHidden) {
         : TOOLTIP_DELAY;
 }
 
+/**
+ * Geometry of the floating taskbar. The chrome actor stays on the monitor's
+ * bottom edge (GNOME only reserves struts for chrome touching an edge), and
+ * the visible bar floats inside it, *inset* px from the sides and bottom.
+ *
+ * @param {{x: number, y: number, width: number, height: number}} monitor
+ * @param {number} barHeight
+ * @param {number} inset
+ * @returns {{x: number, y: number, width: number, height: number, inset: number}}
+ */
+export function taskbarGeometry(monitor, barHeight, inset) {
+    // Very small screens keep the bar flush, so no width is lost
+    const gap = monitor.width < 800 ? 0 : inset;
+    const height = barHeight + gap;
+    return {x: monitor.x, y: monitor.y + monitor.height - height, width: monitor.width, height, inset: gap};
+}
+
+/**
+ * Whether the taskbar uses the translucent material (Apple's hierarchy cue)
+ * or a solid surface (Reduce Transparency, High Contrast).
+ *
+ * @param {boolean} reduceTransparency
+ * @param {boolean} highContrast
+ * @returns {boolean}
+ */
+export function useMaterial(reduceTransparency, highContrast) {
+    return !reduceTransparency && !highContrast;
+}
+
 // ── Intent Bar suggestions (twin of services/suggestions.py) ────────────────
 
 export const SUGGESTION_CATEGORIES = Object.freeze(
@@ -761,13 +790,13 @@ export function spaceChipState(index, name, active, windowCount, attention) {
     let badge = windowCount > 0 ? String(windowCount) : '';
     if (attention)
         badge = `${badge}!`;
-    const windows = windowCount === 0 ? 'empty'
-        : windowCount === 1 ? '1 window' : `${windowCount} windows`;
-    const parts = [`Space ${index + 1}: ${name}`, windows];
+    const windows = windowCount === 0 ? _t('empty')
+        : windowCount === 1 ? _t('1 window') : _t('{count} windows', {count: windowCount});
+    const parts = [_t('Space {number}: {name}', {number: index + 1, name}), windows];
     if (active)
-        parts.push('current');
+        parts.push(_t('current'));
     if (attention)
-        parts.push('needs attention');
+        parts.push(_t('needs attention'));
     return {number: String(index + 1), badge, styleClasses, accessibleName: parts.join(', ')};
 }
 

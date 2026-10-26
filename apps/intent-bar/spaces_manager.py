@@ -19,7 +19,7 @@ from constants import AXON_DIR
 SPACES_FILE: Path = AXON_DIR / "spaces.json"
 _CURRENT_SPACE_FILE: Path = AXON_DIR / "current_space"
 
-_DEFAULT_COLOR: str = "#a78bfa"
+_DEFAULT_COLOR: str = "#5189d6"
 
 
 @dataclass

@@ -6,9 +6,10 @@
  *
  * Edit this file, not stylesheet*.css: scripts/gen_tokens.py fills the
  * {{...}} placeholders from theme/tokens/axon-tokens.json and writes the
- * dark and light stylesheets. Follows GNOME's flat look: solid surfaces,
- * neutral borders, one small shadow for popups, and the accent only for
- * focus, active/selected items and AI. */
+ * dark and light stylesheets. Calm and native: neutral surfaces, one
+ * translucent material for the floating taskbar (solid with Reduce
+ * Transparency or High Contrast), shadows only on what floats, tighter
+ * tracking on large type, and the accent only for focus, selection and AI. */
 
 /* ── Shared ─────────────────────────────────────────────────────────────── */
 
@@ -73,6 +74,7 @@
     background-color: transparent;
     color: #161616;
     font-size: 13.5pt;
+    letter-spacing: -0.3px;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     border: none;
     border-radius: 0;
@@ -172,11 +174,25 @@
 
 /* ── Taskbar ────────────────────────────────────────────────────────────── */
 
+/* The chrome frame on the screen edge; the bar floats inside it */
+.axon-taskbar-frame {
+    background-color: transparent;
+}
+
 .axon-taskbar {
-    background-color: #f6f6f6;
-    border-top: 1px solid rgba(0, 0, 0, 0.09);
-    padding: 0 16px;
+    background-color: rgba(246, 246, 246, 0.88);
+    border: 1px solid rgba(0, 0, 0, 0.09);
+    border-top-color: rgba(255, 255, 255, 0.60);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    padding: 0 8px;
     spacing: 0;
+}
+
+/* Reduce Transparency / High Contrast: a solid, clearly edged surface */
+.axon-taskbar-solid {
+    background-color: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.18);
 }
 
 .axon-taskbar-left {
@@ -193,7 +209,7 @@
 }
 
 .axon-dock-icon {
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 4px;
     width: 40px;
     height: 40px;
@@ -215,12 +231,12 @@
     color: #555555;
 }
 
-/* Running-app marker: active state, so the accent */
+/* Running-app marker: a small neutral dot (status, not decoration) */
 .axon-dock-dot {
-    background-color: #1858c2;
-    border-radius: 6px;
-    width: 14px;
-    height: 3px;
+    background-color: #555555;
+    border-radius: 9999px;
+    width: 4px;
+    height: 4px;
     margin: 2px auto 0 auto;
 }
 
@@ -244,6 +260,7 @@
     background-color: #efefef;
     border: 1px solid rgba(0, 0, 0, 0.09);
     border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
     color: #161616;
     font-size: 8.5pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
@@ -252,8 +269,10 @@
 }
 
 .axon-taskbar-showdesktop {
-    width: 10px;
-    height: 48px;
+    width: 8px;
+    height: 32px;
+    margin-left: 6px;
+    border-radius: 6px;
     background-color: transparent;
     border-left: 1px solid rgba(0, 0, 0, 0.09);
 }
@@ -319,8 +338,8 @@
 
 .axon-startmenu-section-title {
     color: #555555;
-    font-size: 8.5pt;
-    font-weight: 700;
+    font-size: 9pt;
+    font-weight: 600;
     margin-bottom: 12px;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
@@ -395,7 +414,6 @@
     color: #666666;
     font-size: 9pt;
     padding: 8px;
-    font-style: italic;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
@@ -448,11 +466,19 @@
     min-width: 200px;
 }
 
-/* The number takes the Space's own colour from JS (user data) */
 .axon-space-osd-number {
     font-size: 24pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 700;
+    letter-spacing: -0.6px;
+}
+
+/* The Space's own colour (user data, set from JS) as a swatch, not as text */
+.axon-space-osd-swatch {
+    width: 24px;
+    height: 4px;
+    border-radius: 9999px;
+    margin-top: 4px;
 }
 
 .axon-space-osd-name {
@@ -520,9 +546,14 @@
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
+/* The window count sits in its own small pill, so "1" with 3 windows
+ * never reads as "13" */
 .axon-space-chip-badge {
     font-size: 8.5pt;
-    margin-left: 2px;
+    margin-left: 4px;
+    padding: 0 4px;
+    border-radius: 9999px;
+    background-color: rgba(0, 0, 0, 0.045);
     color: #555555;
 }
 
@@ -583,7 +614,7 @@
 .axon-dock-menu-title {
     padding: 6px 16px;
     color: #555555;
-    font-size: 8.5pt;
-    font-weight: 700;
+    font-size: 9pt;
+    font-weight: 600;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }

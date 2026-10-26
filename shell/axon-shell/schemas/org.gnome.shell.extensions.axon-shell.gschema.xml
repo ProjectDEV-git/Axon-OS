@@ -113,5 +113,11 @@
       <description>After a short delay, replace the window-list summary in the Space switch overlay with a phrase from the AI. Off by default: it sends window titles to the selected model.</description>
     </key>
 
+    <key name="reduce-transparency" type="b">
+      <default>false</default>
+      <summary>Reduce transparency</summary>
+      <description>Draw the taskbar on a solid surface instead of the translucent material. High Contrast does the same.</description>
+    </key>
+
   </schema>
 </schemalist>
