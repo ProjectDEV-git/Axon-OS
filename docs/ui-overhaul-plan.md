@@ -132,7 +132,7 @@ add a short note under any item you skip or change.
       (well-known apps 0.95, exact model answer 0.75, loose answer 0.4); the Shell asks
       below 0.6 and falls back to `ClassifyWindow` on older Brains. Rules and the switch are
       in the new Axon Settings → Preferences window.
-- [ ] **Fast Space OSD.** The OSD asks the AI for a summary on every switch. Show a summary
+- [x] **Fast Space OSD.** The OSD asks the AI for a summary on every switch. Show a summary
       built from the window list straight away (e.g. "3 windows · Code · Terminal · Firefox")
       in a pure helper. Optionally replace it with an AI summary after a short delay, behind
       a gsettings toggle (default off), and drop the request if the user switches again.

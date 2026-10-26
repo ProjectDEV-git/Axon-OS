@@ -108,3 +108,13 @@ test('window routing helpers', async () => {
     assert.equal(m.movedMessage('Firefox', 'Web'), 'Firefox moved to Web');
     assert.equal(m.askMessage('Firefox', 'Web'), 'Axon thinks Firefox belongs in Web.');
 });
+
+test('windowSummary', async () => {
+    const {windowSummary} = await import('./ui-logic.mjs');
+    assert.equal(windowSummary([]), 'No windows');
+    assert.equal(windowSummary(['Firefox']), '1 window · Firefox');
+    assert.equal(windowSummary(['Code', 'Terminal', 'Terminal', 'Firefox']),
+        '4 windows · Code · Terminal · Firefox');
+    assert.equal(windowSummary(['A', 'B', 'C', 'D', 'E']), '5 windows · A · B · C · +2 more');
+    assert.equal(windowSummary(['', 'B']), '2 windows · B');
+});

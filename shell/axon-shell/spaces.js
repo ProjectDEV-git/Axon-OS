@@ -19,6 +19,7 @@ import {
     ruleDecision,
     ruleKeyFor,
     spaceAnnouncement,
+    windowSummary,
 } from './ui-logic.js';
 import { destroyNotifications, notify } from './notify.js';
 
@@ -35,6 +36,10 @@ const DEFAULT_SPACES = [
     { name: 'Terminal', color: '#84cc16' },
     { name: 'Notes',    color: '#f97316' },
 ];
+
+// Wait this long before asking the AI for an OSD summary, so quick
+// Super+1..9 presses don't each start a request.
+const OSD_AI_SUMMARY_DELAY_MS = 600;
 
 // ─── SpaceDefinition ──────────────────────────────────────────────────────────
 
@@ -151,6 +156,9 @@ export default class SpacesManager {
         this._settings = null;
         // Windows that closed while a classification or notification was pending
         this._goneWindows = new WeakSet();
+        // Bumped on every Space switch so a slow AI summary for an older
+        // switch is dropped
+        this._osdGeneration = 0;
         this._stateDir = GLib.build_filenamev([GLib.get_home_dir(), '.axon']);
         this._stateFile = GLib.build_filenamev([this._stateDir, 'spaces.json']);
     }
@@ -377,9 +385,15 @@ export default class SpacesManager {
                 ].join(' '),
             });
 
+            // Instant summary from the window list; the AI summary is opt-in
+            let workspace = global.workspace_manager.get_workspace_by_index(idx);
+            let windows = workspace
+                ? workspace.list_windows().filter(w => !w.is_skip_taskbar())
+                : [];
+
             const summaryLabel = new St.Label({
                 style_class: 'axon-space-osd-summary',
-                text: 'Analyzing workspace…',
+                text: windowSummary(windows.map(w => this._appName(w))),
                 x_align: Clutter.ActorAlign.CENTER,
                 style: [
                     'color: #a78bfa;',
@@ -395,12 +409,6 @@ export default class SpacesManager {
             osd.add_child(indexLabel);
             osd.add_child(summaryLabel);
 
-            // Fetch workspace windows and generate summary via Brain service
-            let workspace = global.workspace_manager.get_workspace_by_index(idx);
-            let windows = workspace
-                ? workspace.list_windows().filter(w => !w.is_skip_taskbar())
-                : [];
-
             // Screen readers (Orca) present a NOTIFICATION-role object when it
             // becomes showing, using its accessible name.
             try {
@@ -409,25 +417,23 @@ export default class SpacesManager {
             } catch (e) {
                 // Accessibility metadata is best effort
             }
-            if (windows.length === 0) {
-                summaryLabel.set_text('Empty workspace');
-            } else if (this._brainProxy) {
-                let windowList = windows.map(w => {
-                    let title = w.get_title() || 'Unknown';
-                    let wmClass = w.get_wm_class() || 'Unknown';
-                    return `- Title: "${title}" (Class: "${wmClass}")`;
-                }).join('\n');
-                let prompt = `Summarize what the user is doing on this desktop workspace in a single short phrase (under 10 words, e.g., "3 terminals running, 2 browser tabs open"). Do not include markdown, quotes, formatting, or prefixes. Open windows:\n${windowList}`;
-                callWithRetry(this._brainProxy, 'Generate', [prompt, "", "", false], (result, error) => {
-                    if (!error && result) {
-                        let [response] = result;
-                        summaryLabel.set_text(response.trim().replace(/^"|"$/g, ''));
-                    } else {
-                        summaryLabel.set_text('Workspace active');
-                    }
-                }, 2);
-            } else {
-                summaryLabel.set_text('Workspace active');
+
+            let osdAlive = true;
+            osd.connect('destroy', () => {
+                osdAlive = false;
+            });
+            const generation = ++this._osdGeneration;
+            const aiSummary = this._settings ? this._settings.get_boolean('osd-ai-summary') : false;
+            if (aiSummary && windows.length > 0 && this._brainProxy) {
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, OSD_AI_SUMMARY_DELAY_MS, () => {
+                    if (!osdAlive || generation !== this._osdGeneration)
+                        return GLib.SOURCE_REMOVE; // user switched again
+                    this._requestAISummary(windows, text => {
+                        if (osdAlive && generation === this._osdGeneration)
+                            summaryLabel.set_text(text);
+                    });
+                    return GLib.SOURCE_REMOVE;
+                });
             }
 
             // Measure after adding children; use a sensible fallback size
@@ -469,6 +475,23 @@ export default class SpacesManager {
         } catch (e) {
             console.warn('AxonShell: _showSpaceOSD error:', e.message);
         }
+    }
+
+    // Optional AI phrase for the OSD ("2 terminals and a browser").
+    _requestAISummary(windows, onText) {
+        const windowList = windows.map(w => {
+            const title = w.get_title() || 'Unknown';
+            const wmClass = w.get_wm_class() || 'Unknown';
+            return `- Title: "${title}" (Class: "${wmClass}")`;
+        }).join('\n');
+        const prompt = `Summarize what the user is doing on this desktop workspace in a single short phrase (under 10 words, e.g., "3 terminals running, 2 browser tabs open"). Do not include markdown, quotes, formatting, or prefixes. Open windows:\n${windowList}`;
+        callWithRetry(this._brainProxy, 'Generate', [prompt, '', '', false], (result, error) => {
+            if (!error && result) {
+                const text = String(result[0]).trim().replace(/^"|"$/g, '');
+                if (text && !text.startsWith('[Error'))
+                    onText(text);
+            }
+        }, 1);
     }
 
     // ── Workspace / space operations ───────────────────────────────────────────

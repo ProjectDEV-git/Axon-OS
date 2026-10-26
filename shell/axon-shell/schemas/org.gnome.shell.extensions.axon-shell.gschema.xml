@@ -100,5 +100,11 @@
       <description>App ID (or WM class) mapped to the Space its windows always go to, or "__never__" to never move that app.</description>
     </key>
 
+    <key name="osd-ai-summary" type="b">
+      <default>false</default>
+      <summary>AI summary in the Space OSD</summary>
+      <description>After a short delay, replace the window-list summary in the Space switch overlay with a phrase from the AI. Off by default: it sends window titles to the selected model.</description>
+    </key>
+
   </schema>
 </schemalist>

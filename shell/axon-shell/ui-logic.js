@@ -278,3 +278,23 @@ export function movedMessage(appName, spaceName) {
 export function askMessage(appName, spaceName) {
     return `Axon thinks ${appName || 'this window'} belongs in ${spaceName}.`;
 }
+
+/**
+ * Instant OSD summary from the window list, e.g.
+ * "3 windows · Code · Terminal · Firefox".
+ *
+ * @param {string[]} appNames - one entry per window (duplicates allowed)
+ * @param {number} [maxNames] - app names to list before "+N more"
+ * @returns {string}
+ */
+export function windowSummary(appNames, maxNames = 3) {
+    const count = appNames.length;
+    if (count === 0)
+        return 'No windows';
+    const unique = [...new Set(appNames.map(n => String(n || '').trim()).filter(Boolean))];
+    const parts = [count === 1 ? '1 window' : `${count} windows`];
+    parts.push(...unique.slice(0, maxNames));
+    if (unique.length > maxNames)
+        parts.push(`+${unique.length - maxNames} more`);
+    return parts.join(' · ');
+}

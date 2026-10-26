@@ -54,6 +54,13 @@ class PreferencesWindow(Adw.ApplicationWindow):
         self._shell.bind("auto-route-windows", route, "active", Gio.SettingsBindFlags.DEFAULT)
         group.add(route)
 
+        osd = Adw.SwitchRow(
+            title="AI summary when switching Spaces",
+            subtitle="Sends window titles to the selected model; off shows the window list",
+        )
+        self._shell.bind("osd-ai-summary", osd, "active", Gio.SettingsBindFlags.DEFAULT)
+        group.add(osd)
+
         self._rules_row = Adw.ExpanderRow(title="Per-app rules")
         group.add(self._rules_row)
         self._rule_rows: list[Gtk.Widget] = []
