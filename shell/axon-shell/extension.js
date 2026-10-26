@@ -15,6 +15,7 @@ import IntentBar from './intentbar.js';
 import DockManager from './dock.js';
 import SpaceSwitcher from './spaceswitcher.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
+import {_t, setTranslator} from './ui-logic.js';
 
 // ─── AxonAIIndicator ──────────────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ class AxonAIIndicator extends PanelMenu.Button {
             this._statusDot.remove_style_class_name('axon-status-ok');
             this._statusDot.add_style_class_name('axon-status-error');
         }
-        this.accessible_name = online ? 'Axon AI: online' : 'Axon AI: offline';
+        this.accessible_name = online ? _t('Axon AI: online') : _t('Axon AI: offline');
     }
 
     destroy() {
@@ -206,6 +207,8 @@ export default class AxonShellExtension extends Extension {
     }
 
     enable() {
+        // Shell strings go through the extension's gettext (domain axon-os).
+        setTranslator(msgid => this.gettext(msgid));
         try {
             // Async init: synchronous D-Bus proxy constructors block the whole
             // compositor while activation spawns the Python services, freezing
@@ -500,7 +503,7 @@ export default class AxonShellExtension extends Extension {
         try {
             let action = JSON.parse(intentJson);
             if (action && action.action === 'run_command' && action.command) {
-                confirmAndRun(action.command, `You said: "${transcription}"`);
+                confirmAndRun(action.command, _t('You said: “{text}”', {text: transcription}));
             } else if (action && action.action === 'open_app' && action.app) {
                 launchAppById(String(action.app));
             } else {
@@ -512,7 +515,7 @@ export default class AxonShellExtension extends Extension {
                         '--no-markup',
                         '--title=Axon Assistant',
                         '--text',
-                        `You said: "${transcription}"\n\nReply: ${intentJson}`,
+                        `${_t('You said: “{text}”', {text: transcription})}\n\n${_t('Reply: {reply}', {reply: intentJson})}`,
                         '--no-wrap',
                     ],
                     flags: Gio.SubprocessFlags.NONE,
@@ -548,6 +551,7 @@ export default class AxonShellExtension extends Extension {
     }
 
     disable() {
+        setTranslator(null);
         try {
             if (this._voiceOverlayProc) {
                 this._voiceOverlayProc.force_exit();

@@ -26,7 +26,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import StartMenuPopup from './startmenu.js';
 import {SpaceStrip} from './spaces.js';
-import {motionDuration} from './ui-logic.js';
+import {_t, motionDuration} from './ui-logic.js';
 
 // Animation length; 0 when the user turned animations off (reduced motion)
 const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
@@ -82,7 +82,7 @@ class TaskbarClock extends St.Label {
             style_class: 'axon-taskbar-clock',
             text: '',
             y_align: Clutter.ActorAlign.CENTER,
-            accessible_name: 'Clock',
+            accessible_name: _t('Clock'),
             accessible_role: Atk.Role.LABEL,
         });
         this._updateTime();
@@ -429,7 +429,7 @@ export default class DockManager {
         // Start Menu button
         const startBtn = new DockIcon({
             icon: Gio.ThemedIcon.new('starred-symbolic'),
-            label: 'Start Menu',
+            label: _t('Start Menu'),
             callback: () => this._startMenuPopup && this._startMenuPopup.toggle(),
             dockManager: this,
         });
@@ -438,7 +438,7 @@ export default class DockManager {
         // Intent Bar toggle search button
         const searchBtn = new DockIcon({
             icon: Gio.ThemedIcon.new('system-search-symbolic'),
-            label: 'Intent Bar (Search / AI)',
+            label: _t('Intent Bar (Search / AI)'),
             callback: () => this._intentBar && this._intentBar.toggle(),
             dockManager: this,
         });
@@ -508,7 +508,7 @@ export default class DockManager {
             reactive: true,
             track_hover: true,
             can_focus: true,
-            accessible_name: 'Show Desktop',
+            accessible_name: _t('Show Desktop'),
         });
         showDesktopBtn.connect('clicked', () => this._toggleShowDesktop());
         this._actor.add_child(showDesktopBtn);
@@ -682,7 +682,7 @@ export default class DockManager {
             style_class: 'axon-dock-menu',
             vertical:    true,
             reactive:    true,
-            accessible_name: `${icon._label || 'Application'} menu`,
+            accessible_name: _t('{app} menu', {app: icon._label || _t('Application')}),
         });
         // Keyboard: Up/Down move between items, Escape closes
         this._contextMenu.connect('key-press-event', (_actor, ev) => {
@@ -705,14 +705,14 @@ export default class DockManager {
 
         const titleLabel = new St.Label({
             style_class: 'axon-dock-menu-title',
-            text: icon._label || 'Application',
+            text: icon._label || _t('Application'),
         });
         this._contextMenu.add_child(titleLabel);
 
         if (icon._app) {
             const closeBtn = new St.Button({
                 style_class: 'axon-dock-menu-item',
-                label: 'Close Window',
+                label: _t('Close Window'),
                 x_align: Clutter.ActorAlign.START,
                 reactive: true,
                 can_focus: true,
@@ -765,7 +765,7 @@ export default class DockManager {
 
     _requestAIPredictedActions(icon, contextStr, loadingItem) {
         if (!this._brainProxy) {
-            if (loadingItem) loadingItem.set_label('AI Brain service offline');
+            if (loadingItem) loadingItem.set_label(_t('AI Brain service offline'));
             return;
         }
 
@@ -805,13 +805,13 @@ export default class DockManager {
                         });
                         this._repositionMenu(icon);
                     } else {
-                        if (loadingItem) loadingItem.set_label('No shortcuts suggested');
+                        if (loadingItem) loadingItem.set_label(_t('No shortcuts suggested'));
                     }
                 } catch (e) {
-                    if (loadingItem) loadingItem.set_label('No shortcuts suggested');
+                    if (loadingItem) loadingItem.set_label(_t('No shortcuts suggested'));
                 }
             } else {
-                if (loadingItem) loadingItem.set_label('AI suggestion failed');
+                if (loadingItem) loadingItem.set_label(_t('AI suggestion failed'));
             }
         });
     }

@@ -22,6 +22,7 @@ import {
     spaceAnnouncement,
     spaceChipState,
     windowSummary,
+    _t,
 } from './ui-logic.js';
 import { destroyNotifications, notify } from './notify.js';
 
@@ -92,7 +93,7 @@ class SpaceIndicator extends PanelMenu.Button {
 
         this._label = new St.Label({
             style_class: 'axon-space-label',
-            text: 'Space',
+            text: _t('Space'),
             y_align: Clutter.ActorAlign.CENTER,
         });
 
@@ -166,7 +167,7 @@ export class SpaceStrip {
             style_class: 'axon-space-strip',
             vertical: false,
             y_align: Clutter.ActorAlign.CENTER,
-            accessible_name: 'Spaces',
+            accessible_name: _t('Spaces'),
         });
         this._connect();
         this.update();
@@ -782,10 +783,10 @@ export default class SpacesManager {
 
         const name = this._appName(window);
         const undo = () => this._moveWindowToIndex(window, fromIdx);
-        notify(movedMessage(name, spaceName), 'Axon moved this window to its Space.', [
-            {label: 'Undo', callback: undo},
-            {label: 'Always do this', callback: () => this._setRule(key, spaceName)},
-            {label: 'Never move this app', callback: () => {
+        notify(movedMessage(name, spaceName), _t('Axon moved this window to its Space.'), [
+            {label: _t('Undo'), callback: undo},
+            {label: _t('Always do this'), callback: () => this._setRule(key, spaceName)},
+            {label: _t('Never move this app'), callback: () => {
                 undo();
                 this._setRule(key, NEVER_ROUTE);
             }},
@@ -796,9 +797,9 @@ export default class SpacesManager {
     _askToRoute(window, spaceName, key) {
         const move = () => this._routeWindowToSpace(window, spaceName, {key, quiet: true});
         notify(askMessage(this._appName(window), spaceName), 'Move it there?', [
-            {label: 'Move', callback: move},
-            {label: 'Keep here', callback: () => {}},
-            {label: 'Always do this', callback: () => {
+            {label: _t('Move'), callback: move},
+            {label: _t('Keep here'), callback: () => {}},
+            {label: _t('Always do this'), callback: () => {
                 this._setRule(key, spaceName);
                 move();
             }},

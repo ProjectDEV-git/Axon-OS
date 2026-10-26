@@ -7,7 +7,7 @@ import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {filterSpaces, intentBarWidth, motionDuration} from './ui-logic.js';
+import {_t, filterSpaces, intentBarWidth, motionDuration} from './ui-logic.js';
 
 const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
@@ -29,14 +29,14 @@ export default class SpaceSwitcher {
             vertical: true,
             reactive: true,
             visible: false,
-            accessible_name: 'Go to Space',
+            accessible_name: _t('Go to Space'),
         });
         this._entry = new St.Entry({
             style_class: 'axon-intentbar-input',
-            hint_text: 'Go to a Space or window…',
+            hint_text: _t('Go to a Space or window…'),
             can_focus: true,
             x_expand: true,
-            accessible_name: 'Search Spaces and windows',
+            accessible_name: _t('Search Spaces and windows'),
         });
         this._entry.clutter_text.connect('text-changed', () => this._refresh());
         this._entry.clutter_text.connect('key-press-event', (_actor, event) => {
@@ -60,7 +60,7 @@ export default class SpaceSwitcher {
         this._list = new St.BoxLayout({
             style_class: 'axon-suggestions',
             vertical: true,
-            accessible_name: 'Spaces',
+            accessible_name: _t('Spaces'),
         });
         this._actor.add_child(this._entry);
         this._actor.add_child(this._list);
@@ -135,12 +135,14 @@ export default class SpaceSwitcher {
     _render() {
         this._list.destroy_all_children();
         if (this._results.length === 0) {
-            this._list.add_child(new St.Label({style_class: 'axon-hint-label', text: 'No matching Space or window'}));
+            this._list.add_child(new St.Label({style_class: 'axon-hint-label', text: _t('No matching Space or window')}));
             return;
         }
         this._results.forEach((r, i) => {
             const title = r.window ? r.window : `${r.index + 1}  ${r.name}`;
-            const detail = r.window ? `in ${r.name} (Super+${r.index + 1})` : `Super+${r.index + 1}`;
+            const detail = r.window
+                ? _t('in {name} (Super+{number})', {name: r.name, number: r.index + 1})
+                : `Super+${r.index + 1}`;
             const row = new St.BoxLayout({vertical: false, x_expand: true});
             row.add_child(new St.Label({text: title, x_expand: true, style_class: 'axon-suggestion-title'}));
             row.add_child(new St.Label({text: detail, style_class: 'axon-hint-label'}));

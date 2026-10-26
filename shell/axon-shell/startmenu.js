@@ -6,7 +6,7 @@ import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {fitToWorkArea, motionDuration} from './ui-logic.js';
+import {_t, fitToWorkArea, motionDuration} from './ui-logic.js';
 
 // Animation length; 0 when the user turned animations off (reduced motion)
 const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
@@ -53,7 +53,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         this._searchEntry = new St.Entry({
             style_class: 'axon-startmenu-search',
-            hint_text: 'Search apps, files or ask AI...',
+            hint_text: _t('Search apps, files or ask AI...'),
             can_focus: true,
             x_expand: true,
         });
@@ -105,7 +105,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         const appsTitle = new St.Label({
             style_class: 'axon-startmenu-section-title',
-            text: 'Pinned Apps',
+            text: _t('Pinned Apps'),
         });
         this._appsColumn.add_child(appsTitle);
 
@@ -125,7 +125,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         const filesTitle = new St.Label({
             style_class: 'axon-startmenu-section-title',
-            text: 'Recommended Files',
+            text: _t('Recommended Files'),
         });
         this._filesColumn.add_child(filesTitle);
 
@@ -173,7 +173,7 @@ class StartMenuPopup extends St.BoxLayout {
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-lock-screen-symbolic', icon_size: 16 }),
             can_focus: true,
-            accessible_name: 'Lock screen',
+            accessible_name: _t('Lock screen'),
         });
         lockBtn.connect('clicked', () => {
             this.hide();
@@ -184,7 +184,7 @@ class StartMenuPopup extends St.BoxLayout {
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-reboot-symbolic', icon_size: 16 }),
             can_focus: true,
-            accessible_name: 'Restart',
+            accessible_name: _t('Restart'),
         });
         restartBtn.connect('clicked', () => {
             this.hide();
@@ -195,7 +195,7 @@ class StartMenuPopup extends St.BoxLayout {
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-shutdown-symbolic', icon_size: 16 }),
             can_focus: true,
-            accessible_name: 'Power off',
+            accessible_name: _t('Power off'),
         });
         shutdownBtn.connect('clicked', () => {
             this.hide();
@@ -441,7 +441,7 @@ class StartMenuPopup extends St.BoxLayout {
 
     _showNoRecentFiles() {
         const label = new St.Label({
-            text: 'No recent files found.',
+            text: _t('No recent files found.'),
             style_class: 'axon-startmenu-no-files',
         });
         this._filesList.add_child(label);

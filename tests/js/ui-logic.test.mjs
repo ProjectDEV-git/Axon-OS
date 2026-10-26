@@ -235,3 +235,17 @@ test('announcement', async () => {
     assert.equal(announcement('command', 'Not run.'), 'Command not run.');
     assert.equal(announcement('cancelled'), 'Cancelled.');
 });
+
+test('setTranslator routes Shell strings through gettext and fills placeholders', async () => {
+    const {_t, setTranslator, describeAction: describe} = await import('./ui-logic.mjs');
+    assert.equal(_t('Open {app}', {app: 'Files'}), 'Open Files');
+    assert.equal(_t('Keep {missing}', {}), 'Keep {missing}');
+    assert.equal(_t('Price {p}', {p: '$1'}), 'Price $1');
+    setTranslator(msgid => (msgid === 'Opening {app}…' ? 'Öffne {app}…' : msgid));
+    try {
+        assert.equal(describe({action: 'open_app', app: 'Firefox'}), 'Öffne Firefox…');
+    } finally {
+        setTranslator(null);
+    }
+    assert.equal(describe({action: 'open_app', app: 'Firefox'}), 'Opening Firefox…');
+});

@@ -335,7 +335,8 @@ add a short note under any item you skip or change.
 ### Translation
 - [x] Wire `services/i18n.py` into the GTK apps and mark user-facing strings with `_()`.
   Note: done for the Intent Bar, AI panel, confirmation card, Settings preferences and the shared helpers (`ui_logic`, `suggestions`, `command_risk`, `context_settings`, `status_summary`); compared constants use `N_()`. Welcome, Installer, Files, Terminal, Settings main, Diagnostics and AI Models still have unmarked strings.
-- [ ] Use the extension's gettext for Shell strings.
+- [x] Use the extension's gettext for Shell strings.
+  Note: `metadata.json` sets `gettext-domain: axon-os`; `extension.js` passes `this.gettext` to `setTranslator()` in `ui-logic.js`, and the Shell modules use its `_t()` (same `{name}` msgids as Python). Untested in a real Shell session; space names and D-Bus prompts to the model stay English.
 - [ ] Add a `po/` template (`axon-os.pot`) and a script or Make target to refresh it.
 
 ---

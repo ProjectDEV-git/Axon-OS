@@ -11,6 +11,7 @@ import {confirmAndRun, launchAppById} from './ai-actions.js';
 import {announce} from './a11y.js';
 import Shell from 'gi://Shell';
 import {
+    _t,
     EXAMPLE_PROMPTS,
     RequestTracker,
     SETTINGS_PANELS,
@@ -122,7 +123,7 @@ export default class IntentBar {
         // Refreshed on every show(); never assumed local.
         this._originLabel = new St.Label({
             style_class: 'axon-origin-label',
-            text: 'Model: checking…',
+            text: _t('Model: checking…'),
             x_align: Clutter.ActorAlign.END,
         });
         this._actor.add_child(this._originLabel);
@@ -130,10 +131,10 @@ export default class IntentBar {
         // Input field
         this._entry = new St.Entry({
             style_class: 'axon-intentbar-input',
-            hint_text: 'What do you want to do?',
+            hint_text: _t('What do you want to do?'),
             can_focus: true,
             x_expand: true,
-            accessible_name: 'Intent bar input',
+            accessible_name: _t('Intent bar input'),
             accessible_role: Atk.Role.ENTRY,
         });
 
@@ -152,7 +153,7 @@ export default class IntentBar {
                 // only after that does it close the bar
                 if (this._pendingAction) {
                     this._pendingAction = null;
-                    this._setResponse('Cancelled');
+                    this._setResponse(_t('Cancelled'));
                 } else if (escapeAction(this._requests.busy) === 'cancel') {
                     this._cancelRequest();
                 } else {
@@ -169,7 +170,7 @@ export default class IntentBar {
             child: new St.Icon({icon_name: 'process-stop-symbolic', icon_size: 16}),
             can_focus: true,
             visible: false,
-            accessible_name: 'Stop request',
+            accessible_name: _t('Stop request'),
             y_align: Clutter.ActorAlign.CENTER,
         });
         this._stopButton.connect('clicked', () => this._cancelRequest());
@@ -182,7 +183,7 @@ export default class IntentBar {
             style_class: 'axon-response',
             text: '',
             x_expand: true,
-            accessible_name: 'AI response',
+            accessible_name: _t('AI response'),
             accessible_role: Atk.Role.LABEL,
         });
         this._responseLabel.clutter_text.set_line_wrap(true);
@@ -200,7 +201,7 @@ export default class IntentBar {
         });
         this._recoveryButton = new St.Button({
             style_class: 'axon-chip',
-            label: 'Diagnostics',
+            label: _t('Diagnostics'),
             can_focus: true,
             visible: false,
             y_align: Clutter.ActorAlign.START,
@@ -243,7 +244,7 @@ export default class IntentBar {
             vertical: true,
             x_expand: true,
             visible: false,
-            accessible_name: 'Suggestions',
+            accessible_name: _t('Suggestions'),
         });
         this._previewLabel = new St.Label({
             style_class: 'axon-hint-label',
@@ -372,7 +373,7 @@ export default class IntentBar {
                 style_class: i === this._selected ? 'axon-suggestion axon-suggestion-selected' : 'axon-suggestion',
                 child: row,
                 x_expand: true,
-                accessible_name: `${s.category}: ${s.title}. ${s.subtitle}`,
+                accessible_name: `${_t(s.category)}: ${s.title}. ${s.subtitle}`,
             });
             button.connect('clicked', () => {
                 this._selected = i;
@@ -426,7 +427,7 @@ export default class IntentBar {
             if (launchAppById(a.app_id))
                 this.hide();
             else
-                this._setResponse(`Couldn't open ${s.title}.`, {error: true});
+                this._setResponse(_t("Couldn't open {app}.", {app: s.title}), {error: true});
         } else if (a.type === 'settings') {
             // Only the fixed panel names, never text from the query
             if (!SETTINGS_PANELS.some(([, panel]) => panel === a.panel))
@@ -449,23 +450,23 @@ export default class IntentBar {
 
     _runCommand(command) {
         const shown = confirmAndRun(command, '', out => {
-            const text = out === null ? 'Not run.' : formatCommandOutput(out);
+            const text = out === null ? _t('Not run.') : formatCommandOutput(out);
             this._setResponse(text);
             announce(announcement('command', text));
         });
         if (!shown) {
-            this._setResponse('Blocked: command not in allowlist or contains unsafe characters.',
+            this._setResponse(_t('Blocked: command not in allowlist or contains unsafe characters.'),
                 {error: true});
             return;
         }
-        this._setResponse(`${STAGES.confirm}: ${command}`);
+        this._setResponse(`${_t(STAGES.confirm)}: ${command}`);
     }
 
     // Semantic file search through org.axonos.Search; results open on click.
     _searchFiles(query) {
         const requestId = this._requests.start();
         this._setBusy(true);
-        this._setResponse(STAGES.searching);
+        this._setResponse(_t(STAGES.searching));
         Gio.DBus.session.call(
             'org.axonos.Search', '/org/axonos/Search', 'org.axonos.Search', 'Query',
             new GLib.Variant('(si)', [query, 6]), null, Gio.DBusCallFlags.NONE, 30000, null,
@@ -487,7 +488,7 @@ export default class IntentBar {
 
     _showFileResults(query, results) {
         if (!results.length) {
-            this._setResponse(`No matching files for "${query}".`);
+            this._setResponse(_t('No matching files for “{query}”.', {query}));
             return;
         }
         this._setResponse(`Top ${results.length} matches. Click to open:`);
@@ -508,7 +509,7 @@ export default class IntentBar {
                         global.create_app_launch_context(0, -1));
                     this.hide();
                 } catch (e) {
-                    this._setResponse(`Couldn't open ${shownPath}: ${e.message}`, {error: true});
+                    this._setResponse(_t("Couldn't open {path}: {error}", {path: shownPath, error: e.message}), {error: true});
                 }
             });
             this._suggestBox.add_child(button);
@@ -525,7 +526,7 @@ export default class IntentBar {
         this._setBusy(true);
         // Only stages this code reaches: the proxy may still need creating
         const connected = this._brainProxy || this._extension._brainProxy;
-        this._setResponse(connected ? STAGES.waiting : STAGES.connecting);
+        this._setResponse(_t(connected ? STAGES.waiting : STAGES.connecting));
         this._callBrain(query, requestId);
     }
 
@@ -563,7 +564,10 @@ export default class IntentBar {
 
     _buildEmptyState() {
         this._emptyBox.destroy_all_children();
-        const sections = [['Try', EXAMPLE_PROMPTS], ['Recent', recentForEmptyState(this._history)]];
+        const sections = [
+            [_t('Try'), EXAMPLE_PROMPTS.map(p => _t(p))],
+            [_t('Recent'), recentForEmptyState(this._history)],
+        ];
         for (const [title, items] of sections) {
             if (items.length === 0)
                 continue;
@@ -587,7 +591,7 @@ export default class IntentBar {
         }
         this._emptyBox.add_child(new St.Label({
             style_class: 'axon-hint-label axon-hint-bar',
-            text: 'Enter  Run    Esc  Stop / Close',
+            text: _t('Enter  Run    Esc  Stop / Close'),
         }));
     }
 
@@ -612,7 +616,7 @@ export default class IntentBar {
         if (!this._requests.cancel())
             return;
         this._setBusy(false);
-        this._setResponse('Cancelled');
+        this._setResponse(_t('Cancelled'));
         announce(announcement('cancelled'));
     }
 
@@ -688,7 +692,7 @@ export default class IntentBar {
                     }
                     this._brainProxy = proxy;
                     if (this._requests.isCurrent(requestId))
-                        this._setResponse(STAGES.waiting);
+                        this._setResponse(_t(STAGES.waiting));
                     proxy.GenerateRemote(
                         prompt, systemPrompt, '', false,
                         (result, err) => this._onBrainReply(requestId, result, err)
@@ -738,7 +742,7 @@ export default class IntentBar {
                 // The confirmation card is the preview; output shows here
                 this._runCommand(action.command);
             } else {
-                this._setResponse('Unknown action received from AI.', {error: true});
+                this._setResponse(_t('Unknown action received from AI.'), {error: true});
             }
         } catch (e) {
             logError(e, 'AxonShell: could not execute action');
@@ -749,7 +753,7 @@ export default class IntentBar {
     _runConfirmedAction(action) {
         const appName = String(action.app ?? '').trim();
         if (!launchAppById(appName)) {
-            this._setResponse(`No installed app called "${appName}".`, {error: true});
+            this._setResponse(_t('No installed app called “{app}”.', {app: appName}), {error: true});
             return;
         }
         this.hide();

@@ -4,6 +4,32 @@
 // (tests/js/). The GTK apps use the Python twin in services/ui_logic.py;
 // keep the two in sync.
 
+let translate = msgid => msgid;
+
+/**
+ * Use *fn* (the extension's gettext) for Shell strings; null restores English.
+ *
+ * @param {?function(string): string} fn
+ */
+export function setTranslator(fn) {
+    translate = typeof fn === 'function' ? fn : msgid => msgid;
+}
+
+/**
+ * Translate *msgid* and fill ``{name}`` placeholders, like ``_().format()``
+ * in services/i18n.py, so the Python and Shell msgids match.
+ *
+ * @param {string} msgid
+ * @param {object} [values]
+ * @returns {string}
+ */
+export function _t(msgid, values = null) {
+    const s = translate(msgid);
+    if (!values)
+        return s;
+    return s.replace(/\{(\w+)\}/g, (m, key) => (key in values ? String(values[key]) : m));
+}
+
 const FENCE = '```';
 const FENCE_RE = /^```[A-Za-z0-9_-]*\s*\n?([\s\S]*?)\n?```\s*$/;
 
@@ -80,7 +106,7 @@ export function splitError(text) {
     if (!m)
         return {body: s.trim(), error: null};
     const message = (m[1] ?? m[2] ?? '').trim();
-    return {body: s.slice(0, m.index).trim(), error: message || 'Something went wrong.'};
+    return {body: s.slice(0, m.index).trim(), error: message || _t('Something went wrong.')};
 }
 
 /**
@@ -93,13 +119,13 @@ export function describeAction(action) {
     const kind = action?.action ?? '';
     if (kind === 'open_app') {
         const app = String(action.app ?? '').trim();
-        return app ? `Opening ${app}…` : 'Opening app…';
+        return app ? _t('Opening {app}…', {app}) : _t('Opening app…');
     }
     if (kind === 'run_command') {
         const command = String(action.command ?? '').trim();
-        return command ? `Run: ${command}` : 'Run command';
+        return command ? _t('Run: {command}', {command}) : _t('Run command');
     }
-    return "Axon suggested an action it can't perform here.";
+    return _t("Axon suggested an action it can't perform here.");
 }
 
 /**
@@ -163,12 +189,12 @@ export function escapeAction(busy) {
 export function spaceAnnouncement(spaceName, windowCount) {
     let windows;
     if (windowCount <= 0)
-        windows = 'No windows open.';
+        windows = _t('No windows open.');
     else if (windowCount === 1)
-        windows = '1 window open.';
+        windows = _t('1 window open.');
     else
-        windows = `${windowCount} windows open.`;
-    return `Switched to ${spaceName} Space. ${windows}`;
+        windows = _t('{count} windows open.', {count: windowCount});
+    return `${_t('Switched to {name} Space.', {name: spaceName})} ${windows}`;
 }
 
 // ── Spaces: window routing ──────────────────────────────────────────────────
@@ -271,12 +297,12 @@ export function classificationDecision(space, confidence, spaceNames, currentSpa
 
 /** "Firefox moved to Web" */
 export function movedMessage(appName, spaceName) {
-    return `${appName || 'Window'} moved to ${spaceName}`;
+    return _t('{app} moved to {space}', {app: appName || _t('Window'), space: spaceName});
 }
 
 /** "Axon thinks Firefox belongs in Web." */
 export function askMessage(appName, spaceName) {
-    return `Axon thinks ${appName || 'this window'} belongs in ${spaceName}.`;
+    return _t('Axon thinks {app} belongs in {space}.', {app: appName || _t('this window'), space: spaceName});
 }
 
 /**
@@ -290,12 +316,12 @@ export function askMessage(appName, spaceName) {
 export function windowSummary(appNames, maxNames = 3) {
     const count = appNames.length;
     if (count === 0)
-        return 'No windows';
+        return _t('No windows');
     const unique = [...new Set(appNames.map(n => String(n || '').trim()).filter(Boolean))];
-    const parts = [count === 1 ? '1 window' : `${count} windows`];
+    const parts = [count === 1 ? _t('1 window') : _t('{count} windows', {count})];
     parts.push(...unique.slice(0, maxNames));
     if (unique.length > maxNames)
-        parts.push(`+${unique.length - maxNames} more`);
+        parts.push(_t('+{count} more', {count: unique.length - maxNames}));
     return parts.join(' · ');
 }
 
@@ -455,12 +481,12 @@ export function modelOrigin(modelId, providers = null) {
         kind = hostKind(cfg.base_url);
     else
         kind = providerId === 'ollama' ? 'local' : 'cloud';
-    model = model || 'default model';
+    model = model || _t('default model');
     let label;
     if (kind === 'local' && provider === 'Ollama')
-        label = `Local · ${model}`;
+        label = _t('Local · {model}', {model});
     else
-        label = `${{local: 'Local', remote: 'Remote', cloud: 'Cloud'}[kind]} · ${provider} · ${model}`;
+        label = `${{local: _t('Local'), remote: _t('Remote'), cloud: _t('Cloud')}[kind]} · ${provider} · ${model}`;
     return {kind, provider, model, label};
 }
 
@@ -598,30 +624,32 @@ export function buildSuggestions(query, apps = [], spaces = [], limit = 3) {
     if (q.toLowerCase().startsWith('find ') && q.length > 5) {
         const target = q.slice(5).trim();
         return [
-            row('Files', `Search files for “${target}”`, 'Semantic search in your files',
+            row('Files', _t('Search files for “{query}”', {query: target}), _t('Semantic search in your files'),
                 {type: 'files', query: target, explicit: true}),
-            row('Ask AI', 'Ask Axon AI', q, {type: 'ask', query: q}),
+            row('Ask AI', _t('Ask Axon AI'), q, {type: 'ask', query: q}),
         ];
     }
     const out = [];
     out.push(...topRows(apps
         .map(([appId, name, keywords]) =>
-            [matchScore(q, name, keywords), row('Applications', name, 'Application', {type: 'open_app', app_id: appId})])
+            [matchScore(q, name, keywords), row('Applications', name, _t('Application'), {type: 'open_app', app_id: appId})])
         .filter(([s]) => s >= 2), limit));
-    out.push(row('Files', `Search files for “${q}”`, 'Semantic search in your files', {type: 'files', query: q}));
+    out.push(row('Files', _t('Search files for “{query}”', {query: q}), _t('Semantic search in your files'),
+        {type: 'files', query: q}));
     out.push(...topRows(SETTINGS_PANELS
         .map(([title, panel, words]) =>
-            [matchScore(q, title, words), row('Settings', title, 'Settings', {type: 'settings', panel})])
+            [matchScore(q, title, _t(title), words), row('Settings', _t(title), _t('Settings'), {type: 'settings', panel})])
         .filter(([s]) => s >= 2), limit));
     out.push(...topRows(spaces
         .map((name, i) =>
-            [matchScore(q, name, `${name} space`), row('Spaces', `${name} Space`, `Super+${i + 1}`, {type: 'space', index: i, name})])
+            [matchScore(q, name, `${name} space`), row('Spaces', _t('{name} Space', {name}), `Super+${i + 1}`, {type: 'space', index: i, name})])
         .filter(([s]) => s >= 2), limit));
     out.push(...topRows(SUGGESTED_COMMANDS
         .map(([command, description, words]) =>
-            [matchScore(q, command, description, words), row('Commands', command, description, {type: 'command', command})])
+            [matchScore(q, command, description, _t(description), words),
+                row('Commands', command, _t(description), {type: 'command', command})])
         .filter(([s]) => s >= 2), limit));
-    out.push(row('Ask AI', 'Ask Axon AI', q, {type: 'ask', query: q}));
+    out.push(row('Ask AI', _t('Ask Axon AI'), q, {type: 'ask', query: q}));
     return out;
 }
 
@@ -629,12 +657,12 @@ export function buildSuggestions(query, apps = [], spaces = [], limit = 3) {
 export function describeSuggestion(s) {
     const a = s?.action ?? {};
     switch (a.type) {
-    case 'open_app': return `Open ${s.title}`;
-    case 'files': return `Search your files for “${a.query ?? ''}”`;
-    case 'settings': return `Open Settings → ${s.title}`;
-    case 'space': return `Switch to ${a.name ?? ''} Space`;
-    case 'command': return `Run: ${a.command ?? ''} (asks first)`;
-    default: return 'Ask Axon AI';
+    case 'open_app': return _t('Open {app}', {app: s.title});
+    case 'files': return _t('Search your files for “{query}”', {query: a.query ?? ''});
+    case 'settings': return _t('Open Settings → {panel}', {panel: s.title});
+    case 'space': return _t('Switch to {name} Space', {name: a.name ?? ''});
+    case 'command': return _t('Run: {command} (asks first)', {command: a.command ?? ''});
+    default: return _t('Ask Axon AI');
     }
 }
 
@@ -657,7 +685,7 @@ export function defaultSuggestionIndex(rows) {
 export function formatCommandOutput(text, maxLines = 40, maxChars = 4000) {
     const t = String(text ?? '').replace(/\s+$/, '');
     if (!t)
-        return '(no output)';
+        return _t('(no output)');
     const lines = t.split('\n');
     let cut = lines.length > maxLines;
     let shown = lines.slice(0, maxLines).join('\n');
@@ -665,7 +693,7 @@ export function formatCommandOutput(text, maxLines = 40, maxChars = 4000) {
         shown = shown.slice(0, maxChars);
         cut = true;
     }
-    return cut ? `${shown}\n… (output shortened)` : shown;
+    return cut ? `${shown}\n${_t('… (output shortened)')}` : shown;
 }
 
 // ── Spaces strip and quick switcher ─────────────────────────────────────────
@@ -731,10 +759,11 @@ export function filterSpaces(query, spaces) {
 export function announcement(kind, text = '') {
     const first = String(text ?? '').split(/\s+/).filter(Boolean).join(' ').slice(0, 120);
     switch (kind) {
-    case 'answer': return first ? `Axon answered: ${first}` : 'Axon answered.';
-    case 'error': return first ? `Axon couldn't finish: ${first}` : "Axon couldn't finish.";
-    case 'command': return String(text).trim() !== 'Not run.' ? 'Command finished.' : 'Command not run.';
-    case 'cancelled': return 'Cancelled.';
-    default: return first || 'Done.';
+    case 'answer': return first ? _t('Axon answered: {text}', {text: first}) : _t('Axon answered.');
+    case 'error': return first ? _t("Axon couldn't finish: {text}", {text: first}) : _t("Axon couldn't finish.");
+    case 'command':
+        return String(text).trim() !== _t('Not run.') ? _t('Command finished.') : _t('Command not run.');
+    case 'cancelled': return _t('Cancelled.');
+    default: return first || _t('Done.');
     }
 }
