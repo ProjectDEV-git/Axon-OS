@@ -79,6 +79,14 @@ mkdir -p "${EXT_DIR}"
 cp -r "${SRC}/shell/axon-shell/." "${EXT_DIR}/"
 glib-compile-schemas "${EXT_DIR}/schemas/"
 
+# App icons (scripts/gen_icons.py), in hicolor so they show under any icon theme
+for svg in "${SRC}"/theme/axon-icons/scalable/apps/*.svg; do
+    install -Dm644 "${svg}" "${R}/usr/share/icons/hicolor/scalable/apps/${svg##*/}"
+done
+for svg in "${SRC}"/theme/axon-icons/symbolic/apps/*.svg; do
+    install -Dm644 "${svg}" "${R}/usr/share/icons/hicolor/symbolic/apps/${svg##*/}"
+done
+
 # GTK theme and wallpaper
 install -Dm644 "${SRC}/theme/axon-gtk/gtk-dark.css" "${R}/usr/share/themes/axon-gtk/gtk-4.0/gtk.css"
 install -Dm644 "${SRC}/theme/axon-gtk/index.theme" "${R}/usr/share/themes/axon-gtk/index.theme"
@@ -183,7 +191,7 @@ Type=Application
 Name=Axon OS Updater
 Comment=Check for and apply the latest Axon OS updates
 Exec=/usr/local/bin/axon-update
-Icon=software-update-available
+Icon=axon-updater
 Terminal=false
 StartupNotify=true
 Categories=System;Settings;

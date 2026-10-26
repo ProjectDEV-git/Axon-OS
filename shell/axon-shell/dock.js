@@ -431,7 +431,7 @@ export default class DockManager {
 
         // Start Menu button
         const startBtn = new DockIcon({
-            icon: Gio.ThemedIcon.new('starred-symbolic'),
+            icon: Gio.ThemedIcon.new('axon-os-symbolic'),
             label: _t('Start Menu'),
             callback: () => this._startMenuPopup && this._startMenuPopup.toggle(),
             dockManager: this,

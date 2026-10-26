@@ -39,7 +39,7 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
 
         self.set_title("Axon Terminal")
         fit_default_size(self, 900, 600)
-        self.set_icon_name("utilities-terminal")
+        self.set_icon_name("axon-terminal")
 
         # ---- Load CSS (design tokens first, once) ---------------------------
         load_app_css(Path(__file__).resolve().parent / "main.css")
