@@ -20,7 +20,7 @@ from gi.repository import Adw, GLib, Gtk
 
 # Shared GTK helpers live in apps/shared next to every app
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from axon_gtk_utils import fit_default_size
+from axon_gtk_utils import fit_default_size, load_app_css
 
 # Insert axon-brain path so we can run hardware profiler
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "services" / "axon-brain"))
@@ -40,107 +40,6 @@ OLLAMA_URL = "http://127.0.0.1:11434"
 # ---------------------------------------------------------------------------
 # Embedded CSS
 # ---------------------------------------------------------------------------
-
-_CSS = b"""
-.welcome-window {
-    background-color: #09090f;
-}
-.hero-logo {
-    font-size: 52px;
-    color: #8b5cf6;
-}
-.hero-title {
-    font-size: 32px;
-    font-weight: bold;
-    color: #e8e8f4;
-}
-.hero-subtitle {
-    font-size: 16px;
-    color: #9090b8;
-}
-.chip {
-    background-color: rgba(139, 92, 246, 0.18);
-    color: #8b5cf6;
-    border-radius: 9999px;
-    padding: 4px 14px;
-    font-size: 12px;
-    font-weight: bold;
-    border: 1px solid rgba(139, 92, 246, 0.35);
-}
-.hardware-badge {
-    background-color: rgba(34, 211, 238, 0.1);
-    color: #22d3ee;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 12px;
-    border: 1px solid rgba(34, 211, 238, 0.25);
-    margin-bottom: 12px;
-}
-.model-row {
-    background-color: #111119;
-    border-radius: 12px;
-    border: 1px solid #2a2a42;
-    padding: 12px 16px;
-}
-.model-name {
-    font-size: 14px;
-    font-weight: bold;
-    color: #e8e8f4;
-}
-.model-desc {
-    font-size: 12px;
-    color: #9090b8;
-}
-.model-size {
-    font-size: 11px;
-    color: #50507a;
-}
-.page-title {
-    font-size: 24px;
-    font-weight: bold;
-    color: #e8e8f4;
-}
-.page-subtitle {
-    font-size: 14px;
-    color: #9090b8;
-}
-.nav-btn-next {
-    background-color: #8b5cf6;
-    color: white;
-    border-radius: 9999px;
-    border: none;
-    padding: 10px 28px;
-    font-size: 15px;
-}
-.nav-btn-next:hover {
-    background-color: #7c3aed;
-}
-.nav-btn-back {
-    background-color: transparent;
-    color: #9090b8;
-    border: 1px solid #3a3a58;
-    border-radius: 9999px;
-    padding: 10px 22px;
-}
-.page-indicator-dot {
-    font-size: 8px;
-}
-.check-icon {
-    font-size: 64px;
-    color: #10b981;
-}
-.status-online {
-    color: #10b981;
-    font-size: 12px;
-}
-.status-offline {
-    color: #ef4444;
-    font-size: 12px;
-}
-"""
-
-
-_css_loaded = False
 
 
 def _add_class(widget: Gtk.Widget, css_class: str) -> None:
@@ -185,17 +84,7 @@ class WelcomeWindow(Adw.Window):
         fit_default_size(self, 640, 600)
         self.set_decorated(True)
 
-        # Load CSS (guard against re-registration)
-        global _css_loaded
-        if not _css_loaded:
-            provider = Gtk.CssProvider()
-            provider.load_from_data(_CSS)
-            Gtk.StyleContext.add_provider_for_display(
-                self.get_display(),
-                provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
-            _css_loaded = True
+        load_app_css(Path(__file__).with_name("welcome.css"), self.get_display())
 
         # Root layout
         root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -316,12 +205,13 @@ class WelcomeWindow(Adw.Window):
 
     def _update_indicator(self) -> None:
         for i, dot in enumerate(self._dot_labels):
-            if i == self._current_page:
-                dot.set_opacity(1.0)
-                dot.set_markup('<span color="#8b5cf6">●</span>')
+            # Current page: full opacity and the accent colour (CSS)
+            current = i == self._current_page
+            dot.set_opacity(1.0 if current else 0.3)
+            if current:
+                dot.add_css_class("page-indicator-dot-current")
             else:
-                dot.set_opacity(0.3)
-                dot.set_markup('<span color="#50507a">●</span>')
+                dot.remove_css_class("page-indicator-dot-current")
 
     def _go_to(self, page_name: str) -> None:
         idx = self._PAGE_NAMES.index(page_name)
@@ -442,7 +332,9 @@ class WelcomeWindow(Adw.Window):
             inner.set_hexpand(True)
 
             tier_lbl = Gtk.Label()
-            tier_lbl.set_markup(f"<b>{tier}</b>: <span color='#8b5cf6'>{model_id}</span>")
+            tier_lbl.set_markup(
+                f"<b>{GLib.markup_escape_text(tier)}</b>: {GLib.markup_escape_text(model_id)}"
+            )
             _add_class(tier_lbl, "model-name")
             tier_lbl.set_halign(Gtk.Align.START)
             inner.append(tier_lbl)

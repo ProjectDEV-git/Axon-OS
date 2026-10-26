@@ -229,11 +229,15 @@ add a short note under any item you skip or change.
       Note: also writes `axon-design-tokens-light.css` / `-hc.css` and the Shell's
       `stylesheet-dark.css` / `stylesheet-light.css`, which GNOME 46+ loads by color scheme
       (checked in gnome-shell's `extensionSystem.js`). `stylesheet.css` stays as the fallback.
-- [ ] **Move embedded CSS out of Python.** Move the CSS strings in
+- [x] **Move embedded CSS out of Python.** Move the CSS strings in
       `apps/intent-bar/ui/window.py`, `apps/axon-ai-panel/ui/panel.py`,
       `apps/axon-welcome/ui/welcome.py` and `apps/axon-installer/ui/wizard.py` into `.css`
       files that import the shared tokens. No hardcoded hex colours left in app code.
       (Example of drift today: Intent Bar background `#09090f` vs token `#0f0f14`.)
+      Note: the CSS files don't `@import` the tokens; `load_app_css()` in
+      `apps/shared/axon_gtk_utils.py` loads the tokens as their own provider first, so the
+      variant can be swapped at runtime (Phase 4, "Follow system appearance"). The terminal's
+      ANSI palette and default Space colours are data, not CSS, and stay as they are.
 - [ ] **Shell stylesheet on tokens.** Replace every hardcoded colour, radius and spacing
       value in `shell/axon-shell/stylesheet.css` with generated token values.
 - [ ] **Drop the "Windows glass" look.** Remove the "Windows 10/11 Fluent Modern Glass

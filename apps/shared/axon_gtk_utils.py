@@ -50,3 +50,44 @@ def fit_default_size(window: Gtk.Window, width: int, height: int) -> tuple[int, 
     size = (fit_to_screen(width, mon_w), fit_to_screen(height, mon_h))
     window.set_default_size(*size)
     return size
+
+
+# ── Shared stylesheet loading ──────────────────────────────────────────────
+
+SHARED_DIR = Path(__file__).resolve().parent
+TOKEN_FILES = {
+    "dark": "axon-design-tokens.css",
+    "light": "axon-design-tokens-light.css",
+    "high-contrast": "axon-design-tokens-hc.css",
+}
+_tokens_provider: Gtk.CssProvider | None = None
+_loaded_app_css: set[str] = set()
+
+
+def load_app_css(css_path: Path, display: Gdk.Display | None = None) -> None:
+    """Load the design tokens, then one app stylesheet that uses them.
+
+    App CSS refers to colours as ``@axon_*`` (see apps/shared/
+    axon-design-tokens.css, generated from theme/tokens/axon-tokens.json).
+    Tokens and app CSS are separate providers, so the token variant can
+    change at runtime without reloading the app CSS. Each file loads once.
+    """
+    global _tokens_provider
+    display = display or Gdk.Display.get_default()
+    if display is None:
+        return
+    if _tokens_provider is None:
+        _tokens_provider = Gtk.CssProvider()
+        _tokens_provider.load_from_path(str(SHARED_DIR / TOKEN_FILES["dark"]))
+        Gtk.StyleContext.add_provider_for_display(
+            display, _tokens_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+    key = str(css_path)
+    if key in _loaded_app_css:
+        return
+    provider = Gtk.CssProvider()
+    provider.load_from_path(key)
+    Gtk.StyleContext.add_provider_for_display(
+        display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1
+    )
+    _loaded_app_css.add(key)

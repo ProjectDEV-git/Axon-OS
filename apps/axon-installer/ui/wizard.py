@@ -25,7 +25,7 @@ from gi.repository import Adw, GLib, Gtk
 
 # Shared GTK helpers live in apps/shared next to every app
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from axon_gtk_utils import fit_default_size
+from axon_gtk_utils import fit_default_size, load_app_css
 
 ENGINE_PATH = Path(__file__).resolve().parents[1] / "install_engine.py"
 ENGINE_WRAPPER = "/usr/local/bin/axon-install-engine"
@@ -76,86 +76,6 @@ INSTALL_TIPS = [
     "You can add or change AI providers any time in Axon Settings.",
     "The Context service understands what you're working on, so the AI answers with awareness.",
 ]
-
-_CSS = b"""
-.installer-window { background-color: #0a0a11; }
-.sidebar {
-    background-color: #0d0d15;
-    border-right: 1px solid #1d1d2e;
-}
-.sidebar-logo { font-size: 40px; color: #8b5cf6; }
-.sidebar-product { font-size: 18px; font-weight: bold; color: #e8e8f4; }
-.sidebar-version { font-size: 11px; color: #50507a; }
-.step-row { padding: 8px 14px; border-radius: 10px; }
-.step-row-current { background-color: rgba(139, 92, 246, 0.14); }
-.step-label { font-size: 13px; color: #70709a; }
-.step-label-current { color: #e8e8f4; font-weight: bold; }
-.step-label-done { color: #8b5cf6; }
-.step-dot { font-size: 10px; color: #34344e; }
-.step-dot-current { color: #8b5cf6; }
-.step-dot-done { color: #10b981; }
-.hero-logo { font-size: 64px; color: #8b5cf6; }
-.hero-title { font-size: 34px; font-weight: bold; color: #e8e8f4; }
-.hero-subtitle { font-size: 15px; color: #9090b8; }
-.page-title { font-size: 26px; font-weight: bold; color: #e8e8f4; }
-.page-subtitle { font-size: 14px; color: #9090b8; }
-.chip {
-    background-color: rgba(139, 92, 246, 0.18);
-    color: #a78bfa;
-    border-radius: 9999px;
-    padding: 4px 14px;
-    font-size: 12px;
-    font-weight: bold;
-    border: 1px solid rgba(139, 92, 246, 0.35);
-}
-.ai-hero {
-    background: linear-gradient(135deg, rgba(139,92,246,0.16), rgba(34,211,238,0.10));
-    border: 1px solid rgba(139, 92, 246, 0.30);
-    border-radius: 14px;
-    padding: 14px 18px;
-}
-.ai-hero-title { font-size: 15px; font-weight: bold; color: #e8e8f4; }
-.ai-hero-sub { font-size: 12px; color: #9090b8; }
-.nav-btn-next {
-    background-color: #8b5cf6;
-    color: white;
-    border-radius: 9999px;
-    border: none;
-    padding: 10px 30px;
-    font-size: 15px;
-    font-weight: bold;
-}
-.nav-btn-next:hover { background-color: #7c3aed; }
-.nav-btn-next:disabled { background-color: #3a3060; color: #8a8aa8; }
-.nav-btn-back {
-    background-color: transparent;
-    color: #9090b8;
-    border: 1px solid #3a3a58;
-    border-radius: 9999px;
-    padding: 10px 24px;
-}
-.nav-btn-danger {
-    background-color: #dc2626;
-    color: white;
-    border-radius: 9999px;
-    border: none;
-    padding: 10px 30px;
-    font-size: 15px;
-    font-weight: bold;
-}
-.status-online { color: #10b981; font-size: 13px; font-weight: bold; }
-.status-offline { color: #f59e0b; font-size: 13px; font-weight: bold; }
-.warn-text { color: #f59e0b; font-size: 12px; }
-.error-text { color: #ef4444; font-size: 13px; }
-.muted { color: #70709a; font-size: 12px; }
-.summary-value { color: #a78bfa; font-weight: bold; }
-.install-percent { font-size: 44px; font-weight: bold; color: #8b5cf6; }
-.install-step { font-size: 15px; color: #e8e8f4; }
-.install-tip { font-size: 13px; color: #9090b8; font-style: italic; }
-.check-icon { font-size: 72px; color: #10b981; }
-progressbar > trough { background-color: #1d1d2e; border-radius: 9999px; min-height: 10px; }
-progressbar > trough > progress { background-color: #8b5cf6; border-radius: 9999px; min-height: 10px; }
-"""
 
 _STEPS = [
     ("welcome", "Welcome"),
@@ -225,11 +145,7 @@ class InstallerWindow(Adw.Window):
             if geo.width < 1100 or geo.height < 768:
                 self.maximize()
 
-        provider = Gtk.CssProvider()
-        provider.load_from_data(_CSS)
-        Gtk.StyleContext.add_provider_for_display(
-            self.get_display(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        load_app_css(Path(__file__).with_name("wizard.css"), self.get_display())
 
         self._live = is_live_session()
         self._engine_proc = None

@@ -47,7 +47,7 @@ from ui_logic import (
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from axon_gtk_utils import fit_default_size
+from axon_gtk_utils import fit_default_size, load_app_css
 from context_settings import ITEM_LABELS, SENSITIVE_ITEMS, sends_sensitive
 from diagnostics import FAIL, INFO, OK, WARN, run_diagnostics
 from status_summary import StatusSummary, build_status
@@ -295,119 +295,8 @@ def _apply_markup(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-_css_loaded = False
-
-
 class AIPanelWindow(Adw.Window):
     """Main side-panel window for the Axon AI assistant."""
-
-    _CSS: bytes = b"""
-    .panel-window {
-        background: linear-gradient(180deg, #0d0d1e 0%, #0a0a16 100%);
-        border: 1px solid #2a2a42;
-        border-radius: 12px;
-        box-shadow:
-            0 20px 60px rgba(0, 0, 0, 0.7),
-            0 4px 16px rgba(0, 0, 0, 0.4),
-            inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    }
-    .panel-header {
-        background: linear-gradient(180deg, #0a0a16 0%, #0d0d1e 100%);
-        border-bottom: 1px solid #2a2a42;
-        border-radius: 12px 12px 0 0;
-    }
-    .bubble-user {
-        background-color: #16162a;
-        border-radius: 12px 12px 4px 12px;
-        border-left: 3px solid #8b5cf6;
-        box-shadow:
-            0 2px 8px rgba(0, 0, 0, 0.3),
-            inset 0 1px 0 rgba(139, 92, 246, 0.08);
-        color: #e8e8f4;
-        padding: 11px 15px;
-    }
-    .bubble-assistant {
-        background-color: #0f0f1c;
-        border-radius: 4px 12px 12px 12px;
-        border: 1px solid #2a2a42;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-        color: #e8e8f4;
-        padding: 11px 15px;
-    }
-    .bubble-error {
-        border-color: rgba(248, 113, 113, 0.6);
-        color: #fca5a5;
-    }
-    .bubble-error image {
-        color: #f87171;
-    }
-    .origin-label {
-        color: #9090b8;
-        font-size: 11px;
-        margin-bottom: 4px;
-    }
-    .context-title {
-        color: #9090b8;
-        font-size: 11px;
-    }
-    .context-chip {
-        font-size: 11px;
-        padding: 0 6px;
-        min-height: 22px;
-    }
-    .thinking-label {
-        color: #8b5cf6;
-        font-size: 13px;
-        font-style: italic;
-    }
-    .panel-input-area {
-        background: linear-gradient(180deg, transparent 0%, #080810 30%, #080810 100%);
-        border-top: 1px solid #2a2a42;
-        padding: 14px;
-        border-radius: 0 0 12px 12px;
-    }
-    .copy-btn {
-        background-color: transparent;
-        color: #50507a;
-        font-size: 11px;
-        border: none;
-        padding: 2px 6px;
-        border-radius: 6px;
-        transition: all 150ms ease;
-    }
-    .copy-btn:hover {
-        color: #8b5cf6;
-        background-color: rgba(139, 92, 246, 0.12);
-    }
-    .quick-chip {
-        background-color: rgba(139, 92, 246, 0.07);
-        color: #8b5cf6;
-        border: 1px solid rgba(139, 92, 246, 0.28);
-        border-radius: 9999px;
-        padding: 4px 13px;
-        font-size: 12px;
-        transition: all 150ms ease;
-    }
-    .quick-chip:hover {
-        background: linear-gradient(135deg, #9d6ff8 0%, #8b5cf6 100%);
-        color: white;
-        border-color: #8b5cf6;
-        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
-    }
-    .clear-btn {
-        color: #50507a;
-        background: transparent;
-        border: none;
-        font-size: 16px;
-        border-radius: 6px;
-        padding: 4px 6px;
-        transition: all 150ms ease;
-    }
-    .clear-btn:hover {
-        color: #ff5f57;
-        background-color: rgba(255, 95, 87, 0.1);
-    }
-    """
 
     _QUICK_CHIPS: list[str] = [  # noqa: RUF012
         "Explain Error",
@@ -442,17 +331,7 @@ class AIPanelWindow(Adw.Window):
         self._stream_prompt = ""
         self._conv_id: str = ""
 
-        # Apply CSS (guard against re-registration)
-        global _css_loaded
-        if not _css_loaded:
-            css_provider = Gtk.CssProvider()
-            css_provider.load_from_data(self._CSS)
-            Gtk.StyleContext.add_provider_for_display(
-                self.get_display(),
-                css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
-            _css_loaded = True
+        load_app_css(Path(__file__).with_name("panel.css"), self.get_display())
 
         # 860 px doesn't fit 768 px-high screens on an undecorated window
         fit_default_size(self, 420, 860)

@@ -1,0 +1,129 @@
+/* Intent Bar (GTK). Colours come from the design tokens (@axon_*), loaded
+ * by axon_gtk_utils.load_app_css; see theme/tokens/axon-tokens.json. */
+
+/* ---- Window shell ---- */
+.intent-bar-window {
+    background-color: @axon_popup;
+    border-radius: 12px;
+    border: 1px solid @axon_border_strong;
+    box-shadow: 0 4px 16px alpha(black, 0.35);
+}
+
+/* ---- Entry field ---- */
+.intent-entry {
+    background-color: transparent;
+    color: @axon_fg;
+    font-size: 20px;
+    caret-color: @axon_accent_text;
+    border: none;
+    padding: 8px 4px;
+    box-shadow: none;
+    outline: none;
+}
+
+.intent-entry:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* ---- Separators ---- */
+.entry-sep {
+    background-color: @axon_border;
+    min-height: 1px;
+}
+
+/* ---- Quick-action chips: neutral; the accent is kept for AI and focus ---- */
+.intent-chip {
+    background-color: @axon_hover;
+    color: @axon_fg_secondary;
+    border: 1px solid @axon_border;
+    border-radius: 9999px;
+    padding: 4px 12px;
+    font-size: 12px;
+}
+
+.intent-chip:hover {
+    background-color: @axon_active;
+    color: @axon_fg;
+}
+
+/* ---- Response text ---- */
+.response-label {
+    color: @axon_fg;
+    font-size: 13px;
+}
+
+/* ---- Errors: colour plus an icon, never colour alone ---- */
+.response-error {
+    color: @axon_error;
+}
+
+.response-error-icon {
+    color: @axon_error;
+}
+
+/* ---- Space badge ---- */
+.space-badge {
+    background-color: @axon_hover;
+    color: @axon_fg_secondary;
+    border-radius: 9999px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+/* ---- Where the model runs (AI-related, so it may use the accent) ---- */
+.model-badge {
+    background-color: @axon_accent_subtle;
+    color: @axon_accent_text;
+    border-radius: 9999px;
+    padding: 2px 10px;
+    font-size: 11px;
+}
+
+/* ---- Semantic search result rows ---- */
+.search-result-row {
+    border-radius: 8px;
+    padding: 6px 10px;
+}
+
+.search-result-row:hover {
+    background-color: @axon_hover;
+}
+
+.search-result-path {
+    color: @axon_fg;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.search-result-snippet {
+    color: @axon_fg_secondary;
+    font-size: 11px;
+}
+
+/* ---- Loading stage next to the spinner ---- */
+.stage-label {
+    color: @axon_fg_secondary;
+    font-size: 12px;
+}
+
+/* ---- Keyboard hint labels ---- */
+.hint-label {
+    color: @axon_fg_muted;
+    font-size: 11px;
+}
+
+/* ---- Start Ollama button ---- */
+.start-ollama-btn {
+    color: @axon_fg;
+    border: 1px solid @axon_border_strong;
+    border-radius: 8px;
+    background-color: transparent;
+    font-size: 12px;
+    padding: 4px 10px;
+}
+
+.start-ollama-btn:hover {
+    background-color: @axon_hover;
+}

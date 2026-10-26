@@ -33,7 +33,7 @@ from constants import AXON_DIR
 from service_utils import confirm_and_exec
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from axon_gtk_utils import monitor_size
+from axon_gtk_utils import load_app_css, monitor_size
 from ui_logic import (
     EXAMPLE_PROMPTS,
     SHOW,
@@ -62,139 +62,6 @@ try:
     import dbus
 except ImportError:  # pragma: no cover - dbus ships on Axon images
     dbus = None
-
-# ---------------------------------------------------------------------------
-# Axon OS Design System — embedded CSS
-# ---------------------------------------------------------------------------
-
-_CSS = b"""
-/* ---- Window shell ---- */
-.intent-bar-window {
-    background-color: #09090f;
-    border-radius: 20px;
-    border: 1px solid #3a3a58;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
-}
-
-/* ---- Entry field ---- */
-.intent-entry {
-    background-color: transparent;
-    color: #e8e8f4;
-    font-size: 20px;
-    caret-color: #8b5cf6;
-    border: none;
-    padding: 8px 4px;
-    box-shadow: none;
-    outline: none;
-}
-
-.intent-entry:focus {
-    outline: none;
-    box-shadow: none;
-}
-
-/* ---- Separators ---- */
-.entry-sep {
-    background-color: #2a2a42;
-    min-height: 1px;
-}
-
-/* ---- Quick-action chips ---- */
-.intent-chip {
-    background-color: rgba(139, 92, 246, 0.08);
-    color: #8b5cf6;
-    border: 1px solid rgba(139, 92, 246, 0.35);
-    border-radius: 9999px;
-    padding: 4px 14px;
-    font-size: 12px;
-}
-
-.intent-chip:hover {
-    background-color: #8b5cf6;
-    color: #ffffff;
-}
-
-/* ---- Response text ---- */
-.response-label {
-    color: #9090b8;
-    font-size: 13px;
-}
-
-/* ---- Errors: colour plus an icon, never colour alone ---- */
-.response-error {
-    color: #f87171;
-}
-
-.response-error-icon {
-    color: #f87171;
-}
-
-/* ---- Space badge ---- */
-.space-badge {
-    background-color: rgba(139, 92, 246, 0.15);
-    color: #8b5cf6;
-    border-radius: 9999px;
-    padding: 2px 12px;
-    font-size: 11px;
-    font-weight: bold;
-}
-
-/* ---- Model badge ---- */
-.model-badge {
-    background-color: rgba(34, 211, 238, 0.12);
-    color: #22d3ee;
-    border-radius: 9999px;
-    padding: 2px 12px;
-    font-size: 11px;
-}
-
-/* ---- Semantic search result rows ---- */
-.search-result-row {
-    border-radius: 10px;
-    padding: 6px 10px;
-}
-
-.search-result-row:hover {
-    background-color: rgba(139, 92, 246, 0.12);
-}
-
-.search-result-path {
-    color: #c4b5fd;
-    font-size: 13px;
-    font-weight: bold;
-}
-
-.search-result-snippet {
-    color: #70709a;
-    font-size: 11px;
-}
-
-/* ---- Loading stage next to the spinner ---- */
-.stage-label {
-    color: #9090b8;
-    font-size: 12px;
-}
-
-/* ---- Keyboard hint labels ---- */
-.hint-label {
-    color: #50507a;
-    font-size: 11px;
-}
-
-/* ---- Start Ollama button ---- */
-.start-ollama-btn {
-    color: #8b5cf6;
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    border-radius: 8px;
-    background-color: transparent;
-    font-size: 12px;
-    padding: 4px 10px;
-}
-
-.start-ollama-btn:hover {
-    background-color: rgba(139, 92, 246, 0.15);
-}
-"""
 
 # ---------------------------------------------------------------------------
 # System-prompt template
@@ -249,9 +116,6 @@ def _validate_app_name(name: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-_css_loaded = False
-
-
 class IntentBarWindow(Adw.Window):
     """Floating intent bar with streaming AI responses."""
 
@@ -292,16 +156,7 @@ class IntentBarWindow(Adw.Window):
     # ------------------------------------------------------------------
 
     def _apply_css(self) -> None:
-        global _css_loaded
-        if not _css_loaded:
-            provider = Gtk.CssProvider()
-            provider.load_from_data(_CSS)
-            Gtk.StyleContext.add_provider_for_display(
-                self.get_display(),
-                provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
-            _css_loaded = True
+        load_app_css(Path(__file__).with_name("intent-bar.css"), self.get_display())
 
     # ------------------------------------------------------------------
     # UI construction

@@ -1,0 +1,92 @@
+/* Axon installer. Colours come from the design tokens (@axon_*), loaded by
+ * axon_gtk_utils.load_app_css; see theme/tokens/axon-tokens.json. */
+
+.installer-window { background-color: @axon_bg; }
+
+.sidebar {
+    background-color: @axon_surface;
+    border-right: 1px solid @axon_border;
+}
+
+.sidebar-logo { font-size: 40px; color: @axon_accent_text; }
+.sidebar-product { font-size: 18px; font-weight: bold; color: @axon_fg; }
+.sidebar-version { font-size: 11px; color: @axon_fg_muted; }
+
+.step-row { padding: 8px 14px; border-radius: 10px; }
+.step-row-current { background-color: @axon_accent_subtle; }
+.step-label { font-size: 13px; color: @axon_fg_muted; }
+.step-label-current { color: @axon_fg; font-weight: bold; }
+.step-label-done { color: @axon_fg_secondary; }
+.step-dot { font-size: 10px; color: @axon_fg_muted; }
+.step-dot-current { color: @axon_accent_text; }
+.step-dot-done { color: @axon_success; }
+
+.hero-logo { font-size: 64px; color: @axon_accent_text; }
+.hero-title { font-size: 34px; font-weight: bold; color: @axon_fg; }
+.hero-subtitle { font-size: 15px; color: @axon_fg_secondary; }
+.page-title { font-size: 26px; font-weight: bold; color: @axon_fg; }
+.page-subtitle { font-size: 14px; color: @axon_fg_secondary; }
+
+.chip {
+    background-color: @axon_accent_subtle;
+    color: @axon_accent_text;
+    border-radius: 9999px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.ai-hero {
+    background-color: @axon_accent_subtle;
+    border: 1px solid @axon_border;
+    border-radius: 12px;
+    padding: 14px 18px;
+}
+
+.ai-hero-title { font-size: 15px; font-weight: bold; color: @axon_fg; }
+.ai-hero-sub { font-size: 12px; color: @axon_fg_secondary; }
+
+.nav-btn-next {
+    background-color: @axon_accent;
+    color: @axon_accent_fg;
+    border-radius: 9999px;
+    border: none;
+    padding: 10px 30px;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.nav-btn-next:hover { background-color: @axon_accent_hover; }
+.nav-btn-next:disabled { background-color: @axon_surface_raised; color: @axon_fg_muted; }
+
+.nav-btn-back {
+    background-color: transparent;
+    color: @axon_fg_secondary;
+    border: 1px solid @axon_border_strong;
+    border-radius: 9999px;
+    padding: 10px 24px;
+}
+
+.nav-btn-danger {
+    background-color: @axon_error;
+    color: @axon_bg;
+    border-radius: 9999px;
+    border: none;
+    padding: 10px 30px;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.status-online { color: @axon_success; font-size: 13px; font-weight: bold; }
+.status-offline { color: @axon_warning; font-size: 13px; font-weight: bold; }
+.warn-text { color: @axon_warning; font-size: 12px; }
+.error-text { color: @axon_error; font-size: 13px; }
+.muted { color: @axon_fg_muted; font-size: 12px; }
+.summary-value { color: @axon_fg; font-weight: bold; }
+.install-percent { font-size: 44px; font-weight: bold; color: @axon_accent_text; }
+.install-step { font-size: 15px; color: @axon_fg; }
+.install-tip { font-size: 13px; color: @axon_fg_secondary; font-style: italic; }
+.check-icon { font-size: 72px; color: @axon_success; }
+
+progressbar > trough { background-color: @axon_surface_raised; border-radius: 9999px; min-height: 10px; }
+progressbar > trough > progress { background-color: @axon_accent; border-radius: 9999px; min-height: 10px; }
