@@ -159,3 +159,11 @@ def test_escape_stops_stream_then_hides(monkeypatch: pytest.MonkeyPatch) -> None
     win._on_key_pressed(None, escape, 0, None)
     assert not win.get_visible()
     win.destroy()
+
+
+def test_header_uses_symbolic_icons_and_no_duplicate_badge(window: Any) -> None:
+    assert window._clear_btn.get_icon_name() == "user-trash-symbolic"
+    assert not hasattr(window, "_model_badge")
+    bubble = panel_mod.MessageBubble("assistant", "hi")
+    assert bubble._copy_btn.get_icon_name() == "edit-copy-symbolic"
+    assert bubble._copy_btn.get_tooltip_text() == "Copy to clipboard"

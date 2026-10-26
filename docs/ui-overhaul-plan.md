@@ -84,13 +84,16 @@ add a short note under any item you skip or change.
       Stop button while a request is running.
       Note: the Shell bar uses non-streaming `Generate`, which the Brain can't cancel; the
       late reply is dropped instead. The GTK apps also call Brain `CancelStream`.
-- [ ] **AI panel header clutter.** The header shows both a model dropdown and a model badge
+- [x] **AI panel header clutter.** The header shows both a model dropdown and a model badge
       with the same name, plus an unused `spacer`. Keep the dropdown, remove the badge or
       repurpose it as the local/cloud indicator from Phase 3, and remove the spacer.
-- [ ] **Emoji icon buttons.** Replace `🗑`, `⎘` and any other emoji buttons with symbolic
+      Note: badge removed; Phase 3 adds the local/cloud indicator.
+- [x] **Emoji icon buttons.** Replace `🗑`, `⎘` and any other emoji buttons with symbolic
       icons (`user-trash-symbolic`, `edit-copy-symbolic`, ...) and give each an accessible
       label (`btn.update_property([Gtk.AccessibleProperty.LABEL], ["Copy message"])`),
       keeping the tooltips.
+      Note: also fixed the terminal's `✕` dismiss button. Buttons that pair a glyph with
+      text ("← Back", "⬡ AI") were left as they are.
 - [ ] **Errors look like normal answers.** Errors are plain text such as
       `[error] Ollama is not running...` in the normal response colour. Add an `error` style
       (error colour plus an icon) and keep the recovery button next to it (e.g. Start Ollama).

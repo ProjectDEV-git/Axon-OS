@@ -161,10 +161,11 @@ class TerminalWidget(Gtk.Box):
         diag_title.set_hexpand(True)
         diag_header.append(diag_title)
 
-        dismiss_btn = Gtk.Button(label="✕")
+        dismiss_btn = Gtk.Button.new_from_icon_name("window-close-symbolic")
         dismiss_btn.add_css_class("flat")
         dismiss_btn.add_css_class("diagnosis-dismiss")
         dismiss_btn.set_tooltip_text("Dismiss")
+        dismiss_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Dismiss diagnosis"])
         dismiss_btn.connect("clicked", lambda _b: self._hide_diagnosis())
         diag_header.append(dismiss_btn)
         diag_frame.append(diag_header)

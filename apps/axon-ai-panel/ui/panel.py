@@ -162,10 +162,11 @@ class MessageBubble(Gtk.Box):
         # Copy button row
         btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         btn_row.set_halign(Gtk.Align.END)
-        self._copy_btn = Gtk.Button(label="⎘")
+        self._copy_btn = Gtk.Button.new_from_icon_name("edit-copy-symbolic")
         self._copy_btn.add_css_class("copy-btn")
         self._copy_btn.add_css_class("flat")
         self._copy_btn.set_tooltip_text("Copy to clipboard")
+        self._copy_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Copy message"])
         self._copy_btn.connect("clicked", self._on_copy_clicked)
         btn_row.append(self._copy_btn)
         self._inner.append(btn_row)
@@ -286,15 +287,6 @@ class AIPanelWindow(Adw.Window):
         color: #e8e8f4;
         padding: 11px 15px;
     }
-    .model-badge {
-        background: linear-gradient(135deg, #9d6ff8 0%, #8b5cf6 100%);
-        border-radius: 9999px;
-        color: white;
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 11px;
-        box-shadow: 0 2px 6px rgba(139, 92, 246, 0.35);
-    }
     .thinking-label {
         color: #8b5cf6;
         font-size: 13px;
@@ -412,10 +404,6 @@ class AIPanelWindow(Adw.Window):
         title_label.set_hexpand(True)
         title_label.set_xalign(0.0)
 
-        # Spacer
-        spacer = Gtk.Box()
-        spacer.set_hexpand(True)
-
         # Model dropdown
         self._model_store = Gtk.StringList()
         for m in self._DEFAULT_MODELS:
@@ -425,21 +413,20 @@ class AIPanelWindow(Adw.Window):
         self._model_dropdown.set_selected(0)
         self._model_dropdown.connect("notify::selected", self._on_model_changed)
 
+        self._model_dropdown.set_tooltip_text("Model")
+        self._model_dropdown.update_property([Gtk.AccessibleProperty.LABEL], ["Model"])
+
         # Clear history button
-        self._clear_btn = Gtk.Button(label="🗑")
+        self._clear_btn = Gtk.Button.new_from_icon_name("user-trash-symbolic")
         self._clear_btn.add_css_class("clear-btn")
         self._clear_btn.add_css_class("flat")
         self._clear_btn.set_tooltip_text("Clear conversation")
+        self._clear_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Clear conversation"])
         self._clear_btn.connect("clicked", self._on_clear_clicked)
-
-        # Model badge
-        self._model_badge = Gtk.Label(label=self._client.model)
-        self._model_badge.add_css_class("model-badge")
 
         header.append(title_label)
         header.append(self._model_dropdown)
         header.append(self._clear_btn)
-        header.append(self._model_badge)
         root.append(header)
 
         # ---- Quick action chips --------------------------------------------
@@ -565,7 +552,6 @@ class AIPanelWindow(Adw.Window):
         if selected_item is not None:
             model_name: str = selected_item.get_string()
             self._client.model = model_name
-            self._model_badge.set_label(model_name)
 
     # ------------------------------------------------------------------
     # Keyboard
