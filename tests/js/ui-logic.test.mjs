@@ -164,3 +164,14 @@ test('model origin matches the Python twin', async () => {
     assert.equal(m.routingOrigin('', {...tiers, deep_model: '@openai/gpt-4.1'}, providers).kind, 'cloud');
     assert.equal(m.routingOrigin('', {}, null).label, 'Model: unknown');
 });
+
+test('confirmArgv passes the exact command as its own argument', async () => {
+    const {confirmArgv} = await import('./ui-logic.mjs');
+    const card = confirmArgv('ls -la', 'You said: list', '/usr/lib/axon/apps/axon-confirm/main.py');
+    assert.equal(card[card.indexOf('--command') + 1], 'ls -la');
+    assert.equal(card[card.indexOf('--context') + 1], 'You said: list');
+    const zen = confirmArgv('ls -la', '', null);
+    assert.equal(zen[0], 'zenity');
+    assert.ok(zen.includes('--no-markup'));
+    assert.ok(zen.at(-1).includes('ls -la'));
+});

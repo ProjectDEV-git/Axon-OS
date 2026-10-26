@@ -79,3 +79,21 @@ def test_privacy_switches_write_context_settings(tmp_path: Path) -> None:
     assert loaded.share_context is False
     assert not win._context_switches["share_open_files"].get_sensitive()
     win.destroy()
+
+
+def test_always_allowed_commands_listed_and_cleared(tmp_path: Path) -> None:
+    import command_approvals
+
+    path = tmp_path / "approved.json"
+    command_approvals.add_approval("df -h", path)
+    command_approvals.add_approval("uptime", path)
+    win = prefs.PreferencesWindow(
+        shell_settings=memory_settings(), context_path=tmp_path / "c.json", approvals_path=path
+    )
+    assert [r.get_title() for r in win._approval_rows] == ["uptime", "df -h"]
+    win._remove_approval("uptime")
+    assert command_approvals.load_approvals(path) == ["df -h"]
+    win._clear_approvals()
+    assert command_approvals.load_approvals(path) == []
+    assert [r.get_title() for r in win._approval_rows] == ["None"]
+    win.destroy()

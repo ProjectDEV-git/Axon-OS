@@ -37,6 +37,7 @@ from axon_gtk_utils import monitor_size
 from ui_logic import (
     EXAMPLE_PROMPTS,
     SHOW,
+    STAGE_CONFIRM,
     STAGE_CONNECTING,
     STAGE_SEARCHING,
     STAGE_WAITING,
@@ -732,7 +733,11 @@ class IntentBarWindow(Adw.Window):
 
         action = parse_action(full)
         if action is not None:
-            self._set_response(describe_action(action))
+            if action.get("action") == "run_command":
+                # The confirmation card opens next; nothing runs without it
+                self._set_response(f"{STAGE_CONFIRM}: {action.get('command', '')}")
+            else:
+                self._set_response(describe_action(action))
             self._execute_action(action)
             return False
         body, error = split_error(full)

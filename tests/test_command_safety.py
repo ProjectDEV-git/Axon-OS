@@ -114,7 +114,13 @@ class TestAICommandConfirmation:
             assert service_utils.confirm_and_exec("ls -la") is not None
             mock_popen.assert_called_once()
             assert mock_popen.call_args[0][0] == ["ls", "-la"]
-            assert "--no-markup" in mock_run.call_args[0][0]
+            # The command is shown as plain text: its own argument to the Axon
+            # card, or zenity with --no-markup when the card isn't installed
+            argv = mock_run.call_args[0][0]
+            if "--command" in argv:
+                assert argv[argv.index("--command") + 1] == "ls -la"
+            else:
+                assert "--no-markup" in argv
 
     def test_blocked_command_never_prompts(self):
         from services import service_utils
@@ -122,3 +128,63 @@ class TestAICommandConfirmation:
         with patch.object(service_utils.subprocess, "run") as mock_run:
             assert service_utils.confirm_and_exec("rm -rf /") is None
             mock_run.assert_not_called()
+
+
+class TestConfirmationCard:
+    """The Axon card replaces zenity but keeps every fail-closed rule."""
+
+    def test_card_gets_exact_command_as_its_own_argument(self):
+        from services import service_utils
+
+        argv = service_utils._confirm_argv("ls -la", 60, "You said: list")
+        assert argv[argv.index("--command") + 1] == "ls -la"
+        assert argv[argv.index("--context") + 1] == "You said: list"
+        assert argv[1].endswith("axon-confirm/main.py")
+
+    def test_zenity_fallback_keeps_no_markup(self):
+        from services import service_utils
+
+        with patch.object(service_utils, "_confirm_card", return_value=None):
+            argv = service_utils._confirm_argv("ls -la", 30, "")
+        assert argv[0] == "zenity" and "--no-markup" in argv and "--timeout=30" in argv
+
+    def test_timeout_counts_as_no(self):
+        import subprocess
+
+        from services import service_utils
+
+        with (
+            patch.object(
+                service_utils.subprocess, "run", side_effect=subprocess.TimeoutExpired("x", 1)
+            ),
+            patch.object(service_utils.subprocess, "Popen") as mock_popen,
+        ):
+            assert service_utils.confirm_and_exec("ls -la") is None
+            mock_popen.assert_not_called()
+
+    def test_closed_or_crashed_card_counts_as_no(self):
+        from services import service_utils
+
+        for code in (1, 2, -9, 10):
+            with (
+                patch.object(
+                    service_utils.subprocess, "run", return_value=MagicMock(returncode=code)
+                ),
+                patch.object(service_utils.subprocess, "Popen") as mock_popen,
+            ):
+                assert service_utils.confirm_and_exec("ls -la") is None
+                mock_popen.assert_not_called()
+
+
+def test_shell_allowlist_matches_python() -> None:
+    """ai-actions.js must allow exactly what services/service_utils.py allows."""
+    import re
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "shell/axon-shell/ai-actions.js").read_text(
+        encoding="utf-8"
+    )
+    block = re.search(r"ALLOWED_BINARIES = new Set\(\[(.*?)\]\)", src, re.DOTALL)
+    assert block, "ALLOWED_BINARIES not found"
+    js_allowed = set(re.findall(r"'([^']+)'", block.group(1)))
+    assert js_allowed == ALLOWED_COMMANDS

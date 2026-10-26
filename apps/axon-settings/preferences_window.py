@@ -28,6 +28,7 @@ for _base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().pare
     if (_base / "services").is_dir():
         sys.path.insert(0, str(_base / "services"))
         break
+import command_approvals
 import context_settings
 
 
@@ -38,6 +39,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         self,
         shell_settings: Gio.Settings | None = None,
         context_path: Path | None = None,
+        approvals_path: Path | None = None,
         **kwargs: object,
     ) -> None:
         super().__init__(**kwargs)
@@ -45,6 +47,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         fit_default_size(self, 560, 620)
         self._shell = shell_settings if shell_settings is not None else load_shell_settings()
         self._context_path = context_path or context_settings.CONFIG_PATH
+        self._approvals_path = approvals_path or command_approvals.APPROVALS_PATH
 
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(Adw.HeaderBar())
@@ -53,6 +56,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         self._page = Adw.PreferencesPage()
         toolbar.set_content(self._page)
         self._page.add(self._build_privacy_group())
+        self._page.add(self._build_approvals_group())
         self._page.add(self._build_spaces_group())
 
     # -- Privacy: what context the AI receives ------------------------------
@@ -97,6 +101,55 @@ class PreferencesWindow(Adw.ApplicationWindow):
             )
         except OSError:
             pass  # read-only home: the switches still show the choice
+
+    # -- Commands that run without asking ---------------------------------
+
+    def _build_approvals_group(self) -> Adw.PreferencesGroup:
+        self._approvals_group = Adw.PreferencesGroup(
+            title="Commands that run without asking",
+            description="Read-only commands you chose to “Always allow” on the "
+            "confirmation card. Everything else always asks.",
+        )
+        clear = Gtk.Button(label="Clear All")
+        clear.add_css_class("flat")
+        clear.set_valign(Gtk.Align.CENTER)
+        clear.connect("clicked", lambda _b: self._clear_approvals())
+        self._approvals_group.set_header_suffix(clear)
+        self._approval_rows: list[Gtk.Widget] = []
+        self._refresh_approvals()
+        return self._approvals_group
+
+    def _refresh_approvals(self) -> None:
+        for row in self._approval_rows:
+            self._approvals_group.remove(row)
+        self._approval_rows = []
+        commands = command_approvals.load_approvals(self._approvals_path)
+        if not commands:
+            empty = Adw.ActionRow(title="None")
+            self._approvals_group.add(empty)
+            self._approval_rows.append(empty)
+            return
+        for command in commands:
+            row = Adw.ActionRow(title=command)
+            row.set_use_markup(False)
+            row.add_css_class("monospace")
+            remove = Gtk.Button.new_from_icon_name("user-trash-symbolic")
+            remove.add_css_class("flat")
+            remove.set_valign(Gtk.Align.CENTER)
+            remove.set_tooltip_text("Ask again for this command")
+            remove.update_property([Gtk.AccessibleProperty.LABEL], [f"Stop allowing {command}"])
+            remove.connect("clicked", lambda _b, c=command: self._remove_approval(c))
+            row.add_suffix(remove)
+            self._approvals_group.add(row)
+            self._approval_rows.append(row)
+
+    def _remove_approval(self, command: str) -> None:
+        command_approvals.remove_approval(command, self._approvals_path)
+        self._refresh_approvals()
+
+    def _clear_approvals(self) -> None:
+        command_approvals.clear_approvals(self._approvals_path)
+        self._refresh_approvals()
 
     # -- Spaces ------------------------------------------------------------
 

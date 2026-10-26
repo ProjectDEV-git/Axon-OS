@@ -90,7 +90,7 @@ no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 ignore_missing_imports = true
-exclude = ["tests/", "build/", "dist/", "apps/axon-ai-panel/", "apps/axon-files/", "apps/axon-installer/", "apps/axon-settings/", "apps/axon-shortcuts/", "apps/axon-terminal/", "apps/axon-welcome/", "apps/intent-bar/"]
+exclude = ["tests/", "build/", "dist/", "apps/axon-ai-panel/", "apps/axon-confirm/", "apps/axon-files/", "apps/axon-installer/", "apps/axon-settings/", "apps/axon-shortcuts/", "apps/axon-terminal/", "apps/axon-welcome/", "apps/intent-bar/"]
 
 [[tool.mypy.overrides]]
 module = ["gi.*", "dbus.*"]

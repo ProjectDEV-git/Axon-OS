@@ -2,12 +2,15 @@
 //
 // Every command the model proposes is checked against the same allowlist as
 // services/service_utils.py (ALLOWED_COMMANDS) and runs only after the user
-// approves it in a confirmation dialog. Apps launch only by desktop ID; a
-// string from the model is never executed as a command line.
+// approves it on the Axon confirmation card (zenity if the card is missing).
+// Apps launch only by desktop ID; a string from the model is never executed
+// as a command line.
 
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
+
+import {confirmArgv} from './ui-logic.js';
 
 // Keep in sync with ALLOWED_COMMANDS in services/service_utils.py
 const ALLOWED_BINARIES = new Set([
@@ -40,10 +43,18 @@ export function parseAllowedCommand(command) {
     return argv;
 }
 
+// The Axon confirmation card (apps/axon-confirm): exact command, risk level,
+// effects, Allow once / Cancel. Same program as service_utils.confirm_command.
+const CONFIRM_CARD_PATHS = [
+    GLib.build_filenamev([GLib.get_home_dir(), '.local', 'share', 'axon-os', 'axon-confirm', 'main.py']),
+    '/usr/lib/axon/apps/axon-confirm/main.py',
+];
+
 /**
  * Ask the user to approve an AI-proposed command, then run it.
  *
- * Fails closed: a blocked command, a missing dialog or a cancel runs nothing.
+ * Fails closed: a blocked command, a missing dialog, Cancel, closing the
+ * card, its timeout or any error runs nothing. Only exit status 0 runs it.
  *
  * @param {string} command - command line proposed by the model
  * @param {string} [context] - optional extra line shown above the command
@@ -55,14 +66,10 @@ export function confirmAndRun(command, context = '') {
         console.warn(`Axon: blocked AI command not in allowlist: ${command}`);
         return false;
     }
-    const text = `${context ? `${context}\n\n` : ''}Axon AI wants to run this command:\n\n${command.trim()}\n\nRun it?`;
+    const cardPath = CONFIRM_CARD_PATHS.find(p => GLib.file_test(p, GLib.FileTest.EXISTS)) ?? null;
     try {
         const confirmProc = new Gio.Subprocess({
-            argv: [
-                'zenity', '--question', '--no-markup', '--no-wrap',
-                '--title=Axon AI', '--ok-label=Run', '--cancel-label=Cancel',
-                '--text', text,
-            ],
+            argv: confirmArgv(command.trim(), context, cardPath),
             flags: Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE,
         });
         confirmProc.init(null);

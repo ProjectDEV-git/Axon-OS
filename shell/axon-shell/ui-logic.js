@@ -485,3 +485,27 @@ export function routingOrigin(modelId, tiers = {}, providers = null) {
         .reduce((a, b) => (ORIGIN_RANK[b.kind] > ORIGIN_RANK[a.kind] ? b : a));
     return worst.kind === 'local' ? modelOrigin(general, providers) : worst;
 }
+
+// ── Command confirmation ────────────────────────────────────────────────────
+
+/**
+ * Command line for the confirmation dialog: the Axon card, else zenity.
+ * The command is always its own argument and shown as plain text.
+ *
+ * @param {string} command - the exact command
+ * @param {string} context - optional line shown above it
+ * @param {string|null} cardPath - path to the card, or null for zenity
+ * @returns {string[]}
+ */
+export function confirmArgv(command, context, cardPath) {
+    if (cardPath) {
+        const argv = ['python3', cardPath, '--command', command, '--timeout', '60'];
+        return context ? [...argv, '--context', context] : argv;
+    }
+    const text = `${context ? `${context}\n\n` : ''}Axon AI wants to run this command:\n\n${command}\n\nRun it?`;
+    return [
+        'zenity', '--question', '--no-markup', '--no-wrap',
+        '--title=Axon AI', '--ok-label=Run', '--cancel-label=Cancel', '--timeout=60',
+        '--text', text,
+    ];
+}

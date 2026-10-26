@@ -191,7 +191,7 @@ add a short note under any item you skip or change.
       Note: the dialog offers Cancel (also on close), Send Without It and Send; Send is
       remembered for the conversation. Until the user has been warned, a model that leaves
       the computer never receives clipboard, terminal or file context.
-- [ ] **Command confirmation card.** Replace the `zenity` question (and the Shell's
+- [x] **Command confirmation card.** Replace the `zenity` question (and the Shell's
       "Asking before running: …" text) with an Axon-styled confirmation showing: the exact
       command, what it affects where known, whether it needs admin rights, a risk level
       (pure helper with tests: e.g. read-only / changes files / needs root), and
@@ -200,6 +200,12 @@ add a short note under any item you skip or change.
       "Always allow" is allowed only for an exact command string at the lowest risk level,
       stored in a list the user can view and clear in Settings, and never for commands
       that need root or delete files.
+      Note: the card is a small program, `apps/axon-confirm/main.py`, run like zenity was
+      (exit 0 = run; Cancel, close, timeout, error = no). It re-checks the allowlist itself.
+      Risk levels come from `services/command_risk.py`; "Always allow" lives in
+      `services/command_approvals.py` and is re-checked on every use. zenity stays as the
+      fallback when the card isn't installed. A test now checks the Shell and Python
+      allowlists are identical.
 - [ ] **Axon status surface.** Add one place (a Shell top-bar indicator/popover, or a
       section at the top of the AI panel) showing: Brain service, Ollama, active model,
       model download progress if available, semantic index progress if available, voice
