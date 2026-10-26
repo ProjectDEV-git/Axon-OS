@@ -322,7 +322,11 @@ add a short note under any item you skip or change.
       Note: GTK uses `announce()` (GTK 4.14+), only when the AT-SPI bus answers, because
       4.14 segfaults without one (reproduced under Xvfb). The Shell uses the NOTIFICATION-role
       trick from `a11y.js`. Neither was checked with Orca.
-- [ ] Text scaling: layouts survive 1.25× and 1.5× "Large Text".
+- [x] Text scaling: layouts survive 1.25× and 1.5× "Large Text".
+      Note: font sizes were in px, which GTK and St don't scale with Large Text (measured:
+      a 13px label stayed 96 px wide at 1.5×), so app CSS and the Shell tokens now use pt.
+      The Intent Bar's chip and hint rows wrap. A GTK test checks the panel and Intent Bar
+      still fit at 1.25× and 1.5×. The Shell at large text was not checked in a real session.
 - [ ] Status shown with icon or text as well as colour.
 
 ### Translation

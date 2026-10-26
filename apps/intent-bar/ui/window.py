@@ -105,6 +105,17 @@ _RESPONSE_MAX_HEIGHT = 320  # px; longer answers scroll
 _SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
+def _wrapping_row(spacing: int) -> Gtk.FlowBox:
+    """A row of small widgets that wraps onto more lines when space runs out."""
+    row = Gtk.FlowBox()
+    row.set_selection_mode(Gtk.SelectionMode.NONE)
+    row.set_column_spacing(spacing)
+    row.set_row_spacing(4)
+    row.set_max_children_per_line(12)
+    row.set_homogeneous(False)
+    return row
+
+
 def _installed_apps() -> list[tuple[str, str, str]]:
     """Visible installed apps as ``(desktop id, name, keywords)``."""
     apps = []
@@ -270,7 +281,8 @@ class IntentBarWindow(Adw.Window):
         root.append(sep2)
 
         # ---- Row 5: quick-action chips ----------------------------------
-        chips_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        # FlowBox so the chips wrap with Large Text instead of widening the bar
+        chips_row = _wrapping_row(spacing=8)
         chips_row.set_margin_bottom(8)
         root.append(chips_row)
 
@@ -342,7 +354,7 @@ class IntentBarWindow(Adw.Window):
         self._build_empty_state()
 
         # ---- Row 7: keyboard hint row -----------------------------------
-        hint_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        hint_row = _wrapping_row(spacing=16)
         hint_row.set_margin_top(4)
         root.append(hint_row)
 

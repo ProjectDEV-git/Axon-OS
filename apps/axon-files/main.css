@@ -86,18 +86,18 @@
 }
 
 .file-name-label {
-    font-size: 14px;
+    font-size: 10.5pt;
     font-weight: bold;
     color: @axon_fg;
 }
 
 .file-path-label {
-    font-size: 11px;
+    font-size: 8.25pt;
     color: @axon_fg_muted;
 }
 
 .file-meta-label {
-    font-size: 12px;
+    font-size: 9pt;
     color: @axon_fg_secondary;
 }
 
@@ -109,14 +109,14 @@
 }
 
 .preview-title {
-    font-size: 18px;
+    font-size: 13.5pt;
     font-weight: bold;
     color: @axon_fg;
     margin-bottom: 8px;
 }
 
 .preview-meta {
-    font-size: 12px;
+    font-size: 9pt;
     color: @axon_fg_secondary;
     margin-bottom: 16px;
 }
@@ -127,7 +127,7 @@
     border: 1px solid @axon_border;
     padding: 12px;
     font-family: monospace;
-    font-size: 12px;
+    font-size: 9pt;
     color: @axon_fg_secondary;
 }
 
@@ -136,7 +136,7 @@
     background-color: @axon_surface_raised;
     color: @axon_success;
     font-weight: bold;
-    font-size: 11px;
+    font-size: 8.25pt;
     padding: 2px 8px;
     border-radius: 9999px;
     border: 1px solid @axon_border;
@@ -145,7 +145,7 @@
 .badge-type {
     background-color: @axon_surface_raised;
     color: @axon_fg_secondary;
-    font-size: 10px;
+    font-size: 7.5pt;
     padding: 2px 6px;
     border-radius: 4px;
     border: 1px solid @axon_border;
@@ -159,7 +159,7 @@
     border-radius: 9999px;
     padding: 6px 12px;
     font-weight: bold;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 .sync-btn:hover {
@@ -169,7 +169,7 @@
 
 .ai-toggle-btn {
     border-radius: 9999px;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: bold;
 }
 

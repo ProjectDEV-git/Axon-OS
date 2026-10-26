@@ -272,7 +272,7 @@
 }
 
 .axon-ai-indicator-dot {
-    font-size: 10px;
+    font-size: 7.5pt;
 }
 
 /* ── Start Menu (size is set from JS to fit the work area) ──────────────── */
@@ -535,7 +535,7 @@
 
 /* The dot takes the Space's own colour from JS; the label carries the name */
 .axon-space-dot {
-    font-size: 10px;
+    font-size: 7.5pt;
 }
 
 .axon-space-label {

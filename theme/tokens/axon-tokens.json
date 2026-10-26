@@ -1,17 +1,17 @@
 {
-  "$comment": "Axon OS design tokens: the single source for colours, spacing, radii, type, shadows, focus ring and motion. Edit this file, then run: python3 scripts/gen_tokens.py",
+  "$comment": "Axon OS design tokens: the single source for colours, spacing, radii, type, shadows, focus ring and motion. Edit this file, then run: python3 scripts/gen_tokens.py Font sizes are in pt so they follow GNOME's Large Text setting (px does not).",
   "font": {
     "family": "\"Inter\", \"Cantarell\", \"Ubuntu\", system-ui, sans-serif",
     "mono": "\"JetBrains Mono\", \"Ubuntu Mono\", \"DejaVu Sans Mono\", monospace"
   },
   "font_size": {
-    "xs": "11px",
-    "sm": "12px",
-    "md": "13px",
-    "lg": "15px",
-    "xl": "20px",
-    "xxl": "28px",
-    "display": "48px"
+    "xs": "8pt",
+    "sm": "9pt",
+    "md": "10pt",
+    "lg": "11pt",
+    "xl": "15pt",
+    "xxl": "21pt",
+    "display": "36pt"
   },
   "font_weight": {
     "regular": "400",

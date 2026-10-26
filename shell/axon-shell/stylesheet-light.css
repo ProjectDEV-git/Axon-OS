@@ -14,7 +14,7 @@
 
 .axon-hint-label {
     color: #5e5e74;
-    font-size: 11px;
+    font-size: 8pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
@@ -39,7 +39,7 @@
     border: 1px solid rgba(0, 0, 0, 0.12);
     color: #52526a;
     padding: 4px 12px;
-    font-size: 12px;
+    font-size: 9pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     transition-duration: 100ms;
 }
@@ -72,7 +72,7 @@
 .axon-intentbar-input StEntry {
     background-color: transparent;
     color: #1e1e28;
-    font-size: 20px;
+    font-size: 15pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     border: none;
     border-radius: 0;
@@ -92,7 +92,7 @@
 /* Where the model runs: AI-related, so it may use the accent */
 .axon-origin-label {
     color: #6d28d9;
-    font-size: 11px;
+    font-size: 8pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     margin-bottom: 8px;
 }
@@ -122,7 +122,7 @@
     padding: 6px 8px;
     color: #1e1e28;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
-    font-size: 13px;
+    font-size: 10pt;
     text-align: left;
 }
 
@@ -150,7 +150,7 @@
 
 .axon-response {
     color: #1e1e28;
-    font-size: 13px;
+    font-size: 10pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
@@ -233,7 +233,7 @@
 
 .axon-taskbar-clock {
     color: #1e1e28;
-    font-size: 11px;
+    font-size: 8pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 500;
     text-align: center;
@@ -245,7 +245,7 @@
     border: 1px solid rgba(0, 0, 0, 0.12);
     border-radius: 6px;
     color: #1e1e28;
-    font-size: 11px;
+    font-size: 8pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 500;
     padding: 4px 8px;
@@ -271,12 +271,12 @@
 .axon-ai-indicator-icon {
     color: #6d28d9;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: 600;
 }
 
 .axon-ai-indicator-dot {
-    font-size: 10px;
+    font-size: 7.5pt;
 }
 
 /* ── Start Menu (size is set from JS to fit the work area) ──────────────── */
@@ -308,7 +308,7 @@
     border: none;
     box-shadow: none;
     color: #1e1e28;
-    font-size: 15px;
+    font-size: 11pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
@@ -319,7 +319,7 @@
 
 .axon-startmenu-section-title {
     color: #52526a;
-    font-size: 11px;
+    font-size: 8pt;
     font-weight: 700;
     margin-bottom: 12px;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
@@ -354,7 +354,7 @@
 
 .axon-startmenu-app-label {
     color: #1e1e28;
-    font-size: 11px;
+    font-size: 8pt;
     margin-top: 6px;
     text-align: center;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
@@ -383,7 +383,7 @@
 
 .axon-startmenu-file-label {
     color: #1e1e28;
-    font-size: 12px;
+    font-size: 9pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
 
@@ -393,7 +393,7 @@
 
 .axon-startmenu-no-files {
     color: #5e5e74;
-    font-size: 12px;
+    font-size: 9pt;
     padding: 8px;
     font-style: italic;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
@@ -415,7 +415,7 @@
 
 .axon-startmenu-username {
     color: #1e1e28;
-    font-size: 13px;
+    font-size: 10pt;
     font-weight: 600;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }
@@ -450,13 +450,13 @@
 
 /* The number takes the Space's own colour from JS (user data) */
 .axon-space-osd-number {
-    font-size: 48px;
+    font-size: 36pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 700;
 }
 
 .axon-space-osd-name {
-    font-size: 20px;
+    font-size: 15pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     font-weight: 600;
     color: #1e1e28;
@@ -464,14 +464,14 @@
 }
 
 .axon-space-osd-index {
-    font-size: 12px;
+    font-size: 9pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     color: #52526a;
     margin-top: 6px;
 }
 
 .axon-space-osd-summary {
-    font-size: 13px;
+    font-size: 10pt;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     color: #52526a;
     margin-top: 8px;
@@ -492,7 +492,7 @@
     border-bottom: 2px solid transparent;
     color: #52526a;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 .axon-space-chip:hover {
@@ -521,7 +521,7 @@
 }
 
 .axon-space-chip-badge {
-    font-size: 11px;
+    font-size: 8pt;
     margin-left: 2px;
     color: #52526a;
 }
@@ -539,13 +539,13 @@
 
 /* The dot takes the Space's own colour from JS; the label carries the name */
 .axon-space-dot {
-    font-size: 10px;
+    font-size: 7.5pt;
 }
 
 .axon-space-label {
     color: #1e1e28;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 /* ── Dock context menu (AI predicted actions) ───────────────────────────── */
@@ -564,7 +564,7 @@
     padding: 8px 16px;
     border-radius: 6px;
     color: #1e1e28;
-    font-size: 13px;
+    font-size: 10pt;
     font-weight: 500;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
     text-align: left;
@@ -583,7 +583,7 @@
 .axon-dock-menu-title {
     padding: 6px 16px;
     color: #52526a;
-    font-size: 11px;
+    font-size: 8pt;
     font-weight: 700;
     font-family: "Inter", "Cantarell", "Ubuntu", system-ui, sans-serif;
 }

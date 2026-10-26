@@ -13,7 +13,7 @@
 .intent-entry {
     background-color: transparent;
     color: @axon_fg;
-    font-size: 20px;
+    font-size: 15pt;
     caret-color: @axon_accent_text;
     border: none;
     padding: 8px 4px;
@@ -39,7 +39,7 @@
     border: 1px solid @axon_border;
     border-radius: 9999px;
     padding: 4px 12px;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 .intent-chip:hover {
@@ -50,7 +50,7 @@
 /* ---- Response text ---- */
 .response-label {
     color: @axon_fg;
-    font-size: 13px;
+    font-size: 9.75pt;
 }
 
 /* ---- Errors: colour plus an icon, never colour alone ---- */
@@ -68,7 +68,7 @@
     color: @axon_fg_secondary;
     border-radius: 9999px;
     padding: 2px 10px;
-    font-size: 11px;
+    font-size: 8.25pt;
     font-weight: bold;
 }
 
@@ -78,7 +78,7 @@
     color: @axon_accent_text;
     border-radius: 9999px;
     padding: 2px 10px;
-    font-size: 11px;
+    font-size: 8.25pt;
 }
 
 /* ---- Semantic search result rows ---- */
@@ -93,25 +93,25 @@
 
 .search-result-path {
     color: @axon_fg;
-    font-size: 13px;
+    font-size: 9.75pt;
     font-weight: bold;
 }
 
 .search-result-snippet {
     color: @axon_fg_secondary;
-    font-size: 11px;
+    font-size: 8.25pt;
 }
 
 /* ---- Loading stage next to the spinner ---- */
 .stage-label {
     color: @axon_fg_secondary;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 /* ---- Keyboard hint labels ---- */
 .hint-label {
     color: @axon_fg_muted;
-    font-size: 11px;
+    font-size: 8.25pt;
 }
 
 /* ---- Start Ollama button ---- */
@@ -120,7 +120,7 @@
     border: 1px solid @axon_border_strong;
     border-radius: 8px;
     background-color: transparent;
-    font-size: 12px;
+    font-size: 9pt;
     padding: 4px 10px;
 }
 

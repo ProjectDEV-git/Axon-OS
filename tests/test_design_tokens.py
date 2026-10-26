@@ -69,8 +69,10 @@ def test_text_on_accent_and_focus_ring(variant: str) -> None:
 
 
 def test_scales_are_px_or_ms() -> None:
-    for group in ("font_size", "space", "radius"):
+    for group in ("space", "radius"):
         assert all(re.fullmatch(r"\d+px", v) for v in TOKENS[group].values()), group
+    # pt, not px: px font sizes don't follow GNOME's Large Text setting
+    assert all(re.fullmatch(r"\d+pt", v) for v in TOKENS["font_size"].values())
     assert all(re.fullmatch(r"\d+ms", v) for v in TOKENS["duration"].values())
 
 
@@ -140,3 +142,11 @@ def test_focusable_shell_widgets_have_a_focus_ring() -> None:
     ):
         rule = re.search(rf"\.{cls}:focus[^{{]*\{{\n(.*?)\n\}}", template, re.DOTALL)
         assert rule and "{{color.focus_ring}}" in rule.group(1), cls
+
+
+def test_app_css_font_sizes_scale_with_large_text() -> None:
+    for css in (ROOT / "apps").rglob("*.css"):
+        text = css.read_text()
+        assert not re.search(r"font-size:\s*[\d.]+px", text), f"{css}: use pt so Large Text works"
+    template = (ROOT / "shell" / "axon-shell" / "stylesheet.css.in").read_text()
+    assert not re.search(r"font-size:\s*[\d.]+px", template)

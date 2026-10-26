@@ -6,18 +6,18 @@
 }
 
 .hero-logo {
-    font-size: 52px;
+    font-size: 39pt;
     color: @axon_accent_text;
 }
 
 .hero-title {
-    font-size: 32px;
+    font-size: 24pt;
     font-weight: bold;
     color: @axon_fg;
 }
 
 .hero-subtitle {
-    font-size: 16px;
+    font-size: 12pt;
     color: @axon_fg_secondary;
 }
 
@@ -26,7 +26,7 @@
     color: @axon_accent_text;
     border-radius: 9999px;
     padding: 4px 14px;
-    font-size: 12px;
+    font-size: 9pt;
     font-weight: bold;
 }
 
@@ -35,7 +35,7 @@
     color: @axon_fg_secondary;
     border-radius: 8px;
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 9pt;
     border: 1px solid @axon_border;
     margin-bottom: 12px;
 }
@@ -48,29 +48,29 @@
 }
 
 .model-name {
-    font-size: 14px;
+    font-size: 10.5pt;
     font-weight: bold;
     color: @axon_fg;
 }
 
 .model-desc {
-    font-size: 12px;
+    font-size: 9pt;
     color: @axon_fg_secondary;
 }
 
 .model-size {
-    font-size: 11px;
+    font-size: 8.25pt;
     color: @axon_fg_muted;
 }
 
 .page-title {
-    font-size: 24px;
+    font-size: 18pt;
     font-weight: bold;
     color: @axon_fg;
 }
 
 .page-subtitle {
-    font-size: 14px;
+    font-size: 10.5pt;
     color: @axon_fg_secondary;
 }
 
@@ -80,7 +80,7 @@
     border-radius: 9999px;
     border: none;
     padding: 10px 28px;
-    font-size: 15px;
+    font-size: 11.25pt;
 }
 
 .nav-btn-next:hover {
@@ -96,7 +96,7 @@
 }
 
 .page-indicator-dot {
-    font-size: 8px;
+    font-size: 6pt;
     color: @axon_fg_muted;
 }
 
@@ -105,16 +105,16 @@
 }
 
 .check-icon {
-    font-size: 64px;
+    font-size: 48pt;
     color: @axon_success;
 }
 
 .status-online {
     color: @axon_success;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 .status-offline {
     color: @axon_error;
-    font-size: 12px;
+    font-size: 9pt;
 }

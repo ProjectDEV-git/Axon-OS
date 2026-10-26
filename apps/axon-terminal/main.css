@@ -20,7 +20,7 @@ window {
     border-radius: 8px;
     padding: 4px 12px;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 .ai-toggle-btn:hover {
@@ -63,12 +63,12 @@ tabbar tab:hover:not(:selected) {
 .diagnosis-title {
     color: @axon_accent_text;
     font-weight: 700;
-    font-size: 13px;
+    font-size: 9.75pt;
 }
 
 .diagnosis-text {
     color: @axon_fg;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 .diagnosis-dismiss {
@@ -89,7 +89,7 @@ tabbar tab:hover:not(:selected) {
     border: 1px solid @axon_border;
     border-radius: 9999px;
     padding: 3px 12px;
-    font-size: 11px;
+    font-size: 8.25pt;
     font-family: monospace;
 }
 
@@ -107,7 +107,7 @@ tabbar tab:hover:not(:selected) {
 
 .nl-icon {
     color: @axon_accent_text;
-    font-size: 16px;
+    font-size: 12pt;
     font-weight: 700;
 }
 
@@ -126,7 +126,7 @@ tabbar tab:hover:not(:selected) {
 .nl-preview {
     color: @axon_success;
     font-family: monospace;
-    font-size: 12px;
+    font-size: 9pt;
     padding: 4px 12px;
     margin-left: 28px;
 }

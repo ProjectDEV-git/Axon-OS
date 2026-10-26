@@ -39,24 +39,24 @@
 
 .origin-label {
     color: @axon_fg_secondary;
-    font-size: 11px;
+    font-size: 8.25pt;
     margin-bottom: 4px;
 }
 
 .context-title {
     color: @axon_fg_secondary;
-    font-size: 11px;
+    font-size: 8.25pt;
 }
 
 .context-chip {
-    font-size: 11px;
+    font-size: 8.25pt;
     padding: 0 6px;
     min-height: 22px;
 }
 
 .thinking-label {
     color: @axon_accent_text;
-    font-size: 13px;
+    font-size: 9.75pt;
     font-style: italic;
 }
 
@@ -69,7 +69,7 @@
 .copy-btn {
     background-color: transparent;
     color: @axon_fg_muted;
-    font-size: 11px;
+    font-size: 8.25pt;
     border: none;
     padding: 2px 6px;
     border-radius: 6px;
@@ -87,7 +87,7 @@
     border: 1px solid @axon_border;
     border-radius: 9999px;
     padding: 4px 12px;
-    font-size: 12px;
+    font-size: 9pt;
 }
 
 .quick-chip:hover {
@@ -111,7 +111,7 @@
 /* Model, response time and sources under an answer */
 .bubble-meta {
     color: @axon_fg_muted;
-    font-size: 11px;
+    font-size: 8.25pt;
 }
 
 /* A system change the AI proposes; it runs only after the confirmation card */
