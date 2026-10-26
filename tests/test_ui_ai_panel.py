@@ -578,3 +578,17 @@ def test_action_card_runs_only_through_confirmation(monkeypatch: pytest.MonkeyPa
     pump(GLib)
     assert "Not run." in [w.get_text() for w in _find(bubble, Gtk.Label)]
     win.destroy()
+
+
+def test_compact_mode_fits_320px() -> None:
+    client = FakeClient()
+    client.model = ""
+    win = panel_mod.AIPanelWindow(ollama_client=client, context_reader=FakeContext())
+    win._populate_model_dropdown(["@openrouter/anthropic/claude-sonnet-4.5-with-a-long-name"])
+    win._model_dropdown.set_selected(win._model_store.get_n_items() - 1)
+    win._messages_box.append(panel_mod.MessageBubble("user", "word " * 200))
+    win._messages_box.append(panel_mod.MessageBubble("assistant", "x" * 400))
+    pump(GLib, 200)
+    minimum = win.get_content().measure(Gtk.Orientation.HORIZONTAL, -1)[0]
+    assert minimum <= 320, minimum
+    win.destroy()

@@ -292,7 +292,7 @@ add a short note under any item you skip or change.
       per-message removals). The Brain doesn't report which files the model relied on.
 - [x] **Action cards.** Show proposed system changes as cards using the Phase 3
       confirmation component.
-- [ ] **Compact mode.** Layout works at 320 px wide.
+- [x] **Compact mode.** Layout works at 320 px wide.
 
 ### Spaces visibility
 - [ ] Numbered indicators matching Super+1…9.

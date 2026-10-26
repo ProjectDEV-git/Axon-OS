@@ -339,6 +339,29 @@ def _apply_markup(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _label_factory(ellipsize: bool) -> Gtk.SignalListItemFactory:
+    """List item factory showing a Gtk.StringObject as a label."""
+    factory = Gtk.SignalListItemFactory()
+
+    def setup(_f: Gtk.SignalListItemFactory, item: Gtk.ListItem) -> None:
+        label = Gtk.Label(xalign=0.0)
+        if ellipsize:
+            label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+            label.set_max_width_chars(14)
+        item.set_child(label)
+
+    def bind(_f: Gtk.SignalListItemFactory, item: Gtk.ListItem) -> None:
+        label = item.get_child()
+        string = item.get_item()
+        text = string.get_string() if string is not None else ""
+        label.set_text(text)
+        label.set_tooltip_text(text)
+
+    factory.connect("setup", setup)
+    factory.connect("bind", bind)
+    return factory
+
+
 class AIPanelWindow(Adw.Window):
     """Main side-panel window for the Axon AI assistant."""
 
@@ -409,6 +432,10 @@ class AIPanelWindow(Adw.Window):
         self._tiers: dict[str, str] = {}
 
         self._model_dropdown = Gtk.DropDown(model=self._model_store)
+        # Long names ("@openrouter/anthropic/…") are shortened on the button so
+        # the panel still fits 320 px; the popup list shows them in full.
+        self._model_dropdown.set_factory(_label_factory(ellipsize=True))
+        self._model_dropdown.set_list_factory(_label_factory(ellipsize=False))
         self._model_dropdown.set_selected(self._model_index(self._client.model))
         self._model_dropdown.connect("notify::selected", self._on_model_changed)
 
@@ -442,6 +469,7 @@ class AIPanelWindow(Adw.Window):
         # Where requests go. Never says "local" until the model is checked.
         self._origin_label = Gtk.Label(label="Model: checking…", xalign=0.0)
         self._origin_label.add_css_class("origin-label")
+        self._origin_label.set_ellipsize(Pango.EllipsizeMode.END)
         self._origin_label.set_margin_start(16)
         self._origin_label.set_margin_end(16)
         root.append(self._origin_label)
@@ -634,7 +662,8 @@ class AIPanelWindow(Adw.Window):
     def _update_origin(self) -> None:
         origin = self.current_origin()
         self._origin_label.set_text(origin.label)
-        self._origin_label.set_tooltip_text(origin_tooltip(origin))
+        # The label may be shortened at 320 px; the tooltip has it in full
+        self._origin_label.set_tooltip_text(f"{origin.label}\n{origin_tooltip(origin)}")
 
     def _model_index(self, model: str) -> int:
         if not model:
