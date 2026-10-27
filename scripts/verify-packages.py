@@ -7,7 +7,7 @@ and looks each name up in the release's Packages indexes (amd64, and i386 for
 exists, at exactly that version, in the release it is taken from. A name that is missing would otherwise only show up as a warning
 or a failed build hours into an ISO build.
 
-Usage: scripts/verify-packages.py [--ubuntu-release noble]
+Usage: scripts/verify-packages.py [--ubuntu-release resolute|noble]
 Exit code 1 if a package is missing, 2 if the archive cannot be reached.
 """
 
@@ -32,10 +32,16 @@ def say(message: str) -> None:
     sys.stdout.write(message + "\n")
 
 
-def names_in_lists() -> dict[str, list[str]]:
-    """package -> where it is asked for, from the package lists."""
+def names_in_lists(release: str) -> dict[str, list[str]]:
+    """package -> where it is asked for, from the package lists that apply to ``release``.
+
+    common.<release>.list belongs to that release only; the other release's file is skipped.
+    """
     found: dict[str, list[str]] = {}
     for path in sorted((ROOT / "build" / "package-lists").glob("*.list")):
+        parts = path.name.split(".")
+        if len(parts) == 3 and parts[1] != release:
+            continue
         for line in path.read_text(encoding="utf-8").splitlines():
             if line.strip() and not line.lstrip().startswith("#"):
                 found.setdefault(line.strip(), []).append(path.name)
@@ -121,16 +127,18 @@ def check_backports() -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--ubuntu-release", default="noble")
+    parser.add_argument("--ubuntu-release", default="resolute")
     args = parser.parse_args()
 
-    wanted = names_in_lists()
+    wanted = names_in_lists(args.ubuntu_release)
     for name, where in names_in_metapackages().items():
         wanted.setdefault(name, []).extend(where)
     # Packages built in this repository do not come from the archive
     own = {p.parent.name for p in (ROOT / "packaging").glob("*/control")}
-    # Binary packages the Axon repository provides from packaging/backports (not in noble)
-    own |= AXON_REPO_PACKAGES
+    # Binary packages the Axon repository provides from packaging/backports (not in noble;
+    # resolute has them in the archive)
+    if args.ubuntu_release == "noble":
+        own |= AXON_REPO_PACKAGES
     indexes: dict[str, set[str] | None] = {}
     missing = 0
     for name in sorted(wanted):
@@ -148,7 +156,8 @@ def main() -> int:
             say(f"MISSING  {name}  (in {', '.join(sorted(set(wanted[name])))})")
             missing += 1
     say(f"checked {len(wanted)} package names against {args.ubuntu_release}: {missing} missing")
-    backports = check_backports()
+    # The backports are rebuilt for 24.04 only; 26.04 takes these packages from its own archive
+    backports = check_backports() if args.ubuntu_release == "noble" else 0
     if backports < 0:
         say("archive unreachable; backports not verified")
         return 2

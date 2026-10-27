@@ -143,8 +143,29 @@ def load_catalog(path: Path | None = None) -> Catalog:
 
 
 HWE_KERNEL_META = "linux-image-generic-hwe-24.04"
+# Ubuntu 26.04 ships a 7.0 kernel (NTSYNC, sched_ext) from the start, so the gaming kernel is an
+# Ubuntu 24.04 item only (checked against the resolute archive, 2026-10-27).
+GAMING_KERNEL_RELEASES = ("noble",)
+OS_RELEASE = Path("/etc/os-release")
 _HWE_IMAGE_RE = re.compile(r"^linux-image-(?:unsigned-)?((\d+)\.(\d+)\.\d+-\d+)-generic$")
 _GA_MAJOR_MINOR = (6, 8)  # the kernel Axon OS ships; Ubuntu's HWE kernels are newer
+
+
+def ubuntu_codename(os_release: Path = OS_RELEASE) -> str:
+    """The Ubuntu release this system is based on ("noble", "resolute"), or "" if unknown."""
+    try:
+        text = os_release.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    fields = dict(
+        line.split("=", 1) for line in text.splitlines() if "=" in line and not line.startswith("#")
+    )
+    return (fields.get("UBUNTU_CODENAME") or fields.get("VERSION_CODENAME") or "").strip("\"' ")
+
+
+def gaming_kernel_offered(codename: str) -> bool:
+    """True where installing Ubuntu's newer (HWE) kernel makes sense: Ubuntu 24.04 only."""
+    return codename in GAMING_KERNEL_RELEASES
 
 
 def _running_version(release: str) -> str:
@@ -241,20 +262,29 @@ _HWE_KERNEL_RE = re.compile(
 )
 
 
-def signed_modules_package(package: str, kernel_release: str | None = None) -> str | None:
+# Ubuntu 26.04's own kernel (7.0 and later point releases) carries the plain "-generic" modules
+_RELEASE_KERNEL_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-generic$")
+
+
+def signed_modules_package(
+    package: str, kernel_release: str | None = None, codename: str | None = None
+) -> str | None:
     """The prebuilt, Secure Boot signed kernel modules for an NVIDIA driver package, if any.
 
     ``nvidia-driver-580-open`` on kernel ``6.8.0-147-generic`` gives
     ``linux-modules-nvidia-580-open-generic``; on an HWE kernel (6.11 or newer) the same name
-    ends in ``-hwe-24.04``. With them there is no DKMS build, and no key to enroll: Canonical's
-    signature is already trusted by Secure Boot. On other kernels the driver would be built
-    with DKMS and unsigned, so this returns None.
+    ends in ``-hwe-24.04``. On Ubuntu 26.04 (``resolute``) every generic kernel uses the plain
+    name. With them there is no DKMS build, and no key to enroll: Canonical's signature is
+    already trusted by Secure Boot. On other kernels the driver would be built with DKMS and
+    unsigned, so this returns None.
     """
     match = _DRIVER_RE.match(package)
     kernel = platform.release() if kernel_release is None else kernel_release
     if not match:
         return None
     base = f"linux-modules-nvidia-{match.group(1)}{match.group(2) or ''}-generic"
+    if (ubuntu_codename() if codename is None else codename) == "resolute":
+        return base if _RELEASE_KERNEL_RE.match(kernel) else None
     if _SIGNED_KERNEL_RE.match(kernel):
         return base
     if _HWE_KERNEL_RE.match(kernel):

@@ -2,7 +2,7 @@
 # Axon OS — Master ISO Build Script
 #
 # Builds a bootable hybrid (BIOS + UEFI) live ISO of Axon OS on top of
-# Ubuntu 24.04 (noble) using debootstrap + casper + GRUB + xorriso.
+# Ubuntu 26.04 (resolute; 24.04 noble still selectable) using debootstrap + casper + GRUB + xorriso.
 # No live-build dependency; works on any Ubuntu/Debian host and on
 # GitHub Actions ubuntu-24.04 runners.
 #
@@ -25,6 +25,7 @@
 #   --cmd 'CMD'       Run a command inside the chroot (combine with --chroot)
 #
 # Environment:
+#   AXON_UBUNTU_RELEASE   Ubuntu codename to build on: resolute (26.04, default) or noble (24.04)
 #   AXON_BUILD_DIR   Work directory (default: /var/lib/axon-build; must be root-owned)
 #   AXON_WINABI_BUILD     1 = build the untested axon-winabi kernel module into the image (default: 0)
 #   AXON_WINABI_AUTOLOAD  1 = also auto-load it at boot (needs AXON_WINABI_BUILD=1; default: 0)
@@ -37,7 +38,8 @@ BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "${BASE_DIR}/pyproject.toml" | head -1)"
 VERSION="${VERSION:-0.3.0}"
 ARCH="amd64"
-DIST="noble"
+# Ubuntu release to build on: resolute = 26.04 LTS (default), noble = 24.04 LTS.
+DIST="${AXON_UBUNTU_RELEASE:-resolute}"
 MIRROR="https://us.archive.ubuntu.com/ubuntu/"
 EDITION="standard"
 VOLID="AXON_OS"
@@ -269,7 +271,11 @@ bootstrap() {
     rm -rf "${CHROOT}"
     mkdir -p "${CHROOT}"
     log "Bootstrapping Ubuntu ${DIST} (${ARCH})... (first time — downloads ~100 MB)"
-    debootstrap --arch="${ARCH}" "${DIST}" "${CHROOT}" "${MIRROR}"
+    # An older host debootstrap has no script for a newer release; every Ubuntu release since
+    # gutsy bootstraps the same way
+    debootstrap_script=()
+    [[ -e "/usr/share/debootstrap/scripts/${DIST}" ]] || debootstrap_script=(/usr/share/debootstrap/scripts/gutsy)
+    debootstrap --arch="${ARCH}" "${DIST}" "${CHROOT}" "${MIRROR}" "${debootstrap_script[@]}"
 
     # Fix IPv6 unreachable + hash mismatch errors inside the chroot
     cat > "${CHROOT}/etc/apt/apt.conf.d/99force-ipv4" <<'APTEOF'
@@ -327,6 +333,7 @@ configure_chroot() {
         AXON_VERSION="${VERSION}" \
         AXON_QUICK="${QUICK}" \
         AXON_EDITION="${EDITION}" \
+        AXON_RELEASE="${DIST}" \
         AXON_WINABI_BUILD="${AXON_WINABI_BUILD:-0}" \
         AXON_WINABI_AUTOLOAD="${AXON_WINABI_AUTOLOAD:-0}" \
         /bin/bash /opt/axon-src/build/config/chroot-setup.sh

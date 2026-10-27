@@ -1,48 +1,69 @@
 #!/bin/sh
-# Axon OS — rollback menuentry booting the @axon-fallback factory snapshot.
+# Axon OS — rollback menuentries booting BTRFS snapshots of the system.
 # Installed as /etc/grub.d/42_axon_rollback.
 #
+#   @axon-fallback            the factory snapshot taken at install time
+#   @axon-pre-upgrade-<time>  the newest snapshot taken by `axon-update --release-upgrade`
+#                             (Ubuntu 24.04 -> 26.04)
+#
 # The kernel and initrd must come from inside the snapshot: the running
-# system's newest kernel is usually newer than the one captured at install
-# time (daily upgrades), and that file does not exist under @axon-fallback.
+# system's newest kernel is usually newer than the one captured in the
+# snapshot (daily upgrades), and that file does not exist under it.
+#
+# AXON_ROLLBACK_TOP (a directory standing in for the BTRFS top level) and
+# AXON_ROLLBACK_UUID exist for the tests; grub-mkconfig never sets them.
 set -e
 
-if [ "$(grub-probe --target=fs / 2>/dev/null)" != "btrfs" ]; then
-    exit 0
+top="${AXON_ROLLBACK_TOP:-}"
+uuid="${AXON_ROLLBACK_UUID:-}"
+if [ -z "${top}" ]; then
+    if [ "$(grub-probe --target=fs / 2>/dev/null)" != "btrfs" ]; then
+        exit 0
+    fi
+    uuid="$(grub-probe --target=fs_uuid / 2>/dev/null)" || exit 0
+    [ -n "${uuid}" ] || exit 0
+    device="$(grub-probe --target=device / 2>/dev/null | head -n 1)" || exit 0
+    [ -n "${device}" ] || exit 0
+
+    # Mount the btrfs top level read-only to look inside the snapshots
+    top="$(mktemp -d)"
+    cleanup() {
+        umount "${top}" 2>/dev/null || true
+        rmdir "${top}" 2>/dev/null || true
+    }
+    trap cleanup EXIT
+    mount -o ro,subvolid=5 "${device}" "${top}" 2>/dev/null || exit 0
 fi
 
-uuid="$(grub-probe --target=fs_uuid / 2>/dev/null)" || exit 0
-[ -n "${uuid}" ] || exit 0
-device="$(grub-probe --target=device / 2>/dev/null | head -n 1)" || exit 0
-[ -n "${device}" ] || exit 0
-
-# Mount the btrfs top level read-only to look inside the snapshot
-mnt="$(mktemp -d)"
-cleanup() {
-    umount "${mnt}" 2>/dev/null || true
-    rmdir "${mnt}" 2>/dev/null || true
-}
-trap cleanup EXIT
-mount -o ro,subvolid=5 "${device}" "${mnt}" 2>/dev/null || exit 0
-
-snap_boot="${mnt}/@axon-fallback/boot"
-kernel="$(ls -1 "${snap_boot}"/vmlinuz-* 2>/dev/null | sort -V | tail -n 1)"
-[ -n "${kernel}" ] || exit 0
-kbase="$(basename "${kernel}")"
-kver="${kbase#vmlinuz-}"
-initrd=""
-if [ -f "${snap_boot}/initrd.img-${kver}" ]; then
-    initrd="initrd.img-${kver}"
-fi
-
-cat <<ENTRY
-menuentry 'Axon OS — Recovery rollback (factory snapshot)' --class axon --class gnu-linux {
+# emit_entry SUBVOLUME TITLE EXTRA_KERNEL_PARAMS
+emit_entry() {
+    subvol="$1"
+    title="$2"
+    extra="$3"
+    snap_boot="${top}/${subvol}/boot"
+    # shellcheck disable=SC2012  # kernel file names are plain
+    kernel="$(ls -1 "${snap_boot}"/vmlinuz-* 2>/dev/null | sort -V | tail -n 1)"
+    [ -n "${kernel}" ] || return 0
+    kbase="$(basename "${kernel}")"
+    kver="${kbase#vmlinuz-}"
+    cat <<ENTRY
+menuentry '${title}' --class axon --class gnu-linux {
     insmod part_gpt
     insmod btrfs
     search --no-floppy --fs-uuid --set=root ${uuid}
-    linux /@axon-fallback/boot/${kbase} root=UUID=${uuid} rootflags=subvol=@axon-fallback rw quiet splash axon.rollback=1
+    linux /${subvol}/boot/${kbase} root=UUID=${uuid} rootflags=subvol=${subvol} rw quiet splash ${extra}
 ENTRY
-if [ -n "${initrd}" ]; then
-    echo "    initrd /@axon-fallback/boot/${initrd}"
+    if [ -f "${snap_boot}/initrd.img-${kver}" ]; then
+        echo "    initrd /${subvol}/boot/initrd.img-${kver}"
+    fi
+    echo "}"
+}
+
+# The upgrade snapshot first: right after an upgrade it is the one wanted. The time in the
+# name sorts, so the last one is the newest.
+# shellcheck disable=SC2012
+pre_upgrade="$(ls -1d "${top}"/@axon-pre-upgrade-[0-9]*-[0-9]* 2>/dev/null | sort | tail -n 1)"
+if [ -n "${pre_upgrade}" ]; then
+    emit_entry "$(basename "${pre_upgrade}")" 'Axon OS — before the upgrade (snapshot)' 'axon.rollback=upgrade'
 fi
-echo "}"
+emit_entry '@axon-fallback' 'Axon OS — Recovery rollback (factory snapshot)' 'axon.rollback=1'

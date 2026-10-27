@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-27 08:57+0000\n"
+"POT-Creation-Date: 2026-10-27 09:26+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1936,6 +1936,168 @@ msgstr ""
 
 #: services/context_settings.py
 msgid "Terminal history"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid ""
+" Restart and choose “Axon OS — before the upgrade” to go back, then run axon-"
+"update --rollback-upgrade."
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "/boot has only {have} MB free; {need} MB are needed for the new kernel."
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "A step after the upgrade failed ({cmd}): {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Bringing this release up to date…"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Could not find the system disk."
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Could not finish the upgrade: {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Could not install the upgrade tool: {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Could not mount the BTRFS top level: {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Could not set the upgrade policy: {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Finishing up…"
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Free at least {need} GB on the system disk (now {have} GB)."
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Getting the upgrade tool…"
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Going back failed at “{cmd}”: {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Packages are on hold and would block the upgrade: {names}"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Plug in the power adapter: the upgrade takes a long time."
+msgstr ""
+
+#: services/release_upgrade.py
+msgid ""
+"Restart and choose “Axon OS — before the upgrade” in the boot menu first; "
+"this command runs from the snapshot."
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Restart first: an earlier update is waiting for a restart."
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Step 1 / 5"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Step 2 / 5"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Step 3 / 5"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Step 4 / 5"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Step 5 / 5"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "Taking a snapshot to go back to…"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "The axon-os package is not installed."
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "The snapshot failed: {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "The upgrade failed: {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "This is the live session. Install Axon OS first."
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "This system is already on the newest release Axon OS supports."
+msgstr ""
+
+#: services/release_upgrade.py
+msgid ""
+"This system is not on BTRFS, so there is no snapshot to go back to if the "
+"upgrade fails. Back up your files first, then run again with --no-snapshot."
+msgstr ""
+
+#: services/release_upgrade.py
+msgid "This system's Ubuntu release could not be determined."
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Ubuntu {version} is not offered for this system yet."
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Update Axon OS first: the upgrade needs axon-os {version} or newer."
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Updating the current release failed: {error}"
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Upgrade complete. Restart to start Ubuntu {version}."
+msgstr ""
+
+#: services/release_upgrade.py
+#, python-brace-format
+msgid "Upgrading to Ubuntu {version} (this takes a while)…"
 msgstr ""
 
 #: services/status_summary.py

@@ -1,23 +1,29 @@
 #!/bin/sh
-# Axon OS — keep the Ubuntu 24.04 release kernel (6.8) as a fallback for a newer kernel.
+# Axon OS — keep the release kernel as a fallback for a newer kernel.
 # Installed as /etc/grub.d/41_axon_kernel_fallback.
 #
-# The gaming kernel (Ubuntu's HWE kernel, installed from Game Center) is newer than the
-# 6.8 kernel Axon OS ships, and GRUB boots the newest kernel first. If it does not boot, the
-# boot watchdog (06_axon_watchdog) sets axon_try_ga on the second attempt, and this entry,
-# which boots the 6.8 kernel on the same system, is chosen. A third failed boot still goes
-# to the factory rollback (42_axon_rollback).
+# On Ubuntu 24.04 the release kernel is 6.8 and the gaming kernel (Ubuntu's HWE kernel,
+# installed from Game Center) is newer; after an upgrade to 26.04 the 6.8 kernel is still
+# installed next to the 7.0 one until it is cleaned up. GRUB boots the newest kernel first.
+# If it does not boot, the boot watchdog (06_axon_watchdog) sets axon_try_ga on the second
+# attempt, and this entry, which boots the oldest installed kernel series on the same
+# system, is chosen. A third failed boot still goes to the factory rollback
+# (42_axon_rollback).
 #
-# Emits nothing unless a 6.8 kernel and a newer one are both installed, and never fails:
-# a problem here must not stop grub.cfg from being written.
+# Emits nothing unless kernels of two different series (6.8 and 6.14, say) are installed,
+# and never fails: a problem here must not stop grub.cfg from being written.
 BOOT_DIR="${AXON_BOOT_DIR:-/boot}"
 
 # shellcheck disable=SC2012  # kernel file names are plain
-ga="$(ls -1 "${BOOT_DIR}"/vmlinuz-6.8.0-*-generic 2>/dev/null | sort -V | tail -n 1)"
+kernels="$(ls -1 "${BOOT_DIR}"/vmlinuz-*-generic 2>/dev/null | sort -V)"
+[ -n "${kernels}" ] || exit 0
+# "vmlinuz-6.8.0-100-generic" -> "6.8"
+series_of() { basename "$1" | sed -n 's/^vmlinuz-\([0-9][0-9]*\.[0-9][0-9]*\)\..*/\1/p'; }
+newest="$(printf '%s\n' "${kernels}" | tail -n 1)"
+oldest_series="$(series_of "$(printf '%s\n' "${kernels}" | head -n 1)")"
+[ -n "${oldest_series}" ] && [ "${oldest_series}" != "$(series_of "${newest}")" ] || exit 0
+ga="$(printf '%s\n' "${kernels}" | grep "/vmlinuz-${oldest_series}\." | tail -n 1)"
 [ -n "${ga}" ] || exit 0
-# shellcheck disable=SC2012
-newest="$(ls -1 "${BOOT_DIR}"/vmlinuz-* 2>/dev/null | sort -V | tail -n 1)"
-[ -n "${newest}" ] && [ "${newest}" != "${ga}" ] || exit 0
 
 ver="$(basename "${ga}")"
 ver="${ver#vmlinuz-}"

@@ -45,10 +45,15 @@ chmod +x /usr/sbin/policy-rc.d
 # 1. APT sources (main + universe + multiverse, with updates and security)
 # ---------------------------------------------------------------------------
 log "Writing APT sources..."
-cat > /etc/apt/sources.list <<'EOF'
-deb https://us.archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
-deb https://us.archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
-deb https://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse
+RELEASE="${AXON_RELEASE:-resolute}"
+case "${RELEASE}" in
+    noble | resolute) ;;
+    *) log "ERROR: unsupported Ubuntu release '${RELEASE}' (use resolute or noble)"; exit 1 ;;
+esac
+cat > /etc/apt/sources.list <<EOF
+deb https://us.archive.ubuntu.com/ubuntu/ ${RELEASE} main restricted universe multiverse
+deb https://us.archive.ubuntu.com/ubuntu/ ${RELEASE}-updates main restricted universe multiverse
+deb https://security.ubuntu.com/ubuntu/ ${RELEASE}-security main restricted universe multiverse
 EOF
 # debootstrap may have created the new deb822 file; sources.list wins, drop it
 rm -f /etc/apt/sources.list.d/ubuntu.sources
@@ -99,7 +104,10 @@ done
 # 4. Desktop + Axon dependencies from the package manifest
 # ---------------------------------------------------------------------------
 log "Installing desktop packages from build/package-lists/common.list..."
-mapfile -t PACKAGES < <(grep -vE '^\s*(#|$)' "${SRC}/build/package-lists/common.list")
+# common.list is for every release; common.<release>.list holds what differs (renamed or dropped
+# packages), see scripts/verify-packages.py
+mapfile -t PACKAGES < <(grep -hvE '^\s*(#|$)' "${SRC}/build/package-lists/common.list" \
+    "${SRC}/build/package-lists/common.${RELEASE}.list")
 # DKMS/WiFi packages often fail on mismatched kernels — install them last
 # and tolerate failures so the rest of the build continues.
 DKMS_PACKAGES=(bcmwl-kernel-source broadcom-sta-dkms)
@@ -256,8 +264,8 @@ bash "${SRC}/packaging/build-pkg.sh" --all /tmp/axon-gaming-debs
 if [[ "${EDITION}" != "nvidia" ]]; then
     rm -f /tmp/axon-gaming-debs/axon-nvidia_*.deb
 fi
-# axon-console needs Gamescope, which Ubuntu 24.04 does not have; it joins the image once the
-# Axon repository provides one (plan phase 6).
+# axon-console needs Gamescope: Ubuntu 26.04 has it, on 24.04 it comes from the Axon repository
+# (packaging/backports); without a candidate the package is left out.
 if ! apt-cache policy gamescope | grep -q 'Candidate: [^(]'; then
     log "gamescope is not available; leaving out axon-console"
     rm -f /tmp/axon-gaming-debs/axon-console_*.deb
@@ -762,12 +770,15 @@ EOF
 # Ubuntu 24.04, leaving the user on a black screen after Plymouth quits.
 log "Configuring GDM autologin for live session..."
 mkdir -p /etc/gdm3
+# GNOME 50 (Ubuntu 26.04) has no X11 session, so only 24.04 images may force X11 (VM guests).
 cat > /etc/gdm3/custom.conf <<'EOF'
 [daemon]
 AutomaticLoginEnable=true
 AutomaticLogin=axon
-WaylandEnable=false
 EOF
+if [[ "${RELEASE}" == "noble" ]]; then
+    echo "WaylandEnable=false" >> /etc/gdm3/custom.conf
+fi
 
 # /etc/os-release is a symlink to /usr/lib/os-release on Ubuntu; replace the
 # link with Axon identity while keeping ID_LIKE for tooling compatibility.
@@ -780,7 +791,7 @@ VERSION="${VERSION} (${CODENAME})"
 VERSION_CODENAME=${CODENAME,,}
 ID=axonos
 ID_LIKE="ubuntu debian"
-UBUNTU_CODENAME=noble
+UBUNTU_CODENAME=${RELEASE}
 HOME_URL="https://github.com/ProjectDEV-git/Axon-OS"
 SUPPORT_URL="https://github.com/ProjectDEV-git/Axon-OS/issues"
 BUG_REPORT_URL="https://github.com/ProjectDEV-git/Axon-OS/issues"

@@ -12,6 +12,7 @@ Rewritten for GTK4 + libadwaita.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -89,6 +90,102 @@ def _run_cmd_logged(cmd: list[str], extra_env: dict[str, str] | None = None) -> 
     except Exception as exc:
         logger.exception("Exception running '%s': %s", " ".join(cmd), exc)
         return False
+
+
+def _run_capture(cmd: list[str]) -> tuple[int, str]:
+    """Run a command, echoing its output as it comes; returns (exit code, the last of its output).
+
+    The release upgrade runs for a long time and prints as it goes, so unlike
+    ``_run_cmd_logged`` this does not wait for the end to show anything.
+    """
+    env = os.environ.copy()
+    env["DEBIAN_FRONTEND"] = "noninteractive"
+    try:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env
+        )
+    except OSError as exc:
+        return 127, f"{cmd[0]}: {exc}"
+    tail = ""
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        logger.info("%s", line.rstrip())
+        tail = (tail + line)[-4000:]
+    return proc.wait(), tail
+
+
+def _disk_free_mb(path: str) -> int:
+    try:
+        return shutil.disk_usage(path).free // (1024 * 1024)
+    except OSError:
+        return 0
+
+
+def run_release_upgrade_cli(argv: list[str]) -> int:
+    """``axon-update --release-upgrade`` and its companions; see services/release_upgrade.py."""
+    import tempfile
+    from datetime import datetime
+
+    import release_upgrade as ru
+
+    report = "--progress" in argv
+
+    def progress(fraction: float, phase: str, message: str) -> None:
+        logger.info("Release upgrade: %s", message)
+        if report:
+            _print_progress(fraction, phase, message)
+        else:
+            print(message, flush=True)  # noqa: T201
+
+    if os.geteuid() != 0:
+        logger.error("the release upgrade must run as root (use sudo)")
+        return 1
+    if "--check-release" in argv:
+        target = ru.target_for(ru.read_codename())
+        if target is None:
+            print(_("No newer Ubuntu release to upgrade to."))  # noqa: T201
+            return 1
+        rc, _out = _run_capture(ru.check_available_command())
+        print(  # noqa: T201
+            _("Ubuntu {version} is available.").format(version=ru.RELEASE_NAMES[target])
+            if rc == 0
+            else _("Ubuntu {version} is not offered for this system yet.").format(
+                version=ru.RELEASE_NAMES[target]
+            )
+        )
+        return 0 if rc == 0 else 1
+
+    def rmdir(path: str) -> None:
+        try:
+            os.rmdir(path)
+        except OSError:
+            logger.warning("could not remove %s", path)
+
+    mkdtemp = lambda: tempfile.mkdtemp(prefix="axon-top-")  # noqa: E731
+    if "--rollback-upgrade" in argv:
+        error = ru.run_rollback(_run_capture, mkdtemp, rmdir, datetime.now())
+        message = _("The previous system is back. Restart to use it.")
+    else:
+        error = ru.run_release_upgrade(
+            _run_capture,
+            progress,
+            _disk_free_mb,
+            mkdtemp,
+            rmdir,
+            datetime.now(),
+            allow_no_snapshot="--no-snapshot" in argv,
+        )
+        message = ""
+    if error:
+        logger.error("%s", error)
+        if report:
+            _print_error(error)
+        else:
+            print(error, file=sys.stderr)  # noqa: T201
+        return 1
+    if message:
+        print(message, flush=True)  # noqa: T201
+    return 0
 
 
 UPDATER_PATH = "/usr/local/bin/axon-update"
@@ -369,6 +466,9 @@ def main() -> int:
     # is available there, and GTK would reject the unknown --auto option.
     if "--auto" in sys.argv:
         return run_headless_update(report_progress="--progress" in sys.argv)
+    # Ubuntu 24.04 -> 26.04, started on purpose from a terminal or the GUI; never by the timer
+    if any(a in sys.argv for a in ("--release-upgrade", "--rollback-upgrade", "--check-release")):
+        return run_release_upgrade_cli(sys.argv[1:])
     app = AxonUpdaterApp()
     return app.run(sys.argv)
 

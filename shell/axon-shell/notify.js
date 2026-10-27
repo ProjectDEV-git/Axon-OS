@@ -1,4 +1,4 @@
-// Axon Shell — small notification helper that works on GNOME 45 to 48.
+// Axon Shell — small notification helper that works on GNOME 45 to 50.
 //
 // GNOME 46 changed MessageTray.Source/Notification to take a params object
 // and replaced showNotification() with addNotification().

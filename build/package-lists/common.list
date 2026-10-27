@@ -132,7 +132,7 @@ e2fsprogs
 btrfs-progs
 efibootmgr
 grub-pc-bin
-policykit-1
+pkexec
 os-prober
 
 # ── Hardware & Driver Coverage ────────────────────────────────────────────────
@@ -144,14 +144,11 @@ xserver-xorg-video-intel
 xserver-xorg-video-fbdev
 xserver-xorg-video-vesa
 mesa-vulkan-drivers
-mesa-va-drivers
-mesa-vdpau-drivers
 libgl1-mesa-dri
 va-driver-all
 intel-media-va-driver
 
 # WiFi & Wireless
-wireless-tools
 iw
 rfkill
 wpasupplicant
@@ -260,7 +257,6 @@ flatpak
 gnome-software-plugin-flatpak
 # Game Center installs apt packages through PackageKit (pkcon) with polkit
 packagekit
-packagekit-tools
 vlc
 transmission-gtk
 file-roller

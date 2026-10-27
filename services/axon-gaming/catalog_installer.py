@@ -1,8 +1,8 @@
 """Install and remove catalog items (the catalog installer).
 
 Flatpak apps install per user (no password). Apt packages go through PackageKit
-(``pkcon``), which asks for authorisation with polkit. Items are queued per
-backend: one Flatpak and one apt job run at a time, so two Flatpak installs never
+(``pkcon``, or ``pkgcli`` on 26.04), which asks for authorisation with polkit. Items are queued
+per backend: one Flatpak and one apt job run at a time, so two Flatpak installs never
 fight over the same lock.
 
 Every command is an argument list built from catalog data; nothing runs in a shell.
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import queue
 import re
+import shutil
 import socket
 import subprocess
 import threading
@@ -83,12 +84,23 @@ def is_online(timeout: float = 3.0) -> bool:
 # -- Commands ---------------------------------------------------------------
 
 
+def _pk(verb: str, *packages: str) -> list[str]:
+    """A PackageKit command line: ``pkcon`` on Ubuntu 24.04, ``pkgcli`` where it replaced it.
+
+    PackageKit 1.3.4 (Ubuntu 26.04, checked 2026-10-27) dropped ``pkcon`` and the
+    ``packagekit-tools`` package; ``pkgcli`` takes ``--yes`` before the command.
+    """
+    if shutil.which("pkcon") is None and shutil.which("pkgcli") is not None:
+        return ["pkgcli", "--yes", verb, *packages]
+    return ["pkcon", "-y", verb, *packages]
+
+
 def install_steps(item: Item) -> list[list[str]]:
     """The commands that install ``item``, in order."""
     steps: list[list[str]] = []
     needed = list(item.requires.get("apt", []))
     if needed:
-        steps.append(["pkcon", "-y", "install", *needed])
+        steps.append(_pk("install", *needed))
     if item.kind == "flatpak":
         steps.append(["flatpak", "remote-add", "--user", "--if-not-exists", "flathub", FLATHUB_URL])
         steps.append(
@@ -103,7 +115,7 @@ def install_steps(item: Item) -> list[list[str]]:
             ]
         )
     elif item.kind in ("apt", "axon-apt"):
-        steps.append(["pkcon", "-y", "install", *item.source["packages"]])
+        steps.append(_pk("install", *item.source["packages"]))
     elif backend := gpu_backend(item):
         steps.append(["pkexec", GPU_HELPER, backend])
     return steps
@@ -117,7 +129,7 @@ def remove_steps(item: Item, remove_unused: bool = False) -> list[list[str]]:
             steps.append(["flatpak", "uninstall", "--user", "--unused", "--noninteractive", "-y"])
         return steps
     if item.kind in ("apt", "axon-apt"):
-        return [["pkcon", "-y", "remove", *item.source["packages"]]]
+        return [_pk("remove", *item.source["packages"])]
     if backend := gpu_backend(item):
         return [["pkexec", GPU_HELPER, "remove", backend]]
     return []
@@ -128,7 +140,7 @@ def update_steps(item: Item) -> list[list[str]]:
     if item.kind == "flatpak":
         return [["flatpak", "update", "--user", "--noninteractive", "-y", item.source["ref"]]]
     if item.kind in ("apt", "axon-apt"):
-        return [["pkcon", "-y", "update", *item.source["packages"]]]
+        return [_pk("update", *item.source["packages"])]
     if backend := gpu_backend(item):
         return [["pkexec", GPU_HELPER, backend]]  # installing again replaces it
     return []

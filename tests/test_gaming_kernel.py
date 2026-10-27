@@ -8,10 +8,13 @@ from pathlib import Path
 import pytest
 from catalog import (
     gaming_kernel_item,
+    gaming_kernel_offered,
     gaming_kernel_removal_item,
     hwe_kernel_removal,
     hwe_nvidia_modules,
     load_catalog,
+    signed_modules_package,
+    ubuntu_codename,
 )
 from catalog_installer import installed_linux_packages
 
@@ -250,3 +253,60 @@ def test_the_fallback_script_is_installed_between_the_kernel_and_rollback_entrie
     assert '"${R}/etc/grub.d/41_axon_kernel_fallback"' in deb
     # 06 (counter) < 10_linux (entries) < 41 (fallback sets the default) < 42 (rollback)
     assert "06_axon_watchdog" in deb and "42_axon_rollback" in deb
+
+
+# -- Ubuntu 26.04 (resolute) -------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_the_fallback_is_the_oldest_kernel_series_after_an_upgrade_to_26_04(tmp_path):
+    # 24.04 -> 26.04 leaves the 6.8 kernel installed next to the 7.0 one
+    out = run_fallback(
+        tmp_path, ["6.8.0-147-generic", "7.0.0-37-generic", "7.0.0-38-generic"]
+    ).stdout
+    assert "vmlinuz-6.8.0-147-generic" in out and "7.0.0" not in out
+
+
+@pytest.mark.unit
+def test_no_fallback_between_two_builds_of_the_same_series(tmp_path):
+    result = run_fallback(tmp_path, ["7.0.0-37-generic", "7.0.0-38-generic"])
+    assert result.returncode == 0 and result.stdout == ""
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("UBUNTU_CODENAME=noble\nVERSION_CODENAME=pulse\n", "noble"),
+        ('VERSION_CODENAME="resolute"\n', "resolute"),
+        ("NAME=x\n", ""),
+    ],
+)
+def test_ubuntu_codename_comes_from_os_release(tmp_path, text, expected):
+    path = tmp_path / "os-release"
+    path.write_text(text)
+    assert ubuntu_codename(path) == expected
+    assert ubuntu_codename(tmp_path / "missing") == ""
+
+
+@pytest.mark.unit
+def test_the_gaming_kernel_is_offered_on_24_04_only():
+    assert gaming_kernel_offered("noble")
+    assert not gaming_kernel_offered("resolute")
+    assert not gaming_kernel_offered("")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("kernel", "codename", "expected"),
+    [
+        ("6.8.0-147-generic", "noble", "linux-modules-nvidia-580-open-generic"),
+        ("7.0.0-38-generic", "noble", "linux-modules-nvidia-580-open-generic-hwe-24.04"),
+        # 26.04's own kernel uses the plain name, whatever its version
+        ("7.0.0-38-generic", "resolute", "linux-modules-nvidia-580-open-generic"),
+        ("7.4.0-3-generic", "resolute", "linux-modules-nvidia-580-open-generic"),
+        ("7.0.0-38-lowlatency", "resolute", None),
+    ],
+)
+def test_signed_nvidia_modules_follow_the_release(kernel, codename, expected):
+    assert signed_modules_package("nvidia-driver-580-open", kernel, codename) == expected

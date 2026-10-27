@@ -11,6 +11,14 @@ from catalog_installer import DONE, FAILED, QUEUED, RUNNING, Event, JobQueue
 CATALOG = Path(__file__).resolve().parent.parent / "data" / "gaming" / "catalog.json"
 
 
+@pytest.fixture(autouse=True)
+def _pkcon(monkeypatch):
+    """The commands the tests expect are the pkcon ones, whatever the host has installed."""
+    monkeypatch.setattr(
+        installer.shutil, "which", lambda name: "/usr/bin/pkcon" if name == "pkcon" else None
+    )
+
+
 @pytest.fixture(scope="module")
 def catalog():
     return load_catalog(CATALOG)
@@ -305,3 +313,20 @@ class TestUpdates:
         wait_for(events, "heroic", DONE)
         assert runner.calls == [installer.update_steps(catalog.items["heroic"])[0]]
         queue.close()
+
+
+@pytest.mark.parametrize(
+    ("have", "expected"),
+    [
+        ({"pkcon"}, ["pkcon", "-y", "install", "ratbagd"]),
+        # Ubuntu 26.04 dropped pkcon; pkgcli takes --yes before the command
+        ({"pkgcli"}, ["pkgcli", "--yes", "install", "ratbagd"]),
+        (set(), ["pkcon", "-y", "install", "ratbagd"]),
+        ({"pkcon", "pkgcli"}, ["pkcon", "-y", "install", "ratbagd"]),
+    ],
+)
+def test_packagekit_client_follows_what_is_installed(monkeypatch, have, expected):
+    monkeypatch.setattr(
+        installer.shutil, "which", lambda name: f"/usr/bin/{name}" if name in have else None
+    )
+    assert installer._pk("install", "ratbagd") == expected

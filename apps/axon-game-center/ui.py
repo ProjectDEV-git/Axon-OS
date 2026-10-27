@@ -35,8 +35,10 @@ from catalog import (
     Item,
     driver_item,
     gaming_kernel_item,
+    gaming_kernel_offered,
     gaming_kernel_removal_item,
     load_catalog,
+    ubuntu_codename,
 )
 from constants import AXON_CONFIG_DIR
 from i18n import _
@@ -635,7 +637,7 @@ class GameCenterWindow(Adw.ApplicationWindow):
         box.append(group)
 
         kernel = self.catalog.items.get("gaming-kernel")
-        if kernel is not None:
+        if kernel is not None and gaming_kernel_offered(ubuntu_codename()):
             kernel_group = self._group(
                 _("Kernel"),
                 _("Running kernel: {release}").format(release=platform.release()),
