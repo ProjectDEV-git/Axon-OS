@@ -45,12 +45,26 @@ The operating system is built around two centralized D-Bus services — **Axon B
 
 ### From ISO (recommended)
 
-1. Download the latest `.iso` from the [Releases](https://github.com/ProjectDEV-git/Axon-OS/releases) page, or grab a fresh build from the latest [Build ISO workflow run](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build-iso.yml) (Artifacts → `axon-os-iso`).
+Axon OS comes in two editions. Pick by graphics card:
+
+| Edition | For | File |
+|---|---|---|
+| **Standard** | AMD, Intel and older NVIDIA cards (GTX 10-series and earlier) | `axon-os-<version>-standard-amd64.iso` |
+| **NVIDIA** | GTX 16-series, RTX and newer. Includes the NVIDIA driver, signed so it works with Secure Boot on | `axon-os-<version>-nvidia-amd64.iso` |
+
+1. Download an `.iso` from the [Releases](https://github.com/ProjectDEV-git/Axon-OS/releases) page, or a fresh build from the latest [Build ISO workflow run](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build-iso.yml) (Artifacts → `axon-os-iso-standard` or `axon-os-iso-nvidia`).
+   GitHub limits release files to 2 GB, so a release ISO is split into `.part00`, `.part01`, ... files. Put all the parts and the `.sha256` file in one folder, then join and check them:
+   ```bash
+   cat axon-os-<version>-standard-amd64.iso.part* > axon-os-<version>-standard-amd64.iso
+   sha256sum -c axon-os-<version>-standard-amd64.iso.sha256
+   ```
 2. Flash to a USB drive (replace `/dev/sdX` with your device):
    ```bash
-   sudo dd if=axon-os.iso of=/dev/sdX bs=4M status=progress oflag=sync
+   sudo dd if=axon-os-<version>-standard-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
    ```
 3. Boot from the USB and follow the guided installer.
+
+Games, launchers, emulators, AI models and GPU acceleration for local AI are not on the ISO: the welcome app and Game Center install what you pick after setup. See [docs/gaming.md](docs/gaming.md).
 
 ### From Source (development / testing)
 
@@ -63,8 +77,8 @@ cd Axon-OS
 sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-4.0 \
     gir1.2-adw-1 python3-dbus gir1.2-vte-3.91
 
-# Install Ollama (if not already installed)
-curl -fsSL https://ollama.com/install.sh | sh
+# Install Ollama (if not already installed): a pinned release, checked against its SHA-256
+sudo bash build/config/install-ollama.sh
 
 # Run the full installer (sets up D-Bus services, shell extension, apps)
 ./install.sh
@@ -78,10 +92,13 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Full build (requires sudo)
 sudo bash build/build.sh
 
+# The NVIDIA edition (the default is --edition standard)
+sudo bash build/build.sh --edition nvidia
+
 # Quick rebuild — reuse existing chroot, skip debootstrap
 sudo bash build/build.sh --quick
 
-# Ultra-fast rebuild — quick + gzip compression (3-5x faster)
+# Ultra-fast rebuild — quick + gzip compression (3-5x faster; local testing only, not release quality)
 sudo bash build/build.sh --fast
 
 # Force full clean rebuild from scratch
@@ -94,7 +111,7 @@ sudo bash build/build.sh --keep-chroot
 sudo bash build/build.sh --quick --keep-chroot
 ```
 
-The output ISO is written to `/var/lib/axon-build/axon-os-<version>-amd64.iso`.
+The ISO is written to `dist/axon-os-<version>-<edition>-amd64.iso`. The build fails if it is over its size limit (`build/size-budget.conf`).
 
 Full build documentation — including custom installer, Plymouth splash, and CI details — is in [docs/building.md](docs/building.md).
 

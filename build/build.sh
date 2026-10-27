@@ -7,14 +7,19 @@
 # GitHub Actions ubuntu-24.04 runners.
 #
 # Usage:
-#   sudo bash build/build.sh [--ci] [--compression xz|gzip] [--keep-chroot] [--quick] [--chroot]
+#   sudo bash build/build.sh [--edition standard|nvidia] [--ci] [--compression xz|gzip]
+#                            [--keep-chroot] [--quick] [--chroot]
 #
 # Flags:
+#   --edition=X       standard (default; AMD, Intel, older NVIDIA) or nvidia (GTX 16-series,
+#                     RTX and newer: adds the NVIDIA driver). Each edition has its own work
+#                     directory, so both can be built from one checkout.
 #   --ci              Non-interactive (default)
 #   --compression=X   Squashfs compression (default: xz)
 #   --keep-chroot     Reuse existing chroot without re-bootstrapping (AUTO if chroot exists)
 #   --quick           Fast rebuild: skips debootstrap + runs chroot-setup (already-installed pkgs are no-ops)
-#   --fast            Ultra-fast rebuild: quick mode + gzip compression (smaller ISO but 3-5x faster)
+#   --fast            Ultra-fast rebuild: quick mode + gzip compression (3-5x faster, but the ISO
+#                     is much bigger and NOT release quality; the size budget is not enforced)
 #   --fresh           Force full rebuild: deletes chroot + base image cache, starts from scratch
 #   --chroot          Drop into the existing build chroot shell
 #   --cmd 'CMD'       Run a command inside the chroot (combine with --chroot)
@@ -34,14 +39,10 @@ VERSION="${VERSION:-0.3.0}"
 ARCH="amd64"
 DIST="noble"
 MIRROR="https://us.archive.ubuntu.com/ubuntu/"
-ISO_NAME="axon-os-${VERSION}-${ARCH}.iso"
+EDITION="standard"
 VOLID="AXON_OS"
 
-WORK_DIR="${AXON_BUILD_DIR:-/var/lib/axon-build}"
-CHROOT="${WORK_DIR}/chroot"
-IMAGE="${WORK_DIR}/image"
-APT_CACHE="${WORK_DIR}/apt-cache"  # persistent .deb cache across builds
-BASE_IMAGE="${WORK_DIR}/base-${DIST}-${ARCH}.tar.xz"  # cached chroot tarball
+BUILD_ROOT="${AXON_BUILD_DIR:-/var/lib/axon-build}"
 
 # Reproducible builds: set SOURCE_DATE_EPOCH for deterministic timestamps
 # If not set externally, use the last git commit timestamp
@@ -53,7 +54,6 @@ if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
     fi
 fi
 export SOURCE_DATE_EPOCH
-STAGING="${WORK_DIR}/staging"
 DIST_DIR="${BASE_DIR}/dist"
 
 COMPRESSION="xz"
@@ -62,32 +62,49 @@ KEEP_CHROOT=false
 CHROOT_SHELL=false
 CHROOT_CMD=""
 FRESH=false
-
-for arg in "$@"; do
-    case "${arg}" in
-        --ci) ;; # reserved; everything is already non-interactive
-        --compression=*) COMPRESSION="${arg#*=}" ;;
-        --keep-chroot) KEEP_CHROOT=true ;;
-        --quick) QUICK=true; KEEP_CHROOT=true ;; # --quick implies --keep-chroot
-        --fast) QUICK=true; KEEP_CHROOT=true; COMPRESSION=gzip ;; # --fast is quick + fast compression
-        --chroot) CHROOT_SHELL=true ;;
-        --fresh) FRESH=true ;; # force full rebuild: delete chroot + base image
-        --cmd) [[ $# -gt $((i+1)) ]] || die "--cmd requires an argument" ;; # value parsed below
-        *) echo "[axon-build] Unknown option: ${arg}" >&2; exit 2 ;;
-    esac
-done
-# Extract --cmd value
-for ((i=1; i<=$#; i++)); do
-    eval "val=\${$i}"
-    if [[ "${val}" == "--cmd" ]]; then
-        next=$((i+1))
-        eval "CHROOT_CMD=\${$next}"
-    fi
-done
+FAST=false
 
 BUILD_START=$(date +%s)
 log() { echo "[axon-build] $*"; }
 die() { echo "[axon-build] ERROR: $*" >&2; exit 1; }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --ci) shift ;; # reserved; everything is already non-interactive
+        --compression=*) COMPRESSION="${1#*=}"; shift ;;
+        --compression) [[ $# -ge 2 ]] || die "--compression requires an argument"; COMPRESSION="$2"; shift 2 ;;
+        --edition=*) EDITION="${1#*=}"; shift ;;
+        --edition) [[ $# -ge 2 ]] || die "--edition requires an argument"; EDITION="$2"; shift 2 ;;
+        --keep-chroot) KEEP_CHROOT=true; shift ;;
+        --quick) QUICK=true; KEEP_CHROOT=true; shift ;; # --quick implies --keep-chroot
+        --fast) QUICK=true; KEEP_CHROOT=true; COMPRESSION=gzip; FAST=true; shift ;;
+        --chroot) CHROOT_SHELL=true; shift ;;
+        --fresh) FRESH=true; shift ;; # force full rebuild: delete chroot + base image
+        --cmd) [[ $# -ge 2 ]] || die "--cmd requires an argument"; CHROOT_CMD="$2"; shift 2 ;;
+        *) echo "[axon-build] Unknown option: $1" >&2; exit 2 ;;
+    esac
+done
+
+case "${EDITION}" in
+    standard | nvidia) ;;
+    *) echo "[axon-build] Unknown edition '${EDITION}' (use standard or nvidia)" >&2; exit 2 ;;
+esac
+[[ -f "${BASE_DIR}/build/package-lists/${EDITION}.list" ]] || die "no package list for edition ${EDITION}"
+
+ISO_NAME="axon-os-${VERSION}-${EDITION}-${ARCH}.iso"
+# The standard edition keeps the original work directory (so existing caches still work);
+# any other edition gets its own, so editions never share a chroot.
+if [[ "${EDITION}" == "standard" ]]; then
+    WORK_DIR="${BUILD_ROOT}"
+else
+    WORK_DIR="${BUILD_ROOT}/edition-${EDITION}"
+fi
+CHROOT="${WORK_DIR}/chroot"
+IMAGE="${WORK_DIR}/image"
+APT_CACHE="${BUILD_ROOT}/apt-cache"  # persistent .deb cache, shared by every edition
+BASE_IMAGE="${WORK_DIR}/base-${DIST}-${ARCH}.tar.xz"  # cached chroot tarball
+STAGING="${WORK_DIR}/staging"
+
 timer() {
     local elapsed=$(($(date +%s) - BUILD_START))
     local mins=$((elapsed / 60))
@@ -104,12 +121,14 @@ timer() {
 # base tarball it finds there, so the directory must not be writable by anyone
 # but root (a predictable path in /tmp could be pre-seeded by another user).
 secure_work_dir() {
-    mkdir -p -m 0755 "${WORK_DIR}"
-    local owner perms
-    owner="$(stat -c %u "${WORK_DIR}")"
-    perms="$(stat -c %a "${WORK_DIR}")"
-    [[ "${owner}" == "0" ]] || die "Work dir ${WORK_DIR} is not owned by root; refusing to use it"
-    (( (8#${perms} & 8#022) == 0 )) || die "Work dir ${WORK_DIR} is group/world-writable; refusing to use it"
+    local dir owner perms
+    for dir in "${BUILD_ROOT}" "${WORK_DIR}"; do
+        mkdir -p -m 0755 "${dir}"
+        owner="$(stat -c %u "${dir}")"
+        perms="$(stat -c %a "${dir}")"
+        [[ "${owner}" == "0" ]] || die "Work dir ${dir} is not owned by root; refusing to use it"
+        (( (8#${perms} & 8#022) == 0 )) || die "Work dir ${dir} is group/world-writable; refusing to use it"
+    done
 }
 
 check_deps() {
@@ -307,6 +326,7 @@ configure_chroot() {
     chroot "${CHROOT}" /usr/bin/env \
         AXON_VERSION="${VERSION}" \
         AXON_QUICK="${QUICK}" \
+        AXON_EDITION="${EDITION}" \
         AXON_WINABI_BUILD="${AXON_WINABI_BUILD:-0}" \
         AXON_WINABI_AUTOLOAD="${AXON_WINABI_AUTOLOAD:-0}" \
         /bin/bash /opt/axon-src/build/config/chroot-setup.sh
@@ -347,7 +367,7 @@ build_image_tree() {
 
     du -sx --block-size=1 "${CHROOT}" | cut -f1 > "${IMAGE}/casper/filesystem.size"
 
-    echo "Axon OS ${VERSION} \"Pulse\" - Release ${ARCH} ($(date +%Y%m%d))" > "${IMAGE}/.disk/info"
+    echo "Axon OS ${VERSION} \"Pulse\" ${EDITION} - Release ${ARCH} ($(date +%Y%m%d))" > "${IMAGE}/.disk/info"
     touch "${IMAGE}/.disk/base_installable"
     echo 'full_cd/single' > "${IMAGE}/.disk/cd_type"
 
@@ -359,6 +379,11 @@ build_image_tree() {
     cp -r "${BASE_DIR}/theme/grub/axon" "${IMAGE}/boot/grub/themes/"
     cp "${CHROOT}/usr/share/grub/unicode.pf2" "${IMAGE}/boot/grub/themes/axon/unicode.pf2" || \
     cp /usr/share/grub/unicode.pf2 "${IMAGE}/boot/grub/themes/axon/unicode.pf2" || true
+
+    # The NVIDIA edition boots with the NVIDIA driver's kernel mode setting by default
+    local default_params="quiet splash"
+    local nvidia_params="quiet splash nouveau.modeset=0 nvidia-drm.modeset=1 console=tty0"
+    [[ "${EDITION}" == "nvidia" ]] && default_params="${nvidia_params}"
 
     cat > "${IMAGE}/boot/grub/grub.cfg" <<EOF
 set default="0"
@@ -375,7 +400,7 @@ if loadfont /boot/grub/themes/axon/unicode.pf2 ; then
 fi
 
 menuentry "Try or Install Axon OS ${VERSION}" --class axonos {
-    linux /casper/vmlinuz boot=casper quiet splash ---
+    linux /casper/vmlinuz boot=casper ${default_params} ---
     initrd /casper/initrd
 }
 
@@ -385,7 +410,7 @@ menuentry "Try or Install Axon OS ${VERSION} (safe graphics)" --class safe {
 }
 
 menuentry "Try or Install Axon OS ${VERSION} (modern NVIDIA drivers)" --class nvidia {
-    linux /casper/vmlinuz boot=casper quiet splash nouveau.modeset=0 nvidia-drm.modeset=1 console=tty0 ---
+    linux /casper/vmlinuz boot=casper ${nvidia_params} ---
     initrd /casper/initrd
 }
 
@@ -486,12 +511,37 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Size budget (see build/size-budget.conf)
+# ---------------------------------------------------------------------------
+# Writes the installed size of every package next to the ISO, so the next build (and CI)
+# can say what grew, then checks the ISO against its edition's limit.
+check_size_budget() {
+    local list="${DIST_DIR}/${ISO_NAME%.iso}.packages.tsv"
+    {
+        echo "# iso_bytes=$(stat -c %s "${DIST_DIR}/${ISO_NAME}")"
+        chroot "${CHROOT}" dpkg-query -W -f='${Installed-Size}\t${Package}\t${Version}\n'
+    } > "${list}"
+    [[ -n "${SUDO_UID:-}" ]] && chown "${SUDO_UID}:${SUDO_GID:-${SUDO_UID}}" "${list}"
+
+    if [[ "${FAST}" == "true" ]]; then
+        log "WARNING: --fast ISO (gzip) is NOT release quality; size budget not enforced"
+        return 0
+    fi
+    local previous=()
+    [[ -n "${AXON_PREVIOUS_PACKAGES:-}" && -f "${AXON_PREVIOUS_PACKAGES}" ]] \
+        && previous=(--previous "${AXON_PREVIOUS_PACKAGES}")
+    bash "${BASE_DIR}/scripts/check-iso-size.sh" --edition "${EDITION}" \
+        --packages "${list}" "${previous[@]}" "${DIST_DIR}/${ISO_NAME}" \
+        || die "ISO is over its size limit (see build/size-budget.conf)"
+}
+
+# ---------------------------------------------------------------------------
 # SBOM Generation
 # ---------------------------------------------------------------------------
 generate_sbom() {
     log "Generating Software Bill of Materials (SBOM)..."
 
-    local sbom_file="${DIST_DIR}/sbom.spdx.json"
+    local sbom_file="${DIST_DIR}/${ISO_NAME%.iso}.sbom.spdx.json"
 
     # Collect package information from the chroot
     local packages=""
@@ -514,7 +564,7 @@ generate_sbom() {
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "Axon-OS-${VERSION}",
+  "name": "Axon-OS-${VERSION}-${EDITION}",
   "documentNamespace": "https://axon-os.github.io/sbom/${VERSION}",
   "creationInfo": {
     "created": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
@@ -560,6 +610,7 @@ main() {
 
     log "============================================"
     log " Axon OS Build System v${VERSION}"
+    log " Edition: ${EDITION}"
     log " Base:    Ubuntu ${DIST} (${ARCH})"
     log " Workdir: ${WORK_DIR}"
     log " Output:  ${DIST_DIR}/${ISO_NAME}"
@@ -567,6 +618,7 @@ main() {
     [[ "${QUICK}" == "true" && "${COMPRESSION}" == "gzip" ]] && log " Mode:    FAST (quick rebuild + gzip compression)"
     [[ "${QUICK}" == "true" && "${COMPRESSION}" != "gzip" ]] && log " Mode:    QUICK (fast rebuild)"
     [[ "${FRESH}" == "true" ]] && log " Mode:    FRESH (full rebuild from scratch)"
+    [[ "${FAST}" == "true" ]] && log " WARNING: --fast makes a gzip ISO for local testing only; it is NOT release quality"
     log "============================================"
 
     timer "Phase 1/4: Dependencies"
@@ -583,6 +635,7 @@ main() {
 
     timer "Phase 4/4: Bootable hybrid ISO"
     build_iso
+    check_size_budget
 
     local total=$(($(date +%s) - BUILD_START))
     local mins=$((total / 60))

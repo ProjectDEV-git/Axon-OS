@@ -78,7 +78,8 @@ def row_for(win, item_id, mode="discover"):
 def test_discover_lists_the_whole_catalog_with_legal_notes(tmp_path):
     win, _ = make(tmp_path)
     ids = {r.item.id for r in win._rows}
-    assert ids == set(win.catalog.items)
+    # items for one kind of graphics card are on the Drivers page instead
+    assert ids == {i.id for i in win.catalog.items.values() if not i.requires.get("gpu")}
     assert "legally obtained" in row_for(win, "dolphin").get_subtitle()
     assert win._stack.get_pages().get_n_items() == 5
     win.destroy()

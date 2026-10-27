@@ -135,6 +135,10 @@ install -Dm644 "${SRC}/data/polkit/org.axonos.update.policy" \
 # Hash-pinned Ollama installer used by first boot and axon-ollama-setup
 install -Dm755 "${SRC}/build/config/install-ollama.sh" "${R}${AXON_LIB}/ollama/install-ollama.sh"
 install -Dm644 "${SRC}/build/config/ollama-release.env" "${R}${AXON_LIB}/ollama/ollama-release.env"
+# GPU libraries (CUDA, ROCm) are added after a graphics card is found, never in the ISO
+install -Dm755 "${SRC}/build/config/install-ollama-gpu.sh" "${R}${AXON_LIB}/ollama/install-ollama-gpu.sh"
+install -Dm644 "${SRC}/data/polkit/org.axonos.ollama-gpu.policy" \
+    "${R}/usr/share/polkit-1/actions/org.axonos.ollama-gpu.policy"
 
 # Shell environment interceptor and the shared Python logger
 install -Dm644 "${SRC}/services/axon-sandbox/axon-sandbox-env.sh" "${R}/etc/profile.d/axon-sandbox.sh"

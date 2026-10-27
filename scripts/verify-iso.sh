@@ -25,9 +25,9 @@ usage() {
     echo "  checksum-file   Path to the SHA-256 checksum file (optional)"
     echo ""
     echo "Examples:"
-    echo "  $0 axon-os-0.3.0-amd64.iso"
-    echo "  $0 axon-os-0.3.0-amd64.iso axon-os-0.3.0-amd64.iso.sig"
-    echo "  $0 axon-os-0.3.0-amd64.iso axon-os-0.3.0-amd64.iso.sig axon-os-0.3.0-amd64.iso.sha256"
+    echo "  $0 axon-os-0.3.0-standard-amd64.iso"
+    echo "  $0 axon-os-0.3.0-standard-amd64.iso axon-os-0.3.0-standard-amd64.iso.sig"
+    echo "  $0 axon-os-0.3.0-standard-amd64.iso axon-os-0.3.0-standard-amd64.iso.sig axon-os-0.3.0-standard-amd64.iso.sha256"
     exit 1
 }
 

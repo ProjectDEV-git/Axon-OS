@@ -212,3 +212,20 @@ Removing any of these changes the product for non-gamers, so it needs your sign-
 2. `org.axonos.Gaming` as a top-level service rather than a plugin?
 3. Is a third-party Mesa PPA acceptable for Phase 1, or should we rely on noble's Mesa until Phase 6?
 4. Should I add the Standing Rule (§2) to `AGENTS.md` now?
+
+## 12. Phase 4 findings (2026-10-27)
+
+- **Five packages in `packages.list` do not exist in noble** (`dxvk`, `fastfetch`, `grub-btrfs`,
+  `libsane`, `vkd3d-proton`). The bulk install failed on them every build and fell back to one package
+  at a time, with only a warning. Removed; `scripts/verify-packages.py` now checks every name and runs in CI.
+  (`grub-btrfs`: BTRFS snapshot boot entries are not installed by the image; check the rollback feature
+  separately.)
+- **The pinned Ollama release is one 1.44 GB tarball with both CUDA 12 and 13** (`lib/ollama/cuda_v12`
+  1.2 GB and `cuda_v13` 0.8 GB unpacked, Vulkan 42 MB, CPU libraries and program about 52 MB). AMD ROCm is
+  a separate 1.05 GB asset (2.5 GB unpacked). Layout checked by downloading both; the main hash matches the pin.
+- **The Axon apt repository cannot hold the GPU libraries.** It is served from GitHub Pages, which rejects
+  files over 100 MB, so `axon-ollama-cuda` / `axon-ollama-rocm` apt packages (plan §8.2) are not possible
+  there. Replaced by a pinned, SHA-256-checked helper (`install-ollama-gpu.sh`) run through `pkexec`.
+- **Ubuntu ships prebuilt, Secure Boot-signed NVIDIA modules** (`linux-modules-nvidia-580-open-generic`)
+  for the 6.8 kernel, so the NVIDIA edition needs no DKMS and no MOK enrollment (plan §9.3) for the
+  ISO driver. Drivers installed later from Game Center on the Standard edition may still use DKMS.

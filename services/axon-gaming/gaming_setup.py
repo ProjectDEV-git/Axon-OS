@@ -7,8 +7,11 @@ import sys
 from pathlib import Path
 
 from catalog import Catalog
+from catalog_installer import gpu_backend
 
 CODECS_ID = "media-codecs"
+# Ollama GPU libraries by graphics card vendor (see gpu_drivers.Gpu.vendor)
+AI_ACCELERATION = {"nvidia": "ollama-cuda", "amd": "ollama-rocm"}
 NONE_PRESET = "none"
 
 
@@ -20,8 +23,15 @@ def preset_ids(catalog: Catalog, preset: str) -> list[str]:
 
 
 def selected_ids(catalog: Catalog, chosen: set[str]) -> list[str]:
-    """Chosen ids that exist and can be installed here, in catalog order."""
-    return [i for i in catalog.items if i in chosen and catalog.items[i].kind != "component"]
+    """Chosen ids that exist and can be installed here, in catalog order.
+
+    Components belong to other Axon services, except Ollama's GPU libraries.
+    """
+    return [
+        i
+        for i, item in catalog.items.items()
+        if i in chosen and (item.kind != "component" or gpu_backend(item))
+    ]
 
 
 def game_center_command() -> list[str]:

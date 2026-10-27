@@ -1,0 +1,6 @@
+# Axon OS Standard edition (AMD, Intel and older NVIDIA graphics): open-source Mesa drivers.
+# One package per line; blank lines and "#" comments are ignored. These must install:
+# a name that does not exist fails the build.
+
+# Open-source NVIDIA driver, for cards the NVIDIA edition's driver does not cover
+xserver-xorg-video-nouveau

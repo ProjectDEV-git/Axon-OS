@@ -71,6 +71,11 @@ class GamingPage(Gtk.Box):
 
         self._driver_check = Gtk.CheckButton(active=True, visible=False)
         self.append(self._driver_check)
+        # Local AI on the graphics card (Ollama's CUDA or ROCm libraries)
+        self._ai_check = Gtk.CheckButton(active=False, visible=False)
+        self._ai_item: str | None = None
+        self.append(self._ai_check)
+        self._ai_check.connect("toggled", lambda _b: self._update_summary())
 
         self._choices = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.append(self._choices)
@@ -195,11 +200,41 @@ class GamingPage(Gtk.Box):
                 )
             )
             self._driver_check.set_visible(True)
+        self._offer_ai_acceleration(gpus, bool(needs_driver), (info or {}).get("nvidia_version"))
         self._update_summary()
         return False
 
+    def _offer_ai_acceleration(
+        self, gpus: list, needs_driver: bool, nvidia_version: str | None
+    ) -> None:
+        """Offer Ollama's GPU libraries for the first card they exist for.
+
+        NVIDIA: on by default when the driver is (or is being) installed, since CUDA works
+        with it. AMD: off by default, because only recent cards are supported and
+        otherwise the 1 GB would be wasted.
+        """
+        for gpu in gpus:
+            item_id = gaming_setup.AI_ACCELERATION.get(gpu.vendor)
+            item = self._catalog.items.get(item_id or "")
+            if item is None:
+                continue
+            if gpu.vendor == "nvidia" and not (needs_driver or nvidia_version):
+                continue  # CUDA needs the NVIDIA driver, which this card does not have
+            self._ai_item = item.id
+            vendor = "NVIDIA" if gpu.vendor == "nvidia" else "AMD"
+            self._ai_check.set_label(
+                _("Run local AI on your {vendor} graphics card ({size} download)").format(
+                    vendor=vendor, size=gb(item.size_mb)
+                )
+            )
+            self._ai_check.set_active(gpu.vendor == "nvidia")
+            self._ai_check.set_visible(True)
+            return
+
     def selected(self) -> set[str]:
         chosen = {i for i, b in self._boxes.items() if b.get_active()}
+        if self._ai_item and self._ai_check.get_active():
+            chosen.add(self._ai_item)
         if self._codecs.get_active():
             chosen.add(gaming_setup.CODECS_ID)
         return chosen

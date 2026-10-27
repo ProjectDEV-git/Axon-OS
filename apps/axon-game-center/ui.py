@@ -383,7 +383,8 @@ class GameCenterWindow(Adw.ApplicationWindow):
         box.append(self._runtime_note)
         self._update_starter_card()
         for category, name in self.catalog.categories.items():
-            items = self.catalog.in_category(category)
+            # Items for one kind of graphics card live on the Drivers page
+            items = [i for i in self.catalog.in_category(category) if not i.requires.get("gpu")]
             if not items:
                 continue
             group = self._group(name)
@@ -711,7 +712,9 @@ class GameCenterWindow(Adw.ApplicationWindow):
             self._gpu_group.remove(row)
         self._gpu_rows = []
         for row in getattr(self, "_extra_rows", []):
-            row.get_parent().remove(row)
+            group = row.get_ancestor(Adw.PreferencesGroup)
+            if group is not None:
+                group.remove(row)
         self._extra_rows: list[Gtk.Widget] = []
         info = info or {
             "gpus": [],
@@ -773,18 +776,17 @@ class GameCenterWindow(Adw.ApplicationWindow):
             )
             self._driver_group.add(row)
             self._extra_rows.append(row)
+        # Local AI on the graphics card: a normal install row for the matching card
+        self._rows = [r for r in self._rows if r not in getattr(self, "_ai_rows", [])]
+        self._ai_rows: list[ItemRow] = []
         wanted = {"nvidia": "ollama-cuda", "amd": "ollama-rocm"}
         for gpu in gpus:
             item = self.catalog.items.get(wanted.get(gpu.vendor, ""))
-            if item is None:
+            if item is None or any(r.item.id == item.id for r in self._ai_rows):
                 continue
-            row = Adw.ActionRow(
-                title=item.name,
-                subtitle=GLib.markup_escape_text(f"{item.summary} · {gb(item.size_mb)}"),
-            )
-            button = Gtk.Button(label=_("Install"), valign=Gtk.Align.CENTER, sensitive=False)
-            button.set_tooltip_text(_("Not available yet. It will arrive in an update."))
-            row.add_suffix(button)
+            row = ItemRow(self, item, "installed")  # Update and Remove once installed
+            self._rows.append(row)
+            self._ai_rows.append(row)
             self._ai_group.add(row)
             self._extra_rows.append(row)
 

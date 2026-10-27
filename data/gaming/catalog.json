@@ -982,14 +982,14 @@
         "type": "component",
         "component": "ollama-cuda"
       },
-      "size_mb_estimate": 1500,
+      "size_mb_estimate": 1440,
       "starter_pack": false,
       "aliases": [],
       "requires": {
         "gpu": "nvidia",
         "arch": "x86_64"
       },
-      "notes": "Installed automatically when an NVIDIA graphics card is found.",
+      "notes": "Needs the NVIDIA driver. Downloads the full Ollama release (1.4 GB) and keeps only the CUDA libraries (about 1 GB on disk). Asks for your password.",
       "verified": null
     },
     {
@@ -1001,14 +1001,14 @@
         "type": "component",
         "component": "ollama-rocm"
       },
-      "size_mb_estimate": 1500,
+      "size_mb_estimate": 1050,
       "starter_pack": false,
       "aliases": [],
       "requires": {
         "gpu": "amd",
         "arch": "x86_64"
       },
-      "notes": "Installed automatically when a supported AMD graphics card is found.",
+      "notes": "Only recent AMD cards (RDNA 2 and newer, and some older workstation cards) are supported; on others Ollama keeps using the processor. Downloads 1 GB, 2.5 GB on disk. Asks for your password.",
       "verified": null
     },
     {

@@ -1,0 +1,6 @@
+# Axon OS NVIDIA edition (GTX 16-series, RTX and newer): the NVIDIA driver, signed for
+# Secure Boot, plus the 32-bit libraries Steam needs. One package per line; blank lines
+# and "#" comments are ignored. These must install: a name that does not exist fails the build.
+
+# Metapackage in packaging/axon-nvidia (driver branch pinned there)
+axon-nvidia

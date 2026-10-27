@@ -1,4 +1,5 @@
-# Axon OS — package manifest installed into the ISO root filesystem.
+# Axon OS — packages both editions get (installed into the ISO root filesystem).
+# Edition-specific graphics live in standard.list and nvidia.list; see build/build.sh --edition.
 # One package per line; blank lines and "#" comments are ignored.
 # NOTE: firefox/chromium are NOT listed — on Ubuntu 24.04 they are snap
 # transition packages that cannot install inside a chroot.
@@ -95,7 +96,6 @@ zenity
 dconf-editor
 dconf-cli
 htop
-fastfetch
 
 # ── VM guest additions (VirtualBox + VMware + QEMU/KVM) ───────────────────────
 virtualbox-guest-utils
@@ -141,7 +141,6 @@ xserver-xorg-video-all
 xserver-xorg-video-amdgpu
 xserver-xorg-video-radeon
 xserver-xorg-video-intel
-xserver-xorg-video-nouveau
 xserver-xorg-video-fbdev
 xserver-xorg-video-vesa
 mesa-vulkan-drivers
@@ -165,7 +164,6 @@ libspa-0.2-bluetooth
 
 # Audio Extras
 alsa-base
-alsa-utils
 firmware-sof-signed
 gstreamer1.0-pipewire
 
@@ -180,7 +178,6 @@ printer-driver-escpr
 foomatic-db-compressed-ppds
 ipp-usb
 sane-utils
-libsane
 simple-scan
 
 # Input Devices
@@ -199,7 +196,6 @@ libpam-fprintd
 # Storage & Dual-Boot Filesystems
 ntfs-3g
 exfatprogs
-btrfs-progs
 xfsprogs
 lvm2
 cryptsetup
@@ -230,9 +226,6 @@ upower
 build-essential
 cmake
 pkg-config
-git
-curl
-wget
 python3-venv
 python3-dev
 
@@ -240,11 +233,9 @@ python3-dev
 # Steam, GameMode, MangoHud, Vulkan and the 32-bit graphics libraries come from
 # the axon-gaming-core metapackage (packaging/axon-gaming-core), installed by
 # chroot-setup.sh. Other launchers (Lutris, Heroic...) are download-later.
-# DirectX translation layers (DXVK + vkd3d-proton)
-dxvk
-vkd3d-proton
+# DXVK and vkd3d-proton are not packaged in noble (checked 2026-10-27 with
+# scripts/verify-packages.py); APEX-WIN installs them per prefix when a game needs them.
 # Vulkan runtime
-mesa-vulkan-drivers
 vulkan-tools
 libvulkan1
 libvulkan-dev
@@ -260,7 +251,6 @@ wine64
 wine32:i386
 
 # ── Windows ABI desktop integration ─────────────────────────────────────────
-xdg-utils
 shared-mime-info
 desktop-file-utils
 polkitd
@@ -278,7 +268,6 @@ file-roller
 # ── Architectural Pillars ──────────────────────────────────────────────────────
 # Self-healing snapshots
 timeshift
-grub-btrfs
 # Intelligent hardware routing
 switcheroo-control
 irqbalance

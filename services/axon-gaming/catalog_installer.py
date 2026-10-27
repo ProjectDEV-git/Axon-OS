@@ -22,6 +22,10 @@ from typing import Protocol
 from catalog import Item
 
 FLATHUB_URL = "https://dl.flathub.org/repo/flathub.flatpakrepo"
+# Adds Ollama's GPU libraries; run as root through pkexec (polkit action org.axonos.ollama-gpu)
+GPU_HELPER = "/usr/lib/axon/ollama/install-ollama-gpu.sh"
+# Catalog components this module can install, and the backend name the helper takes
+GPU_COMPONENTS = {"ollama-cuda": "cuda", "ollama-rocm": "rocm"}
 OFFLINE_MESSAGE = "Connect to the internet to install apps."
 RUNTIME_NOTE = "This also downloads the shared runtime, used by many apps."
 
@@ -100,6 +104,8 @@ def install_steps(item: Item) -> list[list[str]]:
         )
     elif item.kind in ("apt", "axon-apt"):
         steps.append(["pkcon", "-y", "install", *item.source["packages"]])
+    elif backend := gpu_backend(item):
+        steps.append(["pkexec", GPU_HELPER, backend])
     return steps
 
 
@@ -112,6 +118,8 @@ def remove_steps(item: Item, remove_unused: bool = False) -> list[list[str]]:
         return steps
     if item.kind in ("apt", "axon-apt"):
         return [["pkcon", "-y", "remove", *item.source["packages"]]]
+    if backend := gpu_backend(item):
+        return [["pkexec", GPU_HELPER, "remove", backend]]
     return []
 
 
@@ -121,12 +129,21 @@ def update_steps(item: Item) -> list[list[str]]:
         return [["flatpak", "update", "--user", "--noninteractive", "-y", item.source["ref"]]]
     if item.kind in ("apt", "axon-apt"):
         return [["pkcon", "-y", "update", *item.source["packages"]]]
+    if backend := gpu_backend(item):
+        return [["pkexec", GPU_HELPER, backend]]  # installing again replaces it
     return []
 
 
+def gpu_backend(item: Item) -> str | None:
+    """ "cuda" or "rocm" for the Ollama GPU library components, else None."""
+    if item.kind != "component":
+        return None
+    return GPU_COMPONENTS.get(str(item.source.get("component")))
+
+
 def is_supported(item: Item) -> bool:
-    """Components are installed by other Axon services, not from here (yet)."""
-    return item.kind != "component"
+    """Components other than the Ollama GPU libraries belong to other Axon services."""
+    return item.kind != "component" or gpu_backend(item) is not None
 
 
 def installed_ids(items: list[Item], runner: Runner = run_command) -> set[str]:
@@ -137,7 +154,14 @@ def installed_ids(items: list[Item], runner: Runner = run_command) -> set[str]:
     runner(["flatpak", "list", "--user", "--runtime", "--columns=application"], lines.append)
     flatpaks.update(lines)
     done: set[str] = set()
+    gpu_lines: list[str] = []
+    runner([GPU_HELPER, "status"], gpu_lines.append)
+    gpu_installed = {ln.split()[0] for ln in gpu_lines if ln.split()[:1] in (["cuda"], ["rocm"])}
     for item in items:
+        backend = gpu_backend(item)
+        if backend and backend in gpu_installed:
+            done.add(item.id)
+            continue
         if item.kind == "flatpak" and item.source["ref"] in flatpaks:
             done.add(item.id)
         elif item.kind in ("apt", "axon-apt") and all(

@@ -1,6 +1,6 @@
 # Gaming on Axon OS
 
-Status: Phases 1 (gaming core and system tweaks), 2 (game mode) and 3 (catalog and Game Center) of `docs/gaming-masterplan.md`.
+Status: Phases 1 (gaming core and system tweaks), 2 (game mode), 3 (catalog and Game Center) and 4 (editions and size enforcement) of `docs/gaming-masterplan.md`.
 Audit and background: `docs/gaming-audit.md`.
 
 ## What ships in the ISO
@@ -149,3 +149,16 @@ Offline, it skips itself with "You can install these later from Game Center."
 - **Ollama CUDA/ROCm libraries and Wine Mono/Gecko** are in the catalog as components, but nothing
   installs them yet; they need the packages planned for Phase 4. Their Install button is disabled.
 - **OpenRGB** may need udev rules that a Flatpak cannot add.
+
+## Editions and size
+
+Two ISOs are built from the same sources (`build.sh --edition standard|nvidia`): **Standard** for AMD,
+Intel and older NVIDIA cards, and **NVIDIA** for GTX 16-series and newer, with the signed 580 driver and
+the 32-bit libraries Steam needs. Both stay inside the budgets in `build/size-budget.conf` (3.5 / 3.9 GB
+and 4.3 / 4.7 GB); the build fails above the second number. Details, the release checklist and where
+the ISOs are hosted are in [docs/building.md](building.md).
+
+**Local AI.** The ISO has Ollama and its CPU libraries only. When the welcome app or Game Center finds a
+graphics card it offers the matching GPU libraries (NVIDIA CUDA, about 1.4 GB to download; AMD ROCm, about
+1 GB), installed by `install-ollama-gpu.sh` after a password prompt. The AMD option is off by default because
+only recent cards are supported. See [docs/building.md](building.md#local-ai-in-the-image).

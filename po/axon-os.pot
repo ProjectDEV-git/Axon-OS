@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-27 07:30+0000\n"
+"POT-Creation-Date: 2026-10-27 08:19+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -539,10 +539,6 @@ msgstr ""
 
 #: apps/axon-game-center/ui.py
 msgid "No graphics card found"
-msgstr ""
-
-#: apps/axon-game-center/ui.py
-msgid "Not available yet. It will arrive in an update."
 msgstr ""
 
 #: apps/axon-game-center/ui.py
@@ -1516,6 +1512,11 @@ msgstr ""
 msgid ""
 "Pick what to install. It downloads in the background while you use the "
 "desktop."
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+#, python-brace-format
+msgid "Run local AI on your {vendor} graphics card ({size} download)"
 msgstr ""
 
 #: apps/axon-welcome/gaming_page.py apps/axon-welcome/ui/welcome.py

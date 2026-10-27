@@ -23,8 +23,9 @@ def test_presets_select_their_items(catalog):
 
 @pytest.mark.unit
 def test_selected_ids_keep_catalog_order_and_drop_unknown_and_components(catalog):
-    chosen = {"discord", "heroic", "bogus", "ollama-cuda"}
-    assert gaming_setup.selected_ids(catalog, chosen) == ["heroic", "discord"]
+    chosen = {"discord", "heroic", "bogus", "ai-models", "ollama-cuda"}
+    # the AI model download belongs to the AI services; the GPU libraries install from here
+    assert gaming_setup.selected_ids(catalog, chosen) == ["heroic", "discord", "ollama-cuda"]
 
 
 @pytest.mark.unit

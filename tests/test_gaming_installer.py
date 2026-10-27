@@ -101,10 +101,19 @@ class TestCommands:
                 assert isinstance(step, list) and all(isinstance(a, str) for a in step)
                 assert not any(ch in " ".join(step) for ch in ";&|`$")
 
-    def test_components_are_not_installed_from_here(self, catalog):
-        item = catalog.items["ollama-cuda"]
+    def test_other_components_are_not_installed_from_here(self, catalog):
+        item = catalog.items["ai-models"]
         assert not installer.is_supported(item)
         assert installer.install_steps(item) == []
+
+    def test_ollama_gpu_libraries_install_through_the_polkit_helper(self, catalog):
+        for item_id, backend in (("ollama-cuda", "cuda"), ("ollama-rocm", "rocm")):
+            item = catalog.items[item_id]
+            assert installer.is_supported(item)
+            helper = installer.GPU_HELPER
+            assert installer.install_steps(item) == [["pkexec", helper, backend]]
+            assert installer.remove_steps(item) == [["pkexec", helper, "remove", backend]]
+            assert installer.update_steps(item) == [["pkexec", helper, backend]]
 
 
 @pytest.mark.unit
@@ -125,6 +134,15 @@ class TestInstalledState:
     def test_flatpak_missing_means_nothing_installed(self, catalog):
         runner = lambda argv, on_line: (on_line("flatpak: not found"), 127)[1]  # noqa: E731
         assert installer.installed_ids([catalog.items["heroic"]], runner) == set()
+
+    def test_installed_gpu_libraries_are_detected_from_the_helper(self, catalog):
+        def runner(argv, on_line):
+            if argv[-1] == "status":
+                on_line("cuda v0.35.1")
+            return 0
+
+        items = [catalog.items["ollama-cuda"], catalog.items["ollama-rocm"]]
+        assert installer.installed_ids(items, runner) == {"ollama-cuda"}
 
     def test_runtime_presence(self):
         assert installer.flatpak_runtime_present(
@@ -254,10 +272,10 @@ class TestJobQueue:
         wait_for(events, "heroic", DONE)
         queue.close()
 
-    def test_components_report_a_clear_failure(self, catalog):
+    def test_components_owned_by_other_services_report_a_clear_failure(self, catalog):
         queue, events = self.make(FakeRunner())
-        queue.install(catalog.items["ollama-cuda"])
-        wait_for(events, "ollama-cuda", FAILED)
+        queue.install(catalog.items["ai-models"])
+        wait_for(events, "ai-models", FAILED)
         queue.close()
 
 
@@ -270,7 +288,7 @@ class TestUpdates:
         assert installer.update_steps(catalog.items["input-remapper"]) == [
             ["pkcon", "-y", "update", "input-remapper"]
         ]
-        assert installer.update_steps(catalog.items["ollama-cuda"]) == []
+        assert installer.update_steps(catalog.items["ai-models"]) == []
 
     def test_update_needs_the_network(self, catalog):
         events = []

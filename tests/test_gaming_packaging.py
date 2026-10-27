@@ -13,7 +13,7 @@ PKG = ROOT / "packaging"
 
 
 def _packages_list() -> list[str]:
-    lines = (ROOT / "build" / "config" / "packages.list").read_text().splitlines()
+    lines = (ROOT / "build" / "package-lists" / "common.list").read_text().splitlines()
     return [ln.strip() for ln in lines if not re.match(r"^\s*(#|$)", ln)]
 
 
@@ -88,6 +88,7 @@ def test_build_pkg_builds_every_small_package(tmp_path):
         "axon-gaming-catalog",
         "axon-gaming-core",
         "axon-gaming-tweaks",
+        "axon-nvidia",
     ]
     info = subprocess.run(
         ["dpkg-deb", "-f", str(tmp_path / debs[0]), "Version"],

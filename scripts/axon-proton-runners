@@ -43,7 +43,9 @@ list() {
 }
 
 selected() {
-    [ -r "$CONF" ] && head -n 1 "$CONF" | tr -d '\n' || true
+    if [ -r "$CONF" ]; then
+        head -n 1 "$CONF" | tr -d '\n'
+    fi
 }
 
 case "${1:-}" in

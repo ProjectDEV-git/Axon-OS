@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>Axon OS</vendor>
+  <vendor_url>https://github.com/ProjectDEV-git/Axon-OS</vendor_url>
+
+  <!-- Game Center and the welcome app run only the Ollama GPU library installer as
+       root, through pkexec. It downloads a pinned release, checks its SHA-256 and unpacks
+       one backend (cuda or rocm); it takes no other input. -->
+  <action id="org.axonos.ollama-gpu">
+    <description>Install graphics card support for local AI</description>
+    <message>Authentication is required to add graphics card support for local AI models</message>
+    <icon_name>applications-science</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/axon/ollama/install-ollama-gpu.sh</annotate>
+  </action>
+</policyconfig>

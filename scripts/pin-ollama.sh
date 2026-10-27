@@ -25,3 +25,14 @@ sed -i \
     -e "s|^OLLAMA_SHA256=.*|OLLAMA_SHA256=\"${SHA}\"|" \
     "${PIN_FILE}"
 echo "Pinned Ollama ${VERSION} (${ASSET}) sha256=${SHA} in ${PIN_FILE}"
+
+# The ROCm libraries are a separate asset of the same release
+ROCM_ASSET="ollama-linux-amd64-rocm.tar.zst"
+curl -fL --retry 3 -o "${tmp}/${ROCM_ASSET}" \
+    "https://github.com/ollama/ollama/releases/download/${VERSION}/${ROCM_ASSET}"
+ROCM_SHA="$(sha256sum "${tmp}/${ROCM_ASSET}" | cut -d' ' -f1)"
+sed -i \
+    -e "s|^OLLAMA_ROCM_ASSET=.*|OLLAMA_ROCM_ASSET=\"${ROCM_ASSET}\"|" \
+    -e "s|^OLLAMA_ROCM_SHA256=.*|OLLAMA_ROCM_SHA256=\"${ROCM_SHA}\"|" \
+    "${PIN_FILE}"
+echo "Pinned ROCm libraries (${ROCM_ASSET}) sha256=${ROCM_SHA}"

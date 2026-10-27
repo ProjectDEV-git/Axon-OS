@@ -11,6 +11,7 @@ export HOME=/root
 
 SRC="/opt/axon-src"
 VERSION="${AXON_VERSION:-0.3.0}"
+EDITION="${AXON_EDITION:-standard}"
 CODENAME="Pulse"
 
 log() { echo "[chroot-setup] $*"; }
@@ -97,8 +98,8 @@ done
 # ---------------------------------------------------------------------------
 # 4. Desktop + Axon dependencies from the package manifest
 # ---------------------------------------------------------------------------
-log "Installing desktop packages from packages.list..."
-mapfile -t PACKAGES < <(grep -vE '^\s*(#|$)' "${SRC}/build/config/packages.list")
+log "Installing desktop packages from build/package-lists/common.list..."
+mapfile -t PACKAGES < <(grep -vE '^\s*(#|$)' "${SRC}/build/package-lists/common.list")
 # DKMS/WiFi packages often fail on mismatched kernels — install them last
 # and tolerate failures so the rest of the build continues.
 DKMS_PACKAGES=(bcmwl-kernel-source broadcom-sta-dkms)
@@ -120,6 +121,23 @@ fi
 for p in "${DKMS_PACKAGES[@]}"; do
     apt-get install -y "${p}" 2>/dev/null || log "WARNING: DKMS package ${p} failed (expected if host kernel differs)"
 done
+
+# Edition packages (standard.list / nvidia.list): no tolerance for failure. An edition
+# without its graphics stack is not the edition it claims to be.
+if [[ ! -f "${SRC}/build/package-lists/${EDITION}.list" ]]; then
+    log "ERROR: no package list for edition '${EDITION}'"
+    exit 1
+fi
+log "Installing ${EDITION} edition packages..."
+mapfile -t EDITION_PACKAGES < <(grep -vE '^\s*(#|$)' "${SRC}/build/package-lists/${EDITION}.list")
+EDITION_DEBS=0
+for p in "${EDITION_PACKAGES[@]}"; do
+    # Packages that come from this repository are built below, after the axon-os package
+    [[ -d "${SRC}/packaging/${p}" ]] && EDITION_DEBS=1
+done
+if [[ "${EDITION_DEBS}" == "0" && ${#EDITION_PACKAGES[@]} -gt 0 ]]; then
+    apt-get install -y "${EDITION_PACKAGES[@]}"
+fi
 
 log "Adding flathub remote..."
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
@@ -215,6 +233,12 @@ bash "${SRC}/packaging/build-deb.sh" /tmp/axon-deb
 apt-get install -y --reinstall -o Dpkg::Options::=--force-confmiss /tmp/axon-deb/axon-os_*_all.deb
 rm -rf /tmp/axon-deb
 
+# Local AI: the Ollama program and its CPU libraries (about 50 MB), hash-pinned. The service
+# stays disabled until the user opts into local AI; the CUDA/ROCm libraries (over 2 GB) are
+# never in the image and are added by install-ollama-gpu.sh when a graphics card is found.
+log "Installing Ollama (CPU only)..."
+bash /usr/lib/axon/ollama/install-ollama.sh --cpu-only
+
 # Gaming: small packages built by packaging/build-pkg.sh (see docs/gaming.md).
 # steam-installer asks for the Steam Subscriber Agreement through debconf; an
 # unattended image build needs the answer preseeded. Steam itself shows the
@@ -224,8 +248,19 @@ echo "steam steam/question select I AGREE" | debconf-set-selections
 echo "steam steam/license note" | debconf-set-selections
 rm -rf /tmp/axon-gaming-debs
 bash "${SRC}/packaging/build-pkg.sh" --all /tmp/axon-gaming-debs
+# axon-nvidia belongs to the NVIDIA edition only; the rest are in every edition.
+if [[ "${EDITION}" != "nvidia" ]]; then
+    rm -f /tmp/axon-gaming-debs/axon-nvidia_*.deb
+fi
 apt-get install -y --reinstall /tmp/axon-gaming-debs/*_all.deb
 rm -rf /tmp/axon-gaming-debs
+
+if [[ "${EDITION}" == "nvidia" ]]; then
+    # The driver is the whole point of this edition: fail the build if it is not there
+    dpkg -s axon-nvidia >/dev/null 2>&1 || { log "ERROR: axon-nvidia is not installed"; exit 1; }
+    dpkg -s libnvidia-gl-580:i386 >/dev/null 2>&1 \
+        || { log "ERROR: 32-bit NVIDIA GL libraries (needed by Steam) are missing"; exit 1; }
+fi
 
 # The live-session installer stays out of the package: the install engine
 # deletes it from installed systems and an upgrade must not bring it back.
@@ -485,7 +520,7 @@ systemctl enable docker.socket 2>/dev/null || log "WARNING: could not enable doc
 # 6a. VM guest display integration (VirtualBox / VMware / QEMU)
 # ---------------------------------------------------------------------------
 # Display auto-resize, clipboard and drag-and-drop come from the guest
-# packages in packages.list — they start themselves in every X11 session:
+# packages in common.list — they start themselves in every X11 session:
 #   * VirtualBox: virtualbox-guest-x11 runs VBoxClient from
 #     /etc/X11/Xsession.d/98vboxadd-xclient. Its --vmsvga-session helper
 #     falls back to the X11 RandR resize agent (Ubuntu does not ship
@@ -760,6 +795,27 @@ if [[ "${QUICK}" == "1" ]]; then
 else
     log "Regenerating initramfs..."
     update-initramfs -u -k all
+fi
+
+# ---------------------------------------------------------------------------
+# Slim the image (ISO size budget, see build/size-budget.conf): nothing here is needed to
+# boot, install or use Axon OS, and each can be installed later. linux-firmware stays whole.
+# ---------------------------------------------------------------------------
+if [[ "${AXON_SLIM:-1}" == "1" ]]; then
+    log "Removing Snap, extra language packs and documentation packages..."
+    SLIM=()
+    # Snap: Axon uses apt and Flatpak only
+    if dpkg -s snapd >/dev/null 2>&1; then SLIM+=(snapd); fi
+    # Language packs beyond English, and *-doc packages (they are leaves; nothing depends on them)
+    while read -r p; do
+        case "${p}" in
+            language-pack-en | language-pack-en-base | language-pack-gnome-en | language-pack-gnome-en-base) ;;
+            *) SLIM+=("${p}") ;;
+        esac
+    done < <(dpkg-query -W -f='${Package}\n' 'language-pack-*' '*-doc' 2>/dev/null || true)
+    if [[ ${#SLIM[@]} -gt 0 ]]; then
+        apt-get purge -y "${SLIM[@]}" || log "WARNING: could not remove ${SLIM[*]} (non-fatal)"
+    fi
 fi
 
 log "Cleaning up..."
