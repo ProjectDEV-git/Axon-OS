@@ -48,11 +48,21 @@ class TestCard:
     def gtk(self) -> Any:
         return require_gtk()
 
-    def make(self, gtk: Any, command: str, timeout: int = 60) -> Any:
-        _Gtk, Adw, _GLib = gtk
+    @pytest.fixture(scope="class")
+    def app(self) -> Any:
+        # One app per class: a second register() with the same id fails on a
+        # D-Bus session bus because the first app's object is still exported.
+        _Gtk, Adw, _GLib = require_gtk()
         app = Adw.Application(application_id="io.github.axon_os.ConfirmTest")
         app.register(None)
-        return confirm.build_window(app, command, "You said: list files", timeout)
+        return app
+
+    @pytest.fixture(autouse=True)
+    def _bind_app(self, app: Any) -> None:
+        self._app = app
+
+    def make(self, gtk: Any, command: str, timeout: int = 60) -> Any:
+        return confirm.build_window(self._app, command, "You said: list files", timeout)
 
     def test_defaults_to_no(self, gtk: Any) -> None:
         win = self.make(gtk, "ls -la")
