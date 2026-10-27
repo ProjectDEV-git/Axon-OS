@@ -20,7 +20,7 @@ BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-DIST="noble"
+DIST="${AXON_UBUNTU_RELEASE:-resolute}"
 ARCH="amd64"
 MIRROR="https://us.archive.ubuntu.com/ubuntu/"
 
@@ -131,7 +131,9 @@ bootstrap() {
     fi
     log "Bootstrapping Ubuntu ${DIST} (${ARCH})... (downloads ~100 MB)"
     mkdir -p "${WORK_DIR}" "${CHROOT}"
-    debootstrap --arch="${ARCH}" "${DIST}" "${CHROOT}" "${MIRROR}"
+    debootstrap_script=()
+    [[ -e "/usr/share/debootstrap/scripts/${DIST}" ]] || debootstrap_script=(/usr/share/debootstrap/scripts/gutsy)
+    debootstrap --arch="${ARCH}" "${DIST}" "${CHROOT}" "${MIRROR}" "${debootstrap_script[@]}"
     log "Bootstrap complete."
 }
 
@@ -155,6 +157,7 @@ setup_chroot() {
     mount_chroot
     chroot "${CHROOT}" /usr/bin/env \
         AXON_VERSION="${version}" \
+        AXON_RELEASE="${DIST}" \
         /bin/bash /opt/axon-src/build/config/chroot-setup.sh
     log "Chroot setup complete."
 }

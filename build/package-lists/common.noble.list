@@ -1,0 +1,9 @@
+# Ubuntu 24.04 (noble) only: packages that 26.04 renamed or folded into others.
+# Added to common.list when AXON_UBUNTU_RELEASE=noble (checked 2026-10-27).
+
+# Video decode drivers; in 26.04 they are part of mesa-libgallium
+mesa-va-drivers
+mesa-vdpau-drivers
+
+# The pkcon command; 26.04 ships pkgcli inside the packagekit package instead
+packagekit-tools

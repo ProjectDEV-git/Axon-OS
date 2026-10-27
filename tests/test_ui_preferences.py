@@ -151,3 +151,30 @@ def test_accent_swatch_writes_the_shell_key(tmp_path: Path) -> None:
     assert settings.get_string("accent-color") == "teal"
     assert not win._accent_buttons["blue"].get_active()  # one choice at a time
     win.destroy()
+
+
+def test_gaming_switches_write_settings(tmp_path: Path) -> None:
+    import gaming_settings
+
+    path = tmp_path / "gaming.json"
+    win = prefs.PreferencesWindow(
+        shell_settings=memory_settings(),
+        context_path=tmp_path / "c.json",
+        approvals_path=tmp_path / "a.json",
+        gaming_path=path,
+    )
+    switches = win._gaming_switches
+    assert switches["pause_ai"].get_active() and not switches["use_cloud"].get_active()
+    switches["use_cloud"].set_active(True)
+    switches["pause_indexing"].set_active(False)
+    assert gaming_settings.load(path) == {
+        "pause_ai": True,
+        "use_cloud": True,
+        "pause_indexing": False,
+        "steam_games": True,
+    }
+    # The cloud option only makes sense while AI is paused
+    switches["pause_ai"].set_active(False)
+    assert not switches["use_cloud"].get_sensitive()
+    assert gaming_settings.load(path)["pause_ai"] is False
+    win.destroy()

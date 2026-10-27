@@ -1,0 +1,149 @@
+#!/usr/bin/python3
+"""axon-game-mode — switch Axon OS game mode on and off.
+
+    axon-game-mode on  [--app-id ID] [--pid PID]   start game mode for a game
+    axon-game-mode off [--pid PID]                 end it for that game
+    axon-game-mode status                          show whether it is on
+    axon-game-mode reset                           force game mode off now
+
+GameMode's start/end hooks call "on" and "off" without arguments (gamemoded
+runs "start" for the first game and "end" after the last, one reference for
+all). Launchers that know the game's process can pass --pid, so a crashed
+game is noticed by org.axonos.Gaming. The token that "on" gets back is saved
+under $XDG_RUNTIME_DIR/axon-game-mode/, one file per pid ("default" without one).
+"""
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+BUS_NAME = "org.axonos.Gaming"
+OBJECT_PATH = "/org/axonos/Gaming"
+DEFAULT_KEY = "default"
+
+
+def say(message: str, error: bool = False) -> None:
+    (sys.stderr if error else sys.stdout).write(message + "\n")
+
+
+def token_dir() -> Path:
+    runtime = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    return Path(runtime) / "axon-game-mode"
+
+
+def token_file(pid: int | None) -> Path:
+    return token_dir() / (str(pid) if pid else DEFAULT_KEY)
+
+
+def save_token(pid: int | None, token: str) -> None:
+    directory = token_dir()
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path = token_file(pid)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(token, encoding="utf-8")
+    tmp.chmod(0o600)
+    tmp.replace(path)
+
+
+def read_token(pid: int | None) -> str | None:
+    try:
+        return token_file(pid).read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def forget_token(pid: int | None) -> None:
+    token_file(pid).unlink(missing_ok=True)
+
+
+class Gaming:
+    """The org.axonos.Gaming service (D-Bus activated if it is not running)."""
+
+    def __init__(self) -> None:
+        import dbus
+
+        self._dbus = dbus
+        bus = dbus.SessionBus()
+        self._obj = bus.get_object(BUS_NAME, OBJECT_PATH)
+        self._iface = dbus.Interface(self._obj, BUS_NAME)
+
+    def enter(self, app_id: str, pid: int) -> str:
+        return str(self._iface.EnterGameMode(app_id, self._dbus.UInt32(pid)))
+
+    def exit(self, token: str) -> None:
+        self._iface.ExitGameMode(token)
+
+    def force_exit(self) -> None:
+        self._iface.ForceExit()
+
+    def state(self) -> tuple[bool, list[tuple[str, str, int]]]:
+        props = self._dbus.Interface(self._obj, self._dbus.PROPERTIES_IFACE).GetAll(BUS_NAME)
+        games = [(str(t), str(a), int(p)) for t, a, p in props["ActiveGames"]]
+        return bool(props["Active"]), games
+
+
+def cmd_on(gaming, args) -> int:
+    old = read_token(args.pid)
+    if old:
+        gaming.exit(old)  # same game registered again: keep one reference, not two
+    token = gaming.enter(args.app_id, args.pid or 0)
+    save_token(args.pid, token)
+    return 0
+
+
+def cmd_off(gaming, args) -> int:
+    token = read_token(args.pid)
+    if token is None:
+        say("axon-game-mode: no game mode started from here", error=True)
+        return 0
+    gaming.exit(token)
+    forget_token(args.pid)
+    return 0
+
+
+def cmd_status(gaming, args) -> int:
+    active, games = gaming.state()
+    say(f"Active: {'yes' if active else 'no'}")
+    for token, app_id, pid in games:
+        say(f"  {app_id or '(unknown)'}  pid={pid or '-'}  token={token[:8]}")
+    return 0
+
+
+def cmd_reset(gaming, args) -> int:
+    gaming.force_exit()
+    directory = token_dir()
+    if directory.is_dir():
+        for path in directory.iterdir():
+            path.unlink(missing_ok=True)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="axon-game-mode", description=__doc__.split("\n")[0])
+    sub = parser.add_subparsers(dest="command", required=True)
+    on = sub.add_parser("on", help="start game mode")
+    on.add_argument("--app-id", default="gamemode", help="name shown in the top bar")
+    on.add_argument("--pid", type=int, default=0, help="the game's process id")
+    off = sub.add_parser("off", help="end game mode for a game")
+    off.add_argument("--pid", type=int, default=0, help="the pid given to 'on'")
+    sub.add_parser("status", help="show whether game mode is on")
+    sub.add_parser("reset", help="force game mode off")
+    return parser
+
+
+COMMANDS = {"on": cmd_on, "off": cmd_off, "status": cmd_status, "reset": cmd_reset}
+
+
+def main(argv: list[str] | None = None, gaming_factory=Gaming) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        gaming = gaming_factory()
+        return COMMANDS[args.command](gaming, args)
+    except Exception as exc:  # D-Bus errors come in many classes
+        say(f"axon-game-mode: {exc}", error=True)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

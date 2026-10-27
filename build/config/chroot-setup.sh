@@ -11,6 +11,7 @@ export HOME=/root
 
 SRC="/opt/axon-src"
 VERSION="${AXON_VERSION:-0.3.0}"
+EDITION="${AXON_EDITION:-standard}"
 CODENAME="Pulse"
 
 log() { echo "[chroot-setup] $*"; }
@@ -44,10 +45,15 @@ chmod +x /usr/sbin/policy-rc.d
 # 1. APT sources (main + universe + multiverse, with updates and security)
 # ---------------------------------------------------------------------------
 log "Writing APT sources..."
-cat > /etc/apt/sources.list <<'EOF'
-deb https://us.archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
-deb https://us.archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
-deb https://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse
+RELEASE="${AXON_RELEASE:-resolute}"
+case "${RELEASE}" in
+    noble | resolute) ;;
+    *) log "ERROR: unsupported Ubuntu release '${RELEASE}' (use resolute or noble)"; exit 1 ;;
+esac
+cat > /etc/apt/sources.list <<EOF
+deb https://us.archive.ubuntu.com/ubuntu/ ${RELEASE} main restricted universe multiverse
+deb https://us.archive.ubuntu.com/ubuntu/ ${RELEASE}-updates main restricted universe multiverse
+deb https://security.ubuntu.com/ubuntu/ ${RELEASE}-security main restricted universe multiverse
 EOF
 # debootstrap may have created the new deb822 file; sources.list wins, drop it
 rm -f /etc/apt/sources.list.d/ubuntu.sources
@@ -97,8 +103,11 @@ done
 # ---------------------------------------------------------------------------
 # 4. Desktop + Axon dependencies from the package manifest
 # ---------------------------------------------------------------------------
-log "Installing desktop packages from packages.list..."
-mapfile -t PACKAGES < <(grep -vE '^\s*(#|$)' "${SRC}/build/config/packages.list")
+log "Installing desktop packages from build/package-lists/common.list..."
+# common.list is for every release; common.<release>.list holds what differs (renamed or dropped
+# packages), see scripts/verify-packages.py
+mapfile -t PACKAGES < <(grep -hvE '^\s*(#|$)' "${SRC}/build/package-lists/common.list" \
+    "${SRC}/build/package-lists/common.${RELEASE}.list")
 # DKMS/WiFi packages often fail on mismatched kernels — install them last
 # and tolerate failures so the rest of the build continues.
 DKMS_PACKAGES=(bcmwl-kernel-source broadcom-sta-dkms)
@@ -120,6 +129,23 @@ fi
 for p in "${DKMS_PACKAGES[@]}"; do
     apt-get install -y "${p}" 2>/dev/null || log "WARNING: DKMS package ${p} failed (expected if host kernel differs)"
 done
+
+# Edition packages (standard.list / nvidia.list): no tolerance for failure. An edition
+# without its graphics stack is not the edition it claims to be.
+if [[ ! -f "${SRC}/build/package-lists/${EDITION}.list" ]]; then
+    log "ERROR: no package list for edition '${EDITION}'"
+    exit 1
+fi
+log "Installing ${EDITION} edition packages..."
+mapfile -t EDITION_PACKAGES < <(grep -vE '^\s*(#|$)' "${SRC}/build/package-lists/${EDITION}.list")
+EDITION_DEBS=0
+for p in "${EDITION_PACKAGES[@]}"; do
+    # Packages that come from this repository are built below, after the axon-os package
+    [[ -d "${SRC}/packaging/${p}" ]] && EDITION_DEBS=1
+done
+if [[ "${EDITION_DEBS}" == "0" && ${#EDITION_PACKAGES[@]} -gt 0 ]]; then
+    apt-get install -y "${EDITION_PACKAGES[@]}"
+fi
 
 log "Adding flathub remote..."
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
@@ -188,17 +214,6 @@ x-scheme-handler/about=${BROWSER_DESKTOP}
 x-scheme-handler/unknown=${BROWSER_DESKTOP}
 MIMEEOF
 
-# ── System monitor: Mission Center (Flathub, GPL-3.0) ───────────────────────
-# Not packaged for Ubuntu 24.04, so it ships as a system-wide Flatpak. Keeps
-# GNOME System Monitor only if the Flatpak cannot be installed.
-log "Installing Mission Center..."
-if flatpak install --system --noninteractive -y flathub io.missioncenter.MissionCenter; then
-    apt-get purge -y gnome-system-monitor 2>/dev/null || true
-else
-    log "WARNING: Mission Center install failed — keeping GNOME System Monitor"
-    apt-get install -y gnome-system-monitor || true
-fi
-
 log "Installing Python AI libraries inside chroot..."
 # Pinned versions: unpinned installs pulled whatever PyPI served at build time
 # pip can't upgrade Debian's typing_extensions in place (no RECORD file), so put a
@@ -225,6 +240,45 @@ bash "${SRC}/packaging/build-deb.sh" /tmp/axon-deb
 # force-confmiss: restores the apt source removed above on reused chroots
 apt-get install -y --reinstall -o Dpkg::Options::=--force-confmiss /tmp/axon-deb/axon-os_*_all.deb
 rm -rf /tmp/axon-deb
+
+# Local AI: the Ollama program and its CPU libraries (about 50 MB), hash-pinned. The service
+# stays disabled until the user opts into local AI; the CUDA/ROCm libraries (over 2 GB) are
+# never in the image and are added by install-ollama-gpu.sh when a graphics card is found.
+log "Installing Ollama (CPU only)..."
+bash /usr/lib/axon/ollama/install-ollama.sh --cpu-only
+
+# The axon-os package added the Axon apt repository (and the pin that keeps its rebuilt Ubuntu
+# libraries from replacing Ubuntu's own). Read it so Gamescope can be found there.
+apt-get update || log "WARNING: could not read the Axon repository; Gamescope will be left out"
+
+# Gaming: small packages built by packaging/build-pkg.sh (see docs/gaming.md).
+# steam-installer asks for the Steam Subscriber Agreement through debconf; an
+# unattended image build needs the answer preseeded. Steam itself shows the
+# agreement again on its first start, before anyone can log in or play.
+log "Installing gaming packages (packaging/*/)..."
+echo "steam steam/question select I AGREE" | debconf-set-selections
+echo "steam steam/license note" | debconf-set-selections
+rm -rf /tmp/axon-gaming-debs
+bash "${SRC}/packaging/build-pkg.sh" --all /tmp/axon-gaming-debs
+# axon-nvidia belongs to the NVIDIA edition only; the rest are in every edition.
+if [[ "${EDITION}" != "nvidia" ]]; then
+    rm -f /tmp/axon-gaming-debs/axon-nvidia_*.deb
+fi
+# axon-console needs Gamescope: Ubuntu 26.04 has it, on 24.04 it comes from the Axon repository
+# (packaging/backports); without a candidate the package is left out.
+if ! apt-cache policy gamescope | grep -q 'Candidate: [^(]'; then
+    log "gamescope is not available; leaving out axon-console"
+    rm -f /tmp/axon-gaming-debs/axon-console_*.deb
+fi
+apt-get install -y --reinstall /tmp/axon-gaming-debs/*_all.deb
+rm -rf /tmp/axon-gaming-debs
+
+if [[ "${EDITION}" == "nvidia" ]]; then
+    # The driver is the whole point of this edition: fail the build if it is not there
+    dpkg -s axon-nvidia >/dev/null 2>&1 || { log "ERROR: axon-nvidia is not installed"; exit 1; }
+    dpkg -s libnvidia-gl-595:i386 >/dev/null 2>&1 \
+        || { log "ERROR: 32-bit NVIDIA GL libraries (needed by Steam) are missing"; exit 1; }
+fi
 
 # The live-session installer stays out of the package: the install engine
 # deletes it from installed systems and an upgrade must not bring it back.
@@ -421,6 +475,7 @@ else
     log "WARNING: APEX-WIN runner was not built — .exe files will open with plain Wine"
 fi
 install -Dm755 "${SRC}/scripts/axon-apex-run" /usr/bin/axon-apex-run
+install -Dm755 "${SRC}/scripts/axon-proton-runners" /usr/bin/axon-proton-runners
 install -Dm644 "${SRC}/data/applications/axon-apex-win.desktop" \
     /usr/share/applications/axon-apex-win.desktop
 update-desktop-database /usr/share/applications || true
@@ -483,7 +538,7 @@ systemctl enable docker.socket 2>/dev/null || log "WARNING: could not enable doc
 # 6a. VM guest display integration (VirtualBox / VMware / QEMU)
 # ---------------------------------------------------------------------------
 # Display auto-resize, clipboard and drag-and-drop come from the guest
-# packages in packages.list — they start themselves in every X11 session:
+# packages in common.list — they start themselves in every X11 session:
 #   * VirtualBox: virtualbox-guest-x11 runs VBoxClient from
 #     /etc/X11/Xsession.d/98vboxadd-xclient. Its --vmsvga-session helper
 #     falls back to the X11 RandR resize agent (Ubuntu does not ship
@@ -715,12 +770,15 @@ EOF
 # Ubuntu 24.04, leaving the user on a black screen after Plymouth quits.
 log "Configuring GDM autologin for live session..."
 mkdir -p /etc/gdm3
+# GNOME 50 (Ubuntu 26.04) has no X11 session, so only 24.04 images may force X11 (VM guests).
 cat > /etc/gdm3/custom.conf <<'EOF'
 [daemon]
 AutomaticLoginEnable=true
 AutomaticLogin=axon
-WaylandEnable=false
 EOF
+if [[ "${RELEASE}" == "noble" ]]; then
+    echo "WaylandEnable=false" >> /etc/gdm3/custom.conf
+fi
 
 # /etc/os-release is a symlink to /usr/lib/os-release on Ubuntu; replace the
 # link with Axon identity while keeping ID_LIKE for tooling compatibility.
@@ -733,7 +791,7 @@ VERSION="${VERSION} (${CODENAME})"
 VERSION_CODENAME=${CODENAME,,}
 ID=axonos
 ID_LIKE="ubuntu debian"
-UBUNTU_CODENAME=noble
+UBUNTU_CODENAME=${RELEASE}
 HOME_URL="https://github.com/ProjectDEV-git/Axon-OS"
 SUPPORT_URL="https://github.com/ProjectDEV-git/Axon-OS/issues"
 BUG_REPORT_URL="https://github.com/ProjectDEV-git/Axon-OS/issues"
@@ -758,6 +816,27 @@ if [[ "${QUICK}" == "1" ]]; then
 else
     log "Regenerating initramfs..."
     update-initramfs -u -k all
+fi
+
+# ---------------------------------------------------------------------------
+# Slim the image (ISO size budget, see build/size-budget.conf): nothing here is needed to
+# boot, install or use Axon OS, and each can be installed later. linux-firmware stays whole.
+# ---------------------------------------------------------------------------
+if [[ "${AXON_SLIM:-1}" == "1" ]]; then
+    log "Removing Snap, extra language packs and documentation packages..."
+    SLIM=()
+    # Snap: Axon uses apt and Flatpak only
+    if dpkg -s snapd >/dev/null 2>&1; then SLIM+=(snapd); fi
+    # Language packs beyond English, and *-doc packages (they are leaves; nothing depends on them)
+    while read -r p; do
+        case "${p}" in
+            language-pack-en | language-pack-en-base | language-pack-gnome-en | language-pack-gnome-en-base) ;;
+            *) SLIM+=("${p}") ;;
+        esac
+    done < <(dpkg-query -W -f='${Package}\n' 'language-pack-*' '*-doc' 2>/dev/null || true)
+    if [[ ${#SLIM[@]} -gt 0 ]]; then
+        apt-get purge -y "${SLIM[@]}" || log "WARNING: could not remove ${SLIM[*]} (non-fatal)"
+    fi
 fi
 
 log "Cleaning up..."

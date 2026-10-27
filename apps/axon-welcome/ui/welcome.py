@@ -40,6 +40,8 @@ except ImportError:
 # apps/axon-welcome/ holds windows_mode.py (also importable without GTK)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import windows_mode
+from gaming_page import GamingPage
+from gpu_drivers import detect_graphics
 
 # Hash-pinned Ollama installer shipped in the image (see build/config/install-ollama.sh)
 OLLAMA_INSTALLER = "/usr/lib/axon/ollama/install-ollama.sh"
@@ -68,7 +70,7 @@ def _scrollable(page: Gtk.Widget) -> Gtk.ScrolledWindow:
 
 
 class WelcomeWindow(Adw.Window):
-    _PAGE_NAMES = ["welcome", "setup", "preferences", "windows", "features", "ready"]  # noqa: RUF012
+    _PAGE_NAMES = ["welcome", "setup", "gaming", "preferences", "windows", "features", "ready"]  # noqa: RUF012
 
     def __init__(self, app: Adw.Application):
         super().__init__(application=app)
@@ -113,6 +115,7 @@ class WelcomeWindow(Adw.Window):
         # Build pages
         self._stack.add_named(_scrollable(self._build_page_welcome()), "welcome")
         self._stack.add_named(_scrollable(self._build_page_setup()), "setup")
+        self._stack.add_named(_scrollable(self._build_page_gaming()), "gaming")
         self._stack.add_named(_scrollable(self._build_page_preferences()), "preferences")
         self._stack.add_named(_scrollable(self._build_page_windows()), "windows")
         self._stack.add_named(_scrollable(self._build_page_features()), "features")
@@ -402,17 +405,28 @@ class WelcomeWindow(Adw.Window):
 
         skip_btn = Gtk.Button(label=_("Skip"))
         _add_class(skip_btn, "nav-btn-back")
-        skip_btn.connect("clicked", lambda _: self._go_to("preferences"))
+        skip_btn.connect("clicked", lambda _: self._go_to("gaming"))
         nav.append(skip_btn)
 
         continue_btn = Gtk.Button(label=_("Continue →"))
         _add_class(continue_btn, "nav-btn-next")
-        continue_btn.connect("clicked", lambda _: self._go_to("preferences"))
+        continue_btn.connect("clicked", lambda _: self._go_to("gaming"))
         nav.append(continue_btn)
 
         page.append(nav)
 
         return page
+
+    # ------------------------------------------------------------------
+    # PAGE — Gaming setup (presets install in the background)
+    # ------------------------------------------------------------------
+
+    def _build_page_gaming(self) -> Gtk.Widget:
+        return GamingPage(
+            on_back=lambda: self._go_to("setup"),
+            on_next=lambda: self._go_to("preferences"),
+            detect=detect_graphics,
+        )
 
     # ------------------------------------------------------------------
     # D-Bus Signal Handler
@@ -752,7 +766,7 @@ class WelcomeWindow(Adw.Window):
 
         back_btn = Gtk.Button(label=_("← Back"))
         _add_class(back_btn, "nav-btn-back")
-        back_btn.connect("clicked", lambda _: self._go_to("setup"))
+        back_btn.connect("clicked", lambda _: self._go_to("gaming"))
         nav.append(back_btn)
 
         continue_btn = Gtk.Button(label=_("Continue →"))

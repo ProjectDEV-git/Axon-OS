@@ -11,7 +11,7 @@ not shipped.
 | Papirus icon theme (`papirus-icon-theme`) | App, folder and system icons | Ubuntu archive | GPL-3.0 |
 | WhiteSur GTK/Shell theme (opt-in, `AXON_WHITESUR=1`) | Optional macOS-style window and shell styling; the default is the Axon theme | github.com/vinceliuice/WhiteSur-gtk-theme (pinned commit) | MIT |
 | Brave (`brave-browser`) | Default web browser | brave-browser-apt-release.s3.brave.com (signing key pinned) | MPL-2.0; "Brave" name and logo are Brave Software trademarks, shipped unmodified |
-| Mission Center (`io.missioncenter.MissionCenter`) | System monitor | Flathub | GPL-3.0 |
+| Steam launcher (`steam-installer`) | Game store and launcher; the Steam runtime downloads on first start | Ubuntu multiverse | Proprietary (Valve Steam Subscriber Agreement, shown by Steam on first start) |
 | Ollama | Local AI runtime, installed on first boot | github.com/ollama/ollama (SHA-256 pinned) | MIT |
 | APEX-WIN (`apex-win/`, vendored) | Runs Windows programs with Wine on double-click | github.com/Gaming-RF/APEX-WIN (commit in `apex-win/AXON-VENDOR.md`) | MIT |
 

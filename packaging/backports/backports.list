@@ -1,0 +1,20 @@
+# Source packages Axon OS rebuilds for Ubuntu 24.04 (noble) from a newer Ubuntu release,
+# unchanged apart from the version number. Built in order by scripts/build-backports.sh;
+# each package can use the ones before it. Columns: source package, release to take it from,
+# exact version (pinned, so a build is the same tomorrow as today).
+#
+# Why: Ubuntu 24.04 has no Gamescope (the Axon Console session needs it), and Gamescope 3.16
+# needs libraries newer than noble has. Checked against the archive indexes on 2026-10-27:
+#   libwlroots-0.18-dev (noble: none), libliftoff-dev >= 0.5.0 (noble: 0.4.1),
+#   vkroots-headers >= 0~202404300106 (noble: 0~202311190157), libxcb-errors-dev (noble: none),
+#   and, for wlroots, libwayland-dev >= 1.23 (noble: 1.22).
+#
+# wayland replaces Ubuntu's libwayland-* on systems that use the Axon repository. The library keeps
+# its soname and is backward compatible, and Ubuntu 25.04 and later ship 1.23 and newer, but it is
+# the one entry here that changes a package the whole desktop uses.
+libliftoff        questing  0.5.0-1.1
+vkroots           questing  0~202404300106git5106d8a-2
+xcb-util-errors   questing  1.0.1-4
+wayland           questing  1.24.0-1build1
+wlroots           questing  0.18.2-3
+gamescope         questing  3.16.15-2

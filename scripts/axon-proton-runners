@@ -1,0 +1,76 @@
+#!/bin/sh
+# axon-proton-runners — find the Proton/Wine builds on this system and pick the
+# one Windows programs run with (axon-apex-run reads the choice).
+#
+# Usage:
+#   axon-proton-runners list            name<TAB>path, one build per line
+#   axon-proton-runners get             the selected path ("system" if none)
+#   axon-proton-runners set NAME|PATH   select a build from the list
+#   axon-proton-runners clear           back to the system Wine
+#   axon-proton-runners resolve         directory holding bin/wine for the
+#                                       selection (empty = use system Wine)
+#
+# Builds are looked for where Steam, ProtonPlus and ProtonUp-Qt install them:
+#   ~/.steam/steam/compatibilitytools.d/*        (Proton-GE, Wine-GE, ...)
+#   ~/.local/share/Steam/compatibilitytools.d/*
+#   ~/.local/share/Steam/steamapps/common/Proton*  (Valve's Proton)
+# The choice is saved in ~/.config/axon-os/windows-runner.
+set -eu
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/axon-os/windows-runner"
+
+# Directory holding bin/wine for a build: Proton-GE uses files/, Valve's dist/.
+wine_dir() {
+    for sub in files dist .; do
+        if [ -x "$1/$sub/bin/wine" ]; then
+            echo "$1/$sub"
+            return 0
+        fi
+    done
+    return 1
+}
+
+list() {
+    for dir in \
+        "$HOME/.steam/steam/compatibilitytools.d"/* \
+        "$HOME/.local/share/Steam/compatibilitytools.d"/* \
+        "$HOME/.local/share/Steam/steamapps/common"/Proton*; do
+        [ -d "$dir" ] || continue
+        wine_dir "$dir" >/dev/null || continue
+        # ~/.steam/steam is usually a symlink to ~/.local/share/Steam
+        printf '%s\t%s\n' "$(basename "$dir")" "$(readlink -f "$dir")"
+    done | sort -u
+}
+
+selected() {
+    if [ -r "$CONF" ]; then
+        head -n 1 "$CONF" | tr -d '\n'
+    fi
+}
+
+case "${1:-}" in
+    list) list ;;
+    get)
+        sel="$(selected)"
+        echo "${sel:-system}"
+        ;;
+    set)
+        [ $# -eq 2 ] || { echo "usage: axon-proton-runners set NAME|PATH" >&2; exit 2; }
+        path="$(list | awk -F'\t' -v want="$2" '$1 == want || $2 == want { print $2; exit }')"
+        [ -n "$path" ] || { echo "axon-proton-runners: no such build: $2" >&2; exit 1; }
+        mkdir -p "$(dirname "$CONF")"
+        printf '%s\n' "$path" > "$CONF"
+        ;;
+    clear) rm -f "$CONF" ;;
+    resolve)
+        sel="$(selected)"
+        [ -n "$sel" ] || exit 0
+        # Only builds that are still in the list; a stale choice means system Wine.
+        list | awk -F'\t' -v want="$sel" '$2 == want { found = 1 } END { exit !found }' || exit 0
+        wine_dir "$sel" || true
+        ;;
+    *)
+        echo "usage: axon-proton-runners list|get|set NAME|clear|resolve" >&2
+        exit 2
+        ;;
+esac

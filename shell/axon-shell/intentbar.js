@@ -25,6 +25,7 @@ import {
     escapeAction,
     formatCommandOutput,
     intentBarWidth,
+    isGameModeError,
     motionDuration,
     parseAction,
     pushHistory,
@@ -207,7 +208,12 @@ export default class IntentBar {
             visible: false,
             y_align: Clutter.ActorAlign.START,
         });
+        this._recoveryMode = 'diagnostics';
         this._recoveryButton.connect('clicked', () => {
+            if (this._recoveryMode === 'run-anyway') {
+                this._runAnyway();
+                return;
+            }
             this.hide();
             openDiagnostics();
         });
@@ -354,7 +360,7 @@ export default class IntentBar {
             return;
         const spaces = this._spacesManager.getSpaces().map(s => s.name);
         this._suggestions = this._requests.busy
-            ? [] : buildSuggestions(this._entry.get_text(), this._apps, spaces);
+            ? [] : buildSuggestions(this._entry.get_text(), this._apps, spaces, 3, this._gamingCatalog());
         this._selected = this._suggestions.length ? defaultSuggestionIndex(this._suggestions) : -1;
         this._renderSuggestions();
     }
@@ -447,10 +453,108 @@ export default class IntentBar {
         } else if (a.type === 'space') {
             this.hide();
             this._spacesManager.switchToSpace(a.index);
+        } else if (a.type === 'game_center') {
+            this._runGameCenter(a);
+        } else if (a.type === 'game_mode') {
+            this._runGameMode(a.op);
         } else if (a.type === 'command') {
             this._runCommand(a.command);
         } else if (a.type === 'files') {
             this._searchFiles(a.query);
+        }
+    }
+
+    // "Run anyway" while game mode has the AI paused: Brain allows the Speed model on
+    // the CPU only for two minutes, then the question is asked again.
+    _runAnyway() {
+        Gio.DBus.session.call(
+            'org.axonos.Brain', '/org/axonos/Brain', 'org.axonos.Brain', 'AllowCpuOnly',
+            new GLib.Variant('(u)', [120]), null, Gio.DBusCallFlags.NONE, 5000, null,
+            (conn, res) => {
+                try {
+                    conn.call_finish(res);
+                } catch (e) {
+                    logError(e, 'AxonShell: AllowCpuOnly failed');
+                    return;
+                }
+                this._onSubmit();
+            });
+    }
+
+    // Game Center intents start axon-game-center. Ids come from the catalog and are
+    // checked again here because they end up on the command line.
+    _runGameCenter(a) {
+        const ident = /^[a-z0-9][a-z0-9-]*$/;
+        const pages = ['', 'discover', 'installed', 'compatibility', 'performance', 'drivers'];
+        let argv = null;
+        if (a.op === 'open' && pages.includes(a.page ?? ''))
+            argv = a.page ? ['axon-game-center', '--page', a.page] : ['axon-game-center'];
+        else if (a.op === 'install' && Array.isArray(a.ids) && a.ids.length && a.ids.every(i => ident.test(i)))
+            argv = ['axon-game-center', '--install', ...a.ids];
+        else if (a.op === 'preset' && ident.test(a.preset ?? ''))
+            argv = ['axon-game-center', '--preset', a.preset];
+        if (!argv)
+            return;
+        try {
+            Gio.Subprocess.new(argv, Gio.SubprocessFlags.NONE);
+            this.hide();
+        } catch (e) {
+            this._setResponse(_t("Game Center isn't available."), {error: true});
+        }
+    }
+
+    // The gaming catalog's names and aliases, read once for the install intents
+    _gamingCatalog() {
+        if (this._catalogCache !== undefined)
+            return this._catalogCache;
+        this._catalogCache = null;
+        for (const path of ['/usr/share/axon/gaming/catalog.json']) {
+            try {
+                const [ok, bytes] = Gio.File.new_for_path(path).load_contents(null);
+                if (!ok)
+                    continue;
+                const data = JSON.parse(new TextDecoder().decode(bytes));
+                this._catalogCache = {
+                    items: data.items.map(i => [i.id, i.name, i.aliases ?? []]),
+                    presets: data.presets.map(p => [p.id, p.name]),
+                };
+                break;
+            } catch (e) {
+                // no catalog installed: the install intents just don't appear
+            }
+        }
+        return this._catalogCache;
+    }
+
+    // Game mode intents run axon-game-mode with fixed arguments, never query text.
+    // "Off" is a reset, so it works however game mode was started.
+    _runGameMode(op) {
+        const argv = {
+            on: ['axon-game-mode', 'on', '--app-id', 'manual'],
+            off: ['axon-game-mode', 'reset'],
+            status: ['axon-game-mode', 'status'],
+        }[op];
+        if (!argv)
+            return;
+        try {
+            const proc = Gio.Subprocess.new(argv,
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE);
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                try {
+                    const [, out] = p.communicate_utf8_finish(res);
+                    const ok = p.get_successful();
+                    const text = op === 'status' ? (out || '').trim()
+                        : ok ? _t(op === 'on' ? 'Game mode is on.' : 'Game mode is off.')
+                            : (out || '').trim() || _t("Couldn't change game mode.");
+                    this._setResponse(text, {error: !ok});
+                    announce(text);
+                } catch (e) {
+                    logError(e, 'AxonShell: game mode command failed');
+                    this._setResponse(_t("Couldn't change game mode."), {error: true});
+                }
+            });
+        } catch (e) {
+            this._setResponse(_t("Couldn't change game mode."), {error: true});
         }
     }
 
@@ -730,7 +834,7 @@ export default class IntentBar {
 
         const {body, error} = splitError(responseText);
         if (error) {
-            this._setResponse(body ? `${body}\n\n${error}` : error, {error: true, recovery: true});
+            this._setResponse(body ? `${body}\n\n${error}` : error, {error: true, recovery: !isGameModeError(error)});
             announce(announcement('error', error));
         } else {
             this._setResponse(body);
@@ -771,7 +875,11 @@ export default class IntentBar {
         if (!this._responseLabel) return;
         this._responseLabel.set_text(text);
         this._errorIcon.visible = error;
-        this._recoveryButton.visible = error && recovery;
+        // While a game runs, the AI is paused: offer "Run anyway" instead of Diagnostics
+        const paused = error && isGameModeError(text);
+        this._recoveryMode = paused ? 'run-anyway' : 'diagnostics';
+        this._recoveryButton.label = paused ? _t('Run anyway') : _t('Diagnostics');
+        this._recoveryButton.visible = error && (recovery || paused);
         if (error)
             this._responseLabel.add_style_class_name('axon-response-error');
         else

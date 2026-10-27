@@ -6,8 +6,22 @@
 # ollama-release.env, checks it against the pinned hash, and installs it with
 # a dedicated `ollama` system user and systemd unit. Must run as root.
 #
+# Usage: install-ollama.sh [--cpu-only]
+#   --cpu-only  Install the program and its CPU libraries only (about 50 MB), leave out the
+#               NVIDIA CUDA, AMD ROCm and Vulkan libraries (over 2 GB), and do not start or
+#               enable the service. This is what the ISO ships; the GPU libraries are
+#               added later by install-ollama-gpu.sh once a graphics card is detected.
+#
 # Exit codes: 0 installed (or already present), 1 failure, 3 no pinned hash.
 set -euo pipefail
+
+CPU_ONLY=false
+for arg in "$@"; do
+    case "${arg}" in
+        --cpu-only) CPU_ONLY=true ;;
+        *) echo "[install-ollama] unknown option: ${arg}" >&2; exit 2 ;;
+    esac
+done
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIN_FILE="${OLLAMA_PIN_FILE:-${HERE}/ollama-release.env}"
@@ -29,6 +43,7 @@ fi
 # Enable and start the service when running on a booted system (not in a
 # chroot), so the API is up as soon as this script returns.
 start_service() {
+    [[ "${CPU_ONLY}" == "true" ]] && return 0
     if [[ -d /run/systemd/system ]] && [[ -f /etc/systemd/system/ollama.service ]]; then
         systemctl daemon-reload 2>/dev/null || true
         systemctl enable --now ollama.service 2>/dev/null || log "WARNING: could not start ollama.service"
@@ -62,7 +77,7 @@ if [[ "${OLLAMA_ASSET}" == *.tar.zst ]] && ! command -v zstd >/dev/null 2>&1; th
 fi
 
 url="https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}/${OLLAMA_ASSET}"
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d /var/tmp/axon-ollama.XXXXXX)"
 trap 'rm -rf "${tmp}"' EXIT
 
 log "downloading ${url}"
@@ -79,9 +94,12 @@ if ! echo "${OLLAMA_SHA256}  ${tmp}/${OLLAMA_ASSET}" | sha256sum -c --status -; 
 fi
 
 log "extracting into ${PREFIX}"
+# GPU backends are separate directories under lib/ollama (cuda_v12, cuda_v13, rocm_*, vulkan)
+skip=()
+[[ "${CPU_ONLY}" == "true" ]] && skip=(--exclude='lib/ollama/cuda_*' --exclude='lib/ollama/rocm*' --exclude='lib/ollama/vulkan')
 case "${OLLAMA_ASSET}" in
-    *.tgz|*.tar.gz) tar -xzf "${tmp}/${OLLAMA_ASSET}" -C "${PREFIX}" ;;
-    *.tar.zst) tar --zstd -xf "${tmp}/${OLLAMA_ASSET}" -C "${PREFIX}" ;;
+    *.tgz|*.tar.gz) tar -xzf "${tmp}/${OLLAMA_ASSET}" -C "${PREFIX}" "${skip[@]}" ;;
+    *.tar.zst) tar --zstd -xf "${tmp}/${OLLAMA_ASSET}" -C "${PREFIX}" "${skip[@]}" ;;
     *) log "unsupported asset type: ${OLLAMA_ASSET}"; exit 1 ;;
 esac
 
@@ -103,10 +121,13 @@ Group=ollama
 Restart=always
 RestartSec=3
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# The service stays on, but an idle model leaves GPU memory after 5 minutes (Ollama's default,
+# written down so it is not changed by accident). Game mode unloads models at once.
+Environment="OLLAMA_KEEP_ALIVE=5m"
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
 start_service
-log "installed Ollama ${OLLAMA_VERSION}"
+log "installed Ollama ${OLLAMA_VERSION}$([[ "${CPU_ONLY}" == "true" ]] && echo " (CPU only)")"

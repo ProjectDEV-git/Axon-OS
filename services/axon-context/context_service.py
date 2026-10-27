@@ -38,6 +38,9 @@ if _this not in sys.path:
     sys.path.insert(0, _this)
 from clipboard_store import ClipboardStore
 
+# Clipboard polling slows down by this factor while game mode throttles Context
+_THROTTLE_FACTOR = 5
+
 
 class ContextService(ServiceBase):
     BUS_NAME = "org.axonos.Context"
@@ -65,6 +68,9 @@ class ContextService(ServiceBase):
         self._config_mtime = 0.0
         self._terminal_cache = None
         self._terminal_cache_mtime = {}
+        # Game mode: poll the clipboard every _THROTTLE_FACTOR-th tick instead of every one
+        self._throttled = False
+        self._poll_ticks = 0
         self._start_clipboard_watcher()
 
     def _load_config(self):
@@ -320,8 +326,18 @@ class ContextService(ServiceBase):
             return False
         return "x-kde-passwordManagerHint" in result.stdout
 
+    @dbus.service.method("org.axonos.Context", in_signature="b", out_signature="")
+    def Throttle(self, enabled):
+        """Poll less often (game mode). The Wayland clipboard watcher is event driven."""
+        self._throttled = bool(enabled)
+        logger.info("Context polling %s", "throttled" if self._throttled else "normal")
+
     def _poll_xclip(self):
         """Polls xclip for clipboard changes (X11 fallback)."""
+        if self._throttled:
+            self._poll_ticks += 1
+            if self._poll_ticks % _THROTTLE_FACTOR:
+                return True  # every 2 s normally, every 10 s while throttled
         self._load_config()
         if not self.track_clipboard:
             return True

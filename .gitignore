@@ -17,6 +17,8 @@ sdist/
 develop-eggs/
 dist/
 lib/
+# ...but packaging/*/files/ mirrors an installed filesystem (usr/lib/...)
+!packaging/**/files/usr/lib/
 lib64/
 parts/
 MANIFEST

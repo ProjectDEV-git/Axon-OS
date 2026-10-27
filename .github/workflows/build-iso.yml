@@ -22,6 +22,8 @@ on:
 # token; only the tag-only publish job below can write to releases.
 permissions:
   contents: read
+  # read the package list of the last good build, to show what grew
+  actions: read
 
 concurrency:
   group: build-iso-${{ github.ref }}
@@ -29,9 +31,14 @@ concurrency:
 
 jobs:
   build-iso:
-    name: Build bootable ISO (amd64)
+    name: Build ${{ matrix.edition }} ISO (amd64)
     runs-on: ubuntu-24.04
     timeout-minutes: 180
+    strategy:
+      # An over-size NVIDIA ISO must not hide a good Standard one (or the other way round)
+      fail-fast: false
+      matrix:
+        edition: [standard, nvidia]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,13 +68,47 @@ jobs:
           cargo --version
           bash scripts/build-apex-win.sh
 
-      - name: Build ISO
-        run: sudo AXON_BUILD_DIR=/mnt/axon-build bash build/build.sh --ci
+      # Package names are checked against the Ubuntu archive first, so a typo fails here
+      # in a minute instead of hours into the build
+      - name: Check package names exist
+        run: python3 scripts/verify-packages.py
 
-      - name: Report artifacts
+      # The package list of the last good build on main, so the size report can say what grew
+      - name: Fetch previous package list
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EDITION: ${{ matrix.edition }}
         run: |
+          set -euo pipefail
+          run_id="$(gh run list --workflow build-iso.yml --branch main --status success \
+            --limit 1 --json databaseId --jq '.[0].databaseId')"
+          [ -n "${run_id}" ] || exit 0
+          gh run download "${run_id}" --name "axon-os-packages-${EDITION}" --dir previous
+          ls previous
+
+      - name: Build ISO
+        run: |
+          previous=""
+          if ls previous/*.packages.tsv >/dev/null 2>&1; then
+            previous="$(ls "$PWD"/previous/*.packages.tsv | head -1)"
+          fi
+          # build.sh fails the job if the ISO is over its edition's hard limit
+          sudo AXON_BUILD_DIR=/mnt/axon-build AXON_PREVIOUS_PACKAGES="${previous}" \
+            bash build/build.sh --ci --edition "${{ matrix.edition }}"
+
+      - name: Size report
+        run: |
+          set -euo pipefail
           ls -lh dist/
           cat dist/*.sha256
+          {
+            echo '### ISO size: ${{ matrix.edition }}'
+            echo '```'
+            bash scripts/check-iso-size.sh --edition "${{ matrix.edition }}" \
+              --packages dist/*.packages.tsv dist/*.iso
+            echo '```'
+          } | tee -a "${GITHUB_STEP_SUMMARY}"
 
       - name: Verify ISO is bootable (El Torito + live payload)
         run: |
@@ -97,12 +138,22 @@ jobs:
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
-          name: axon-os-iso
+          name: axon-os-iso-${{ matrix.edition }}
           path: |
             dist/*.iso
             dist/*.sha256
+            dist/*.sbom.spdx.json
           compression-level: 0
           retention-days: 14
+          if-no-files-found: error
+
+      # Small, kept longer: the next build compares its package sizes with this one
+      - name: Upload package sizes
+        uses: actions/upload-artifact@v4
+        with:
+          name: axon-os-packages-${{ matrix.edition }}
+          path: dist/*.packages.tsv
+          retention-days: 90
           if-no-files-found: error
 
   publish-release:
@@ -113,33 +164,36 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download ISO artifact
+      - name: Download ISO artifacts
         uses: actions/download-artifact@v4
         with:
-          name: axon-os-iso
+          pattern: axon-os-iso-*
+          merge-multiple: true
           path: dist
 
-      - name: Attach ISO to release
+      - name: Attach ISOs to release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
           gh release create "${GITHUB_REF_NAME}" \
             --title "Axon OS ${GITHUB_REF_NAME}" \
             --generate-notes || true
-          gh release upload "${GITHUB_REF_NAME}" dist/*.sha256 --clobber
+          gh release upload "${GITHUB_REF_NAME}" dist/*.sha256 dist/*.sbom.spdx.json --clobber
           # Release assets are capped at 2 GiB, so a larger ISO is attached in
           # parts; `cat` joins them back and the .sha256 checks the result.
-          ISO="$(ls dist/*.iso)"
-          NAME="$(basename "${ISO}")"
-          if [ "$(stat -c%s "${ISO}")" -lt 2147000000 ]; then
-            gh release upload "${GITHUB_REF_NAME}" "${ISO}" --clobber
-          else
+          for ISO in dist/*.iso; do
+            NAME="$(basename "${ISO}")"
+            if [ "$(stat -c%s "${ISO}")" -lt 2147000000 ]; then
+              gh release upload "${GITHUB_REF_NAME}" "${ISO}" --clobber
+              continue
+            fi
             split -b 1900M -d -a 2 "${ISO}" "${ISO}.part"
             rm -f "${ISO}"
             gh release upload "${GITHUB_REF_NAME}" "${ISO}".part* --clobber
             NOTES="$(gh release view "${GITHUB_REF_NAME}" --json body --jq .body)"
-            printf '%s\n\n### Download the ISO\n\nThe ISO is split into parts because GitHub caps release files at 2 GB. Download every `%s.partNN` file and the `.sha256` into one folder, then run:\n\n```bash\ncat %s.part* > %s && sha256sum -c %s.sha256\n```\n' \
-              "${NOTES}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" > notes.md
+            printf '%s\n\n### Download %s\n\nThe ISO is split into parts because GitHub caps release files at 2 GB. Download every `%s.partNN` file and `%s.sha256` into one folder, then run:\n\n```bash\ncat %s.part* > %s && sha256sum -c %s.sha256\n```\n' \
+              "${NOTES}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" > notes.md
             gh release edit "${GITHUB_REF_NAME}" --notes-file notes.md
-          fi
+          done

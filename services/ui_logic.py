@@ -31,6 +31,16 @@ _ERROR_RE = re.compile(
 )
 
 
+# What Brain answers while game mode has the AI paused (services/axon-brain/game_gate.py).
+# Clients recognise it to offer "Run anyway" instead of a plain error.
+GAME_MODE_MESSAGE = "Game mode is on. AI is paused to keep your game smooth."
+
+
+def is_game_mode_error(message: str) -> bool:
+    """True if *message* is Brain saying the AI is paused for a game."""
+    return GAME_MODE_MESSAGE in message
+
+
 def classify_stream_prefix(text: str) -> str:
     """Decide whether a partial model reply can be shown yet.
 

@@ -1,6 +1,7 @@
 name: Publish apt repo
 
-# Builds the axon-os .deb and publishes it to the signed apt repository on
+# Builds the axon-os .deb and the small packages in packaging/*/, and publishes
+# them to the signed apt repository on
 # GitHub Pages (gh-pages branch, served at
 # https://projectdev-git.github.io/Axon-OS/apt). Installed systems pick it up
 # through axon-update.
@@ -20,11 +21,19 @@ on:
       ref:
         description: "Tag or branch to publish (default: the selected ref)"
         required: false
+      backports:
+        description: "Also rebuild the Ubuntu backports (Gamescope and its libraries; takes about 30 minutes)"
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       ref:
         type: string
         required: true
+      backports:
+        type: boolean
+        required: false
+        default: false
     secrets:
       APT_SIGNING_KEY:
         required: true
@@ -37,7 +46,49 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Newer Ubuntu source packages rebuilt for 24.04 (packaging/backports/backports.list). Only when
+  # asked: the result stays in the repository's pool until a newer one replaces it.
+  backports:
+    if: inputs.backports
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sbuild mmdebstrap devscripts dpkg-dev uidmap
+          # sbuild's unshare mode maps a range of ids into a user namespace
+          grep -q "^$(id -un):" /etc/subuid || echo "$(id -un):100000:65536" | sudo tee -a /etc/subuid
+          grep -q "^$(id -un):" /etc/subgid || echo "$(id -un):100000:65536" | sudo tee -a /etc/subgid
+          # Ubuntu 24.04 restricts unprivileged user namespaces; allow them for this build
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Build backports
+        run: bash scripts/build-backports.sh --out "${GITHUB_WORKSPACE}/backports"
+
+      - name: Keep the packages only
+        run: |
+          find backports -maxdepth 1 -type f ! -name '*.deb' -delete
+          ls -l backports
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: axon-backports
+          path: backports/*.deb
+          if-no-files-found: error
+
   publish:
+    needs: backports
+    # The backports job is skipped unless asked for; publishing must not wait for it then
+    if: ${{ !cancelled() && (needs.backports.result == 'success' || needs.backports.result == 'skipped') }}
     runs-on: ubuntu-24.04
     env:
       KEEP_VERSIONS: 5
@@ -80,8 +131,17 @@ jobs:
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y apt-utils libglib2.0-bin
 
+      - name: Get the backports
+        if: inputs.backports
+        uses: actions/download-artifact@v4
+        with:
+          name: axon-backports
+          path: out
+
       - name: Build package
-        run: bash src/packaging/build-deb.sh "${GITHUB_WORKSPACE}/out"
+        run: |
+          bash src/packaging/build-deb.sh "${GITHUB_WORKSPACE}/out"
+          bash src/packaging/build-pkg.sh --all "${GITHUB_WORKSPACE}/out"
 
       - name: Import signing key
         env:
@@ -118,10 +178,21 @@ jobs:
           set -euo pipefail
           pool=apt/pool/main
           mkdir -p "${pool}"
-          cp "${GITHUB_WORKSPACE}"/out/axon-os_*_all.deb "${pool}/"
+          cp "${GITHUB_WORKSPACE}"/out/*.deb "${pool}/"
 
-          # Keep the newest KEEP_VERSIONS packages
-          ls "${pool}"/axon-os_*_all.deb | sort -V | head -n -"${KEEP_VERSIONS}" | xargs -r rm -f
+          # GitHub Pages rejects files over 100 MB and the whole site is limited to 1 GB. Fail here,
+          # with a clear message, instead of at the push.
+          too_big="$(find "${pool}" -name '*.deb' -size +95M)"
+          if [ -n "${too_big}" ]; then
+            echo "::error::These packages are too big for GitHub Pages (limit 100 MB):" ${too_big}
+            exit 1
+          fi
+
+          # Keep the newest KEEP_VERSIONS of each package
+          for name in $(ls "${pool}" | sed 's/_.*//' | sort -u); do
+            ls "${pool}/${name}"_*.deb | sort -V | head -n -"${KEEP_VERSIONS}" | xargs -r rm -f
+          done
+          echo "pool size: $(du -sm "${pool}" | cut -f1) MB (limit for the site: 1000 MB)"
 
           cd apt
           rm -rf dists
@@ -153,7 +224,7 @@ jobs:
         run: |
           tag="${REF#refs/tags/}"
           if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            gh release upload "${tag}" "${GITHUB_WORKSPACE}"/out/axon-os_*_all.deb \
+            gh release upload "${tag}" "${GITHUB_WORKSPACE}"/out/axon-*_all.deb \
               --repo "${GITHUB_REPOSITORY}" --clobber
           fi
 

@@ -117,6 +117,11 @@ cat > "${B}/axon-shield" <<EOF
 exec /usr/bin/python3 ${SERVICES_DIR}/axon-sandbox/shield.py "\$@"
 EOF
 chmod 755 "${B}/axon-shield"
+cat > "${B}/axon-game-center" <<EOF
+#!/bin/sh
+exec /usr/bin/python3 ${APPS_DIR}/axon-game-center/main.py "\$@"
+EOF
+chmod 755 "${B}/axon-game-center"
 cat > "${B}/axon-diagnose" <<EOF
 #!/bin/sh
 exec /usr/bin/python3 ${SERVICES_DIR}/diagnostics.py "\$@"
@@ -130,6 +135,14 @@ install -Dm644 "${SRC}/data/polkit/org.axonos.update.policy" \
 # Hash-pinned Ollama installer used by first boot and axon-ollama-setup
 install -Dm755 "${SRC}/build/config/install-ollama.sh" "${R}${AXON_LIB}/ollama/install-ollama.sh"
 install -Dm644 "${SRC}/build/config/ollama-release.env" "${R}${AXON_LIB}/ollama/ollama-release.env"
+# FPS overlay layout: MangoHud 0.6.9 only reads ~/.config/MangoHud/MangoHud.conf, so every new user
+# gets a copy from /etc/skel and Game Center copies it when the overlay is turned on
+install -Dm644 "${SRC}/data/mangohud/MangoHud.conf" "${R}/usr/share/axon/mangohud/MangoHud.conf"
+install -Dm644 "${SRC}/data/mangohud/MangoHud.conf" "${R}/etc/skel/.config/MangoHud/MangoHud.conf"
+# GPU libraries (CUDA, ROCm) are added after a graphics card is found, never in the ISO
+install -Dm755 "${SRC}/build/config/install-ollama-gpu.sh" "${R}${AXON_LIB}/ollama/install-ollama-gpu.sh"
+install -Dm644 "${SRC}/data/polkit/org.axonos.ollama-gpu.policy" \
+    "${R}/usr/share/polkit-1/actions/org.axonos.ollama-gpu.policy"
 
 # Shell environment interceptor and the shared Python logger
 install -Dm644 "${SRC}/services/axon-sandbox/axon-sandbox-env.sh" "${R}/etc/profile.d/axon-sandbox.sh"
@@ -137,6 +150,7 @@ install -Dm644 "${SRC}/axon_logger.py" "${R}/usr/lib/python3/dist-packages/axon_
 
 # Self-healing boot watchdog: GRUB counter + rollback entry
 install -Dm755 "${SRC}/build/config/grub.d-06_axon_watchdog" "${R}/etc/grub.d/06_axon_watchdog"
+install -Dm755 "${SRC}/build/config/grub.d-41_axon_kernel_fallback" "${R}/etc/grub.d/41_axon_kernel_fallback"
 install -Dm755 "${SRC}/build/config/grub.d-42_axon_rollback" "${R}/etc/grub.d/42_axon_rollback"
 
 # ── System units ─────────────────────────────────────────────────────────────
@@ -209,13 +223,26 @@ if [[ -f "${KEYRING_ASC}" ]]; then
     install -d "${R}/usr/share/keyrings"
     gpg --batch --yes --dearmor -o "${R}/usr/share/keyrings/axon-os-archive-keyring.gpg" "${KEYRING_ASC}"
     chmod 644 "${R}/usr/share/keyrings/axon-os-archive-keyring.gpg"
-    install -d "${R}/etc/apt/sources.list.d"
+    install -d "${R}/etc/apt/sources.list.d" "${R}/etc/apt/preferences.d"
     cat > "${R}/etc/apt/sources.list.d/axon-os.sources" <<EOF
 Types: deb
 URIs: ${APT_URL}
 Suites: stable
 Components: main
 Signed-By: /usr/share/keyrings/axon-os-archive-keyring.gpg
+EOF
+    # The repository also holds rebuilds of newer Ubuntu libraries (Gamescope's: see
+    # packaging/backports). They must only be installed when something asks for them, never
+    # replace what Ubuntu provides on their own: priority 100 means "only if needed". The
+    # Axon packages themselves keep the normal priority so they update as usual.
+    cat > "${R}/etc/apt/preferences.d/axon-os" <<EOF
+Package: *
+Pin: release o=Axon OS
+Pin-Priority: 100
+
+Package: axon-*
+Pin: release o=Axon OS
+Pin-Priority: 500
 EOF
 else
     log "WARNING: ${KEYRING_ASC#"${SRC}/"} missing; package will not add the Axon apt repository"

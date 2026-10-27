@@ -46,7 +46,7 @@ fi
 infer_tag() {
     local file version
     file="${isos[0]}"
-    if [[ "$(basename "${file}")" =~ axon-os-([0-9]+\.[0-9]+\.[0-9]+)-amd64\.iso ]]; then
+    if [[ "$(basename "${file}")" =~ axon-os-([0-9]+\.[0-9]+\.[0-9]+)(-(standard|nvidia))?-amd64\.iso ]]; then
         echo "v${BASH_REMATCH[1]}"
         return 0
     fi

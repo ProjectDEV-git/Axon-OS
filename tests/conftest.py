@@ -30,6 +30,7 @@ for _subdir in (
     "services/axon-sandbox",
     "services/axon-gui-agent",
     "services/axon-brain",
+    "services/axon-gaming",
     "apps/axon-installer",
     "apps/axon-terminal",
 ):
@@ -41,6 +42,7 @@ for _subdir in (
 _SERVICE_PACKAGES = {
     "services.axon_brain": ROOT / "services" / "axon-brain",
     "services.axon_context": ROOT / "services" / "axon-context",
+    "services.axon_gaming": ROOT / "services" / "axon-gaming",
     "services.axon_search": ROOT / "services" / "axon-search",
     "services.axon_voice": ROOT / "services" / "axon-voice",
     "services.axon_gui_agent": ROOT / "services" / "axon-gui-agent",

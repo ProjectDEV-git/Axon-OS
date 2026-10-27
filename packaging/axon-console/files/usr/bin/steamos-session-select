@@ -1,0 +1,13 @@
+#!/bin/sh
+# steamos-session-select — what Steam runs for "Switch to Desktop" in SteamOS-style sessions.
+# In Axon Console the desktop is another login session, so this ends this one and the
+# login screen comes back. Any other target is ignored.
+case "${1:-}" in
+    desktop | plasma | gnome | gamescope-desktop)
+        if [ -n "${XDG_SESSION_ID:-}" ] && command -v loginctl >/dev/null 2>&1; then
+            exec loginctl terminate-session "$XDG_SESSION_ID"
+        fi
+        pkill -x gamescope
+        ;;
+esac
+exit 0

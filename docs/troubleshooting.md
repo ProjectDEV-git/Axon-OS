@@ -212,8 +212,8 @@ python3 services/axon-brain/hardware_profiler.py
    sudo modprobe nvidia
    nvidia-smi
    
-   # Reinstall Ollama (will detect CUDA)
-   curl -fsSL https://ollama.com/install.sh | sh
+   # Add Ollama's CUDA libraries (also in Game Center > Drivers)
+   pkexec /usr/lib/axon/ollama/install-ollama-gpu.sh cuda
    ```
 
 2. **AMD GPU not supported:**

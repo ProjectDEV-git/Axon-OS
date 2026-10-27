@@ -16,6 +16,12 @@ GitHub for it.
    an empty prefix without its registry keys and DLLs. It now runs in the prefix
    it was installed into. Worth sending upstream.
 
+2. **User-chosen Proton/Wine build** (`tier0.rs` `runner_wine`). Tier 0 runs
+   `$AXON_WINE_DIR/bin/wine` instead of the system `wine` when that variable
+   (set by `scripts/axon-apex-run` from `axon-proton-runners`) names a runner
+   whose `bin/wine` is an executable file nobody else can write. It is read from
+   the runner's own environment, never from a daemon client. Tier 0 only.
+
 ## How Axon uses it
 
 See `docs/windows-apps.md`. In short: only the `win-sandbox-runner` binary is

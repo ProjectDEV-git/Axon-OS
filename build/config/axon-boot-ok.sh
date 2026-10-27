@@ -16,6 +16,13 @@ mkdir -p /boot/efi/axon || exit 0
 [ -f "${ENV_FILE}" ] || grub-editenv "${ENV_FILE}" create 2>/dev/null
 grub-editenv "${ENV_FILE}" set boot_attempts=0 2>/dev/null
 
+# Booted from the snapshot taken before a release upgrade: say how to keep it.
+if grep -q 'axon\.rollback=upgrade' /proc/cmdline 2>/dev/null; then
+    echo "Axon OS booted from the snapshot taken before the upgrade. To keep using it," \
+        "run: sudo axon-update --rollback-upgrade, then restart." \
+        > /etc/motd.d/axon-rollback 2>/dev/null || true
+fi
+
 # Surface a recovery notice when this boot came from the rollback snapshot.
 if grep -q 'axon\.rollback=1' /proc/cmdline 2>/dev/null; then
     mkdir -p /var/lib/axon 2>/dev/null || true

@@ -1,0 +1,47 @@
+#!/bin/sh
+# axon-console-session — the "Axon Console" login session.
+#
+# Runs Steam's Big Picture (gamepad) interface inside Gamescope as the whole session.
+# Game mode stays on until the session ends, so Brain and file indexing stay paused and
+# the games get the GPU. Leaving Steam ends Gamescope, this script and the session, and
+# the login screen comes back; that is also how "Return to desktop" works.
+#
+# Extra Gamescope options, for a particular TV or handheld, go in AXON_GAMESCOPE_ARGS or
+# ~/.config/axon-os/console.conf (one line, same options: -W 1920 -H 1080 -r 60).
+set -u
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}"
+mkdir -p "$STATE"
+# Nothing else is on screen in this session, so a log is the only way to see what went wrong
+exec >>"$STATE/axon-console.log" 2>&1
+echo "== axon-console-session $(date '+%F %T') =="
+
+if ! command -v gamescope >/dev/null 2>&1; then
+    echo "gamescope is not installed; Axon Console cannot start"
+    exit 1
+fi
+if ! command -v steam >/dev/null 2>&1; then
+    echo "steam is not installed; Axon Console cannot start"
+    exit 1
+fi
+
+# The session's own pid: if this script is killed, Axon game mode notices and ends
+if command -v axon-game-mode >/dev/null 2>&1; then
+    axon-game-mode on --app-id console --pid "$$" || echo "game mode could not be turned on"
+    trap 'axon-game-mode off --pid "$$"' EXIT
+fi
+trap 'exit 143' INT TERM
+
+ARGS="${AXON_GAMESCOPE_ARGS:-}"
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/axon-os/console.conf"
+if [ -z "$ARGS" ] && [ -r "$CONF" ]; then
+    ARGS="$(head -n 1 "$CONF")"
+fi
+
+# -e: Steam integration (overlay and Big Picture hand-offs); -f: fullscreen.
+# $ARGS is deliberately split into words.
+# shellcheck disable=SC2086
+gamescope -e -f $ARGS -- steam -gamepadui
+status=$?
+echo "gamescope exited with status $status"
+exit "$status"

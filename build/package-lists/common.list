@@ -1,4 +1,5 @@
-# Axon OS — package manifest installed into the ISO root filesystem.
+# Axon OS — packages both editions get (installed into the ISO root filesystem).
+# Edition-specific graphics live in standard.list and nvidia.list; see build/build.sh --edition.
 # One package per line; blank lines and "#" comments are ignored.
 # NOTE: firefox/chromium are NOT listed — on Ubuntu 24.04 they are snap
 # transition packages that cannot install inside a chroot.
@@ -17,8 +18,8 @@ gedit
 eog
 evince
 gnome-calculator
-# System monitor: Mission Center (Flatpak) is installed by chroot-setup.sh
 gnome-disk-utility
+gnome-system-monitor
 gnome-keyring
 xdg-user-dirs
 xdg-user-dirs-gtk
@@ -95,7 +96,6 @@ zenity
 dconf-editor
 dconf-cli
 htop
-fastfetch
 
 # ── VM guest additions (VirtualBox + VMware + QEMU/KVM) ───────────────────────
 virtualbox-guest-utils
@@ -132,7 +132,7 @@ e2fsprogs
 btrfs-progs
 efibootmgr
 grub-pc-bin
-policykit-1
+pkexec
 os-prober
 
 # ── Hardware & Driver Coverage ────────────────────────────────────────────────
@@ -141,18 +141,14 @@ xserver-xorg-video-all
 xserver-xorg-video-amdgpu
 xserver-xorg-video-radeon
 xserver-xorg-video-intel
-xserver-xorg-video-nouveau
 xserver-xorg-video-fbdev
 xserver-xorg-video-vesa
 mesa-vulkan-drivers
-mesa-va-drivers
-mesa-vdpau-drivers
 libgl1-mesa-dri
 va-driver-all
 intel-media-va-driver
 
 # WiFi & Wireless
-wireless-tools
 iw
 rfkill
 wpasupplicant
@@ -165,7 +161,6 @@ libspa-0.2-bluetooth
 
 # Audio Extras
 alsa-base
-alsa-utils
 firmware-sof-signed
 gstreamer1.0-pipewire
 
@@ -180,7 +175,6 @@ printer-driver-escpr
 foomatic-db-compressed-ppds
 ipp-usb
 sane-utils
-libsane
 simple-scan
 
 # Input Devices
@@ -199,7 +193,6 @@ libpam-fprintd
 # Storage & Dual-Boot Filesystems
 ntfs-3g
 exfatprogs
-btrfs-progs
 xfsprogs
 lvm2
 cryptsetup
@@ -213,48 +206,34 @@ ethtool
 nfs-common
 cifs-utils
 
-# Media Codecs
-gstreamer1.0-plugins-bad
-gstreamer1.0-plugins-ugly
-gstreamer1.0-libav
+# Media Codecs: the patent-encumbered set (plugins-bad/ugly, libav, ffmpeg) is an
+# opt-in download (docs/gaming.md, rule 2.2); only hardware decode stays here.
 gstreamer1.0-vaapi
-ffmpeg
-libavcodec-extra
 
 # Power Management
+# GNOME's power-mode switch needs power-profiles-daemon, which conflicts with tlp (found
+# 2026-10-27 by an apt simulation; the same conflict is in 24.04): one of them, and GNOME's wins
 power-profiles-daemon
 thermald
-tlp
 acpi
 acpid
 upower
 
 # ── App Development ───────────────────────────────────────────────────────────
+# (Node, Go and Docker are not shipped: install them from the app catalog.)
 build-essential
 cmake
 pkg-config
-git
-curl
-wget
 python3-venv
 python3-dev
-nodejs
-npm
-golang
-docker.io
-docker-compose-v2
 
 # ── Gaming ────────────────────────────────────────────────────────────────────
-steam-installer
-steam-devices
-lutris
-gamemode
-mangohud
-# DirectX translation layers (DXVK + vkd3d-proton)
-dxvk
-vkd3d-proton
+# Steam, GameMode, MangoHud, Vulkan and the 32-bit graphics libraries come from
+# the axon-gaming-core metapackage (packaging/axon-gaming-core), installed by
+# chroot-setup.sh. Other launchers (Lutris, Heroic...) are download-later.
+# DXVK and vkd3d-proton are not packaged in noble (checked 2026-10-27 with
+# scripts/verify-packages.py); APEX-WIN installs them per prefix when a game needs them.
 # Vulkan runtime
-mesa-vulkan-drivers
 vulkan-tools
 libvulkan1
 libvulkan-dev
@@ -270,7 +249,6 @@ wine64
 wine32:i386
 
 # ── Windows ABI desktop integration ─────────────────────────────────────────
-xdg-utils
 shared-mime-info
 desktop-file-utils
 polkitd
@@ -278,7 +256,8 @@ polkitd
 # ── Everyday Tasks & Utilities ────────────────────────────────────────────────
 flatpak
 gnome-software-plugin-flatpak
-libreoffice
+# Game Center installs apt packages through PackageKit (pkcon) with polkit
+packagekit
 vlc
 transmission-gtk
 file-roller
@@ -286,7 +265,6 @@ file-roller
 # ── Architectural Pillars ──────────────────────────────────────────────────────
 # Self-healing snapshots
 timeshift
-grub-btrfs
 # Intelligent hardware routing
 switcheroo-control
 irqbalance

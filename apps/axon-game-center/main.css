@@ -1,0 +1,17 @@
+/* Axon Game Center. Colours come from the design tokens (@axon_*),
+ * loaded by axon_gtk_utils.load_app_css; see theme/tokens/axon-tokens.json. */
+
+.item-error {
+    color: @axon_error;
+}
+
+.item-progress {
+    min-width: 140px;
+}
+
+.starter-card {
+    background-color: @axon_surface;
+    border: 1px solid @axon_border;
+    border-radius: 12px;
+    padding: 12px;
+}

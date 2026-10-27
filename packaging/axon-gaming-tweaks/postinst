@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    # Earlier versions loaded ntsync from modules-load.d only if the kernel at install time had it
+    rm -f /etc/modules-load.d/axon-ntsync.conf
+    # was-enabled is true for a unit the helper has never seen, so a fresh install enables it
+    # and a unit the admin disabled stays disabled
+    deb-systemd-helper unmask axon-ntsync.service >/dev/null || true
+    if deb-systemd-helper --quiet was-enabled axon-ntsync.service; then
+        deb-systemd-helper enable axon-ntsync.service >/dev/null || true
+    else
+        deb-systemd-helper update-state axon-ntsync.service >/dev/null || true
+    fi
+    if [ -d /run/systemd/system ]; then
+        sysctl -q --system >/dev/null 2>&1 || true
+        udevadm control --reload >/dev/null 2>&1 || true
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        systemctl start axon-ntsync.service >/dev/null 2>&1 || true
+    fi
+fi
+exit 0

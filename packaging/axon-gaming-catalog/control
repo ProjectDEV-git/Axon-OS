@@ -1,0 +1,11 @@
+Package: axon-gaming-catalog
+Version: @VERSION@
+Architecture: all
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Section: games
+Priority: optional
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon OS gaming app catalog
+ The list of apps, tools and presets that Axon Game Center and the welcome
+ app offer to install. Shipped as its own package so a new list reaches
+ installed systems through the normal update, without a new ISO.

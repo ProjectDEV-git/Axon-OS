@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "remove" ] && [ -d /run/systemd/system ]; then
+    udevadm control --reload >/dev/null 2>&1 || true
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+if [ "$1" = "purge" ]; then
+    deb-systemd-helper purge axon-ntsync.service >/dev/null || true
+    deb-systemd-helper unmask axon-ntsync.service >/dev/null || true
+fi
+exit 0

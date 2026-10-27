@@ -1,0 +1,17 @@
+[Unit]
+Description=Axon OS Game Mode Service
+After=dbus.socket
+Requires=dbus.socket
+
+[Service]
+Type=dbus
+BusName=org.axonos.Gaming
+ExecStart=/usr/bin/python3 AXON_SERVICES_DIR/axon-gaming/gaming_service.py
+Restart=on-failure
+RestartSec=3
+# Only NoNewPrivileges: PrivateTmp/Protect* need user namespaces in a user
+# manager, which Ubuntu 24.04 restricts, so they fail with 218/CAPABILITIES.
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

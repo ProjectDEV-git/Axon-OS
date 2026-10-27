@@ -30,7 +30,7 @@ def test_requests_gtk4_vte_binding():
 def test_iso_ships_gtk4_vte():
     # Parsed exactly like chroot-setup.sh: grep -vE '^\s*(#|$)', one package
     # per line. An inline comment would become part of the apt argument.
-    lines = (ROOT / "build" / "config" / "packages.list").read_text().splitlines()
+    lines = (ROOT / "build" / "package-lists" / "common.list").read_text().splitlines()
     packages = [ln for ln in lines if not re.match(r"^\s*(#|$)", ln)]
     bad = [p for p in packages if not re.fullmatch(r"[a-z0-9][a-z0-9+.\-]+(:[a-z0-9]+)?", p)]
     assert not bad, f"not bare package names: {bad}"

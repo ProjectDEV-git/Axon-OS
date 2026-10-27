@@ -91,6 +91,20 @@ export function parseAction(text) {
     return null;
 }
 
+/** What Brain answers while game mode has the AI paused (twin of ui_logic.GAME_MODE_MESSAGE). */
+export const GAME_MODE_MESSAGE = 'Game mode is on. AI is paused to keep your game smooth.';
+
+/**
+ * True if `message` is Brain saying the AI is paused for a game, so the UI can
+ * offer "Run anyway" instead of a plain error.
+ *
+ * @param {string} message
+ * @returns {boolean}
+ */
+export function isGameModeError(message) {
+    return String(message ?? '').includes(GAME_MODE_MESSAGE);
+}
+
 const ERROR_RE = /(?:^|\n)[ \t]*(?:\[error\][ \t]*([\s\S]*)|\[error:[ \t]*([\s\S]*?)\])/i;
 
 /**
@@ -764,10 +778,29 @@ export function calculate(query) {
     }
 }
 
+// ── Game mode indicator ─────────────────────────────────────────────────────
+
+/**
+ * Names of the running games for the top-bar menu. GameMode's own hook doesn't
+ * know the game, so it reports "gamemode" (or nothing): shown as "A game".
+ *
+ * @param {Array<[string, string, number]>} games - [token, app_id, pid] from org.axonos.Gaming
+ * @returns {string[]} one entry per distinct name
+ */
+export function gameModeNames(games) {
+    const names = [];
+    for (const [, appId] of games ?? []) {
+        const name = !appId || appId === 'gamemode' ? _t('A game') : String(appId);
+        if (!names.includes(name))
+            names.push(name);
+    }
+    return names;
+}
+
 // ── Intent Bar suggestions (twin of services/suggestions.py) ────────────────
 
 export const SUGGESTION_CATEGORIES = Object.freeze(
-    ['Calculator', 'Applications', 'Files', 'Settings', 'Spaces', 'Commands', 'Ask AI']);
+    ['Calculator', 'Applications', 'Files', 'Settings', 'Spaces', 'Game mode', 'Game Center', 'Commands', 'Ask AI']);
 
 /** [title, GNOME Settings panel, extra search words] */
 export const SETTINGS_PANELS = Object.freeze([
@@ -782,6 +815,105 @@ export const SETTINGS_PANELS = Object.freeze([
     ['Privacy', 'privacy', 'location camera'],
     ['Accessibility', 'universal-access', 'a11y large text contrast zoom'],
 ]);
+
+/** Game mode intents: operation → [title, subtitle] */
+export const GAME_MODE_ROWS = Object.freeze({
+    on: ['Turn game mode on', 'Pause AI while you play'],
+    off: ['Turn game mode off', 'Bring AI back'],
+    status: ['Is game mode on?', 'See what is running'],
+});
+
+/**
+ * Which game mode intents `query` asks for: [] if it is not about game mode.
+ * "game mode on" turns it on, "game mode off" off, "is game mode on" asks; a
+ * bare "game mode" offers all three (twin of suggestions.game_mode_ops()).
+ *
+ * @param {string} query
+ * @returns {string[]}
+ */
+export function gameModeOps(query) {
+    const q = String(query ?? '');
+    const words = new Set(q.toLowerCase().match(/[a-z]+/g) ?? []);
+    if (!(words.has('game') && words.has('mode')) && !words.has('gamemode'))
+        return [];
+    if (words.has('is') || words.has('status') || q.trimEnd().endsWith('?'))
+        return ['status'];
+    if (['off', 'stop', 'disable', 'exit', 'end'].some(w => words.has(w)))
+        return ['off'];
+    if (['on', 'start', 'enable'].some(w => words.has(w)))
+        return ['on'];
+    return ['status', 'on', 'off'];
+}
+
+const normalWords = text => (String(text ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? []);
+const normal = text => normalWords(text).join(' ');
+
+/**
+ * [id, name] of the catalog item `text` names: an exact id, name or alias, else a
+ * prefix. "epic games" finds Heroic. Twin of suggestions.find_catalog_item().
+ *
+ * @param {string} text
+ * @param {Array<[string, string, string[]]>} items - [id, name, aliases]
+ * @returns {[string, string]|null}
+ */
+export function findCatalogItem(text, items) {
+    const q = normal(text);
+    if (!q)
+        return null;
+    const names = (items ?? []).map(([id, name, aliases]) =>
+        [id, name, [normal(id), normal(name), ...(aliases ?? []).map(normal)]]);
+    for (const [id, name, options] of names) {
+        if (options.includes(q))
+            return [id, name];
+    }
+    for (const [id, name, options] of names) {
+        if (options.some(o => o.startsWith(`${q} `) || (q.length >= 3 && o.startsWith(q))))
+            return [id, name];
+    }
+    return null;
+}
+
+/**
+ * [title, subtitle, action] for "install heroic", "open game center", "update proton"
+ * (twin of suggestions.game_center_rows()).
+ *
+ * @param {string} query
+ * @param {Array<[string, string, string[]]>} items - [id, name, aliases]
+ * @param {Array<[string, string]>} presets - [id, name]
+ * @returns {Array<[string, string, object]>}
+ */
+export function gameCenterRows(query, items, presets) {
+    const words = normalWords(query);
+    const q = words.join(' ');
+    if (!words.length)
+        return [];
+    if (['game center', 'open game center', 'gaming apps', 'open gaming apps'].includes(q)) {
+        return [[_t('Open Game Center'), _t('Install launchers, Proton and tools'),
+            {type: 'game_center', op: 'open', page: ''}]];
+    }
+    if (words[0] === 'update' && words.slice(1).includes('proton')) {
+        return [[_t('Update Proton'), _t('Open Game Center to pick a version'),
+            {type: 'game_center', op: 'open', page: 'compatibility'}]];
+    }
+    if (words[0] !== 'install' || words.length < 2)
+        return [];
+    const rest = words.slice(1).join(' ');
+    const restWords = new Set(words.slice(1));
+    // "install retro" alone means RetroArch, so a preset needs "pack" or "preset"
+    // ("starter" is unique)
+    for (const [presetId, name] of presets ?? []) {
+        if (restWords.has(presetId) && (presetId === 'starter' || restWords.has('pack') || restWords.has('preset'))) {
+            return [[_t('Install the {name} pack', {name}), _t('Opens Game Center'),
+                {type: 'game_center', op: 'preset', preset: presetId}]];
+        }
+    }
+    const found = findCatalogItem(rest, items);
+    if (found === null)
+        return [];
+    const [id, name] = found;
+    return [[_t('Install {name}', {name}), _t('Opens Game Center'),
+        {type: 'game_center', op: 'install', ids: [id]}]];
+}
 
 /** [exact allowlisted command, what it shows, extra search words] */
 export const SUGGESTED_COMMANDS = Object.freeze([
@@ -829,9 +961,10 @@ function topRows(scored, limit) {
  * @param {Array<[string, string, string]>} apps - [appId, name, keywords]
  * @param {string[]} spaces - Space names in Super+1…9 order
  * @param {number} [limit]
+ * @param {{items: Array, presets: Array}|null} [catalog] - gaming catalog for install intents
  * @returns {Array<{category: string, title: string, subtitle: string, action: object}>}
  */
-export function buildSuggestions(query, apps = [], spaces = [], limit = 3) {
+export function buildSuggestions(query, apps = [], spaces = [], limit = 3, catalog = null) {
     const q = String(query ?? '').trim();
     if (!q)
         return [];
@@ -863,6 +996,12 @@ export function buildSuggestions(query, apps = [], spaces = [], limit = 3) {
         .map((name, i) =>
             [matchScore(q, name, `${name} space`), row('Spaces', _t('{name} Space', {name}), `Super+${i + 1}`, {type: 'space', index: i, name})])
         .filter(([s]) => s >= 2), limit));
+    out.push(...gameModeOps(q).map(op =>
+        row('Game mode', _t(GAME_MODE_ROWS[op][0]), _t(GAME_MODE_ROWS[op][1]), {type: 'game_mode', op})));
+    if (catalog) {
+        out.push(...gameCenterRows(q, catalog.items, catalog.presets).map(([title, subtitle, action]) =>
+            row('Game Center', title, subtitle, action)));
+    }
     out.push(...topRows(SUGGESTED_COMMANDS
         .map(([command, description, words]) =>
             [matchScore(q, command, description, _t(description), words),
@@ -881,12 +1020,14 @@ export function describeSuggestion(s) {
     case 'files': return _t('Search your files for “{query}”', {query: a.query ?? ''});
     case 'settings': return _t('Open Settings → {panel}', {panel: s.title});
     case 'space': return _t('Switch to {name} Space', {name: a.name ?? ''});
+    case 'game_center': return s.title;
+    case 'game_mode': return _t(GAME_MODE_ROWS[a.op]?.[0] ?? 'Ask Axon AI');
     case 'command': return _t('Run: {command} (asks first)', {command: a.command ?? ''});
     default: return _t('Ask Axon AI');
     }
 }
 
-const STRONG_CATEGORIES = new Set(['Calculator', 'Applications', 'Settings', 'Spaces', 'Commands']);
+const STRONG_CATEGORIES = new Set(['Calculator', 'Applications', 'Settings', 'Spaces', 'Game mode', 'Game Center', 'Commands']);
 
 /**
  * Row Enter runs when the selection wasn't moved (twin of default_index()):

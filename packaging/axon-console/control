@@ -1,0 +1,13 @@
+Package: axon-console
+Version: @VERSION@
+Architecture: all
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: gamescope, steam-installer, axon-gaming-core, axon-game-mode, systemd
+Section: games
+Priority: optional
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon Console: a TV and handheld session for Steam
+ Adds "Axon Console" to the login screen. It starts Steam's Big Picture
+ (gamepad) interface inside Gamescope, with Axon game mode on for the whole
+ session so the AI services stay out of the way of the games. Leaving Steam
+ returns to the login screen.

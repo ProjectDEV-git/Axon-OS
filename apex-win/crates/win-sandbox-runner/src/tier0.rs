@@ -1,7 +1,27 @@
 use crate::Args;
 use anyhow::Result;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use tracing::info;
+
+/// Axon patch: the `wine` binary of the Proton/Wine build the user picked.
+///
+/// `AXON_WINE_DIR` (set by `axon-apex-run` from the user's own choice in
+/// Game Center) names a runner directory such as
+/// `~/.local/share/Steam/compatibilitytools.d/GE-Proton9-27/files`. It is read
+/// from this process's environment, never from a daemon client, and only used
+/// when `bin/wine` exists, is executable and is not group/world-writable.
+/// Anything else falls back to the system `wine`.
+fn runner_wine(dir: Option<&str>) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let wine = Path::new(dir?).join("bin").join("wine");
+    let meta = std::fs::metadata(&wine).ok()?;
+    let mode = meta.permissions().mode();
+    if !meta.is_file() || mode & 0o111 == 0 || mode & 0o022 != 0 {
+        return None;
+    }
+    Some(wine)
+}
 
 /// Tier 0: Direct wine execution with no sandboxing.
 ///
@@ -35,7 +55,11 @@ pub fn run_with_env(
         args.resolved_wineprefix.as_deref(),
     )?;
 
-    let mut cmd = Command::new("wine");
+    let wine = runner_wine(std::env::var("AXON_WINE_DIR").ok().as_deref());
+    if let Some(wine) = &wine {
+        info!("Using runner {}", wine.display());
+    }
+    let mut cmd = Command::new(wine.as_deref().unwrap_or(Path::new("wine")));
     cmd.arg(exe);
     cmd.args(&args.args);
 
@@ -64,5 +88,38 @@ pub fn run_with_env(
         Ok(ExitCode::SUCCESS)
     } else {
         Ok(ExitCode::from(status.code().unwrap_or(1) as u8))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn make_wine(root: &Path, mode: u32) {
+        std::fs::create_dir_all(root.join("bin")).unwrap();
+        let wine = root.join("bin").join("wine");
+        std::fs::write(&wine, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&wine, std::fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    #[test]
+    fn runner_wine_accepts_executable_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        make_wine(dir.path(), 0o755);
+        let got = runner_wine(dir.path().to_str());
+        assert_eq!(got, Some(dir.path().join("bin").join("wine")));
+    }
+
+    #[test]
+    fn runner_wine_rejects_unset_missing_and_unsafe() {
+        assert_eq!(runner_wine(None), None);
+        assert_eq!(runner_wine(Some("/nonexistent/runner")), None);
+        let writable = tempfile::tempdir().unwrap();
+        make_wine(writable.path(), 0o777);
+        assert_eq!(runner_wine(writable.path().to_str()), None);
+        let not_exec = tempfile::tempdir().unwrap();
+        make_wine(not_exec.path(), 0o644);
+        assert_eq!(runner_wine(not_exec.path().to_str()), None);
     }
 }
