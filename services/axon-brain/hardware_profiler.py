@@ -4,6 +4,7 @@ import logging
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -240,8 +241,5 @@ def profile_hardware():
 
 
 if __name__ == "__main__":
-    profile = profile_hardware()
-    from _log_helper import resolve_logger as configure_app_logger
-
-    logger = configure_app_logger(__name__)
-    logger.debug(json.dumps(profile, indent=2))
+    # install.sh reads this JSON from stdout; logging must never be the only output
+    sys.stdout.write(json.dumps(profile_hardware(), indent=2) + "\n")

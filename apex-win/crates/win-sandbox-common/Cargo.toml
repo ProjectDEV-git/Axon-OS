@@ -2,6 +2,7 @@
 name = "win-sandbox-common"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 
 [lib]
 name = "win_sandbox_common"

@@ -130,7 +130,12 @@ apt_install_best_effort \
     zstd \
     ubuntu-drivers-common
 info "Installing Python packages (faster-whisper, webrtcvad, sqlite-vec) into user environment"
-pip3 install --user faster-whisper webrtcvad sqlite-vec || warn "pip install of AI extras failed — you can retry later"
+# Ubuntu 24.04 and newer refuse pip outside a virtual environment (PEP 668). --user keeps these
+# in ~/.local and never touches the system's own Python packages, so the override is safe here.
+if ! pip3 install --user faster-whisper webrtcvad sqlite-vec 2>/dev/null; then
+    pip3 install --user --break-system-packages faster-whisper webrtcvad sqlite-vec \
+        || warn "pip install of AI extras failed — you can retry later"
+fi
 success "Python/GTK dependencies installed"
 
 # ---------------------------------------------------------------------------
@@ -179,8 +184,8 @@ if command -v ollama &>/dev/null; then
     HW_JSON="$(python3 "${PROFILER}" 2>/dev/null)" || HW_JSON=""
 
     if [[ -n "${HW_JSON}" ]]; then
-        SYS_RAM="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['system']['ram_gb']:.1f}\")" 2>/dev/null || echo "?")"
-        GPU_TYPE="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['system']['gpu_type'])" 2>/dev/null || echo "Unknown")"
+        SYS_RAM="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['hardware']['ram_gb']:.1f}\")" 2>/dev/null || echo "?")"
+        GPU_TYPE="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['hardware']['gpu_vendor'] + ' ' + d['hardware']['gpu_model'])" 2>/dev/null || echo "Unknown")"
         SPEED_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['speed']['model'])" 2>/dev/null || echo "llama3.2:1b")"
         GENERAL_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['general']['model'])" 2>/dev/null || echo "llama3.2:3b")"
         DEEP_MODEL="$(echo "${HW_JSON}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['recommendations']['deep']['model'])" 2>/dev/null || echo "llama3:8b")"
