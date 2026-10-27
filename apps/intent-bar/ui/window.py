@@ -17,136 +17,56 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
+from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
 from ..ollama_client import OllamaClient
 from ..spaces_manager import SpacesManager
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent / "services"))
+# services/ sits next to apps/ in the source tree and in the .deb
+# (/usr/lib/axon), and inside the app directory for install.sh
+# (~/.local/share/axon-os/services).
+for _services in (Path(__file__).resolve().parents[3], Path(__file__).resolve().parents[2]):
+    if (_services / "services").is_dir():
+        sys.path.insert(0, str(_services / "services"))
+        break
+from constants import AXON_DIR
 from service_utils import confirm_and_exec
+from suggestions import SETTINGS_PANELS, Suggestion, build_suggestions, default_index
+from suggestions import describe as describe_suggestion
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from axon_gtk_utils import announce, load_app_css, monitor_size
+from i18n import _
+from ui_logic import (
+    EXAMPLE_PROMPTS,
+    SHOW,
+    STAGE_CONFIRM,
+    STAGE_CONNECTING,
+    STAGE_SEARCHING,
+    STAGE_WAITING,
+    ModelOrigin,
+    RequestTracker,
+    announcement,
+    classify_stream_prefix,
+    describe_action,
+    escape_action,
+    format_command_output,
+    intent_bar_width,
+    load_history,
+    origin_tooltip,
+    parse_action,
+    push_history,
+    recent_for_empty_state,
+    routing_origin,
+    save_history,
+    split_error,
+    stage_for_stream,
+)
 
 try:
     import dbus
 except ImportError:  # pragma: no cover - dbus ships on Axon images
     dbus = None
-
-# ---------------------------------------------------------------------------
-# Axon OS Design System — embedded CSS
-# ---------------------------------------------------------------------------
-
-_CSS = b"""
-/* ---- Window shell ---- */
-.intent-bar-window {
-    background-color: #09090f;
-    border-radius: 20px;
-    border: 1px solid #3a3a58;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
-}
-
-/* ---- Entry field ---- */
-.intent-entry {
-    background-color: transparent;
-    color: #e8e8f4;
-    font-size: 20px;
-    caret-color: #8b5cf6;
-    border: none;
-    padding: 8px 4px;
-    box-shadow: none;
-    outline: none;
-}
-
-.intent-entry:focus {
-    outline: none;
-    box-shadow: none;
-}
-
-/* ---- Separators ---- */
-.entry-sep {
-    background-color: #2a2a42;
-    min-height: 1px;
-}
-
-/* ---- Quick-action chips ---- */
-.intent-chip {
-    background-color: rgba(139, 92, 246, 0.08);
-    color: #8b5cf6;
-    border: 1px solid rgba(139, 92, 246, 0.35);
-    border-radius: 9999px;
-    padding: 4px 14px;
-    font-size: 12px;
-}
-
-.intent-chip:hover {
-    background-color: #8b5cf6;
-    color: #ffffff;
-}
-
-/* ---- Response text ---- */
-.response-label {
-    color: #9090b8;
-    font-size: 13px;
-}
-
-/* ---- Space badge ---- */
-.space-badge {
-    background-color: rgba(139, 92, 246, 0.15);
-    color: #8b5cf6;
-    border-radius: 9999px;
-    padding: 2px 12px;
-    font-size: 11px;
-    font-weight: bold;
-}
-
-/* ---- Model badge ---- */
-.model-badge {
-    background-color: rgba(34, 211, 238, 0.12);
-    color: #22d3ee;
-    border-radius: 9999px;
-    padding: 2px 12px;
-    font-size: 11px;
-}
-
-/* ---- Semantic search result rows ---- */
-.search-result-row {
-    border-radius: 10px;
-    padding: 6px 10px;
-}
-
-.search-result-row:hover {
-    background-color: rgba(139, 92, 246, 0.12);
-}
-
-.search-result-path {
-    color: #c4b5fd;
-    font-size: 13px;
-    font-weight: bold;
-}
-
-.search-result-snippet {
-    color: #70709a;
-    font-size: 11px;
-}
-
-/* ---- Keyboard hint labels ---- */
-.hint-label {
-    color: #50507a;
-    font-size: 11px;
-}
-
-/* ---- Start Ollama button ---- */
-.start-ollama-btn {
-    color: #8b5cf6;
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    border-radius: 8px;
-    background-color: transparent;
-    font-size: 12px;
-    padding: 4px 10px;
-}
-
-.start-ollama-btn:hover {
-    background-color: rgba(139, 92, 246, 0.15);
-}
-"""
 
 # ---------------------------------------------------------------------------
 # System-prompt template
@@ -173,15 +93,44 @@ _CHIPS: list[tuple[str, str]] = [
     ("Find File", "find "),
     ("Open App", "open "),
     ("Run Command", "run "),
-    ("Find Files", "find "),
     ("Search Web", "search "),
     ("Summarize", "summarize "),
 ]
 
 _MAX_HISTORY = 20
+# Queries survive closing the bar so the empty state can offer them again
+_HISTORY_FILE = AXON_DIR / "intent_history.json"
+_RESPONSE_MAX_HEIGHT = 320  # px; longer answers scroll
 
 # Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
 _SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _wrapping_row(spacing: int) -> Gtk.FlowBox:
+    """A row of small widgets that wraps onto more lines when space runs out."""
+    row = Gtk.FlowBox()
+    row.set_selection_mode(Gtk.SelectionMode.NONE)
+    row.set_column_spacing(spacing)
+    row.set_row_spacing(4)
+    row.set_max_children_per_line(12)
+    # At least three per line: otherwise GTK sizes the window for one item
+    # per line and the bar keeps a tall blank band
+    row.set_min_children_per_line(3)
+    row.set_homogeneous(False)
+    return row
+
+
+def _installed_apps() -> list[tuple[str, str, str]]:
+    """Visible installed apps as ``(desktop id, name, keywords)``."""
+    apps = []
+    for info in Gio.AppInfo.get_all():
+        if not info.should_show() or not info.get_id():
+            continue
+        keywords = ""
+        if isinstance(info, Gio.DesktopAppInfo):
+            keywords = " ".join(info.get_keywords() or [])
+        apps.append((info.get_id(), info.get_display_name() or info.get_name(), keywords))
+    return apps
 
 
 def _validate_app_name(name: str) -> str | None:
@@ -199,9 +148,6 @@ def _validate_app_name(name: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-_css_loaded = False
-
-
 class IntentBarWindow(Adw.Window):
     """Floating intent bar with streaming AI responses."""
 
@@ -215,15 +161,22 @@ class IntentBarWindow(Adw.Window):
         self._spaces = spaces_manager
 
         # Command history
-        self._history: list[str] = []
+        self._history: list[str] = load_history(_HISTORY_FILE, _MAX_HISTORY)
         self._history_idx: int = -1
 
         # Accumulator for streaming tokens
         self._stream_parts: list[str] = []
         self._stream_cancelled: bool = False
+        # The running AI/search request; Escape or Stop cancels it
+        self._requests = RequestTracker()
+        # Suggestions for what is typed, and an AI action waiting for Enter
+        self._apps = _installed_apps()
+        self._suggestions: list[Suggestion] = []
+        self._pending_action: dict[str, Any] | None = None
 
         self.set_decorated(False)
-        self.set_default_size(660, -1)
+        # clamp(480 px, 45% of the monitor, 820 px)
+        self.set_default_size(intent_bar_width(monitor_size(self.get_display())[0]), -1)
         self.set_size_request(480, -1)  # minimum width so it still fits small screens
         self.add_css_class("intent-bar-window")
 
@@ -233,22 +186,14 @@ class IntentBarWindow(Adw.Window):
 
         # Clean up streaming and resources on destroy
         self.connect("destroy", self._on_destroy)
+        self.connect("map", lambda *_a: self._queue_fit())
 
     # ------------------------------------------------------------------
     # CSS
     # ------------------------------------------------------------------
 
     def _apply_css(self) -> None:
-        global _css_loaded
-        if not _css_loaded:
-            provider = Gtk.CssProvider()
-            provider.load_from_data(_CSS)
-            Gtk.StyleContext.add_provider_for_display(
-                self.get_display(),
-                provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
-            _css_loaded = True
+        load_app_css(Path(__file__).with_name("intent-bar.css"), self.get_display())
 
     # ------------------------------------------------------------------
     # UI construction
@@ -281,16 +226,19 @@ class IntentBarWindow(Adw.Window):
         spacer.set_hexpand(True)
         top_row.append(spacer)
 
-        self._model_badge = Gtk.Label(label=self._ollama.model)
+        # Where requests go: "Local · llama3.2:3b" or "Cloud · OpenAI · gpt-4.1".
+        # Filled in by _check_available_async; never assumed local.
+        self._model_badge = Gtk.Label(label=_("Model: checking…"))
         self._model_badge.add_css_class("model-badge")
         self._model_badge.set_valign(Gtk.Align.CENTER)
         top_row.append(self._model_badge)
 
-        self._start_ollama_btn = Gtk.Button(label="Start Ollama")
+        # Recovery button, shown next to the "not running" error. The check
+        # is a D-Bus call, so it runs in _check_available_async, not here.
+        self._start_ollama_btn = Gtk.Button(label=_("Start Ollama"))
         self._start_ollama_btn.add_css_class("start-ollama-btn")
-        self._start_ollama_btn.set_valign(Gtk.Align.CENTER)
-        self._start_ollama_btn.set_visible(not self._ollama.is_available())
-        top_row.append(self._start_ollama_btn)
+        self._start_ollama_btn.set_valign(Gtk.Align.START)
+        self._start_ollama_btn.set_visible(False)
 
         # ---- Row 2: separator -------------------------------------------
         sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
@@ -305,7 +253,7 @@ class IntentBarWindow(Adw.Window):
         root.append(entry_row)
 
         self._entry = Gtk.Entry()
-        self._entry.set_placeholder_text("Ask anything or type a command...")
+        self._entry.set_placeholder_text(_("Ask anything or type a command..."))
         self._entry.set_hexpand(True)
         self._entry.add_css_class("intent-entry")
         entry_row.append(self._entry)
@@ -315,6 +263,21 @@ class IntentBarWindow(Adw.Window):
         self._spinner.set_size_request(22, 22)
         entry_row.append(self._spinner)
 
+        # What the running request is doing ("Waiting for model…")
+        self._stage_label = Gtk.Label()
+        self._stage_label.add_css_class("stage-label")
+        self._stage_label.set_valign(Gtk.Align.CENTER)
+        self._stage_label.set_visible(False)
+        entry_row.append(self._stage_label)
+
+        self._stop_btn = Gtk.Button.new_from_icon_name("process-stop-symbolic")
+        self._stop_btn.add_css_class("flat")
+        self._stop_btn.set_valign(Gtk.Align.CENTER)
+        self._stop_btn.set_tooltip_text(_("Stop (Esc)"))
+        self._stop_btn.update_property([Gtk.AccessibleProperty.LABEL], [_("Stop request")])
+        self._stop_btn.set_visible(False)
+        entry_row.append(self._stop_btn)
+
         # ---- Row 4: separator -------------------------------------------
         sep2 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep2.add_css_class("entry-sep")
@@ -323,7 +286,8 @@ class IntentBarWindow(Adw.Window):
         root.append(sep2)
 
         # ---- Row 5: quick-action chips ----------------------------------
-        chips_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        # FlowBox so the chips wrap with Large Text instead of widening the bar
+        chips_row = _wrapping_row(spacing=8)
         chips_row.set_margin_bottom(8)
         root.append(chips_row)
 
@@ -345,7 +309,27 @@ class IntentBarWindow(Adw.Window):
         self._response_label.set_margin_top(2)
         self._response_label.set_margin_bottom(8)
         self._response_label.set_visible(False)
-        root.append(self._response_label)
+
+        # Long answers scroll instead of pushing the bar off-screen
+        self._response_scroll = Gtk.ScrolledWindow()
+        self._response_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self._response_scroll.set_max_content_height(_RESPONSE_MAX_HEIGHT)
+        self._response_scroll.set_propagate_natural_height(True)
+        self._error_icon = Gtk.Image.new_from_icon_name("dialog-error-symbolic")
+        self._error_icon.add_css_class("response-error-icon")
+        self._error_icon.set_valign(Gtk.Align.START)
+        self._error_icon.set_visible(False)
+        self._response_label.set_hexpand(True)
+        response_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        response_row.append(self._error_icon)
+        response_row.append(self._response_label)
+        response_row.append(self._start_ollama_btn)
+        self._response_scroll.set_child(response_row)
+        self._response_label.bind_property(
+            "visible", self._response_scroll, "visible", GObject.BindingFlags.SYNC_CREATE
+        )
+        root.append(self._response_scroll)
+        threading.Thread(target=self._check_available_async, daemon=True).start()
 
         # ---- Row 6b: semantic search results ----------------------------
         self._results_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -353,16 +337,98 @@ class IntentBarWindow(Adw.Window):
         self._results_box.set_visible(False)
         root.append(self._results_box)
 
+        # ---- Row 6c: suggestions while typing ----------------------------
+        self._suggest_list = Gtk.ListBox()
+        self._suggest_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self._suggest_list.set_header_func(self._suggestion_header)
+        self._suggest_list.update_property([Gtk.AccessibleProperty.LABEL], [_("Suggestions")])
+        self._suggest_list.connect("row-activated", self._on_suggestion_activated)
+        self._suggest_list.connect("row-selected", lambda *_a: self._update_preview())
+        self._suggest_list.set_visible(False)
+        root.append(self._suggest_list)
+        # What Enter will do ("↵ Open Firefox")
+        self._preview_label = Gtk.Label(xalign=0.0)
+        self._preview_label.add_css_class("hint-label")
+        self._preview_label.set_visible(False)
+        root.append(self._preview_label)
+
+        # ---- Row 6d: empty state (before the user types) -----------------
+        self._empty_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self._empty_box.set_margin_bottom(8)
+        root.append(self._empty_box)
+        self._build_empty_state()
+
         # ---- Row 7: keyboard hint row -----------------------------------
-        hint_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        hint_row = _wrapping_row(spacing=16)
         hint_row.set_margin_top(4)
         root.append(hint_row)
 
-        for hint_text in ("Return  Submit", "Esc  Close", "Up/Down  History"):
+        for hint_text in ("Return  Submit", "Esc  Stop / Close", "Up/Down  History"):
             lbl = Gtk.Label(label=hint_text)
             lbl.add_css_class("hint-label")
             lbl.set_valign(Gtk.Align.CENTER)
             hint_row.append(lbl)
+
+    def _build_empty_state(self) -> None:
+        """Example prompts and recent queries; clicking one fills the entry."""
+        child = self._empty_box.get_first_child()
+        while child is not None:
+            nxt = child.get_next_sibling()
+            self._empty_box.remove(child)
+            child = nxt
+        sections = (
+            ("Try", list(EXAMPLE_PROMPTS)),
+            ("Recent", recent_for_empty_state(self._history)),
+        )
+        for title, items in sections:
+            if not items:
+                continue
+            heading = Gtk.Label(label=title, xalign=0.0)
+            heading.add_css_class("hint-label")
+            self._empty_box.append(heading)
+            for text in items:
+                btn = Gtk.Button(label=text)
+                btn.add_css_class("flat")
+                btn.add_css_class("search-result-row")
+                btn.set_halign(Gtk.Align.START)
+                btn.connect("clicked", lambda _b, t=text: self._fill_entry(t))
+                self._empty_box.append(btn)
+
+    def _fill_entry(self, text: str) -> None:
+        self._entry.set_text(text)
+        self._entry.grab_focus()
+        self._entry.set_position(-1)
+
+    def _update_empty_state(self, *_args: Any) -> None:
+        """Show the empty state only while nothing is typed or shown."""
+        idle = (
+            not self._entry.get_text()
+            and not self._requests.busy
+            and not self._response_label.get_visible()
+            and not self._results_box.get_visible()
+        )
+        self._empty_box.set_visible(idle)
+        self._queue_fit()
+
+    def _queue_fit(self) -> None:
+        """Resize to the content after this change has been laid out."""
+        if not getattr(self, "_fit_pending", False):
+            self._fit_pending = True
+            GLib.idle_add(self._fit_height)
+
+    def _fit_height(self) -> bool:
+        """Make the window as tall as its content, so it never keeps a blank band.
+
+        GTK 4 windows grow with their content but never shrink by themselves.
+        """
+        self._fit_pending = False
+        width = self.get_default_size()[0]
+        if width <= 0:
+            width = self.get_width()
+        _minimum, natural, _b1, _b2 = self.measure(Gtk.Orientation.VERTICAL, width)
+        if natural > 0 and natural != self.get_default_size()[1]:
+            self.set_default_size(width, natural)
+        return False
 
     # ------------------------------------------------------------------
     # Signal connections
@@ -370,7 +436,12 @@ class IntentBarWindow(Adw.Window):
 
     def _connect_signals(self) -> None:
         self._entry.connect("activate", self._on_activate)
+        self._entry.connect("changed", self._update_empty_state)
+        self._entry.connect("changed", self._on_entry_changed)
+        self._response_label.connect("notify::visible", self._update_empty_state)
+        self._results_box.connect("notify::visible", self._update_empty_state)
         self._start_ollama_btn.connect("clicked", self._on_start_ollama)
+        self._stop_btn.connect("clicked", lambda _b: self._cancel_request())
 
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self._on_key_pressed)
@@ -388,7 +459,20 @@ class IntentBarWindow(Adw.Window):
         _state: Any,
     ) -> bool:
         if keyval == Gdk.KEY_Escape:
-            self.close()
+            # Escape drops a waiting action, then stops a running request;
+            # only after that does it close the bar
+            if self._pending_action is not None:
+                self._pending_action = None
+                self._set_response(_("Cancelled"))
+            elif escape_action(self._requests.busy) == "cancel":
+                self._cancel_request()
+            else:
+                self.close()
+            return True
+
+        # Up/Down move through suggestions while typing, history otherwise
+        if keyval in (Gdk.KEY_Up, Gdk.KEY_Down) and self._suggest_list.get_visible():
+            self._move_selection(-1 if keyval == Gdk.KEY_Up else 1)
             return True
 
         if keyval == Gdk.KEY_Up:
@@ -425,12 +509,10 @@ class IntentBarWindow(Adw.Window):
         self._entry.set_position(-1)
 
     def _push_history(self, query: str) -> None:
-        """Push a query onto the history stack (dedup head, cap at max)."""
-        if self._history and self._history[0] == query:
-            return
-        self._history.insert(0, query)
-        if len(self._history) > _MAX_HISTORY:
-            self._history = self._history[:_MAX_HISTORY]
+        """Put a query at the top of the history and save it."""
+        self._history = push_history(self._history, query, _MAX_HISTORY)
+        save_history(_HISTORY_FILE, self._history)
+        self._build_empty_state()
 
     # ------------------------------------------------------------------
     # Quick-action chips
@@ -450,9 +532,21 @@ class IntentBarWindow(Adw.Window):
     # ------------------------------------------------------------------
 
     def _on_activate(self, entry: Gtk.Entry) -> None:
+        # Enter confirms an AI action shown as a preview
+        if self._pending_action is not None:
+            action, self._pending_action = self._pending_action, None
+            self._execute_action(action)
+            return
         query = entry.get_text().strip()
         if not query:
             return
+        selected = self._selected_suggestion()
+        if selected is not None and selected.action.get("type") != "ask":
+            self._push_history(query)
+            self._history_idx = -1
+            self._run_suggestion(selected)
+            return
+        self._hide_suggestions()
 
         # "find <something>" routes to the local semantic index instead of
         # the LLM — works even when Ollama is offline (keyword fallback).
@@ -462,66 +556,157 @@ class IntentBarWindow(Adw.Window):
             self._start_semantic_search(query[5:].strip())
             return
 
-        if not self._ollama.is_available():
-            self._show_error("[error] Ollama is not running. Click 'Start Ollama'.")
-            self._start_ollama_btn.set_visible(True)
-            return
-
-        # Prepare UI for streaming
-        self._spinner.start()
-        self._response_label.set_text("")
-        self._response_label.set_visible(False)
-        entry.set_sensitive(False)
+        # Prepare UI for streaming (the availability check runs in the worker)
+        request_id = self._requests.start()
+        self._set_busy(True)
+        self._set_stage(STAGE_CONNECTING)
+        self._set_response("")
         self._push_history(query)
         self._history_idx = -1
 
         thread = threading.Thread(
             target=self._do_query,
-            args=(query,),
+            args=(query, request_id),
             daemon=True,
         )
         thread.start()
+
+    def _set_busy(self, busy: bool) -> None:
+        """Show or hide the running-request UI (spinner, Stop, locked entry)."""
+        if busy:
+            self._spinner.start()
+        else:
+            self._spinner.stop()
+        self._stop_btn.set_visible(busy)
+        self._entry.set_sensitive(not busy)
+        if not busy:
+            self._set_stage(None)
+            self._entry.grab_focus()
+        self._update_empty_state()
+
+    def _set_stage(self, stage: str | None, request_id: int | None = None) -> bool:
+        """Show the loading stage; ignored for a stale *request_id*."""
+        if request_id is not None and not self._requests.is_current(request_id):
+            return False
+        self._stage_label.set_text(stage or "")
+        self._stage_label.set_visible(bool(stage))
+        return False
+
+    def _cancel_request(self) -> None:
+        """Stop the running request; late results from it are dropped."""
+        if not self._requests.cancel():
+            return
+        self._set_busy(False)
+        self._clear_results()
+        self._set_response(_("Cancelled"))
+        announce(self, announcement("cancelled"))
+        cancel = getattr(self._ollama, "cancel", None)
+        if cancel is not None:
+            threading.Thread(target=cancel, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Streaming implementation
     # ------------------------------------------------------------------
 
-    def _do_query(self, query: str) -> None:
-        """Run the Ollama streaming query in a background thread."""
+    def _do_query(self, query: str, request_id: int) -> None:
+        """Run the Ollama streaming query in a background thread.
+
+        A reply that may be an action (JSON) is held back until the stream
+        ends, so the user sees "Opening Firefox…" instead of raw JSON.
+        """
+        if not self._ollama.is_available():
+            GLib.idle_add(self._on_ai_unavailable, request_id)
+            return
+        GLib.idle_add(self._set_stage, STAGE_WAITING, request_id)
         system = self._build_system_prompt()
-        self._stream_parts = []
+        parts: list[str] = []
+        self._stream_parts = parts
+        showing = False
         try:
             for token in self._ollama.generate_stream(query, system=system):
-                if self._stream_cancelled:
-                    break
-                self._stream_parts.append(token)
-                GLib.idle_add(self._append_token, token)
+                if self._stream_cancelled or not self._requests.is_current(request_id):
+                    return
+                parts.append(token)
+                if showing:
+                    GLib.idle_add(self._append_token, token, request_id)
+                    continue
+                so_far = "".join(parts)
+                GLib.idle_add(self._set_stage, stage_for_stream(so_far), request_id)
+                if classify_stream_prefix(so_far) == SHOW:
+                    showing = True
+                    GLib.idle_add(self._append_token, so_far, request_id)
         except Exception as exc:
-            if not self._stream_cancelled:
-                GLib.idle_add(self._append_token, f"\n[error] {exc}")
+            parts.append(f"\n[error] {exc}")
         if not self._stream_cancelled:
-            GLib.idle_add(self._finish_stream, "".join(self._stream_parts))
+            GLib.idle_add(self._finish_stream, "".join(parts), request_id)
 
-    def _append_token(self, token: str) -> bool:
-        """Append a streaming token to the response label (GTK main thread)."""
-        self._response_label.set_text(self._response_label.get_text() + token)
-        self._response_label.set_visible(True)
+    def _check_available_async(self) -> None:
+        """Worker thread: fill the origin badge; show "Start Ollama" if offline."""
+        routing_info = getattr(self._ollama, "routing_info", None)
+        providers, tiers = routing_info() if routing_info is not None else (None, {})
+        GLib.idle_add(self._set_origin, routing_origin(self._ollama.model, tiers, providers))
+        if not self._ollama.is_available():
+            GLib.idle_add(self._show_ai_offline)
+
+    def _set_origin(self, origin: ModelOrigin) -> bool:
+        self._model_badge.set_text(origin.label)
+        self._model_badge.set_tooltip_text(origin_tooltip(origin))
         return False
 
-    def _finish_stream(self, full: str) -> bool:
-        """Called when streaming is complete (GTK main thread)."""
-        self._spinner.stop()
-        self._entry.set_sensitive(True)
-        self._entry.grab_focus()
+    def _on_ai_unavailable(self, request_id: int) -> bool:
+        """GTK thread: the query found the AI offline."""
+        if not self._requests.finish(request_id):
+            return False
+        self._set_busy(False)
+        self._show_ai_offline()
+        return False
 
-        # Attempt action JSON parsing
-        stripped = full.strip()
-        try:
-            action: Any = json.loads(stripped)
-            if isinstance(action, dict) and "action" in action:
+    def _show_ai_offline(self) -> bool:
+        """Show the offline error with its recovery button."""
+        if self._requests.busy:
+            return False  # don't overwrite a request that is running
+        self._show_error(_("Ollama is not running."))
+        announce(self, announcement("error", "Ollama is not running."), important=True)
+        self._start_ollama_btn.set_sensitive(True)
+        self._start_ollama_btn.set_visible(True)
+        return False
+
+    def _append_token(self, token: str, request_id: int) -> bool:
+        """Append a streaming token to the response label (GTK main thread)."""
+        if not self._requests.is_current(request_id):
+            return False
+        self._set_response(self._response_label.get_text() + token)
+        return False
+
+    def _finish_stream(self, full: str, request_id: int) -> bool:
+        """Called when streaming is complete (GTK main thread)."""
+        if not self._requests.finish(request_id):
+            return False  # cancelled: the user already saw "Cancelled"
+        self._set_busy(False)
+
+        action = parse_action(full)
+        if action is not None:
+            if action.get("action") == "run_command":
+                # The confirmation card opens next; nothing runs without it
+                self._set_response(f"{STAGE_CONFIRM}: {action.get('command', '')}")
                 self._execute_action(action)
-        except (json.JSONDecodeError, ValueError):
-            pass
+            else:
+                # Show what will happen and wait for Enter (Esc cancels)
+                self._pending_action = action
+                self._set_response(
+                    _("{action} Press Enter to confirm, Esc to cancel.").format(
+                        action=describe_action(action)
+                    )
+                )
+            return False
+        body, error = split_error(full)
+        if error is not None:
+            self._show_error(f"{body}\n\n{error}" if body else error)
+            announce(self, announcement("error", error), important=True)
+        elif body:
+            # Covers replies that were held back as possible JSON
+            self._set_response(body)
+            announce(self, announcement("answer", body))
 
         return False
 
@@ -548,21 +733,198 @@ class IntentBarWindow(Adw.Window):
         elif action_type == "run_command":
             command: str = action.get("command", "")
             if command:
-                # The confirmation dialog blocks, so keep it off the GTK thread
-                threading.Thread(target=confirm_and_exec, args=(command,), daemon=True).start()
+                self._run_command(command)
+
+    def _run_command(self, command: str) -> None:
+        """Allowlist + confirmation card, then show the output here."""
+        self._set_response(f"{STAGE_CONFIRM}: {command}")
+
+        def worker() -> None:
+            # The confirmation card blocks, so keep it off the GTK thread
+            proc = confirm_and_exec(
+                command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            )
+            if proc is None:
+                GLib.idle_add(self._command_done, "Not run.")
+                return
+            try:
+                out, _ = proc.communicate(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                out = "(stopped after 15 seconds)"
+            GLib.idle_add(self._command_done, format_command_output(out or ""))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _command_done(self, text: str) -> bool:
+        self._set_response(text)
+        announce(self, announcement("command", text))
+        return False
+
+    # ------------------------------------------------------------------
+    # Suggestions while typing
+    # ------------------------------------------------------------------
+
+    def _on_entry_changed(self, _entry: Gtk.Entry) -> None:
+        self._pending_action = None  # typing changes the request
+        self._update_suggestions()
+
+    def _update_suggestions(self) -> None:
+        query = self._entry.get_text()
+        spaces = (
+            [s.name for s in self._spaces.get_spaces()]
+            if hasattr(self._spaces, "get_spaces")
+            else []
+        )
+        self._suggestions = build_suggestions(query, self._apps, spaces)
+        self._suggest_list.remove_all()
+        for suggestion in self._suggestions:
+            self._suggest_list.append(self._suggestion_row(suggestion))
+        visible = bool(self._suggestions) and not self._requests.busy
+        self._suggest_list.set_visible(visible)
+        default = self._suggest_list.get_row_at_index(default_index(self._suggestions))
+        if visible and default is not None:
+            self._suggest_list.select_row(default)
+        self._update_preview()
+        self._queue_fit()
+
+    def _hide_suggestions(self) -> None:
+        self._suggest_list.set_visible(False)
+        self._preview_label.set_visible(False)
+        self._queue_fit()
+
+    @staticmethod
+    def _suggestion_row(suggestion: Suggestion) -> Gtk.ListBoxRow:
+        row = Gtk.ListBoxRow()
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        box.set_margin_top(4)
+        box.set_margin_bottom(4)
+        box.set_margin_start(6)
+        box.set_margin_end(6)
+        title = Gtk.Label(label=suggestion.title, xalign=0.0)
+        title.set_ellipsize(Pango.EllipsizeMode.END)
+        title.set_hexpand(True)
+        subtitle = Gtk.Label(label=suggestion.subtitle, xalign=1.0)
+        subtitle.add_css_class("hint-label")
+        subtitle.set_ellipsize(Pango.EllipsizeMode.END)
+        box.append(title)
+        box.append(subtitle)
+        row.set_child(box)
+        row.update_property([Gtk.AccessibleProperty.LABEL], [suggestion.accessible_label])
+        return row
+
+    def _suggestion_header(self, row: Gtk.ListBoxRow, before: Gtk.ListBoxRow | None) -> None:
+        index = row.get_index()
+        category = self._suggestions[index].category if index < len(self._suggestions) else ""
+        previous = self._suggestions[before.get_index()].category if before is not None else None
+        if category and category != previous:
+            header = Gtk.Label(label=category, xalign=0.0)
+            header.add_css_class("hint-label")
+            header.set_margin_top(4)
+            row.set_header(header)
+        else:
+            row.set_header(None)
+
+    def _selected_suggestion(self) -> Suggestion | None:
+        if not self._suggest_list.get_visible():
+            return None
+        row = self._suggest_list.get_selected_row()
+        if row is None or row.get_index() >= len(self._suggestions):
+            return None
+        return self._suggestions[row.get_index()]
+
+    def _move_selection(self, step: int) -> None:
+        row = self._suggest_list.get_selected_row()
+        index = (row.get_index() if row is not None else -1) + step
+        index = max(0, min(index, len(self._suggestions) - 1))
+        target = self._suggest_list.get_row_at_index(index)
+        if target is not None:
+            self._suggest_list.select_row(target)
+
+    def _update_preview(self) -> None:
+        selected = self._selected_suggestion()
+        self._preview_label.set_visible(selected is not None)
+        if selected is not None:
+            self._preview_label.set_text(
+                _("Enter: {action}").format(action=describe_suggestion(selected))
+            )
+
+    def _on_suggestion_activated(self, _list: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
+        self._suggest_list.select_row(row)
+        self._on_activate(self._entry)
+
+    def _run_suggestion(self, suggestion: Suggestion) -> None:
+        action = suggestion.action
+        kind = action.get("type")
+        self._hide_suggestions()
+        if kind == "copy":
+            text = str(action.get("text", ""))
+            self.get_clipboard().set(text)
+            message = _("Copied {text}").format(text=text)
+            self._set_response(message)
+            announce(self, message)
+        elif kind == "files":
+            self._start_semantic_search(str(action.get("query", "")))
+        elif kind == "open_app":
+            info = Gio.DesktopAppInfo.new(str(action.get("app_id", "")))
+            if info is not None and info.launch([], None):
+                self.close()
+            else:
+                self._show_error(_("Couldn't open {name}.").format(name=suggestion.title))
+        elif kind == "settings":
+            panel = str(action.get("panel", ""))
+            # Only the fixed panel names, never text from the query
+            if panel in {p for _t, p, _w in SETTINGS_PANELS} and shutil.which(
+                "gnome-control-center"
+            ):
+                subprocess.Popen(  # nosec B603 B607 - fixed program and panel name
+                    ["gnome-control-center", panel],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+                self.close()
+            else:
+                self._show_error(_("GNOME Settings isn't available."))
+        elif kind == "space":
+            self._switch_space(int(action.get("index", 0)), str(action.get("name", "")))
+        elif kind == "command":
+            self._run_command(str(action.get("command", "")))
+
+    def _switch_space(self, index: int, name: str) -> None:
+        """Ask the Axon Shell extension (org.axonos.Shell) to switch Space."""
+
+        def worker() -> None:
+            try:
+                if dbus is None:
+                    raise RuntimeError("python3-dbus is not available")
+                obj = dbus.SessionBus().get_object("org.axonos.Shell", "/org/axonos/Shell")
+                obj.SwitchToSpace(index, dbus_interface="org.axonos.Shell", timeout=5)
+            except Exception:
+                GLib.idle_add(
+                    self._show_error,
+                    _("Couldn't switch to {name}: Axon Shell isn't running.").format(name=name),
+                )
+                return
+            GLib.idle_add(self.close)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Semantic file search (org.axonos.Search)
     # ------------------------------------------------------------------
 
     def _start_semantic_search(self, query: str) -> None:
-        self._spinner.start()
+        request_id = self._requests.start()
+        self._set_busy(True)
+        self._set_stage(STAGE_SEARCHING)
         self._clear_results()
-        self._response_label.set_text(f'Searching your files for "{query}"...')
-        self._response_label.set_visible(True)
-        threading.Thread(target=self._do_semantic_search, args=(query,), daemon=True).start()
+        self._set_response(_("Searching your files for “{query}”").format(query=query))
+        threading.Thread(
+            target=self._do_semantic_search, args=(query, request_id), daemon=True
+        ).start()
 
-    def _do_semantic_search(self, query: str) -> None:
+    def _do_semantic_search(self, query: str, request_id: int) -> None:
         results: list[dict[str, Any]] = []
         error = ""
         if dbus is None:
@@ -575,22 +937,29 @@ class IntentBarWindow(Adw.Window):
                 results = json.loads(iface.Query(query, 6, timeout=30))
             except Exception as exc:
                 error = str(exc)
-        GLib.idle_add(self._show_search_results, query, results, error)
+        GLib.idle_add(self._show_search_results, query, results, error, request_id)
 
-    def _show_search_results(self, query: str, results: list[dict[str, Any]], error: str) -> bool:
-        self._spinner.stop()
+    def _show_search_results(
+        self, query: str, results: list[dict[str, Any]], error: str, request_id: int
+    ) -> bool:
+        if not self._requests.finish(request_id):
+            return False
+        self._set_busy(False)
         self._clear_results()
         if error:
-            self._show_error(f"[error] Semantic search unavailable: {error}")
+            self._show_error(_("Semantic search unavailable: {error}").format(error=error))
             return False
         if not results:
-            self._show_error(f'No matching files for "{query}".')
+            self._set_response(_("No matching files for “{query}”.").format(query=query))
             return False
 
         backend = results[0].get("backend", "vector")
         label = "semantic" if backend == "vector" else "keyword"
-        self._response_label.set_text(f"Top {len(results)} {label} matches — click to open:")
-        self._response_label.set_visible(True)
+        self._set_response(
+            _("Top {count} {kind} matches. Click one to open it:").format(
+                count=len(results), kind=label
+            )
+        )
 
         home = GLib.get_home_dir()
         for item in results:
@@ -627,6 +996,7 @@ class IntentBarWindow(Adw.Window):
             self._results_box.remove(child)
             child = nxt
         self._results_box.set_visible(False)
+        self._queue_fit()
 
     # ------------------------------------------------------------------
     # System prompt
@@ -641,9 +1011,20 @@ class IntentBarWindow(Adw.Window):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _show_error(self, text: str) -> None:
+    def _set_response(self, text: str, error: bool = False) -> None:
+        """Show *text* below the entry; errors get an icon and the error colour."""
         self._response_label.set_text(text)
-        self._response_label.set_visible(True)
+        self._response_label.set_visible(bool(text))
+        self._error_icon.set_visible(error)
+        if error:
+            self._response_label.add_css_class("response-error")
+        else:
+            self._response_label.remove_css_class("response-error")
+            self._start_ollama_btn.set_visible(False)
+        self._queue_fit()
+
+    def _show_error(self, text: str) -> None:
+        self._set_response(text, error=True)
 
     def _on_start_ollama(self, _btn: Gtk.Button) -> None:
         """Attempt to launch the Ollama daemon."""
@@ -653,7 +1034,7 @@ class IntentBarWindow(Adw.Window):
             stderr=subprocess.DEVNULL,
         )
         self._start_ollama_btn.set_sensitive(False)
-        self._show_error("Starting Ollama... please wait a moment and try again.")
+        self._set_response(_("Starting Ollama… try again in a moment."))
 
     # ------------------------------------------------------------------
     # Semantic File Search Helpers

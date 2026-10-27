@@ -5,13 +5,13 @@ Name=Axon Settings
 GenericName=Settings Assistant
 Comment=AI settings assistant to configure system parameters via natural language
 Exec=python3 AXON_APPS_DIR/axon-settings/main.py
-Icon=org.gnome.Settings
+Icon=axon-settings
 Terminal=false
 StartupNotify=true
 Categories=System;Settings;Core;
-Keywords=axon;settings;assistant;control;configuration;wifi;brightness;volume;theme;ai;model;openai;anthropic;gemini;ollama;diagnostics;troubleshoot;health;
+Keywords=axon;settings;assistant;control;configuration;wifi;brightness;volume;theme;ai;model;openai;anthropic;gemini;ollama;diagnostics;troubleshoot;health;spaces;privacy;preferences;
 X-GNOME-Autostart-enabled=false
-Actions=ai-models;diagnostics;
+Actions=ai-models;diagnostics;preferences;
 
 [Desktop Action ai-models]
 Name=AI Models
@@ -20,3 +20,7 @@ Exec=python3 AXON_APPS_DIR/axon-settings/main.py --ai-models
 [Desktop Action diagnostics]
 Name=Diagnostics
 Exec=python3 AXON_APPS_DIR/axon-settings/main.py --diagnostics
+
+[Desktop Action preferences]
+Name=Preferences
+Exec=python3 AXON_APPS_DIR/axon-settings/main.py --preferences

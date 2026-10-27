@@ -3,7 +3,14 @@ Name=Axon-Icons
 Comment=Axon OS icon theme
 Example=folder
 Inherits=Papirus-Dark,Papirus,hicolor
-Directories=
+Directories=scalable/apps,symbolic/apps
+
+[symbolic/apps]
+Size=16
+Context=Applications
+Type=Scalable
+MinSize=8
+MaxSize=512
 
 [16x16/apps]
 Size=16

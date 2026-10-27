@@ -108,6 +108,10 @@ class ConversationStore:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)"
         )
+        # Added later: databases created before archiving existed get the column
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(conversations)")}
+        if "archived" not in columns:
+            conn.execute("ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
         conn.commit()
         # Connection stays open via threading.local() for reuse.
 
@@ -171,7 +175,8 @@ class ConversationStore:
         with self._lock:
             conn = self._get_connection()
             cursor = conn.execute(
-                "SELECT id, title, system_prompt, created_at, updated_at FROM conversations ORDER BY updated_at DESC"
+                "SELECT id, title, system_prompt, created_at, updated_at, archived "
+                "FROM conversations ORDER BY updated_at DESC"
             )
             return [dict(row) for row in cursor.fetchall()]
 
@@ -189,6 +194,17 @@ class ConversationStore:
                 (title, conversation_id),
             )
             conn.commit()
+
+    def set_archived(self, conversation_id, archived):
+        """Archive (hide from the main list) or restore a conversation."""
+        with self._lock:
+            conn = self._get_connection()
+            cursor = conn.execute(
+                "UPDATE conversations SET archived = ? WHERE id = ?",
+                (1 if archived else 0, conversation_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
 
     def search_messages(self, query):
         with self._lock:

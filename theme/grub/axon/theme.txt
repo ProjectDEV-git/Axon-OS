@@ -2,7 +2,7 @@
 title-text: ""
 # No desktop-image or terminal-box: GRUB resolves an empty value to the theme
 # directory itself and fails with "bitmap file ... is of unsupported format".
-desktop-color: "#000000"
+desktop-color: "#161616"
 terminal-font: "Sans 12"
 
 + boot_menu {
@@ -12,7 +12,7 @@ terminal-font: "Sans 12"
   height = 50%
   item_font = "DejaVu Sans Regular 14"
   selected_item_font = "DejaVu Sans Bold 14"
-  item_color = "#999999"
+  item_color = "#b4b4b4"
   selected_item_color = "#ffffff"
   item_height = 44
   item_padding = 8
@@ -28,7 +28,7 @@ terminal-font: "Sans 12"
   top = 90%
   width = 60%
   align = "center"
-  color = "#666666"
+  color = "#9a9a9a"
   font = "DejaVu Sans Regular 11"
   text = "[Enter] Boot   [E] Edit   [C] Command Line"
 }

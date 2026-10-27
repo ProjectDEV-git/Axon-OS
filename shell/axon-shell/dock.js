@@ -20,11 +20,26 @@ import Shell from 'gi://Shell';
 import Meta from 'gi://Meta';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
-import Atk from 'gi://Atk';
+import Graphene from 'gi://Graphene';
 
+import * as AppFavorites from 'resource:///org/gnome/shell/ui/appFavorites.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import StartMenuPopup from './startmenu.js';
+import {SpaceStrip} from './spaces.js';
+import {
+    MOTION,
+    PRESS_SCALE,
+    _t,
+    motionDuration,
+    taskbarApps,
+    taskbarGeometry,
+    tooltipDelay,
+    useMaterial,
+} from './ui-logic.js';
+
+// Animation length; 0 when the user turned animations off (reduced motion)
+const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
 // ─── D-Bus interfaces ─────────────────────────────────────────────────────────
 
@@ -61,46 +76,14 @@ const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const TASKBAR_HEIGHT     = 48;   // px, taskbar height
-const ICON_SIZE          = 32;   // px, taskbar icon size
-const BOUNCE_PEAK        = 1.25; // bounce scale
-const BOUNCE_DURATION    = 150;  // ms
-const TRAMPOLINE_SCALE   = 0.90; // press scale
-const TRAMPOLINE_DURATION = 100; // ms
+const TASKBAR_HEIGHT     = 48;   // px, the visible bar
+const TASKBAR_INSET      = 8;    // px it floats above and inside the screen edges
+const ICON_SIZE          = 32;   // px, app icons in the taskbar
+const SYMBOLIC_SIZE      = 20;   // px, the start and search glyphs
+const LAUNCH_LIFT        = 1.08; // launch feedback: a gentle lift, no bounce
 
-// ─── Clock Label ───────────────────────────────────────────────────────────────
-
-const TaskbarClock = GObject.registerClass(
-class TaskbarClock extends St.Label {
-    _init() {
-        super._init({
-            style_class: 'axon-taskbar-clock',
-            text: '',
-            y_align: Clutter.ActorAlign.CENTER,
-            accessible_name: 'Clock',
-            accessible_role: Atk.Role.LABEL,
-        });
-        this._updateTime();
-        this._timerId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, () => {
-            this._updateTime();
-            return GLib.SOURCE_CONTINUE;
-        });
-    }
-
-    _updateTime() {
-        let now = GLib.DateTime.new_now_local();
-        // Two-line layout: HH:MM AM/PM \n MM/DD/YYYY
-        this.set_text(now.format('%I:%M %p\n%m/%d/%Y'));
-    }
-
-    destroy() {
-        if (this._timerId) {
-            GLib.source_remove(this._timerId);
-            this._timerId = null;
-        }
-        super.destroy();
-    }
-});
+// When the last dock tooltip closed, so neighbours open without a delay
+let lastTooltipHidden = null;
 
 // ─── DockIcon ──────────────────────────────────────────────────────────────────
 
@@ -113,6 +96,8 @@ class DockIcon extends St.Button {
             track_hover: true,
             can_focus: true,
             accessible_name: opts.label ?? '',
+            // Scale from the centre, not the top-left corner
+            pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
         });
 
         this._app      = opts.app      ?? null;
@@ -127,9 +112,10 @@ class DockIcon extends St.Button {
         if (this._app) {
             iconWidget = this._app.create_icon_texture(ICON_SIZE);
         } else if (opts.icon) {
+            // Symbolic glyphs (start, search) sit at text size, not app-icon size
             iconWidget = new St.Icon({
                 gicon:     opts.icon,
-                icon_size: ICON_SIZE,
+                icon_size: SYMBOLIC_SIZE,
                 style_class: 'axon-taskbar-icon-svg',
             });
         } else {
@@ -158,6 +144,8 @@ class DockIcon extends St.Button {
         this.set_child(cell);
 
         this.connect('clicked',      this._onClick.bind(this));
+        // Feedback on press, not on release
+        this.connect('notify::pressed', this._onPressedChanged.bind(this));
         this.connect('notify::hover', this._onHoverChanged.bind(this));
         this.connect('destroy',      this._onDestroy.bind(this));
 
@@ -178,43 +166,45 @@ class DockIcon extends St.Button {
     }
 
     bounce() {
+        // Decorative only: skip it entirely when animations are off
+        if (!St.Settings.get().enable_animations)
+            return;
         this.ease({
-            scale_y:  BOUNCE_PEAK,
-            scale_x:  BOUNCE_PEAK,
-            duration: BOUNCE_DURATION,
-            mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
+            scale_y:  LAUNCH_LIFT,
+            scale_x:  LAUNCH_LIFT,
+            duration: motion(MOTION.enter),
+            mode:     Clutter.AnimationMode.EASE_OUT_QUINT,
             onComplete: () => {
                 this.ease({
                     scale_y:  1.0,
                     scale_x:  1.0,
-                    duration: BOUNCE_DURATION,
-                    mode:     Clutter.AnimationMode.EASE_IN_OUT_BOUNCE,
+                    duration: motion(MOTION.settle),
+                    mode:     Clutter.AnimationMode.EASE_OUT_QUINT,
                 });
             },
         });
     }
 
-    _onClick() {
+    _onPressedChanged() {
+        // Starts from the current scale, so a quick tap can reverse mid-way
+        const scale = this.pressed ? PRESS_SCALE : 1.0;
         this.ease({
-            scale_x:  TRAMPOLINE_SCALE,
-            scale_y:  TRAMPOLINE_SCALE,
-            duration: TRAMPOLINE_DURATION,
-            mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
-                this.ease({
-                    scale_x:  1.0,
-                    scale_y:  1.0,
-                    duration: TRAMPOLINE_DURATION,
-                    mode:     Clutter.AnimationMode.EASE_OUT_BACK,
-                });
-            },
+            scale_x:  scale,
+            scale_y:  scale,
+            duration: motion(this.pressed ? MOTION.press : MOTION.release),
+            mode:     Clutter.AnimationMode.EASE_OUT_QUINT,
         });
+    }
+
+    _onClick() {
         this._callback();
     }
 
     _onHoverChanged() {
         if (this.hover) {
-            this._tooltipId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+            const delay = tooltipDelay(GLib.get_monotonic_time() / 1000, lastTooltipHidden);
+            this._tooltipInstant = delay === 0;
+            this._tooltipId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
                 this._showTooltip();
                 this._tooltipId = null;
                 return GLib.SOURCE_REMOVE;
@@ -245,11 +235,13 @@ class DockIcon extends St.Button {
         const y = Math.round(iconY - natH - 6);
 
         this._tooltip.set_position(x, y);
+        if (this._tooltipInstant)
+            return;
         this._tooltip.set_opacity(0);
         this._tooltip.ease({
             opacity:  255,
-            duration: 120,
-            mode:     Clutter.AnimationMode.EASE_OUT_QUAD,
+            duration: motion(MOTION.tooltip),
+            mode:     Clutter.AnimationMode.EASE_OUT_QUINT,
         });
     }
 
@@ -257,10 +249,11 @@ class DockIcon extends St.Button {
         if (!this._tooltip) return;
         const t = this._tooltip;
         this._tooltip = null;
+        lastTooltipHidden = GLib.get_monotonic_time() / 1000;
         t.ease({
             opacity:    0,
-            duration:   80,
-            mode:       Clutter.AnimationMode.EASE_IN_QUAD,
+            duration:   motion(MOTION.exit),
+            mode:       Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => t.destroy(),
         });
     }
@@ -363,6 +356,7 @@ export default class DockManager {
             if (qsParent) qsParent.remove_child(quickSettings);
             const qsHome = this._quickSettingsOrigParent || Main.panel._rightBox;
             qsHome.add_child(quickSettings);
+            quickSettings.x_expand = this._quickSettingsExpand ?? quickSettings.x_expand;
             this._quickSettingsOrigParent = null;
         }
         const dateMenu = this._actor ? this._actor._dateMenuHolder : null;
@@ -371,8 +365,21 @@ export default class DockManager {
             if (dmParent) dmParent.remove_child(dateMenu);
             const dmHome = this._dateMenuOrigParent || Main.panel._centerBox;
             dmHome.add_child(dateMenu);
+            dateMenu.x_expand = this._dateMenuExpand ?? dateMenu.x_expand;
             this._dateMenuOrigParent = null;
         }
+
+        if (this._spaceStrip) {
+            this._spaceStrip.destroy();
+            this._spaceStrip = null;
+        }
+
+        for (const [settings, id] of this._materialIds ?? [])
+            settings.disconnect(id);
+        this._materialIds = null;
+        this._settings = null;
+        this._a11ySettings = null;
+        this._bar = null;
 
         if (this._actor) {
             Main.layoutManager.removeChrome(this._actor);
@@ -393,13 +400,22 @@ export default class DockManager {
     }
 
     _buildUI() {
-        // Full width bottom taskbar container
-        this._actor = new St.BoxLayout({
+        // The chrome actor sits on the bottom edge so GNOME reserves its
+        // strut; the visible bar floats inside it (see taskbarGeometry).
+        this._actor = new St.Bin({
+            style_class: 'axon-taskbar-frame',
+            x_expand: true,
+        });
+        const bar = new St.BoxLayout({
             style_class: 'axon-taskbar',
             vertical:    false,
             reactive:    true,
             track_hover: true,
+            x_expand:    true,
+            y_expand:    true,
         });
+        this._actor.set_child(bar);
+        this._bar = bar;
 
         // 1. Left container: Start button and Search/Intent icon
         const leftBox = new St.BoxLayout({
@@ -407,12 +423,12 @@ export default class DockManager {
             vertical: false,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        this._actor.add_child(leftBox);
+        bar.add_child(leftBox);
 
         // Start Menu button
         const startBtn = new DockIcon({
-            icon: Gio.ThemedIcon.new('starred-symbolic'),
-            label: 'Start Menu',
+            icon: Gio.ThemedIcon.new('axon-os-symbolic'),
+            label: _t('Start Menu'),
             callback: () => this._startMenuPopup && this._startMenuPopup.toggle(),
             dockManager: this,
         });
@@ -421,15 +437,21 @@ export default class DockManager {
         // Intent Bar toggle search button
         const searchBtn = new DockIcon({
             icon: Gio.ThemedIcon.new('system-search-symbolic'),
-            label: 'Intent Bar (Search / AI)',
+            label: _t('Intent Bar (Search / AI)'),
             callback: () => this._intentBar && this._intentBar.toggle(),
             dockManager: this,
         });
         leftBox.add_child(searchBtn);
 
+        // Numbered Space chips (Super+1…9), with window counts
+        if (this._extension._spacesManager) {
+            this._spaceStrip = new SpaceStrip(this._extension._spacesManager);
+            leftBox.add_child(this._spaceStrip.actor);
+        }
+
         // Spacer to push apps to center
         const centerSpacerLeft = new St.Widget({ x_expand: true });
-        this._actor.add_child(centerSpacerLeft);
+        bar.add_child(centerSpacerLeft);
 
         // 2. Center container: App icons (pinned and running)
         this._iconRow = new St.BoxLayout({
@@ -437,24 +459,22 @@ export default class DockManager {
             vertical: false,
             y_align:  Clutter.ActorAlign.CENTER,
         });
-        this._actor.add_child(this._iconRow);
+        bar.add_child(this._iconRow);
 
         // Spacer to push tray to far right
         const centerSpacerRight = new St.Widget({ x_expand: true });
-        this._actor.add_child(centerSpacerRight);
+        bar.add_child(centerSpacerRight);
 
         // 3. Right container: Clock + System Indicators (stealing native items)
         const rightBox = new St.BoxLayout({
             style_class: 'axon-taskbar-right',
             vertical: false,
             y_align: Clutter.ActorAlign.CENTER,
-            spacing: 12,
         });
-        this._actor.add_child(rightBox);
+        bar.add_child(rightBox);
 
-        // Clock Label
-        const clock = new TaskbarClock();
-        rightBox.add_child(clock);
+        // The clock is GNOME's own date menu, adopted below: it follows the
+        // 12/24-hour setting and holds the calendar and notifications.
 
         // Migrate native Quick Settings (network/volume/power aggregate).
         // Remember the original parent so disable() can restore the exact
@@ -465,6 +485,9 @@ export default class DockManager {
             const parent = nativeQS.get_parent();
             if (parent) parent.remove_child(nativeQS);
             rightBox.add_child(nativeQS);
+            // In the top panel it stretches; in the taskbar it hugs its icons
+            this._quickSettingsExpand = nativeQS.x_expand;
+            nativeQS.x_expand = false;
             this._actor._quickSettingsHolder = nativeQS;
             this._quickSettingsOrigParent = parent;
         }
@@ -475,6 +498,8 @@ export default class DockManager {
             const parent = nativeDate.get_parent();
             if (parent) parent.remove_child(nativeDate);
             rightBox.add_child(nativeDate);
+            this._dateMenuExpand = nativeDate.x_expand;
+            nativeDate.x_expand = false;
             this._actor._dateMenuHolder = nativeDate;
             this._dateMenuOrigParent = parent;
         }
@@ -485,18 +510,41 @@ export default class DockManager {
             reactive: true,
             track_hover: true,
             can_focus: true,
-            accessible_name: 'Show Desktop',
+            accessible_name: _t('Show Desktop'),
         });
         showDesktopBtn.connect('clicked', () => this._toggleShowDesktop());
-        this._actor.add_child(showDesktopBtn);
+        bar.add_child(showDesktopBtn);
 
         // Register with Chrome Manager so windows respect taskbar boundary
+        // Struts follow the actor's geometry; trackFullscreen hides it over
+        // fullscreen windows (GNOME 46 has no "trackPosition" option)
         Main.layoutManager.addChrome(this._actor, {
             affectsStruts: true,
-            trackPosition: true,
+            trackFullscreen: true,
         });
 
+        // Translucent material unless Reduce Transparency or High Contrast is on
+        this._settings = this._extension.getSettings();
+        this._a11ySettings = new Gio.Settings({schema_id: 'org.gnome.desktop.a11y.interface'});
+        this._materialIds = [
+            [this._settings, this._settings.connect('changed::reduce-transparency', () => this._updateMaterial())],
+            [this._a11ySettings, this._a11ySettings.connect('changed::high-contrast', () => this._updateMaterial())],
+        ];
+        this._updateMaterial();
+
         this._reposition();
+    }
+
+    _updateMaterial() {
+        if (!this._bar)
+            return;
+        const material = useMaterial(
+            this._settings.get_boolean('reduce-transparency'),
+            this._a11ySettings.get_boolean('high-contrast'));
+        if (material)
+            this._bar.remove_style_class_name('axon-taskbar-solid');
+        else
+            this._bar.add_style_class_name('axon-taskbar-solid');
     }
 
     _populate() {
@@ -505,18 +553,27 @@ export default class DockManager {
         }
         this._iconMap.clear();
 
-        const running = this._appSystem.get_running();
-        for (const app of running) {
-            this._addApp(app);
-        }
+        // Pinned apps (GNOME favourites) first, then the other running apps
+        const pinned = AppFavorites.getAppFavorites().getFavorites();
+        const running = this._appSystem.get_running().filter(app => !this._hidden(app));
+        const byId = new Map([...pinned, ...running].map(app => [app.get_id(), app]));
+        for (const entry of taskbarApps(pinned.map(app => app.get_id()), running.map(app => app.get_id())))
+            this._addApp(byId.get(entry.id), entry.running);
     }
 
-    _addApp(app) {
-        if (this._iconMap.has(app)) return;
+    // The live-session installer only shows when it is pinned
+    _hidden(app) {
+        return app.get_name() === 'Axon OS Installer' &&
+            !AppFavorites.getAppFavorites().isFavorite(app.get_id());
+    }
 
-        // Skip adding the system installers or tools if running in background
-        const appName = app.get_name();
-        if (appName === "Axon OS Installer") return;
+    _addApp(app, running = true) {
+        const existing = this._iconMap.get(app);
+        if (existing) {
+            existing.setRunning(running);
+            return;
+        }
+        if (this._hidden(app)) return;
 
         const dockIcon = new DockIcon({
             app:      app,
@@ -524,7 +581,7 @@ export default class DockManager {
             callback: () => this._activateApp(app),
             dockManager: this,
         });
-        dockIcon.setRunning(true);
+        dockIcon.setRunning(running);
         this._iconRow.add_child(dockIcon);
         this._iconMap.set(app, dockIcon);
     }
@@ -582,6 +639,9 @@ export default class DockManager {
             'window-created',
             this._onWindowCreated.bind(this)
         );
+
+        this._favoritesChangedId = AppFavorites.getAppFavorites().connect(
+            'changed', () => this._populate());
     }
 
     _disconnectSignals() {
@@ -592,6 +652,10 @@ export default class DockManager {
         if (this._windowCreatedId) {
             global.display.disconnect(this._windowCreatedId);
             this._windowCreatedId = null;
+        }
+        if (this._favoritesChangedId) {
+            AppFavorites.getAppFavorites().disconnect(this._favoritesChangedId);
+            this._favoritesChangedId = null;
         }
     }
 
@@ -605,7 +669,11 @@ export default class DockManager {
                 return GLib.SOURCE_REMOVE;
             });
         } else if (state === Shell.AppState.STOPPED) {
-            this._removeApp(app);
+            // A pinned app stays, without its running dot
+            if (AppFavorites.getAppFavorites().isFavorite(app.get_id()))
+                this._iconMap.get(app)?.setRunning(false);
+            else
+                this._removeApp(app);
         }
     }
 
@@ -627,8 +695,10 @@ export default class DockManager {
         const monitor = Main.layoutManager.primaryMonitor;
         if (!monitor) return;
 
-        this._actor.set_position(monitor.x, monitor.y + monitor.height - TASKBAR_HEIGHT);
-        this._actor.set_size(monitor.width, TASKBAR_HEIGHT);
+        const geo = taskbarGeometry(monitor, TASKBAR_HEIGHT, TASKBAR_INSET);
+        this._actor.set_position(geo.x, geo.y);
+        this._actor.set_size(geo.width, geo.height);
+        this._actor.set_style(`padding: 0 ${geo.inset}px ${geo.inset}px ${geo.inset}px;`);
     }
 
     _show() {
@@ -659,34 +729,75 @@ export default class DockManager {
             style_class: 'axon-dock-menu',
             vertical:    true,
             reactive:    true,
+            accessible_name: _t('{app} menu', {app: icon._label || _t('Application')}),
+        });
+        // Keyboard: Up/Down move between items, Escape closes
+        this._contextMenu.connect('key-press-event', (_actor, ev) => {
+            const key = ev.get_key_symbol();
+            if (key === Clutter.KEY_Escape) {
+                this.closeActiveMenu();
+                icon.grab_key_focus();
+                return Clutter.EVENT_STOP;
+            }
+            if (key === Clutter.KEY_Up || key === Clutter.KEY_Down) {
+                const items = this._contextMenu.get_children()
+                    .filter(c => c instanceof St.Button && c.reactive);
+                const at = items.findIndex(c => c.has_key_focus());
+                const next = key === Clutter.KEY_Up ? at - 1 : at + 1;
+                items[(next + items.length) % items.length]?.grab_key_focus();
+                return Clutter.EVENT_STOP;
+            }
+            return Clutter.EVENT_PROPAGATE;
         });
 
         const titleLabel = new St.Label({
             style_class: 'axon-dock-menu-title',
-            text: icon._label || 'Application',
+            text: icon._label || _t('Application'),
         });
         this._contextMenu.add_child(titleLabel);
 
         if (icon._app) {
-            const closeBtn = new St.Button({
+            const favorites = AppFavorites.getAppFavorites();
+            const appId = icon._app.get_id();
+            const pinned = favorites.isFavorite(appId);
+            const pinBtn = new St.Button({
                 style_class: 'axon-dock-menu-item',
-                label: 'Close Window',
+                label: pinned ? _t('Unpin from Taskbar') : _t('Pin to Taskbar'),
                 x_align: Clutter.ActorAlign.START,
                 reactive: true,
+                can_focus: true,
             });
-            closeBtn.connect('clicked', () => {
-                icon._app.request_quit();
+            pinBtn.connect('clicked', () => {
                 this.closeActiveMenu();
+                if (pinned)
+                    favorites.removeFavorite(appId);
+                else
+                    favorites.addFavorite(appId);
             });
-            this._contextMenu.add_child(closeBtn);
+            this._contextMenu.add_child(pinBtn);
+
+            if (icon._app.get_n_windows() > 0) {
+                const closeBtn = new St.Button({
+                    style_class: 'axon-dock-menu-item',
+                    label: _t('Quit'),
+                    x_align: Clutter.ActorAlign.START,
+                    reactive: true,
+                    can_focus: true,
+                });
+                closeBtn.connect('clicked', () => {
+                    icon._app.request_quit();
+                    this.closeActiveMenu();
+                });
+                this._contextMenu.add_child(closeBtn);
+            }
 
             const sep = new St.Widget({ style_class: 'axon-dock-separator', style: 'height: 1px; width: 90%;' });
             this._contextMenu.add_child(sep);
         }
 
         const loadingItem = new St.Button({
-            style_class: 'axon-dock-menu-item',
-            label: '⬡ Loading AI shortcuts…',
+            style_class: 'axon-dock-menu-item axon-dock-menu-status',
+            label: _t('Loading AI shortcuts…'),
             x_align: Clutter.ActorAlign.START,
             reactive: false,
         });
@@ -694,6 +805,9 @@ export default class DockManager {
 
         Main.uiGroup.add_child(this._contextMenu);
         this._repositionMenu(icon);
+        // Put keyboard focus in the menu so it can be used without a mouse
+        const firstItem = this._contextMenu.get_children().find(c => c instanceof St.Button && c.reactive);
+        (firstItem ?? this._contextMenu).grab_key_focus();
 
         let contextStr = 'Active workspace.';
         if (this._contextProxy) {
@@ -719,7 +833,7 @@ export default class DockManager {
 
     _requestAIPredictedActions(icon, contextStr, loadingItem) {
         if (!this._brainProxy) {
-            if (loadingItem && loadingItem.set_text) loadingItem.set_text('AI Brain service offline');
+            if (loadingItem) loadingItem.set_label(_t('AI Brain service offline'));
             return;
         }
 
@@ -749,6 +863,7 @@ export default class DockManager {
                                 label: '⬡ ' + act,
                                 x_align: Clutter.ActorAlign.START,
                                 reactive: true,
+                                can_focus: true,
                             });
                             btn.connect('clicked', () => {
                                 this._executeAIAction(act, icon);
@@ -758,13 +873,13 @@ export default class DockManager {
                         });
                         this._repositionMenu(icon);
                     } else {
-                        if (loadingItem && loadingItem.set_text) loadingItem.set_text('No shortcuts suggested');
+                        if (loadingItem) loadingItem.set_label(_t('No shortcuts suggested'));
                     }
                 } catch (e) {
-                    if (loadingItem && loadingItem.set_text) loadingItem.set_text('No shortcuts suggested');
+                    if (loadingItem) loadingItem.set_label(_t('No shortcuts suggested'));
                 }
             } else {
-                if (loadingItem && loadingItem.set_text) loadingItem.set_text('AI suggestion failed');
+                if (loadingItem) loadingItem.set_label(_t('AI suggestion failed'));
             }
         });
     }

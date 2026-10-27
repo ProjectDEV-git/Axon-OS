@@ -59,6 +59,12 @@ from providers import (
     parse_model_ref,
 )
 from service_utils import rate_limited
+from window_routing import (
+    DEFAULT_SPACE,
+    KNOWN_APP_CONFIDENCE,
+    classify_known_app,
+    score_model_answer,
+)
 
 CONFIG_FILE = AXON_DIR / "config.toml"
 # Written by the graphical installer; holds the model the user picked there.
@@ -605,6 +611,11 @@ class BrainService(ServiceBase):
         self.store.delete_conversation(conversation_id)
         return True
 
+    @dbus.service.method("org.axonos.Brain", in_signature="sb", out_signature="b")
+    def ArchiveConversation(self, conversation_id, archived):
+        """Archive or restore a conversation. Returns False if it doesn't exist."""
+        return bool(self.store.set_archived(str(conversation_id), bool(archived)))
+
     @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="b")
     def UpdateTitle(self, conversation_id, title):
         self.store.update_title(conversation_id, title)
@@ -638,6 +649,43 @@ class BrainService(ServiceBase):
             resp = self._do_chat_sync(conversation_id, context, model)
             self.store.add_message(conversation_id, "assistant", resp)
             return resp
+
+    @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
+    def ClassifyWindowDetailed(self, title, wm_class):
+        """Classify a window and say how sure the answer is.
+
+        Returns JSON ``{"space": str, "confidence": float, "source": str}``
+        where source is ``rule`` (well-known app), ``model`` or ``none``.
+        The Shell asks the user instead of moving the window when the
+        confidence is low.
+        """
+        known = classify_known_app(str(wm_class))
+        if known is not None:
+            return json.dumps(
+                {"space": known, "confidence": KNOWN_APP_CONFIDENCE, "source": "rule"}
+            )
+        model = self.router.get_model_for_classify_window()
+        try:
+            raw = self._complete(
+                model,
+                self._CLASSIFY_WINDOW_PROMPT,
+                f"App: {_sanitize_context(wm_class)}\nWindow Title: {_sanitize_context(title)}",
+                temperature=0.1,
+                timeout=5.0,
+            )
+        except Exception as e:
+            logger.debug("Window classification failed: %s", e)
+            return json.dumps({"space": DEFAULT_SPACE, "confidence": 0.0, "source": "none"})
+        space, confidence = score_model_answer(raw)
+        return json.dumps({"space": space, "confidence": confidence, "source": "model"})
+
+    _CLASSIFY_WINDOW_PROMPT = (
+        "You are a workspace routing assistant for Axon OS. Classify this window into one "
+        "of these 9 workspace spaces:\n"
+        "Code, Web, Chat, Files, Media, Work, Personal, Terminal, Notes.\n"
+        "Respond with ONLY the exact space name (one word, capitalised, e.g., 'Code' or "
+        "'Web'). No other text or markdown."
+    )
 
     @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
     def ClassifyWindow(self, title, wm_class):

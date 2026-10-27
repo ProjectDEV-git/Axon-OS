@@ -23,6 +23,25 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk
 
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from axon_gtk_utils import fit_default_size, load_app_css
+
+# Translations (services/i18n.py); plain English when services/ isn't found
+for _base in (*Path(__file__).resolve().parents, Path("/usr/lib/axon")):
+    if (_base / "services" / "i18n.py").is_file():
+        sys.path.insert(0, str(_base / "services"))
+        break
+try:
+    from i18n import N_, _
+except ImportError:
+
+    def _(text: str) -> str:  # type: ignore[no-redef]
+        return text
+
+    N_ = _
+
+
 ENGINE_PATH = Path(__file__).resolve().parents[1] / "install_engine.py"
 ENGINE_WRAPPER = "/usr/local/bin/axon-install-engine"
 
@@ -73,95 +92,15 @@ INSTALL_TIPS = [
     "The Context service understands what you're working on, so the AI answers with awareness.",
 ]
 
-_CSS = b"""
-.installer-window { background-color: #0a0a11; }
-.sidebar {
-    background-color: #0d0d15;
-    border-right: 1px solid #1d1d2e;
-}
-.sidebar-logo { font-size: 40px; color: #8b5cf6; }
-.sidebar-product { font-size: 18px; font-weight: bold; color: #e8e8f4; }
-.sidebar-version { font-size: 11px; color: #50507a; }
-.step-row { padding: 8px 14px; border-radius: 10px; }
-.step-row-current { background-color: rgba(139, 92, 246, 0.14); }
-.step-label { font-size: 13px; color: #70709a; }
-.step-label-current { color: #e8e8f4; font-weight: bold; }
-.step-label-done { color: #8b5cf6; }
-.step-dot { font-size: 10px; color: #34344e; }
-.step-dot-current { color: #8b5cf6; }
-.step-dot-done { color: #10b981; }
-.hero-logo { font-size: 64px; color: #8b5cf6; }
-.hero-title { font-size: 34px; font-weight: bold; color: #e8e8f4; }
-.hero-subtitle { font-size: 15px; color: #9090b8; }
-.page-title { font-size: 26px; font-weight: bold; color: #e8e8f4; }
-.page-subtitle { font-size: 14px; color: #9090b8; }
-.chip {
-    background-color: rgba(139, 92, 246, 0.18);
-    color: #a78bfa;
-    border-radius: 9999px;
-    padding: 4px 14px;
-    font-size: 12px;
-    font-weight: bold;
-    border: 1px solid rgba(139, 92, 246, 0.35);
-}
-.ai-hero {
-    background: linear-gradient(135deg, rgba(139,92,246,0.16), rgba(34,211,238,0.10));
-    border: 1px solid rgba(139, 92, 246, 0.30);
-    border-radius: 14px;
-    padding: 14px 18px;
-}
-.ai-hero-title { font-size: 15px; font-weight: bold; color: #e8e8f4; }
-.ai-hero-sub { font-size: 12px; color: #9090b8; }
-.nav-btn-next {
-    background-color: #8b5cf6;
-    color: white;
-    border-radius: 9999px;
-    border: none;
-    padding: 10px 30px;
-    font-size: 15px;
-    font-weight: bold;
-}
-.nav-btn-next:hover { background-color: #7c3aed; }
-.nav-btn-next:disabled { background-color: #3a3060; color: #8a8aa8; }
-.nav-btn-back {
-    background-color: transparent;
-    color: #9090b8;
-    border: 1px solid #3a3a58;
-    border-radius: 9999px;
-    padding: 10px 24px;
-}
-.nav-btn-danger {
-    background-color: #dc2626;
-    color: white;
-    border-radius: 9999px;
-    border: none;
-    padding: 10px 30px;
-    font-size: 15px;
-    font-weight: bold;
-}
-.status-online { color: #10b981; font-size: 13px; font-weight: bold; }
-.status-offline { color: #f59e0b; font-size: 13px; font-weight: bold; }
-.warn-text { color: #f59e0b; font-size: 12px; }
-.error-text { color: #ef4444; font-size: 13px; }
-.muted { color: #70709a; font-size: 12px; }
-.summary-value { color: #a78bfa; font-weight: bold; }
-.install-percent { font-size: 44px; font-weight: bold; color: #8b5cf6; }
-.install-step { font-size: 15px; color: #e8e8f4; }
-.install-tip { font-size: 13px; color: #9090b8; font-style: italic; }
-.check-icon { font-size: 72px; color: #10b981; }
-progressbar > trough { background-color: #1d1d2e; border-radius: 9999px; min-height: 10px; }
-progressbar > trough > progress { background-color: #8b5cf6; border-radius: 9999px; min-height: 10px; }
-"""
-
 _STEPS = [
-    ("welcome", "Welcome"),
-    ("network", "Internet"),
-    ("identity", "About You"),
-    ("disk", "Disk Setup"),
-    ("ai", "AI Setup"),
-    ("summary", "Summary"),
-    ("install", "Installing"),
-    ("done", "Finished"),
+    ("welcome", N_("Welcome")),
+    ("network", N_("Internet")),
+    ("identity", N_("About You")),
+    ("disk", N_("Disk")),
+    ("ai", N_("AI")),
+    ("summary", N_("Summary")),
+    ("install", N_("Installing")),
+    ("done", N_("Finished")),
 ]
 
 
@@ -208,8 +147,8 @@ def is_live_session() -> bool:
 class InstallerWindow(Adw.Window):
     def __init__(self, app: Adw.Application):
         super().__init__(application=app)
-        self.set_title("Install Axon OS")
-        self.set_default_size(1060, 720)
+        self.set_title(_("Install Axon OS"))
+        fit_default_size(self, 1060, 720)
 
         # On small screens (e.g. 1366x768 laptops), maximise so the wizard
         # always fits without being clipped.
@@ -221,11 +160,7 @@ class InstallerWindow(Adw.Window):
             if geo.width < 1100 or geo.height < 768:
                 self.maximize()
 
-        provider = Gtk.CssProvider()
-        provider.load_from_data(_CSS)
-        Gtk.StyleContext.add_provider_for_display(
-            self.get_display(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        load_app_css(Path(__file__).with_name("wizard.css"), self.get_display())
 
         self._live = is_live_session()
         self._engine_proc = None
@@ -284,7 +219,7 @@ class InstallerWindow(Adw.Window):
         head.set_margin_top(36)
         head.set_margin_bottom(28)
         head.append(_label("⬡", "sidebar-logo", halign=Gtk.Align.CENTER))
-        head.append(_label("Axon OS", "sidebar-product", halign=Gtk.Align.CENTER))
+        head.append(_label(_("Axon OS"), "sidebar-product", halign=Gtk.Align.CENTER))
         head.append(
             _label(
                 f"{_os_version()} — AI-native desktop", "sidebar-version", halign=Gtk.Align.CENTER
@@ -295,13 +230,13 @@ class InstallerWindow(Adw.Window):
         self._step_rows = []
         self._step_dots = []
         self._step_labels = []
-        for _, title in _STEPS:
+        for _step, title in _STEPS:
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
             _cls(row, "step-row")
             row.set_margin_start(18)
             row.set_margin_end(18)
             dot = _label("●", "step-dot")
-            lbl = _label(title, "step-label")
+            lbl = _label(_(title), "step-label")
             row.append(dot)
             row.append(lbl)
             side.append(row)
@@ -314,7 +249,10 @@ class InstallerWindow(Adw.Window):
         side.append(spacer)
 
         foot = _label(
-            "Local-first AI · Your data stays yours", "muted", halign=Gtk.Align.CENTER, wrap=True
+            _("Local-first AI · You choose where it runs"),
+            "muted",
+            halign=Gtk.Align.CENTER,
+            wrap=True,
         )
         foot.set_margin_bottom(20)
         foot.set_margin_start(16)
@@ -343,7 +281,7 @@ class InstallerWindow(Adw.Window):
                 _cls(dot, "step-dot-current")
                 _cls(lbl, "step-label-current")
             else:
-                dot.set_label("●")
+                dot.set_label("○")  # upcoming: hollow, so state isn't colour alone
 
     def _go(self, name: str) -> None:
         idx = [s[0] for s in _STEPS].index(name)
@@ -388,18 +326,18 @@ class InstallerWindow(Adw.Window):
         outer.append(clamp)
         return outer, page
 
-    def _nav_row(self, back_to=None, next_to=None, next_label="Continue", next_danger=False):
+    def _nav_row(self, back_to=None, next_to=None, next_label=None, next_danger=False):
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         nav.set_halign(Gtk.Align.END)
         nav.set_margin_top(14)
         if back_to:
-            back = Gtk.Button(label="Back")
+            back = Gtk.Button(label=_("Back"))
             _cls(back, "nav-btn-back")
             back.connect("clicked", lambda _b: self._go(back_to))
             nav.append(back)
         next_btn = None
         if next_to:
-            next_btn = Gtk.Button(label=next_label)
+            next_btn = Gtk.Button(label=next_label or _("Continue"))
             _cls(next_btn, "nav-btn-danger" if next_danger else "nav-btn-next")
             next_btn.connect("clicked", lambda _b: self._go(next_to))
             nav.append(next_btn)
@@ -417,29 +355,25 @@ class InstallerWindow(Adw.Window):
         outer.set_margin_end(48)
 
         outer.append(_label("⬡", "hero-logo", halign=Gtk.Align.CENTER))
-        outer.append(_label("Welcome to Axon OS", "hero-title", halign=Gtk.Align.CENTER))
+        outer.append(_label(_("Welcome to Axon OS"), "hero-title", halign=Gtk.Align.CENTER))
         outer.append(
             _label(
-                "The AI-native operating system. Your assistant lives in the OS itself —\n"
-                "local-first, private, and one keystroke away.",
+                "The AI-native operating system. Your assistant lives in the OS itself,\n"
+                "runs on this computer by default, and is one keystroke away.",
                 "hero-subtitle",
                 halign=Gtk.Align.CENTER,
                 wrap=True,
             )
         )
 
-        # 2x2 grid: a single row of four chips forced a 645 px minimum width
-        chips = Gtk.Grid()
-        chips.set_column_spacing(8)
-        chips.set_row_spacing(8)
-        chips.set_column_homogeneous(True)
-        chips.set_halign(Gtk.Align.CENTER)
-        chips.set_margin_top(18)
-        for i, text in enumerate(
-            ("⬡ AI-Centered", "🔒 100% Local Option", "☁ Any Provider", "🐧 GNOME Native")
-        ):
-            chips.attach(_cls(Gtk.Label(label=text), "chip"), i % 2, i // 2, 1, 1)
-        outer.append(chips)
+        outer.append(
+            _label(
+                _("Use local models, or connect a cloud provider later in Settings."),
+                "hero-subtitle",
+                halign=Gtk.Align.CENTER,
+                wrap=True,
+            )
+        )
 
         btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         btns.set_halign(Gtk.Align.CENTER)
@@ -450,7 +384,7 @@ class InstallerWindow(Adw.Window):
         try_btn.connect("clicked", lambda _b: self.close())
         btns.append(try_btn)
 
-        install_btn = Gtk.Button(label="Install Axon OS  →")
+        install_btn = Gtk.Button(label=_("Install Axon OS"))
         _cls(install_btn, "nav-btn-next")
         install_btn.connect("clicked", lambda _b: self._go("network"))
         btns.append(install_btn)
@@ -458,7 +392,7 @@ class InstallerWindow(Adw.Window):
 
         if self._live:
             note = _label(
-                "Trying keeps everything in memory — nothing touches your disk.",
+                _("Trying keeps everything in memory — nothing touches your disk."),
                 "muted",
                 halign=Gtk.Align.CENTER,
             )
@@ -472,16 +406,18 @@ class InstallerWindow(Adw.Window):
 
     def _page_network(self):
         outer, page = self._page_box(
-            "Connect to the Internet",
-            "A connection lets the installer set up Ollama and download your AI model "
-            "automatically. You can also stay offline — AI setup will finish on first boot.",
+            _("Connect to the Internet"),
+            _(
+                "A connection lets the installer set up Ollama and download your AI model "
+                "automatically. You can also stay offline: AI setup finishes on first boot."
+            ),
         )
 
-        self._net_status = _label("Checking connection…", "status-offline")
+        self._net_status = _label(_("Checking connection…"), "status-offline")
         page.append(self._net_status)
 
         group = Adw.PreferencesGroup()
-        group.set_title("Wi-Fi networks")
+        group.set_title(_("Wi-Fi networks"))
         group.set_margin_top(8)
 
         self._wifi_list = Gtk.ListBox()
@@ -490,7 +426,7 @@ class InstallerWindow(Adw.Window):
         group.add(self._wifi_list)
         page.append(group)
 
-        refresh = Gtk.Button(label="↻  Rescan networks")
+        refresh = Gtk.Button(label=_("↻  Rescan networks"))
         _cls(refresh, "nav-btn-back")
         refresh.set_halign(Gtk.Align.START)
         refresh.set_margin_top(8)
@@ -501,7 +437,7 @@ class InstallerWindow(Adw.Window):
         spacer.set_vexpand(True)
         page.append(spacer)
 
-        nav, _ = self._nav_row(back_to="welcome", next_to="identity")
+        nav, _next = self._nav_row(back_to="welcome", next_to="identity")
         page.append(nav)
         return outer
 
@@ -531,10 +467,10 @@ class InstallerWindow(Adw.Window):
         ctx.remove_class("status-online")
         ctx.remove_class("status-offline")
         if state == "full":
-            self._net_status.set_label("●  Connected to the internet")
+            self._net_status.set_label(_("●  Connected to the internet"))
             ctx.add_class("status-online")
         else:
-            self._net_status.set_label("●  Offline — AI downloads will run on first boot")
+            self._net_status.set_label(_("●  Offline — AI downloads will run on first boot"))
             ctx.add_class("status-offline")
 
     def _refresh_wifi(self) -> None:
@@ -580,8 +516,8 @@ class InstallerWindow(Adw.Window):
         while child := self._wifi_list.get_first_child():
             self._wifi_list.remove(child)
         if not rows:
-            row = Adw.ActionRow(title="No Wi-Fi networks found")
-            row.set_subtitle("Plug in an ethernet cable, or continue offline")
+            row = Adw.ActionRow(title=_("No Wi-Fi networks found"))
+            row.set_subtitle(_("Plug in an ethernet cable, or continue offline"))
             self._wifi_list.append(row)
             return
         for ssid, in_use, signal, security in rows[:12]:
@@ -590,10 +526,12 @@ class InstallerWindow(Adw.Window):
             bits = [f"signal {signal}%"]
             bits.append("secured" if secured else "open")
             if in_use:
-                bits.append("connected ✓")
+                bits.append("connected")
             row.set_subtitle(" · ".join(bits))
             row.set_activatable(not in_use)
-            icon = Gtk.Label(label="🔒" if secured else "📶")
+            icon = Gtk.Image.new_from_icon_name(
+                "network-wireless-encrypted-symbolic" if secured else "network-wireless-symbolic"
+            )
             row.add_prefix(icon)
             row.connect("activated", self._on_wifi_row, ssid, secured)
             self._wifi_list.append(row)
@@ -644,28 +582,28 @@ class InstallerWindow(Adw.Window):
 
     def _page_identity(self):
         outer, page = self._page_box(
-            "Tell Us About You", "This creates your account on the installed system."
+            _("About You"), _("This creates your account on the installed system.")
         )
 
         group = Adw.PreferencesGroup()
 
-        self._fullname_row = Adw.EntryRow(title="Full name")
+        self._fullname_row = Adw.EntryRow(title=_("Full name"))
         self._fullname_row.connect("changed", self._on_identity_changed)
         group.add(self._fullname_row)
 
-        self._username_row = Adw.EntryRow(title="Username")
+        self._username_row = Adw.EntryRow(title=_("Username"))
         self._username_row.connect("changed", self._on_username_edited)
         group.add(self._username_row)
 
-        self._password_row = Adw.PasswordEntryRow(title="Password")
+        self._password_row = Adw.PasswordEntryRow(title=_("Password"))
         self._password_row.connect("changed", self._on_identity_changed)
         group.add(self._password_row)
 
-        self._password2_row = Adw.PasswordEntryRow(title="Confirm password")
+        self._password2_row = Adw.PasswordEntryRow(title=_("Confirm password"))
         self._password2_row.connect("changed", self._on_identity_changed)
         group.add(self._password2_row)
 
-        self._hostname_row = Adw.EntryRow(title="Computer name")
+        self._hostname_row = Adw.EntryRow(title=_("Computer name"))
         self._hostname_row.set_text("axon")
         self._hostname_row.connect("changed", self._on_identity_changed)
         group.add(self._hostname_row)
@@ -734,8 +672,8 @@ class InstallerWindow(Adw.Window):
 
     def _page_disk(self):
         outer, page = self._page_box(
-            "How Do You Want to Install?",
-            "Pick an installation style, then choose the target disk.",
+            _("How Do You Want to Install?"),
+            _("Pick an installation style, then choose the target disk."),
         )
 
         mode_group = Adw.PreferencesGroup()
@@ -743,8 +681,8 @@ class InstallerWindow(Adw.Window):
         self._mode_erase = Gtk.CheckButton()
         self._mode_erase.set_active(True)
         erase_row = Adw.ActionRow(
-            title="Erase disk and install Axon OS",
-            subtitle="Deletes everything on the selected disk — simplest and cleanest",
+            title=_("Erase disk and install Axon OS"),
+            subtitle=_("Deletes everything on the selected disk — simplest and cleanest"),
         )
         erase_row.add_prefix(self._mode_erase)
         erase_row.set_activatable_widget(self._mode_erase)
@@ -752,7 +690,7 @@ class InstallerWindow(Adw.Window):
 
         self._mode_alongside = Gtk.CheckButton(group=self._mode_erase)
         dual_row = Adw.ActionRow(
-            title="Install alongside another OS (dual boot)",
+            title=_("Install alongside another OS (dual boot)"),
             subtitle="Uses the largest unallocated space (≥ 16 GB) on the selected disk. "
             "Shrink a partition in GNOME Disks first if there is none. "
             "The GRUB menu will list your other systems at boot.",
@@ -763,7 +701,7 @@ class InstallerWindow(Adw.Window):
         page.append(mode_group)
 
         disk_group = Adw.PreferencesGroup()
-        disk_group.set_title("Target disk")
+        disk_group.set_title(_("Target disk"))
         disk_group.set_margin_top(10)
         self._disk_list = Gtk.ListBox()
         self._disk_list.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -772,7 +710,7 @@ class InstallerWindow(Adw.Window):
         page.append(disk_group)
 
         warn = _label(
-            "⚠ “Erase disk” permanently destroys all data on the chosen disk.",
+            _("⚠ “Erase disk” permanently destroys all data on the chosen disk."),
             "warn-text",
             wrap=True,
         )
@@ -848,8 +786,8 @@ class InstallerWindow(Adw.Window):
             self._disk_list.remove(child)
         self._disk_checks = []
         if not disks:
-            row = Adw.ActionRow(title="No usable disks found")
-            row.set_subtitle("Attach a disk of at least 20 GB and rescan")
+            row = Adw.ActionRow(title=_("No usable disks found"))
+            row.set_subtitle(_("Attach a disk of at least 20 GB and rescan"))
             self._disk_list.append(row)
             self._disk_next.set_sensitive(False)
             return
@@ -880,14 +818,16 @@ class InstallerWindow(Adw.Window):
 
     def _page_ai(self):
         outer, page = self._page_box(
-            "Set Up Your AI",
-            "Axon OS is built around its AI. Choose a local model, connect cloud "
-            "providers, or both — you can change everything later in Settings.",
+            _("Set Up Your AI"),
+            _(
+                "Axon OS is built around its AI. Choose a local model, connect cloud "
+                "providers, or both. You can change everything later in Settings."
+            ),
         )
 
         hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         _cls(hero, "ai-hero")
-        hero.append(_label("⬡  Local AI with Ollama — recommended", "ai-hero-title"))
+        hero.append(_label(_("⬡  Local AI with Ollama — recommended"), "ai-hero-title"))
         hero.append(
             _label(
                 "Runs entirely on this machine. Powers the Intent Bar, AI Panel and "
@@ -904,14 +844,16 @@ class InstallerWindow(Adw.Window):
         self._ollama_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         self._ollama_switch.set_active(True)
         ollama_row = Adw.ActionRow(
-            title="Install Ollama",
-            subtitle="Local model runtime — installed automatically (online now, or on first boot)",
+            title=_("Install Ollama"),
+            subtitle=_(
+                "Local model runtime — installed automatically (online now, or on first boot)"
+            ),
         )
         ollama_row.add_suffix(self._ollama_switch)
         ollama_row.set_activatable_widget(self._ollama_switch)
         local_group.add(ollama_row)
 
-        self._model_combo = Adw.ComboRow(title="Default local model")
+        self._model_combo = Adw.ComboRow(title=_("Default local model"))
         model_names = Gtk.StringList()
         for _mid, name, desc in OLLAMA_MODELS:
             model_names.append(f"{name} — {desc}")
@@ -925,8 +867,8 @@ class InstallerWindow(Adw.Window):
         page.append(local_group)
 
         cloud_group = Adw.PreferencesGroup()
-        cloud_group.set_title("Cloud AI providers (optional)")
-        cloud_group.set_description("Add an API key to use hosted models alongside local AI")
+        cloud_group.set_title(_("Cloud AI providers (optional)"))
+        cloud_group.set_description(_("Add an API key to use hosted models alongside local AI"))
         cloud_group.set_margin_top(10)
 
         self._provider_rows = {}
@@ -934,7 +876,7 @@ class InstallerWindow(Adw.Window):
             expander = Adw.ExpanderRow(title=name, subtitle=desc)
             expander.set_show_enable_switch(True)
             expander.set_enable_expansion(False)
-            key_row = Adw.PasswordEntryRow(title="API key")
+            key_row = Adw.PasswordEntryRow(title=_("API key"))
             expander.add_row(key_row)
             cloud_group.add(expander)
             self._provider_rows[pid] = (expander, key_row)
@@ -953,7 +895,7 @@ class InstallerWindow(Adw.Window):
         spacer.set_vexpand(True)
         page.append(spacer)
 
-        nav, _ = self._nav_row(back_to="disk", next_to="summary")
+        nav, _next = self._nav_row(back_to="disk", next_to="summary")
         page.append(nav)
         return outer
 
@@ -972,8 +914,8 @@ class InstallerWindow(Adw.Window):
 
     def _page_summary(self):
         outer, page = self._page_box(
-            "Ready to Install",
-            "Review your choices. Nothing is written to disk until you press Install.",
+            _("Ready to Install"),
+            _("Review your choices. Nothing is written to disk until you press Install."),
         )
         self._summary_group = Adw.PreferencesGroup()
         self._summary_rows = []
@@ -983,8 +925,8 @@ class InstallerWindow(Adw.Window):
         spacer.set_vexpand(True)
         page.append(spacer)
 
-        nav, _ = self._nav_row(
-            back_to="ai", next_to="install", next_label="Install Now", next_danger=True
+        nav, _next = self._nav_row(
+            back_to="ai", next_to="install", next_label=_("Install"), next_danger=True
         )
         page.append(nav)
         return outer
@@ -1042,7 +984,7 @@ class InstallerWindow(Adw.Window):
         outer.append(bar_clamp)
 
         self._install_step = _label(
-            "Starting installer…", "install-step", halign=Gtk.Align.CENTER, wrap=True
+            _("Starting installer…"), "install-step", halign=Gtk.Align.CENTER, wrap=True
         )
         outer.append(self._install_step)
 
@@ -1058,7 +1000,7 @@ class InstallerWindow(Adw.Window):
         self._install_error_box.set_visible(False)
         self._install_error = _label("", "error-text", halign=Gtk.Align.CENTER, wrap=True)
         self._install_error_box.append(self._install_error)
-        retry = Gtk.Button(label="Back to Summary")
+        retry = Gtk.Button(label=_("Back to Summary"))
         _cls(retry, "nav-btn-back")
         retry.set_halign(Gtk.Align.CENTER)
         retry.connect("clicked", lambda _b: self._go("summary"))
@@ -1133,7 +1075,7 @@ class InstallerWindow(Adw.Window):
                 for line in self._engine_proc.stdout:
                     line = line.strip()
                     if line.startswith("AXON-PROGRESS:"):
-                        _, pct, msg = line.split(":", 2)
+                        _tag, pct, msg = line.split(":", 2)
                         GLib.idle_add(self._on_progress, int(pct), msg)
                     elif line.startswith("AXON-ERROR:"):
                         GLib.idle_add(self._on_install_error, line.split(":", 1)[1])
@@ -1164,7 +1106,7 @@ class InstallerWindow(Adw.Window):
     def _on_install_error(self, message: str) -> None:
         self._install_failed = True
         self.set_deletable(True)
-        self._install_step.set_label("Installation failed")
+        self._install_step.set_label(_("Installation failed"))
         self._install_error.set_label(message.strip())
         self._install_error_box.set_visible(True)
 
@@ -1184,7 +1126,7 @@ class InstallerWindow(Adw.Window):
         outer.set_margin_end(64)
 
         outer.append(_label("✓", "check-icon", halign=Gtk.Align.CENTER))
-        outer.append(_label("Axon OS Is Installed!", "hero-title", halign=Gtk.Align.CENTER))
+        outer.append(_label(_("Axon OS Is Installed!"), "hero-title", halign=Gtk.Align.CENTER))
         outer.append(
             _label(
                 "Remove the installation media, then restart to boot into your new "
@@ -1199,12 +1141,12 @@ class InstallerWindow(Adw.Window):
         btns.set_halign(Gtk.Align.CENTER)
         btns.set_margin_top(28)
 
-        stay = Gtk.Button(label="Keep Exploring Live")
+        stay = Gtk.Button(label=_("Keep Exploring Live"))
         _cls(stay, "nav-btn-back")
         stay.connect("clicked", lambda _b: self.close())
         btns.append(stay)
 
-        reboot = Gtk.Button(label="Restart Now  ⟳")
+        reboot = Gtk.Button(label=_("Restart Now"))
         _cls(reboot, "nav-btn-next")
         reboot.connect("clicked", self._on_reboot)
         btns.append(reboot)

@@ -35,6 +35,8 @@ class OllamaClient:
         self.q: queue.Queue[str | None] = queue.Queue()
         self.current_tx: str | None = None
         self._stream_lock: threading.Lock = threading.Lock()
+        # Latest model download progress from the Brain, for the status view
+        self.pull_progress: dict[str, Any] | None = None
 
         # Register signal listeners
         self.bus.add_signal_receiver(
@@ -47,6 +49,34 @@ class OllamaClient:
             signal_name="GenerationCompleted",
             dbus_interface="org.axonos.Brain",
         )
+        self.bus.add_signal_receiver(
+            self._on_pull_progress,
+            signal_name="PullProgress",
+            dbus_interface="org.axonos.Brain",
+        )
+
+    def _on_pull_progress(self, model: str, completed: int, total: int, status: str) -> None:
+        done = bool(total) and int(completed) >= int(total)
+        finished = status in ("success", "Pull failed") or done
+        self.pull_progress = (
+            None
+            if finished and status != "Pull failed"
+            else {
+                "model": str(model),
+                "completed": int(completed),
+                "total": int(total),
+                "status": str(status),
+            }
+        )
+
+    def search_stats(self) -> dict[str, Any] | None:
+        """Semantic index stats from org.axonos.Search, or None. Blocking D-Bus call."""
+        try:
+            obj = self.bus.get_object("org.axonos.Search", "/org/axonos/Search")
+            data = json.loads(obj.GetStats(dbus_interface="org.axonos.Search", timeout=3))
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
 
     def _on_token_generated(self, transaction_id: str, token: str) -> None:
         if self.current_tx and transaction_id == self.current_tx:
@@ -97,6 +127,26 @@ class OllamaClient:
             return [m["name"] for m in models]
         except Exception:
             return []
+
+    def routing_info(self) -> tuple[list[dict[str, Any]] | None, dict[str, str]]:
+        """Providers and per-tier models, for the local/cloud indicator.
+
+        Blocking D-Bus calls; run off the GTK thread. Returns ``(None, {})``
+        pieces that could not be read, so callers never guess "local".
+        """
+        providers: list[dict[str, Any]] | None = None
+        tiers: dict[str, str] = {}
+        try:
+            providers = list(json.loads(self._get_brain().ListProviders()).get("providers", []))
+        except Exception:
+            providers = None
+        try:
+            tiers = {
+                str(k): str(v) for k, v in json.loads(self._get_brain().GetModelSettings()).items()
+            }
+        except Exception:
+            tiers = {}
+        return providers, tiers
 
     # ------------------------------------------------------------------
     # Generate (single-turn completion)
@@ -164,6 +214,20 @@ class OllamaClient:
         except Exception:
             return []
 
+    def rename_conversation(self, conversation_id: str, title: str) -> bool:
+        """Change a conversation's title. Blocking D-Bus call."""
+        try:
+            return bool(self._get_brain().UpdateTitle(conversation_id, title))
+        except Exception:
+            return False
+
+    def archive_conversation(self, conversation_id: str, archived: bool) -> bool:
+        """Archive or restore a conversation. Blocking D-Bus call."""
+        try:
+            return bool(self._get_brain().ArchiveConversation(conversation_id, archived))
+        except Exception:
+            return False
+
     def delete_conversation(self, conversation_id: str) -> None:
         """Delete a conversation session."""
         try:
@@ -171,6 +235,21 @@ class OllamaClient:
             brain.DeleteConversation(conversation_id)
         except Exception:
             pass
+
+    def cancel(self) -> None:
+        """Stop the running stream: tell the Brain and unblock the reader.
+
+        Blocking D-Bus call; run it off the GTK thread.
+        """
+        tx = self.current_tx
+        if not tx:
+            return
+        try:
+            self._get_brain().CancelStream(tx)
+        except Exception:
+            pass  # the sentinel below still ends the local generator
+        if self.current_tx == tx:
+            self.q.put(None)
 
     def send_message_stream(
         self, conversation_id: str, message: str, model: str = "", ctx: str = ""

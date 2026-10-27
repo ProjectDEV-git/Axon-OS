@@ -18,11 +18,28 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import close_on_escape, fit_default_size
+
 # Repo root in a checkout, /usr/lib/axon when installed: both hold services/.
 _AXON_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 if _AXON_ROOT not in sys.path:
     sys.path.insert(0, _AXON_ROOT)
 from services.diagnostics import FAIL, INFO, OK, WARN, CheckResult, Report, run_diagnostics
+
+# Translations (services/i18n.py); plain English when services/ isn't found
+for _base in (*Path(__file__).resolve().parents, Path("/usr/lib/axon")):
+    if (_base / "services" / "i18n.py").is_file():
+        sys.path.insert(0, str(_base / "services"))
+        break
+try:
+    from i18n import _
+except ImportError:
+
+    def _(text: str) -> str:  # type: ignore[no-redef]
+        return text
+
 
 _STATUS_ICONS = {
     OK: "emblem-ok-symbolic",
@@ -38,8 +55,8 @@ class DiagnosticsWindow(Adw.ApplicationWindow):
 
     def __init__(self, **kwargs: object) -> None:
         super().__init__(**kwargs)
-        self.set_title("Diagnostics")
-        self.set_default_size(620, 680)
+        self.set_title(_("Diagnostics"))
+        fit_default_size(self, 620, 680)
         self._report: Report | None = None
 
         self._toasts = Adw.ToastOverlay()
@@ -48,19 +65,22 @@ class DiagnosticsWindow(Adw.ApplicationWindow):
         self.set_content(self._toasts)
 
         header = Adw.HeaderBar()
-        self._run_btn = Gtk.Button(label="Run again")
+        self._run_btn = Gtk.Button(label=_("Run again"))
         self._run_btn.connect("clicked", lambda _b: self.run())
         header.pack_start(self._run_btn)
         self._save_btn = Gtk.Button(icon_name="document-save-symbolic")
-        self._save_btn.set_tooltip_text("Save report to a file")
+        self._save_btn.set_tooltip_text(_("Save report to a file"))
+        self._save_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Save report"])
         self._save_btn.connect("clicked", self._on_save)
         header.pack_end(self._save_btn)
         self._copy_btn = Gtk.Button(icon_name="edit-copy-symbolic")
-        self._copy_btn.set_tooltip_text("Copy report")
+        self._copy_btn.set_tooltip_text(_("Copy report"))
+        self._copy_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Copy report"])
         self._copy_btn.connect("clicked", self._on_copy)
         header.pack_end(self._copy_btn)
         toolbar.add_top_bar(header)
 
+        close_on_escape(self)
         self._page = Adw.PreferencesPage()
         toolbar.set_content(self._page)
         self._groups: list[Adw.PreferencesGroup] = []
@@ -163,7 +183,7 @@ class DiagnosticsWindow(Adw.ApplicationWindow):
         if self._report is None:
             return
         Gdk.Display.get_default().get_clipboard().set(self._report.to_text())
-        self._toasts.add_toast(Adw.Toast(title="Report copied"))
+        self._toasts.add_toast(Adw.Toast(title=_("Report copied")))
 
     def _on_save(self, _btn: Gtk.Button) -> None:
         if self._report is None:

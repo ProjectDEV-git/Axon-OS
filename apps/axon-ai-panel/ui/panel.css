@@ -1,0 +1,124 @@
+/* Axon AI panel. Colours come from the design tokens (@axon_*), loaded by
+ * axon_gtk_utils.load_app_css; see theme/tokens/axon-tokens.json. */
+
+.panel-window {
+    background-color: @axon_bg;
+    border: 1px solid @axon_border;
+    border-radius: 12px;
+}
+
+.panel-header {
+    border-bottom: 1px solid @axon_border;
+}
+
+/* The user's messages carry the accent (the AI conversation) */
+.bubble-user {
+    background-color: @axon_accent_subtle;
+    border-radius: 12px 12px 4px 12px;
+    color: @axon_fg;
+    padding: 10px 14px;
+}
+
+.bubble-assistant {
+    background-color: @axon_surface;
+    border-radius: 4px 12px 12px 12px;
+    border: 1px solid @axon_border;
+    color: @axon_fg;
+    padding: 10px 14px;
+}
+
+/* Errors: colour plus an icon, never colour alone */
+.bubble-error {
+    border-color: @axon_error;
+    color: @axon_error;
+}
+
+.bubble-error image {
+    color: @axon_error;
+}
+
+.origin-label {
+    color: @axon_fg_secondary;
+    font-size: 8.25pt;
+    margin-bottom: 4px;
+}
+
+.context-title {
+    color: @axon_fg_secondary;
+    font-size: 8.25pt;
+}
+
+.context-chip {
+    font-size: 8.25pt;
+    padding: 0 6px;
+    min-height: 22px;
+}
+
+.thinking-label {
+    color: @axon_accent_text;
+    font-size: 9.75pt;
+    font-style: italic;
+}
+
+.panel-input-area {
+    background-color: @axon_bg;
+    border-top: 1px solid @axon_border;
+    padding: 12px;
+}
+
+.copy-btn {
+    background-color: transparent;
+    color: @axon_fg_muted;
+    font-size: 8.25pt;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.copy-btn:hover {
+    color: @axon_fg;
+    background-color: @axon_hover;
+}
+
+/* Quick chips are neutral; the accent is kept for AI and focus */
+.quick-chip {
+    background-color: @axon_hover;
+    color: @axon_fg_secondary;
+    border: 1px solid @axon_border;
+    border-radius: 9999px;
+    padding: 4px 12px;
+    font-size: 9pt;
+}
+
+.quick-chip:hover {
+    background-color: @axon_active;
+    color: @axon_fg;
+}
+
+.clear-btn {
+    color: @axon_fg_muted;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+
+.clear-btn:hover {
+    color: @axon_error;
+    background-color: @axon_hover;
+}
+
+/* Model, response time and sources under an answer */
+.bubble-meta {
+    color: @axon_fg_muted;
+    font-size: 8.25pt;
+}
+
+/* A system change the AI proposes; it runs only after the confirmation card */
+.action-card {
+    background-color: @axon_surface_raised;
+    border: 1px solid @axon_border_strong;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-top: 6px;
+}

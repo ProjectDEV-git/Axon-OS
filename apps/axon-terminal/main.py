@@ -21,10 +21,26 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, Gtk
 
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import fit_default_size, load_app_css
+
 # Ensure sibling modules are importable when running as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from terminal_widget import TerminalWidget
+
+# Translations (services/i18n.py); plain English when services/ isn't found
+for _base in (*Path(__file__).resolve().parents, Path("/usr/lib/axon")):
+    if (_base / "services" / "i18n.py").is_file():
+        sys.path.insert(0, str(_base / "services"))
+        break
+try:
+    from i18n import _
+except ImportError:
+
+    def _(text: str) -> str:  # type: ignore[no-redef]
+        return text
 
 
 class AxonTerminalWindow(Adw.ApplicationWindow):
@@ -33,22 +49,12 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs: object) -> None:
         super().__init__(**kwargs)
 
-        self.set_title("Axon Terminal")
-        self.set_default_size(900, 600)
-        self.set_icon_name("utilities-terminal")
+        self.set_title(_("Axon Terminal"))
+        fit_default_size(self, 900, 600)
+        self.set_icon_name("axon-terminal")
 
-        # ---- Load CSS (guard against re-registration) ----------------------
-        if not hasattr(AxonTerminalWindow, "_css_loaded"):
-            css_path = Path(__file__).resolve().parent / "main.css"
-            if css_path.exists():
-                css_provider = Gtk.CssProvider()
-                css_provider.load_from_path(str(css_path))
-                Gtk.StyleContext.add_provider_for_display(
-                    Gdk.Display.get_default(),
-                    css_provider,
-                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-                )
-            AxonTerminalWindow._css_loaded = True
+        # ---- Load CSS (design tokens first, once) ---------------------------
+        load_app_css(Path(__file__).resolve().parent / "main.css")
 
         # ---- Root layout ---------------------------------------------------
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -60,14 +66,15 @@ class AxonTerminalWindow(Adw.ApplicationWindow):
 
         # New tab button
         new_tab_btn = Gtk.Button(icon_name="tab-new-symbolic")
-        new_tab_btn.set_tooltip_text("New tab (Ctrl+Shift+T)")
+        new_tab_btn.set_tooltip_text(_("New tab (Ctrl+Shift+T)"))
+        new_tab_btn.update_property([Gtk.AccessibleProperty.LABEL], ["New tab"])
         new_tab_btn.connect("clicked", self._on_new_tab)
         header.pack_start(new_tab_btn)
 
         # AI bar toggle button
-        ai_btn = Gtk.Button(label="⬡ AI")
+        ai_btn = Gtk.Button(label=_("⬡ AI"))
         ai_btn.add_css_class("ai-toggle-btn")
-        ai_btn.set_tooltip_text("Toggle AI command bar (Ctrl+Shift+A)")
+        ai_btn.set_tooltip_text(_("Toggle AI command bar (Ctrl+Shift+A)"))
         ai_btn.connect("clicked", self._on_ai_toggle)
         header.pack_end(ai_btn)
 

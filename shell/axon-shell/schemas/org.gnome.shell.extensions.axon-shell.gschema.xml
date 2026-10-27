@@ -80,11 +80,57 @@
       <description>Keybinding to activate Space 9.</description>
     </key>
 
+    <!-- Space quick switcher: Super+J ("jump") -->
+    <key name="open-space-switcher" type="as">
+      <default>["&lt;Super&gt;j"]</default>
+      <summary>Open the Space switcher</summary>
+      <description>Keybinding to search Spaces and their windows and jump to one.</description>
+    </key>
+
     <!-- Voice toggle: Super+V -->
     <key name="toggle-voice" type="as">
       <default>["&lt;Super&gt;v"]</default>
       <summary>Toggle Voice Recording</summary>
       <description>Keybinding to trigger local voice commands.</description>
+    </key>
+
+    <!-- Spaces: moving new windows to the Space the AI picks -->
+    <key name="auto-route-windows" type="b">
+      <default>true</default>
+      <summary>Move new windows to their Space</summary>
+      <description>When on, Axon asks the AI which Space a new window belongs in and moves it there (or asks first when unsure). Per-app rules are applied first.</description>
+    </key>
+
+    <key name="space-rules" type="a{ss}">
+      <default>{}</default>
+      <summary>Per-app Space rules</summary>
+      <description>App ID (or WM class) mapped to the Space its windows always go to, or "__never__" to never move that app.</description>
+    </key>
+
+    <key name="osd-ai-summary" type="b">
+      <default>false</default>
+      <summary>AI summary in the Space OSD</summary>
+      <description>After a short delay, replace the window-list summary in the Space switch overlay with a phrase from the AI. Off by default: it sends window titles to the selected model.</description>
+    </key>
+
+    <key name="accent-color" type="s">
+      <choices>
+        <choice value="blue"/>
+        <choice value="teal"/>
+        <choice value="green"/>
+        <choice value="orange"/>
+        <choice value="pink"/>
+        <choice value="graphite"/>
+      </choices>
+      <default>"blue"</default>
+      <summary>Accent colour</summary>
+      <description>The colour of focus rings, selections, the main action and AI details in Axon apps and the Axon Shell.</description>
+    </key>
+
+    <key name="reduce-transparency" type="b">
+      <default>false</default>
+      <summary>Reduce transparency</summary>
+      <description>Draw the taskbar on a solid surface instead of the translucent material. High Contrast does the same.</description>
     </key>
 
   </schema>

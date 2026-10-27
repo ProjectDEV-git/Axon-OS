@@ -534,12 +534,13 @@ install -Dm755 "${SRC}/build/config/axon-display-diag" /usr/local/bin/axon-displ
 # ---------------------------------------------------------------------------
 # 6b. GNOME defaults (gschema overrides apply to every user, incl. live)
 # ---------------------------------------------------------------------------
-# Window/shell look: WhiteSur GTK + Shell theme (MIT, built from source at
-# image-build time; falls back to the Axon dark theme if anything fails).
+# Window look: the Axon GTK theme (GTK's own default theme plus the Axon
+# accent, from scripts/gen_tokens.py). The WhiteSur GTK + Shell theme (MIT,
+# a macOS look) is opt-in with AXON_WHITESUR=1; Axon's look is its own.
 # Icons: Papirus (GPL-3.0, from the Ubuntu archive). The WhiteSur icon theme
 # redraws Apple's app icons, so it is no longer shipped. See
 # docs/THIRD-PARTY.md for every bundled theme and app and its license.
-log "Installing WhiteSur GTK/Shell theme..."
+log "Applying the GTK theme (WhiteSur only with AXON_WHITESUR=1)..."
 GTK_THEME_NAME='axon-gtk'
 ICON_THEME_NAME='Papirus-Dark'
 SHELL_THEME_NAME=''
@@ -548,7 +549,9 @@ rm -rf /usr/share/icons/WhiteSur /usr/share/icons/WhiteSur-dark /usr/share/icons
 
 # In quick mode, skip theme rebuild if themes are already installed
 WHITESUR_SKIP=false
-if [[ "${QUICK}" == "1" ]] && [[ -d /usr/share/themes/WhiteSur-Dark ]]; then
+if [[ "${AXON_WHITESUR:-0}" != "1" ]]; then
+    WHITESUR_SKIP=true
+elif [[ "${QUICK}" == "1" ]] && [[ -d /usr/share/themes/WhiteSur-Dark ]]; then
     log "Quick mode: WhiteSur theme already installed — skipping rebuild"
     GTK_THEME_NAME='WhiteSur-Dark'
     SHELL_THEME_NAME='WhiteSur-Dark'
@@ -591,12 +594,12 @@ cursor-size=24
 text-scaling-factor=1.0
 
 [org.gnome.desktop.background]
-picture-uri='file:///usr/share/backgrounds/axon/axon-aurora.png'
-picture-uri-dark='file:///usr/share/backgrounds/axon/axon-aurora.png'
+picture-uri='file:///usr/share/backgrounds/axon/axon-neural-light.png'
+picture-uri-dark='file:///usr/share/backgrounds/axon/axon-neural-dark.png'
 picture-options='zoom'
 
 [org.gnome.desktop.screensaver]
-picture-uri='file:///usr/share/backgrounds/axon/axon-aurora.png'
+picture-uri='file:///usr/share/backgrounds/axon/axon-neural-dark.png'
 
 [org.gnome.desktop.wm.preferences]
 num-workspaces=9

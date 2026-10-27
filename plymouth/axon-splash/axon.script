@@ -1,8 +1,8 @@
 // Axon OS Plymouth Boot Splash
-// Dark background: #0e0e10 (matches the axon.png logo background)
+// Dark background: #161616 (matches the axon.png logo background)
 
-Window.SetBackgroundTopColor(0.055, 0.055, 0.063);
-Window.SetBackgroundBottomColor(0.055, 0.055, 0.063);
+Window.SetBackgroundTopColor(0.086, 0.086, 0.086);
+Window.SetBackgroundBottomColor(0.086, 0.086, 0.086);
 
 // --- Logo ---
 logo_image = Image("axon.png");
@@ -18,14 +18,14 @@ bar_y         = Window.GetHeight() - 48;
 bar_width_max = Math.Int(Window.GetWidth() * 0.5);
 bar_x         = Math.Int((Window.GetWidth() - bar_width_max) / 2);
 
-// Background track (#1e1e23)
+// Background track (#282828)
 bar_bg_image = Image("progress-track.png").Scale(bar_width_max, bar_height);
 bar_bg_sprite = Sprite(bar_bg_image);
 bar_bg_sprite.SetX(bar_x);
 bar_bg_sprite.SetY(bar_y);
 bar_bg_sprite.SetOpacity(0);
 
-// Fill (violet #a78bfa)
+// Fill (the Axon accent, #2b6fde)
 bar_fill_source = Image("progress-fill.png");
 bar_fill_sprite = Sprite(bar_fill_source.Scale(1, bar_height));
 bar_fill_sprite.SetX(bar_x);

@@ -19,62 +19,80 @@ gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, Gtk, Pango
 
-_css_loaded = False
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import load_app_css
+
+# Translations (services/i18n.py); plain English when services/ isn't found
+for _base in (*Path(__file__).resolve().parents, Path("/usr/lib/axon")):
+    if (_base / "services" / "i18n.py").is_file():
+        sys.path.insert(0, str(_base / "services"))
+        break
+try:
+    from i18n import N_, _
+except ImportError:
+
+    def _(text: str) -> str:  # type: ignore[no-redef]
+        return text
+
+    N_ = _
+
 
 # Shortcut definitions grouped by category
 SHORTCUTS = [
     {
-        "title": "Spaces & Navigation",
-        "icon": "🏠",
+        "title": N_("Spaces and Navigation"),
+        "icon": "view-grid-symbolic",
         "bindings": [
-            ("Super + 1–9", "Switch to Space 1–9"),
-            ("Super + Shift + 1–9", "Move window to Space 1–9"),
-            ("Super + Tab", "Switch between Spaces"),
-            ("Alt + Tab", "Switch between windows"),
+            ("Super + 1–9", N_("Switch to Space 1–9")),
+            ("Super + Shift + 1–9", N_("Move window to Space 1–9")),
+            ("Super + Tab", N_("Switch between Spaces")),
+            ("Super + J", N_("Search Spaces and windows, then jump")),
+            ("Alt + Tab", N_("Switch between windows")),
         ],
     },
     {
-        "title": "AI & Assistant",
-        "icon": "🧠",
+        "title": N_("AI and Assistant"),
+        "icon": "axon-ai-panel-symbolic",
         "bindings": [
-            ("Super + Space", "Open Intent Bar (AI command palette)"),
-            ("Super + A", "Toggle AI Side Panel"),
-            ("Super + V", "Push-to-talk Voice Input"),
-            ("Ctrl + Shift + A", "Terminal AI helper (in Axon Terminal)"),
+            ("Super + Space", N_("Open Intent Bar (AI command palette)")),
+            ("Super + A", N_("Toggle AI Side Panel")),
+            ("Super + V", N_("Push-to-talk Voice Input")),
+            ("Ctrl + Shift + A", N_("Terminal AI helper (in Axon Terminal)")),
         ],
     },
     {
-        "title": "System",
-        "icon": "⚙️",
+        "title": N_("System"),
+        "icon": "axon-settings-symbolic",
         "bindings": [
-            ("Super", "Open Start Menu"),
-            ("Super + /", "Show this shortcut overlay"),
-            ("Super + L", "Lock screen"),
-            ("Ctrl + Alt + T", "Open terminal"),
-            ("Print Screen", "Screenshot"),
+            ("Super", N_("Open Start Menu")),
+            ("Super + /", N_("Show this shortcut overlay")),
+            ("Super + L", N_("Lock screen")),
+            ("Ctrl + Alt + T", N_("Open terminal")),
+            ("Print Screen", N_("Screenshot")),
         ],
     },
     {
-        "title": "Window Management",
-        "icon": "🪟",
+        "title": N_("Windows"),
+        "icon": "focus-windows-symbolic",
         "bindings": [
-            ("Super + ↑", "Maximize window"),
-            ("Super + ↓", "Restore / unmaximize"),
-            ("Super + ←", "Tile window left"),
-            ("Super + →", "Tile window right"),
-            ("Alt + F4", "Close window"),
+            ("Super + ↑", N_("Maximize window")),
+            ("Super + ↓", N_("Restore / unmaximize")),
+            ("Super + ←", N_("Tile window left")),
+            ("Super + →", N_("Tile window right")),
+            ("Alt + F4", N_("Close window")),
         ],
     },
     {
-        "title": "Axon Terminal",
-        "icon": "💻",
+        "title": N_("Axon Terminal"),
+        "icon": "axon-terminal-symbolic",
         "bindings": [
-            ("Ctrl + Shift + T", "New tab"),
-            ("Ctrl + Shift + W", "Close tab"),
-            ("Ctrl + Page Up/Down", "Switch tabs"),
-            ("Ctrl + Shift + C", "Copy selection"),
-            ("Ctrl + Shift + V", "Paste"),
-            ("Ctrl + Shift + A", "AI command bar"),
+            ("Ctrl + Shift + T", N_("New tab")),
+            ("Ctrl + Shift + W", N_("Close tab")),
+            ("Ctrl + Page Up/Down", N_("Switch tabs")),
+            ("Ctrl + Shift + C", N_("Copy selection")),
+            ("Ctrl + Shift + V", N_("Paste")),
+            ("Ctrl + Shift + A", N_("AI command bar")),
         ],
     },
 ]
@@ -83,23 +101,11 @@ SHORTCUTS = [
 class ShortcutsWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs: object) -> None:
         super().__init__(**kwargs)
-        self.set_title("Keyboard Shortcuts")
+        self.set_title(_("Keyboard Shortcuts"))
         self.set_default_size(720, 560)
         self.set_resizable(True)
 
-        # Load CSS (guard against re-registration)
-        global _css_loaded
-        if not _css_loaded:
-            css_path = Path(__file__).resolve().parent / "main.css"
-            if css_path.exists():
-                css_provider = Gtk.CssProvider()
-                css_provider.load_from_path(str(css_path))
-                Gtk.StyleContext.add_provider_for_display(
-                    Gdk.Display.get_default(),
-                    css_provider,
-                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-                )
-            _css_loaded = True
+        load_app_css(Path(__file__).resolve().parent / "main.css")
 
         # Close on Escape key
         esc_controller = Gtk.EventControllerKey()
@@ -121,17 +127,18 @@ class ShortcutsWindow(Adw.ApplicationWindow):
         title_box.set_margin_top(16)
         title_box.set_margin_bottom(8)
 
-        title_icon = Gtk.Label(label="⌨")
+        title_icon = Gtk.Image.new_from_icon_name("axon-shortcuts")
+        title_icon.set_pixel_size(32)
         title_icon.add_css_class("title-icon")
         title_box.append(title_icon)
 
-        title_label = Gtk.Label(label="Axon Keyboard Shortcuts")
+        title_label = Gtk.Label(label=_("Keyboard Shortcuts"))
         title_label.add_css_class("overlay-title")
         title_box.append(title_label)
 
         root.append(title_box)
 
-        subtitle = Gtk.Label(label="Press Escape to close")
+        subtitle = Gtk.Label(label=_("Press Escape to close"))
         subtitle.add_css_class("overlay-subtitle")
         subtitle.set_margin_bottom(12)
         root.append(subtitle)
@@ -177,11 +184,11 @@ class ShortcutsWindow(Adw.ApplicationWindow):
 
         # Group header
         header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        icon_label = Gtk.Label(label=group["icon"])
+        icon_label = Gtk.Image.new_from_icon_name(group["icon"])
         icon_label.add_css_class("group-icon")
         header_box.append(icon_label)
 
-        title = Gtk.Label(label=group["title"])
+        title = Gtk.Label(label=_(group["title"]))
         title.add_css_class("group-title")
         title.set_xalign(0)
         header_box.append(title)
@@ -202,11 +209,14 @@ class ShortcutsWindow(Adw.ApplicationWindow):
             key_label = Gtk.Label(label=keys)
             key_label.add_css_class("key-badge")
             key_label.set_halign(Gtk.Align.START)
-            key_label.set_size_request(200, -1)
+            # Fixed key column so descriptions share one left edge and get
+            # the rest of the width instead of wrapping word by word
+            key_label.set_size_request(150, -1)
+            key_label.set_valign(Gtk.Align.CENTER)
             row.append(key_label)
 
             # Description
-            desc_label = Gtk.Label(label=description)
+            desc_label = Gtk.Label(label=_(description))
             desc_label.add_css_class("key-desc")
             desc_label.set_xalign(0)
             desc_label.set_hexpand(True)

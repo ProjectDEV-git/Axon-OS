@@ -91,6 +91,33 @@ class TestConversationStoreConnectionLifecycle(unittest.TestCase):
         messages = store.get_messages(conv_id)
         self.assertEqual(len(messages), 2)
 
+    def test_archive_and_restore(self):
+        store = ConversationStore(db_path=self.db_path)
+        conv_id = store.create_conversation(title="Old chat")
+        listed = {c["id"]: c for c in store.list_conversations()}
+        self.assertEqual(listed[conv_id]["archived"], 0)
+        self.assertTrue(store.set_archived(conv_id, True))
+        listed = {c["id"]: c for c in store.list_conversations()}
+        self.assertEqual(listed[conv_id]["archived"], 1)
+        self.assertTrue(store.set_archived(conv_id, False))
+        self.assertFalse(store.set_archived("missing", True))
+
+    def test_old_database_gets_the_archived_column(self):
+        import sqlite3
+
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        conn = sqlite3.connect(self.db_path)
+        conn.execute(
+            "CREATE TABLE conversations (id TEXT PRIMARY KEY, title TEXT NOT NULL, "
+            "system_prompt TEXT, created_at TIMESTAMP, updated_at TIMESTAMP)"
+        )
+        conn.execute("INSERT INTO conversations (id, title) VALUES ('c1', 'Before')")
+        conn.commit()
+        conn.close()
+        store = ConversationStore(db_path=self.db_path)
+        rows = store.list_conversations()
+        self.assertEqual(rows[0]["archived"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,2058 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the axon-os package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: axon-os\n"
+"Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
+"POT-Creation-Date: 2026-10-26 11:30+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "(Cancelled)"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Active Chat"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Archived"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Ask again for a new answer"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Ask anything…"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Axon Brain service is offline or Ollama is not running."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Axon status: checking…"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Axon status: {headline}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py services/ui_logic.py
+#: shell/axon-shell/ui-logic.js
+msgid "Axon suggested an action it can't perform here."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py apps/axon-confirm/main.py
+#: apps/axon-settings/ai_models.py apps/axon-terminal/terminal_widget.py
+msgid "Cancel"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py apps/intent-bar/ui/window.py
+#: shell/axon-shell/intentbar.js
+msgid "Cancelled"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Check Again"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Choose what context Axon may send"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Clear"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Clear Conversation"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Clear conversation"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Context:"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Context: checking…"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Context: none"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Context: off"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Conversations"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Copy message"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Copy to clipboard"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Delete"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Delete Conversation?"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py apps/axon-settings/diagnostics_window.py
+#: shell/axon-shell/intentbar.js
+msgid "Diagnostics"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py apps/axon-terminal/terminal_widget.py
+msgid "Dismiss"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Don't send {item}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Don't send {item} with this message"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Explain Error"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Fix Bug"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Fix: {hint}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Full Diagnostics"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py services/status_summary.py
+msgid "Model"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py apps/intent-bar/ui/window.py
+#: shell/axon-shell/intentbar.js
+msgid "Model: checking…"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "New Chat"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "New Conversation"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "No conversations yet"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py shell/axon-shell/intentbar.js
+#, python-brace-format
+msgid "No installed app called “{app}”."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py services/suggestions.py
+#: shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Open {app}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Opened {app}."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Opens the confirmation card first"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Regenerate"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Review and Run…"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Send"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Send Without It"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Send desktop context to the cloud?"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py services/suggestions.py
+#: shell/axon-shell/ui-logic.js
+msgid "Settings"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Show archived conversations"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Sources: {files}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Stop"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Stop generating (Esc)"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Summarize"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid ""
+"This will remove all messages in the current conversation. This cannot be "
+"undone."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Translate"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py apps/axon-settings/ai_models.py
+msgid "Try again"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Untitled"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Write Code"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "“{title}” will be removed. This can't be undone."
+msgstr ""
+
+#: apps/axon-confirm/main.py
+msgid "Admin rights"
+msgstr ""
+
+#: apps/axon-confirm/main.py
+msgid "Allow Once"
+msgstr ""
+
+#: apps/axon-confirm/main.py
+msgid "Always allow this exact command"
+msgstr ""
+
+#: apps/axon-confirm/main.py
+msgid "Axon AI wants to run this command"
+msgstr ""
+
+#: apps/axon-confirm/main.py
+#, python-brace-format
+msgid "Cancels automatically in {seconds} s"
+msgstr ""
+
+#: apps/axon-confirm/main.py
+msgid "Needed"
+msgstr ""
+
+#: apps/axon-confirm/main.py
+msgid "Run this command?"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "AI Content Summary:"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "AI Search"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Axon Files"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Failed to create file: invalid characters in name"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Failed to create file: name escapes target directory"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Failed to create folder: invalid characters in name"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Failed to create folder: name escapes target directory"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Index state: Database offline."
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Index state: Loading..."
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Indexing background process started..."
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "New File"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "New Folder"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Open File"
+msgstr ""
+
+#: apps/axon-files/ui.py apps/axon-shortcuts/main.py
+msgid "Paste"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Paste failed: Source file no longer exists."
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Places"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Rename failed: invalid characters in name"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Rename failed: path escapes directory"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Search All Folders"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Search files, folders or content..."
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Select a file to preview AI details"
+msgstr ""
+
+#: apps/axon-files/ui.py
+msgid "Sync Index"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid ""
+"A connection lets the installer set up Ollama and download your AI model "
+"automatically. You can also stay offline: AI setup finishes on first boot."
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "AI"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "API key"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "About You"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Add an API key to use hosted models alongside local AI"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Attach a disk of at least 20 GB and rescan"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Axon OS"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Axon OS Is Installed!"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid ""
+"Axon OS is built around its AI. Choose a local model, connect cloud "
+"providers, or both. You can change everything later in Settings."
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Back"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Back to Summary"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Checking connection…"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Cloud AI providers (optional)"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Computer name"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Confirm password"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Connect to the Internet"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Continue"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Default local model"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Deletes everything on the selected disk — simplest and cleanest"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Disk"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Erase disk and install Axon OS"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Finished"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Full name"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "How Do You Want to Install?"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Install"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Install Axon OS"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Install Ollama"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Install alongside another OS (dual boot)"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Installation failed"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Installing"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Internet"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Keep Exploring Live"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid ""
+"Local model runtime — installed automatically (online now, or on first boot)"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Local-first AI · You choose where it runs"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "No Wi-Fi networks found"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "No usable disks found"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Password"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Pick an installation style, then choose the target disk."
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Plug in an ethernet cable, or continue offline"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Ready to Install"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Restart Now"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid ""
+"Review your choices. Nothing is written to disk until you press Install."
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py apps/axon-welcome/ui/welcome.py
+msgid "Set Up Your AI"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Starting installer…"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Summary"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Target disk"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "This creates your account on the installed system."
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Trying keeps everything in memory — nothing touches your disk."
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Use local models, or connect a cloud provider later in Settings."
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Username"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Welcome"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py apps/axon-welcome/ui/welcome.py
+msgid "Welcome to Axon OS"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "Wi-Fi networks"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "↻  Rescan networks"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "●  Connected to the internet"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "●  Offline — AI downloads will run on first boot"
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "⚠ “Erase disk” permanently destroys all data on the chosen disk."
+msgstr ""
+
+#: apps/axon-installer/ui/wizard.py
+msgid "⬡  Local AI with Ollama — recommended"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py apps/axon-settings/main.py
+msgid "AI Models"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "API type"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Add a provider or company endpoint"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Add an OAuth client ID with Edit to enable sign-in."
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Address"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Base URL (e.g. https://api.example.com/v1)"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Client ID"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Client secret (only for desktop-app clients that issue one)"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Company or provider sign-in"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Edit"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Extra model names, comma-separated (optional)"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Issuer URL (e.g. https://login.microsoftonline.com/TENANT/v2.0)"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Key style"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Models"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Name"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "No local models installed yet"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Provider"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Providers"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Reload model lists"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Save"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Scopes, space-separated"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Short ID (used in model names, e.g. work)"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Sign in"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Sign out"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Sign-in available"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Sign-in method"
+msgstr ""
+
+#: apps/axon-settings/ai_models.py
+msgid "Use"
+msgstr ""
+
+#: apps/axon-settings/diagnostics_window.py
+msgid "Copy report"
+msgstr ""
+
+#: apps/axon-settings/diagnostics_window.py
+msgid "Report copied"
+msgstr ""
+
+#: apps/axon-settings/diagnostics_window.py
+msgid "Run again"
+msgstr ""
+
+#: apps/axon-settings/diagnostics_window.py
+msgid "Save report to a file"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Apply"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Applying settings change..."
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Ask the assistant to configure something..."
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Axon Assistant"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Choose AI models and providers"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Diagnostics: check that everything is working"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Max Brightness"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Preferences: Spaces, privacy and command approvals"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "System Assistant"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid ""
+"Tell me what you'd like to adjust. Try: 'toggle dark mode', 'enable night "
+"light', 'turn on bluetooth', or 'enable do not disturb'."
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Toggle Bluetooth"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Toggle DND"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Toggle Mute"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Toggle Natural Scroll"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Toggle Night Light"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Toggle Theme"
+msgstr ""
+
+#: apps/axon-settings/main.py
+msgid "Toggle Wi-Fi"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "AI summary when switching Spaces"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Accent colour"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py services/suggestions.py
+msgid "Appearance"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Ask again for this command"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Axon Preferences"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Axon picks a Space for each new window and asks when it isn't sure"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Blue"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Clear All"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Commands that run without asking"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Context sent to the AI"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid ""
+"Desktop context helps answers fit what you are doing. With a cloud model it "
+"leaves this computer, and Axon asks before the first time."
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Draw the taskbar on a solid surface. High Contrast does this too"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Focus rings, selections and the main action"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+#, python-brace-format
+msgid "Forget rule for {app}"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Forget this rule"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Graphite"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Green"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Move new windows to their Space"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "None"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "None yet. Use “Always do this” on a notification."
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Orange"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Per-app rules"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Pink"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid ""
+"Read-only commands you chose to “Always allow” on the confirmation card. "
+"Everything else always asks."
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Reduce transparency"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Send desktop context"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Sends window titles to the selected model; off shows the window list"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py apps/axon-welcome/ui/welcome.py
+#: services/suggestions.py shell/axon-shell/spaces.js
+#: shell/axon-shell/spaceswitcher.js
+msgid "Spaces"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+#, python-brace-format
+msgid "Stop allowing {command}"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Teal"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid ""
+"These settings need the Axon Shell extension, which isn't installed here."
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+#, python-brace-format
+msgid "{count} saved"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "AI and Assistant"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "AI command bar"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py apps/axon-terminal/main.py
+msgid "Axon Terminal"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Close tab"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Close window"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Copy selection"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Keyboard Shortcuts"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py shell/axon-shell/startmenu.js
+msgid "Lock screen"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Maximize window"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Move window to Space 1–9"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "New tab"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Open Intent Bar (AI command palette)"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Open Start Menu"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Open terminal"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Press Escape to close"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Push-to-talk Voice Input"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Restore / unmaximize"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Screenshot"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Search Spaces and windows, then jump"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Show this shortcut overlay"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Spaces and Navigation"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Switch between Spaces"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Switch between windows"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Switch tabs"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Switch to Space 1–9"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "System"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Terminal AI helper (in Axon Terminal)"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Tile window left"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Tile window right"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Toggle AI Side Panel"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Windows"
+msgstr ""
+
+#: apps/axon-terminal/main.py
+msgid "New tab (Ctrl+Shift+T)"
+msgstr ""
+
+#: apps/axon-terminal/main.py
+msgid "Toggle AI command bar (Ctrl+Shift+A)"
+msgstr ""
+
+#: apps/axon-terminal/main.py
+msgid "⬡ AI"
+msgstr ""
+
+#: apps/axon-terminal/terminal_widget.py
+msgid "Analyzing error…"
+msgstr ""
+
+#: apps/axon-terminal/terminal_widget.py
+msgid "Describe what you want to do…"
+msgstr ""
+
+#: apps/axon-terminal/terminal_widget.py
+msgid "Run"
+msgstr ""
+
+#: apps/axon-terminal/terminal_widget.py
+msgid "⚠ AI unavailable"
+msgstr ""
+
+#: apps/axon-terminal/terminal_widget.py
+msgid "⚠ Could not translate to a command."
+msgstr ""
+
+#: apps/axon-terminal/terminal_widget.py
+msgid "⬡ AI Diagnosis"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "AI Context Settings:"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "AI Panel"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid ""
+"Axon APEX isn't installed on this system yet, so this choice applies once it "
+"is."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Axon recommends local models customized for your hardware."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Choose how Axon APEX opens Windows programs (.exe and .msi files)."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Clipboard Tracking"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Connecting to Axon Brain..."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Continue →"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Customize your default shell and AI context signals."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Download Recommended Model"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Downloading: 0%"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Editor Files Tracking"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Get Started"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Installing Ollama runtime (a few minutes)..."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Intent Bar"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid ""
+"Local models by default. Axon says when a request would leave this computer."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Next →"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Ollama is still being installed in the background..."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Preferences & Privacy"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Preferred terminal shell"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Press Super+A. Your assistant, with your conversations kept."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Press Super+Space. Ask anything in natural language."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Provide open file names from editors (VSCode, Vim, nano) to the AI."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Provide recent bash/zsh/fish commands to the AI context."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Provide recent copy-paste text to the AI context."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Retry Download"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Show on startup:"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Skip"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Start Using Axon"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Starting Ollama..."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Super+1–9. A named workspace for each project."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Terminal History Tracking"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Try Super+Space to open the Intent Bar."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "What Axon Can Do"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "Windows Programs"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "You choose where AI runs"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "You're All Set!"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid ""
+"Your AI-native desktop. AI runs on this computer unless you choose a cloud "
+"model."
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "error: Ollama did not start — try again in a moment"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "error: Ollama install failed — check your internet connection"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "← Back"
+msgstr ""
+
+#: apps/axon-welcome/ui/welcome.py
+msgid "✓ Model Ready"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "Ask anything or type a command..."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
+#, python-brace-format
+msgid "Copied {text}"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+#, python-brace-format
+msgid "Couldn't open {name}."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+#, python-brace-format
+msgid "Couldn't switch to {name}: Axon Shell isn't running."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+#, python-brace-format
+msgid "Enter: {action}"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "GNOME Settings isn't available."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
+#, python-brace-format
+msgid "No matching files for “{query}”."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "Ollama is not running."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+#, python-brace-format
+msgid "Searching your files for “{query}”"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+#, python-brace-format
+msgid "Semantic search unavailable: {error}"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "Start Ollama"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "Starting Ollama… try again in a moment."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "Stop (Esc)"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
+msgid "Stop request"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
+msgid "Suggestions"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+#, python-brace-format
+msgid "Top {count} {kind} matches. Click one to open it:"
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+#, python-brace-format
+msgid "{action} Press Enter to confirm, Esc to cancel."
+msgstr ""
+
+#: services/command_risk.py
+msgid "(nothing named)"
+msgstr ""
+
+#: services/command_risk.py
+msgid "Asks for your password and runs as administrator."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Axon couldn't read this command."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Axon doesn't know what this command changes."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Can create or change files."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Can delete files. This may not be undoable."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Changes files"
+msgstr ""
+
+#: services/command_risk.py
+msgid "Deletes files"
+msgstr ""
+
+#: services/command_risk.py
+#, python-brace-format
+msgid "Deletes: {paths}"
+msgstr ""
+
+#: services/command_risk.py
+msgid "Empty command."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Needs admin rights"
+msgstr ""
+
+#: services/command_risk.py
+msgid "Plays a sound."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Prints text."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Read-only"
+msgstr ""
+
+#: services/command_risk.py
+#, python-brace-format
+msgid "Reads: {paths}"
+msgstr ""
+
+#: services/command_risk.py
+msgid "Runs with administrator rights and can change the whole system."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Shows a desktop notification."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Shows information."
+msgstr ""
+
+#: services/command_risk.py
+msgid "Shows information. Doesn't change anything on your computer."
+msgstr ""
+
+#: services/command_risk.py
+#, python-brace-format
+msgid "Writes: {paths}"
+msgstr ""
+
+#: services/context_settings.py
+msgid "Active app"
+msgstr ""
+
+#: services/context_settings.py
+msgid "Clipboard"
+msgstr ""
+
+#: services/context_settings.py
+msgid "Open files"
+msgstr ""
+
+#: services/context_settings.py
+msgid "Terminal history"
+msgstr ""
+
+#: services/status_summary.py
+msgid "All good"
+msgstr ""
+
+#: services/status_summary.py
+msgid "Axon Brain"
+msgstr ""
+
+#: services/status_summary.py
+msgid "Download"
+msgstr ""
+
+#: services/status_summary.py
+msgid "Needs attention"
+msgstr ""
+
+#: services/status_summary.py
+msgid "Semantic index"
+msgstr ""
+
+#: services/status_summary.py
+msgid "Voice"
+msgstr ""
+
+#: services/status_summary.py
+msgid "indexing…"
+msgstr ""
+
+#: services/status_summary.py
+msgid "no details"
+msgstr ""
+
+#: services/status_summary.py
+msgid "starting"
+msgstr ""
+
+#: services/status_summary.py
+msgid "unknown"
+msgstr ""
+
+#: services/status_summary.py
+#, python-brace-format
+msgid "{files} files (keyword search)"
+msgstr ""
+
+#: services/status_summary.py
+#, python-brace-format
+msgid "{files} files (semantic search)"
+msgstr ""
+
+#: services/status_summary.py
+#, python-brace-format
+msgid "{name}: {pct}% ({done} of {total})"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Accessibility"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/dock.js
+#: shell/axon-shell/ui-logic.js
+msgid "Application"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Applications"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Ask AI"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Ask Axon AI"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Bluetooth"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Calculator"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Commands"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Copy {text}"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Date and time"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Displays"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Enter copies the result"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Files"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Free disk space"
+msgstr ""
+
+#: services/suggestions.py
+msgid "How long the computer has been on"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Keyboard"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Memory in use"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Mouse & Touchpad"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Open Settings → {panel}"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Power"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Privacy"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Run: {command} (asks first)"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Search files for “{query}”"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Search your files for “{query}”"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Semantic search in your files"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Sound"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Switch to {name} Space"
+msgstr ""
+
+#: services/suggestions.py
+msgid "System and kernel version"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Wi-Fi"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Your user name"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "{name} Space"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "(no output)"
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Automatic model"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Axon answered."
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Axon answered: {text}"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Axon couldn't finish."
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Axon couldn't finish: {text}"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Cancelled."
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Cloud"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Command finished."
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Command not run."
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Connecting to Axon Brain…"
+msgstr ""
+
+#: services/ui_logic.py
+msgid ""
+"Couldn't check where the model runs, so assume requests may leave this "
+"computer."
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Done."
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Explain what a symlink is"
+msgstr ""
+
+#: services/ui_logic.py
+msgid "How much disk space is free?"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Local"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Local · {model}"
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Model: unknown"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/intentbar.js
+#: shell/axon-shell/ui-logic.js
+msgid "Not run."
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Open Firefox"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Opening app…"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Opening {app}…"
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Planning action…"
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Ready for confirmation"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Remote"
+msgstr ""
+
+#: services/ui_logic.py
+#, python-brace-format
+msgid "Requests are sent to {provider} over the internet."
+msgstr ""
+
+#: services/ui_logic.py
+#, python-brace-format
+msgid "Requests go to {provider} on another computer on your network."
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Run command"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Run: {command}"
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Runs on this computer. Nothing is sent over the internet."
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Searching local files…"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "Something went wrong."
+msgstr ""
+
+#: services/ui_logic.py
+msgid "Waiting for model…"
+msgstr ""
+
+#: services/ui_logic.py
+msgid "find the PDF I edited yesterday"
+msgstr ""
+
+#: services/ui_logic.py
+#, python-brace-format
+msgid "first words after {time}"
+msgstr ""
+
+#: services/ui_logic.py shell/axon-shell/ui-logic.js
+msgid "… (output shortened)"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Start Menu"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Intent Bar (Search / AI)"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Show Desktop"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "{app} menu"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Pin to Taskbar"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Unpin from Taskbar"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Quit"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "Loading AI shortcuts…"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "AI Brain service offline"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "No shortcuts suggested"
+msgstr ""
+
+#: shell/axon-shell/dock.js
+msgid "AI suggestion failed"
+msgstr ""
+
+#: shell/axon-shell/extension.js
+msgid "Axon AI: offline"
+msgstr ""
+
+#: shell/axon-shell/extension.js
+msgid "Axon AI: online"
+msgstr ""
+
+#: shell/axon-shell/extension.js
+msgid "You said: “{text}”"
+msgstr ""
+
+#: shell/axon-shell/extension.js
+msgid "Reply: {reply}"
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "What do you want to do?"
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "Intent bar input"
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "AI response"
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "Couldn't open {app}."
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "Blocked: command not in allowlist or contains unsafe characters."
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "Couldn't open {path}: {error}"
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "Try"
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "Recent"
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "Enter  Run    Esc  Stop / Close"
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "Unknown action received from AI."
+msgstr ""
+
+#: shell/axon-shell/spaces.js
+msgid "Space"
+msgstr ""
+
+#: shell/axon-shell/spaces.js
+msgid "Space {number} of {total}"
+msgstr ""
+
+#: shell/axon-shell/spaces.js
+msgid "Axon moved this window to its Space."
+msgstr ""
+
+#: shell/axon-shell/spaces.js
+msgid "Undo"
+msgstr ""
+
+#: shell/axon-shell/spaces.js
+msgid "Always do this"
+msgstr ""
+
+#: shell/axon-shell/spaces.js
+msgid "Never move this app"
+msgstr ""
+
+#: shell/axon-shell/spaces.js
+msgid "Move"
+msgstr ""
+
+#: shell/axon-shell/spaces.js
+msgid "Keep here"
+msgstr ""
+
+#: shell/axon-shell/spaceswitcher.js
+msgid "Go to Space"
+msgstr ""
+
+#: shell/axon-shell/spaceswitcher.js
+msgid "Go to a Space or window…"
+msgstr ""
+
+#: shell/axon-shell/spaceswitcher.js
+msgid "Search Spaces and windows"
+msgstr ""
+
+#: shell/axon-shell/spaceswitcher.js
+msgid "No matching Space or window"
+msgstr ""
+
+#: shell/axon-shell/spaceswitcher.js
+msgid "in {name} (Super+{number})"
+msgstr ""
+
+#: shell/axon-shell/startmenu.js
+msgid "Search apps, files or ask AI..."
+msgstr ""
+
+#: shell/axon-shell/startmenu.js
+msgid "Pinned Apps"
+msgstr ""
+
+#: shell/axon-shell/startmenu.js
+msgid "Recent Files"
+msgstr ""
+
+#: shell/axon-shell/startmenu.js
+msgid "Restart"
+msgstr ""
+
+#: shell/axon-shell/startmenu.js
+msgid "Power off"
+msgstr ""
+
+#: shell/axon-shell/startmenu.js
+msgid "No pinned apps. Type to search all apps."
+msgstr ""
+
+#: shell/axon-shell/startmenu.js
+msgid "No recent files found."
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "No windows open."
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "1 window open."
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "{count} windows open."
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "Switched to {name} Space."
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "Window"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "{app} moved to {space}"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "Axon thinks {app} belongs in {space}."
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "this window"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "No windows"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "1 window"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "{count} windows"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "+{count} more"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "default model"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "empty"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "Space {number}: {name}"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "current"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "needs attention"
+msgstr ""

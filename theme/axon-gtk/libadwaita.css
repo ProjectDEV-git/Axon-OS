@@ -1,0 +1,7 @@
+/* libadwaita accent generated from theme/tokens/axon-tokens.json by scripts/gen_tokens.py.
+ * Do not edit: change the tokens or the template and run the script. */
+/* Fills that hold white text in both light and dark style; text colours
+ * stay libadwaita's own, which already differ per style. */
+@define-color accent_bg_color #1d64d8;
+@define-color accent_fg_color #ffffff;
+@define-color destructive_bg_color #c0232a;

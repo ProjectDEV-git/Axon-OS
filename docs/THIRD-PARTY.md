@@ -9,10 +9,12 @@ not shipped.
 | Component | Used for | Source | License |
 |---|---|---|---|
 | Papirus icon theme (`papirus-icon-theme`) | App, folder and system icons | Ubuntu archive | GPL-3.0 |
-| WhiteSur GTK/Shell theme | Window and shell styling | github.com/vinceliuice/WhiteSur-gtk-theme (pinned commit) | MIT |
+| WhiteSur GTK/Shell theme (opt-in, `AXON_WHITESUR=1`) | Optional macOS-style window and shell styling; the default is the Axon theme | github.com/vinceliuice/WhiteSur-gtk-theme (pinned commit) | MIT |
 | Brave (`brave-browser`) | Default web browser | brave-browser-apt-release.s3.brave.com (signing key pinned) | MPL-2.0; "Brave" name and logo are Brave Software trademarks, shipped unmodified |
 | Mission Center (`io.missioncenter.MissionCenter`) | System monitor | Flathub | GPL-3.0 |
 | Ollama | Local AI runtime, installed on first boot | github.com/ollama/ollama (SHA-256 pinned) | MIT |
 | APEX-WIN (`apex-win/`, vendored) | Runs Windows programs with Wine on double-click | github.com/Gaming-RF/APEX-WIN (commit in `apex-win/AXON-VENDOR.md`) | MIT |
 
 The WhiteSur *icon* theme was dropped because it reproduces Apple's app icons.
+Axon's own app icons, wallpapers, boot splash and GRUB art are original and
+generated from scripts in this repository (see docs/design-system.md).

@@ -24,10 +24,10 @@ Presentation {
     // -----------------------------------------------------------------------
     // Shared slide properties
     // -----------------------------------------------------------------------
-    property color bgColor:      "#09090f"
-    property color accentColor:  "#8b5cf6"
-    property color textPrimary:  "#f1f5f9"
-    property color textSecondary:"#94a3b8"
+    property color bgColor:      "#161616"
+    property color accentColor:  "#7db3ff"
+    property color textPrimary:  "#f2f2f2"
+    property color textSecondary:"#b4b4b4"
     property string fontFamily:  "Inter, sans-serif"
 
     // -----------------------------------------------------------------------
@@ -54,8 +54,8 @@ Presentation {
                     radius: parent.radius
                     opacity: 0.15
                     gradient: Gradient {
-                        GradientStop { position: 0.0; color: "#8b5cf6" }
-                        GradientStop { position: 1.0; color: "#06b6d4" }
+                        GradientStop { position: 0.0; color: "#2b6fde" }
+                        GradientStop { position: 1.0; color: "#2b6fde" }
                     }
                 }
             }
@@ -83,7 +83,7 @@ Presentation {
                 }
 
                 Text {
-                    text: "A privacy-first, AI-native Linux desktop"
+                    text: "An AI-native Linux desktop that runs AI on this computer by default"
                     font.family: presentation.fontFamily
                     font.pixelSize: 16
                     color: presentation.textSecondary
@@ -117,7 +117,7 @@ Presentation {
                 opacity: 0.04
                 onPaint: {
                     var ctx = getContext("2d")
-                    ctx.strokeStyle = "#8b5cf6"
+                    ctx.strokeStyle = "#2b6fde"
                     ctx.lineWidth = 1
                     for (var x = 0; x < width; x += 40) {
                         ctx.beginPath()
@@ -142,7 +142,7 @@ Presentation {
                     width: 72
                     height: 72
                     radius: 18
-                    color: "#1a1a2e"
+                    color: "#1e1e1e"
                     border.color: presentation.accentColor
                     border.width: 2
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -220,7 +220,7 @@ Presentation {
                 gradient: Gradient {
                     orientation: Gradient.Vertical
                     GradientStop { position: 0.0; color: "transparent" }
-                    GradientStop { position: 1.0; color: "#8b5cf6" }
+                    GradientStop { position: 1.0; color: "#2b6fde" }
                 }
             }
 
@@ -229,7 +229,7 @@ Presentation {
                 spacing: 20
 
                 Text {
-                    text: "Zero Cloud Required"
+                    text: "No cloud account needed"
                     font.family: presentation.fontFamily
                     font.pixelSize: 36
                     font.weight: Font.Bold
@@ -238,7 +238,7 @@ Presentation {
                 }
 
                 Text {
-                    text: "Everything runs on your hardware.\nYour data stays yours."
+                    text: "Local models run on your hardware.\nCloud providers are optional, and Axon shows when one is used."
                     font.family: presentation.fontFamily
                     font.pixelSize: 16
                     color: presentation.textSecondary
@@ -253,13 +253,13 @@ Presentation {
                     anchors.horizontalCenter: parent.horizontalCenter
 
                     Repeater {
-                        model: ["Private", "Offline-first", "Open Source"]
+                        model: ["Local by default", "Works offline", "Open source"]
 
                         Rectangle {
                             height: 32
                             width: tagLabel.implicitWidth + 24
                             radius: 16
-                            color: "#1a1a2e"
+                            color: "#1e1e1e"
                             border.color: presentation.accentColor
                             border.width: 1
 
@@ -279,7 +279,7 @@ Presentation {
                 Rectangle {
                     width: 200
                     height: 1
-                    color: "#2d2d44"
+                    color: "#282828"
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 

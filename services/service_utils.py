@@ -5,10 +5,12 @@ import functools
 import logging
 import shlex
 import subprocess
+import sys
 import threading
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import dbus
@@ -120,32 +122,66 @@ def safe_exec(command: str, **kwargs: Any) -> subprocess.Popen | None:
     return subprocess.Popen(parts, start_new_session=True, **defaults)
 
 
-def confirm_command(command: str, timeout: int = 60) -> bool:
+def _confirm_card() -> Path | None:
+    """The Axon confirmation card (apps/axon-confirm/main.py), if installed.
+
+    services/ sits next to apps/ in the source tree and the .deb, and next to
+    the app directories for install.sh (~/.local/share/axon-os).
+    """
+    base = Path(__file__).resolve().parent.parent
+    for candidate in (
+        base / "apps" / "axon-confirm" / "main.py",
+        base / "axon-confirm" / "main.py",
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _confirm_argv(command: str, timeout: int, context: str) -> list[str]:
+    """Command line for the confirmation dialog: the Axon card, else zenity.
+
+    The command is passed as its own argument and shown as plain text.
+    """
+    card = _confirm_card()
+    if card is not None:
+        argv = [sys.executable or "python3", str(card), "--command", command]
+        argv += ["--timeout", str(timeout)]
+        return argv + (["--context", context] if context else [])
+    text = f"Axon AI wants to run this command:\n\n{command}\n\nRun it?"
+    return [
+        "zenity",
+        "--question",
+        "--no-markup",
+        "--title=Axon AI",
+        "--text",
+        f"{context}\n\n{text}" if context else text,
+        "--ok-label=Run",
+        "--cancel-label=Cancel",
+        f"--timeout={timeout}",
+    ]
+
+
+def confirm_command(command: str, timeout: int = 60, context: str = "") -> bool:
     """Ask the user to approve a command proposed by the AI.
 
+    Shows the Axon confirmation card (exact command, risk level, effects,
+    Allow once / Cancel), falling back to a zenity question.
     Blocks until the user answers, so call it off the GTK/GLib main thread.
-    Fails closed: no dialog, a timeout or any error counts as "no".
+    Fails closed: no dialog, a timeout, a closed dialog or any error counts
+    as "no". Only exit status 0 means yes.
 
     Args:
         command: The command to show the user.
         timeout: Seconds before the dialog gives up.
+        context: Optional line shown above the command (e.g. what was said).
 
     Returns:
         True only if the user explicitly approved.
     """
     try:
         result = subprocess.run(
-            [
-                "zenity",
-                "--question",
-                "--no-markup",
-                "--title=Axon AI",
-                "--text",
-                f"Axon AI wants to run this command:\n\n{command}\n\nRun it?",
-                "--ok-label=Run",
-                "--cancel-label=Cancel",
-                f"--timeout={timeout}",
-            ],
+            _confirm_argv(command, timeout, context),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=timeout + 5,

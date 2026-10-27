@@ -11,8 +11,10 @@ service; keys and tokens stay in the system keyring and never pass back here.
 from __future__ import annotations
 
 import json
+import sys
 import threading
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import gi
@@ -20,6 +22,23 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk
+
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from axon_gtk_utils import close_on_escape, fit_default_size
+
+# Translations (services/i18n.py); plain English when services/ isn't found
+for _base in (*Path(__file__).resolve().parents, Path("/usr/lib/axon")):
+    if (_base / "services" / "i18n.py").is_file():
+        sys.path.insert(0, str(_base / "services"))
+        break
+try:
+    from i18n import _
+except ImportError:
+
+    def _(text: str) -> str:  # type: ignore[no-redef]
+        return text
+
 
 TIERS = (
     ("general", "Everyday model", "Chat, questions and writing"),
@@ -123,7 +142,8 @@ class ProviderDialog(Adw.Window):
         on_save: Callable[[dict[str, Any]], None],
     ) -> None:
         super().__init__(transient_for=parent, modal=True)
-        self.set_default_size(480, 640)
+        fit_default_size(self, 480, 640)
+        close_on_escape(self)
         self._provider = provider or {}
         self._on_save = on_save
         is_new = provider is None
@@ -132,10 +152,10 @@ class ProviderDialog(Adw.Window):
 
         header = Adw.HeaderBar()
         header.set_show_end_title_buttons(False)
-        cancel = Gtk.Button(label="Cancel")
+        cancel = Gtk.Button(label=_("Cancel"))
         cancel.connect("clicked", lambda _b: self.close())
         header.pack_start(cancel)
-        save = Gtk.Button(label="Save")
+        save = Gtk.Button(label=_("Save"))
         save.add_css_class("suggested-action")
         save.connect("clicked", self._on_save_clicked)
         header.pack_end(save)
@@ -147,32 +167,32 @@ class ProviderDialog(Adw.Window):
         page.set_vexpand(True)
         self.set_content(toolbar)
 
-        basics = Adw.PreferencesGroup(title="Provider")
+        basics = Adw.PreferencesGroup(title=_("Provider"))
         page.add(basics)
-        self._label = Adw.EntryRow(title="Name")
+        self._label = Adw.EntryRow(title=_("Name"))
         self._label.set_text(self._provider.get("label", ""))
         basics.add(self._label)
-        self._id = Adw.EntryRow(title="Short ID (used in model names, e.g. work)")
+        self._id = Adw.EntryRow(title=_("Short ID (used in model names, e.g. work)"))
         self._id.set_text(self._provider.get("id", ""))
         self._id.set_sensitive(is_new)
         basics.add(self._id)
         self._kind = _combo(KIND_LABELS, self._provider.get("kind", "openai"))
-        self._kind.set_title("API type")
+        self._kind.set_title(_("API type"))
         self._kind.set_sensitive(is_new)
         basics.add(self._kind)
-        self._base_url = Adw.EntryRow(title="Base URL (e.g. https://api.example.com/v1)")
+        self._base_url = Adw.EntryRow(title=_("Base URL (e.g. https://api.example.com/v1)"))
         self._base_url.set_text(self._provider.get("base_url", ""))
         basics.add(self._base_url)
         self._auth = _combo(AUTH_LABELS, self._provider.get("auth_header", "bearer"))
-        self._auth.set_title("Key style")
+        self._auth.set_title(_("Key style"))
         basics.add(self._auth)
-        self._models = Adw.EntryRow(title="Extra model names, comma-separated (optional)")
+        self._models = Adw.EntryRow(title=_("Extra model names, comma-separated (optional)"))
         self._models.set_text(", ".join(self._provider.get("models", [])))
         basics.add(self._models)
 
         oauth = self._provider.get("oauth") or {}
         sign_in = Adw.PreferencesGroup(
-            title="Company or provider sign-in",
+            title=_("Company or provider sign-in"),
             description=(
                 "For identity providers that allow it (Microsoft Entra ID, Google, Okta…). "
                 "Your IT team or the provider gives you the issuer and client ID."
@@ -181,22 +201,22 @@ class ProviderDialog(Adw.Window):
         sign_in.set_visible(oauth.get("flow") != "openrouter")
         page.add(sign_in)
         self._flow = _combo(FLOW_LABELS, oauth.get("flow", ""))
-        self._flow.set_title("Sign-in method")
+        self._flow.set_title(_("Sign-in method"))
         self._flow.set_sensitive(not builtin)
         sign_in.add(self._flow)
         self._issuer = Adw.EntryRow(
-            title="Issuer URL (e.g. https://login.microsoftonline.com/TENANT/v2.0)"
+            title=_("Issuer URL (e.g. https://login.microsoftonline.com/TENANT/v2.0)")
         )
         self._issuer.set_text(oauth.get("issuer", ""))
         sign_in.add(self._issuer)
-        self._client_id = Adw.EntryRow(title="Client ID")
+        self._client_id = Adw.EntryRow(title=_("Client ID"))
         self._client_id.set_text(oauth.get("client_id", ""))
         sign_in.add(self._client_id)
         self._client_secret = Adw.PasswordEntryRow(
-            title="Client secret (only for desktop-app clients that issue one)"
+            title=_("Client secret (only for desktop-app clients that issue one)")
         )
         sign_in.add(self._client_secret)
-        self._scopes = Adw.EntryRow(title="Scopes, space-separated")
+        self._scopes = Adw.EntryRow(title=_("Scopes, space-separated"))
         self._scopes.set_text(" ".join(oauth.get("scopes", [])))
         sign_in.add(self._scopes)
 
@@ -247,8 +267,8 @@ class AIModelsWindow(Adw.PreferencesWindow):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.set_title("AI Models")
-        self.set_default_size(640, 720)
+        self.set_title(_("AI Models"))
+        fit_default_size(self, 640, 720)
         self._client = BrainClient()
         self._poll_ids: dict[str, int] = {}
         self._code_dialogs: dict[str, Adw.MessageDialog] = {}
@@ -257,9 +277,9 @@ class AIModelsWindow(Adw.PreferencesWindow):
         self._model_settings: dict[str, str] = {}
         self.connect("close-request", self._on_close)
 
-        self._models_page = Adw.PreferencesPage(title="Models", icon_name="starred-symbolic")
+        self._models_page = Adw.PreferencesPage(title=_("Models"), icon_name="starred-symbolic")
         self._providers_page = Adw.PreferencesPage(
-            title="Providers", icon_name="network-server-symbolic"
+            title=_("Providers"), icon_name="network-server-symbolic"
         )
         self.add(self._models_page)
         self.add(self._providers_page)
@@ -318,7 +338,7 @@ class AIModelsWindow(Adw.PreferencesWindow):
             description=f"Axon Brain did not answer ({error}). Start it with "
             "'systemctl --user start axon-brain' and reopen this window.",
         )
-        retry = Gtk.Button(label="Try again", valign=Gtk.Align.CENTER)
+        retry = Gtk.Button(label=_("Try again"), valign=Gtk.Align.CENTER)
         retry.connect("clicked", lambda _b: self.refresh())
         group.set_header_suffix(retry)
 
@@ -334,7 +354,8 @@ class AIModelsWindow(Adw.PreferencesWindow):
             "provider is set up on the Providers page.",
         )
         reload_btn = Gtk.Button(icon_name="view-refresh-symbolic", valign=Gtk.Align.CENTER)
-        reload_btn.set_tooltip_text("Reload model lists")
+        reload_btn.set_tooltip_text(_("Reload model lists"))
+        reload_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Reload model lists"])
         reload_btn.connect("clicked", lambda _b: self.refresh(refresh_models=True))
         group.set_header_suffix(reload_btn)
 
@@ -383,7 +404,7 @@ class AIModelsWindow(Adw.PreferencesWindow):
         if ollama_down:
             return
         if not self._installed:
-            group.add(Adw.ActionRow(title="No local models installed yet"))
+            group.add(Adw.ActionRow(title=_("No local models installed yet")))
             return
         tier_titles = {f"{tier}_model": title for tier, title, _sub in TIERS}
         for m in sorted(self._installed, key=lambda m: str(m.get("name", ""))):
@@ -397,7 +418,7 @@ class AIModelsWindow(Adw.PreferencesWindow):
                 used.add_css_class("dim-label")
                 row.add_suffix(used)
             if len(roles) < len(TIERS):
-                use = Gtk.Button(label="Use", valign=Gtk.Align.CENTER)
+                use = Gtk.Button(label=_("Use"), valign=Gtk.Align.CENTER)
                 use.set_tooltip_text(f"Use {name} for everything")
                 use.connect("clicked", lambda _b, n=name: self._use_everywhere(n))
                 row.add_suffix(use)
@@ -447,7 +468,8 @@ class AIModelsWindow(Adw.PreferencesWindow):
             description="Keys and sign-ins are stored in your keyring, never in a file.",
         )
         add_btn = Gtk.Button(icon_name="list-add-symbolic", valign=Gtk.Align.CENTER)
-        add_btn.set_tooltip_text("Add a provider or company endpoint")
+        add_btn.set_tooltip_text(_("Add a provider or company endpoint"))
+        add_btn.update_property([Gtk.AccessibleProperty.LABEL], ["Add provider"])
         add_btn.connect("clicked", lambda _b: self._edit_provider(None))
         group.set_header_suffix(add_btn)
         for provider in data.get("providers", []):
@@ -457,7 +479,7 @@ class AIModelsWindow(Adw.PreferencesWindow):
         # provider names, URLs and errors are user/server text, not Pango markup
         row = Adw.ExpanderRow(title=p["label"], subtitle=self._provider_state(p), use_markup=False)
         if p["kind"] == "ollama":
-            info = Adw.ActionRow(title="Address", subtitle=p["base_url"], use_markup=False)
+            info = Adw.ActionRow(title=_("Address"), subtitle=p["base_url"], use_markup=False)
             row.add_row(info)
             return row
 
@@ -475,26 +497,26 @@ class AIModelsWindow(Adw.PreferencesWindow):
                 subtitle=self._flow_hint(p.get("oauth_flow", "")),
             )
             if p.get("signed_in"):
-                btn = Gtk.Button(label="Sign out", valign=Gtk.Align.CENTER)
+                btn = Gtk.Button(label=_("Sign out"), valign=Gtk.Align.CENTER)
                 btn.connect(
                     "clicked", lambda _b: self._simple("SignOut", p["id"], toast="Signed out")
                 )
             else:
-                btn = Gtk.Button(label="Sign in", valign=Gtk.Align.CENTER)
+                btn = Gtk.Button(label=_("Sign in"), valign=Gtk.Align.CENTER)
                 btn.add_css_class("suggested-action")
                 btn.connect("clicked", lambda _b: self._start_sign_in(p))
             sign_row.add_suffix(btn)
             row.add_row(sign_row)
         elif p.get("oauth_flow") and not p.get("oauth_ready"):
             hint = Adw.ActionRow(
-                title="Sign-in available",
-                subtitle="Add an OAuth client ID with Edit to enable sign-in.",
+                title=_("Sign-in available"),
+                subtitle=_("Add an OAuth client ID with Edit to enable sign-in."),
             )
             row.add_row(hint)
 
         actions = Adw.ActionRow(title=p["base_url"], use_markup=False)
         actions.set_title_lines(1)
-        edit = Gtk.Button(label="Edit", valign=Gtk.Align.CENTER)
+        edit = Gtk.Button(label=_("Edit"), valign=Gtk.Align.CENTER)
         edit.connect("clicked", lambda _b: self._edit_provider(p))
         actions.add_suffix(edit)
         remove = Gtk.Button(label="Reset" if p.get("builtin") else "Remove")

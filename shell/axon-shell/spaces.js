@@ -4,29 +4,55 @@ import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import Atk from 'gi://Atk';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { safeCall, createProxyWithRetry, callWithRetry } from './dbus-helpers.js';
+import {
+    NEVER_ROUTE,
+    askMessage,
+    classificationDecision,
+    motionDuration,
+    movedMessage,
+    parseClassification,
+    ruleDecision,
+    ruleKeyFor,
+    spaceAnnouncement,
+    spaceChipState,
+    windowSummary,
+    MOTION,
+    _t,
+} from './ui-logic.js';
+import { destroyNotifications, notify } from './notify.js';
+
+// Animation length; 0 when the user turned animations off (reduced motion)
+const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
 
 // ─── Default space definitions ────────────────────────────────────────────────
 
+// One lightness and saturation family, hues spread so neighbours read apart
 const DEFAULT_SPACES = [
-    { name: 'Code',     color: '#8b5cf6' },
-    { name: 'Web',      color: '#22d3ee' },
-    { name: 'Chat',     color: '#10b981' },
-    { name: 'Files',    color: '#f59e0b' },
-    { name: 'Media',    color: '#ef4444' },
-    { name: 'Work',     color: '#ec4899' },
-    { name: 'Personal', color: '#06b6d4' },
-    { name: 'Terminal', color: '#84cc16' },
-    { name: 'Notes',    color: '#f97316' },
+    { name: 'Code',     color: '#5189d6' },
+    { name: 'Web',      color: '#59cbcf' },
+    { name: 'Chat',     color: '#64c48c' },
+    { name: 'Files',    color: '#dfad49' },
+    { name: 'Media',    color: '#da5a4e' },
+    { name: 'Work',     color: '#cf5994' },
+    { name: 'Personal', color: '#8194a7' },
+    { name: 'Terminal', color: '#8cc464' },
+    { name: 'Notes',    color: '#df8749' },
 ];
+
+// Wait this long before asking the AI for an OSD summary, so quick
+// Super+1..9 presses don't each start a request.
+const OSD_AI_SUMMARY_DELAY_MS = 600;
 
 // ─── SpaceDefinition ──────────────────────────────────────────────────────────
 
 class SpaceDefinition {
-    constructor({ id, name, color = '#a78bfa', appIds = [], lastActive = null }) {
+    constructor({ id, name, color = '#5189d6', appIds = [], lastActive = null }) {
         this.id = id;
         this.name = name;
         this.color = color;
@@ -69,7 +95,7 @@ class SpaceIndicator extends PanelMenu.Button {
 
         this._label = new St.Label({
             style_class: 'axon-space-label',
-            text: 'Space',
+            text: _t('Space'),
             y_align: Clutter.ActorAlign.CENTER,
         });
 
@@ -104,6 +130,11 @@ const BrainInterface = `
       <arg type="s" name="wm_class" direction="in"/>
       <arg type="s" name="space_name" direction="out"/>
     </method>
+    <method name="ClassifyWindowDetailed">
+      <arg type="s" name="title" direction="in"/>
+      <arg type="s" name="wm_class" direction="in"/>
+      <arg type="s" name="result_json" direction="out"/>
+    </method>
     <method name="Generate">
       <arg type="s" name="prompt" direction="in"/>
       <arg type="s" name="context" direction="in"/>
@@ -118,6 +149,126 @@ const BrainInterface = `
 const ContextProxy = Gio.DBusProxy.makeProxyWrapper(ContextInterface);
 const BrainProxy = Gio.DBusProxy.makeProxyWrapper(BrainInterface);
 
+// ─── SpaceStrip ───────────────────────────────────────────────────────────────
+
+const MAX_CHIPS = 9; // Super+1…9
+
+/**
+ * Numbered Space chips for the taskbar: 1–9 like Super+1…9, with a dot for
+ * a Space that has windows, a wider bar for one that wants attention and
+ * distinct active / inactive / empty states (shape as well as colour).
+ */
+export class SpaceStrip {
+    constructor(spacesManager) {
+        this._manager = spacesManager;
+        this._attention = new Set();
+        this._signals = [];
+        this._workspaceSignals = [];
+        this._updateId = 0;
+        this.actor = new St.BoxLayout({
+            style_class: 'axon-space-strip',
+            vertical: false,
+            y_align: Clutter.ActorAlign.CENTER,
+            accessible_name: _t('Spaces'),
+        });
+        this._connect();
+        this.update();
+    }
+
+    _connect() {
+        const wm = global.workspace_manager;
+        const display = global.display;
+        const later = () => this._queueUpdate();
+        this._signals.push([wm, wm.connect('active-workspace-changed', later)]);
+        this._signals.push([wm, wm.connect('notify::n-workspaces', () => {
+            this._connectWorkspaces();
+            later();
+        })]);
+        const flag = (_d, window) => {
+            this._attention.add(window);
+            later();
+        };
+        this._signals.push([display, display.connect('window-demands-attention', flag)]);
+        this._signals.push([display, display.connect('window-marked-urgent', flag)]);
+        this._signals.push([display, display.connect('notify::focus-window', () => {
+            if (display.focus_window && this._attention.delete(display.focus_window))
+                later();
+        })]);
+        this._connectWorkspaces();
+    }
+
+    _connectWorkspaces() {
+        for (const [ws, id] of this._workspaceSignals)
+            ws.disconnect(id);
+        this._workspaceSignals = [];
+        const wm = global.workspace_manager;
+        for (let i = 0; i < Math.min(wm.get_n_workspaces(), MAX_CHIPS); i++) {
+            const ws = wm.get_workspace_by_index(i);
+            for (const signal of ['window-added', 'window-removed'])
+                this._workspaceSignals.push([ws, ws.connect(signal, () => this._queueUpdate())]);
+        }
+    }
+
+    _queueUpdate() {
+        if (this._updateId)
+            return;
+        this._updateId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            this._updateId = 0;
+            this.update();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    update() {
+        if (!this.actor)
+            return;
+        this.actor.destroy_all_children();
+        const wm = global.workspace_manager;
+        const activeIndex = wm.get_active_workspace_index();
+        this._manager.getSpaces().slice(0, MAX_CHIPS).forEach((space, i) => {
+            const ws = i < wm.get_n_workspaces() ? wm.get_workspace_by_index(i) : null;
+            const windows = ws ? ws.list_windows().filter(w => !w.is_skip_taskbar()) : [];
+            const state = spaceChipState(i, space.name, i === activeIndex, windows.length,
+                windows.some(w => this._attention.has(w)));
+            const box = new St.BoxLayout({vertical: true, y_align: Clutter.ActorAlign.CENTER});
+            box.add_child(new St.Label({
+                text: state.number,
+                style_class: 'axon-space-chip-number',
+                x_align: Clutter.ActorAlign.CENTER,
+            }));
+            // Always present so every chip has the same height
+            box.add_child(new St.Widget({
+                style_class: `axon-space-chip-dot axon-space-chip-dot-${state.marker}`,
+                x_align: Clutter.ActorAlign.CENTER,
+            }));
+            const chip = new St.Button({
+                style_class: state.styleClasses.join(' '),
+                child: box,
+                can_focus: true,
+                accessible_name: state.accessibleName,
+            });
+            chip.connect('clicked', () => this._manager.switchToSpace(i));
+            this.actor.add_child(chip);
+        });
+    }
+
+    destroy() {
+        if (this._updateId) {
+            GLib.source_remove(this._updateId);
+            this._updateId = 0;
+        }
+        for (const [obj, id] of [...this._signals, ...this._workspaceSignals])
+            obj.disconnect(id);
+        this._signals = [];
+        this._workspaceSignals = [];
+        this._attention.clear();
+        if (this.actor) {
+            this.actor.destroy();
+            this.actor = null;
+        }
+    }
+}
+
 // ─── SpacesManager ────────────────────────────────────────────────────────────
 
 export default class SpacesManager {
@@ -130,11 +281,22 @@ export default class SpacesManager {
         this._contextProxy = null;
         this._brainProxy = null;
         this._windowCreatedId = null;
+        this._settings = null;
+        // Windows that closed while a classification or notification was pending
+        this._goneWindows = new WeakSet();
+        // Bumped on every Space switch so a slow AI summary for an older
+        // switch is dropped
+        this._osdGeneration = 0;
         this._stateDir = GLib.build_filenamev([GLib.get_home_dir(), '.axon']);
         this._stateFile = GLib.build_filenamev([this._stateDir, 'spaces.json']);
     }
 
     enable() {
+        try {
+            this._settings = this._extension.getSettings();
+        } catch (e) {
+            console.warn('AxonShell: no settings for Spaces, using defaults:', e.message);
+        }
         this._ensureStateDir();
         this._loadState();
 
@@ -179,16 +341,7 @@ export default class SpacesManager {
         // Listen for new windows to auto-classify and route
         this._windowCreatedId = global.display.connect('window-created', (display, window) => {
             try {
-                if (window && this._brainProxy) {
-                    let title = window.get_title() || "None";
-                    let wmClass = window.get_wm_class() || "None";
-                    callWithRetry(this._brainProxy, 'ClassifyWindow', [title, wmClass], (result, error) => {
-                        if (!error && result) {
-                            let [spaceName] = result;
-                            this._routeWindowToSpace(window, spaceName);
-                        }
-                    }, 2);
-                }
+                this._onWindowCreated(window);
             } catch (e) {
                 console.warn('AxonShell: window-created hook error:', e.message);
             }
@@ -211,8 +364,10 @@ export default class SpacesManager {
             this._indicator = null;
         }
 
+        destroyNotifications();
         this._contextProxy = null;
         this._brainProxy = null;
+        this._settings = null;
         this._saveState();
     }
 
@@ -311,93 +466,76 @@ export default class SpacesManager {
                 x_align: Clutter.ActorAlign.CENTER,
                 y_align: Clutter.ActorAlign.CENTER,
                 reactive: false,
-                style: [
-                    'background: rgba(17,17,25,0.92);',
-                    'border: 1px solid rgba(139,92,246,0.35);',
-                    'border-radius: 16px;',
-                    'padding: 20px 36px;',
-                    'min-width: 160px;',
-                ].join(' '),
             });
 
+            // The number stays in the text colour (a Space colour can be too
+            // light to read on the popup); the colour is a swatch under it.
             const numberLabel = new St.Label({
                 style_class: 'axon-space-osd-number',
                 text: String(idx + 1),
                 x_align: Clutter.ActorAlign.CENTER,
-                style: [
-                    `color: ${space.color};`,
-                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                    'font-size: 48px;',
-                    'font-weight: 700;',
-                    'line-height: 1;',
-                ].join(' '),
+            });
+            const swatch = new St.Widget({
+                style_class: 'axon-space-osd-swatch',
+                style: `background-color: ${space.color};`,
+                x_align: Clutter.ActorAlign.CENTER,
             });
 
             const nameLabel = new St.Label({
                 style_class: 'axon-space-osd-name',
                 text: space.name,
                 x_align: Clutter.ActorAlign.CENTER,
-                style: [
-                    'color: #e8e8f4;',
-                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                    'font-size: 18px;',
-                    'font-weight: 600;',
-                    'margin-top: 4px;',
-                ].join(' '),
             });
 
             const indexLabel = new St.Label({
                 style_class: 'axon-space-osd-index',
-                text: `Space ${idx + 1} of 9`,
+                text: _t('Space {number} of {total}', {number: idx + 1, total: this._spaces.length}),
                 x_align: Clutter.ActorAlign.CENTER,
-                style: [
-                    'color: #9090b8;',
-                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                    'font-size: 12px;',
-                    'margin-top: 6px;',
-                ].join(' '),
             });
+
+            // Instant summary from the window list; the AI summary is opt-in
+            let workspace = global.workspace_manager.get_workspace_by_index(idx);
+            let windows = workspace
+                ? workspace.list_windows().filter(w => !w.is_skip_taskbar())
+                : [];
 
             const summaryLabel = new St.Label({
                 style_class: 'axon-space-osd-summary',
-                text: 'Analyzing workspace…',
+                text: windowSummary(windows.map(w => this._appName(w))),
                 x_align: Clutter.ActorAlign.CENTER,
-                style: [
-                    'color: #a78bfa;',
-                    'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                    'font-size: 13px;',
-                    'font-weight: 500;',
-                    'margin-top: 8px;',
-                ].join(' '),
             });
 
             osd.add_child(numberLabel);
+            osd.add_child(swatch);
             osd.add_child(nameLabel);
             osd.add_child(indexLabel);
             osd.add_child(summaryLabel);
 
-            // Fetch workspace windows and generate summary via Brain service
-            let workspace = global.workspace_manager.get_workspace_by_index(idx);
-            let windows = workspace ? workspace.list_windows() : [];
-            if (windows.length === 0) {
-                summaryLabel.set_text('Empty workspace');
-            } else if (this._brainProxy) {
-                let windowList = windows.map(w => {
-                    let title = w.get_title() || 'Unknown';
-                    let wmClass = w.get_wm_class() || 'Unknown';
-                    return `- Title: "${title}" (Class: "${wmClass}")`;
-                }).join('\n');
-                let prompt = `Summarize what the user is doing on this desktop workspace in a single short phrase (under 10 words, e.g., "3 terminals running, 2 browser tabs open"). Do not include markdown, quotes, formatting, or prefixes. Open windows:\n${windowList}`;
-                callWithRetry(this._brainProxy, 'Generate', [prompt, "", "", false], (result, error) => {
-                    if (!error && result) {
-                        let [response] = result;
-                        summaryLabel.set_text(response.trim().replace(/^"|"$/g, ''));
-                    } else {
-                        summaryLabel.set_text('Workspace active');
-                    }
-                }, 2);
-            } else {
-                summaryLabel.set_text('Workspace active');
+            // Screen readers (Orca) present a NOTIFICATION-role object when it
+            // becomes showing, using its accessible name.
+            try {
+                osd.accessible_role = Atk.Role.NOTIFICATION;
+                osd.accessible_name = spaceAnnouncement(space.name, windows.length);
+            } catch (e) {
+                // Accessibility metadata is best effort
+            }
+
+            let osdAlive = true;
+            osd.connect('destroy', () => {
+                osdAlive = false;
+            });
+            const generation = ++this._osdGeneration;
+            const aiSummary = this._settings ? this._settings.get_boolean('osd-ai-summary') : false;
+            if (aiSummary && windows.length > 0 && this._brainProxy) {
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, OSD_AI_SUMMARY_DELAY_MS, () => {
+                    if (!osdAlive || generation !== this._osdGeneration)
+                        return GLib.SOURCE_REMOVE; // user switched again
+                    this._requestAISummary(windows, text => {
+                        if (osdAlive && generation === this._osdGeneration)
+                            summaryLabel.set_text(text);
+                    });
+                    return GLib.SOURCE_REMOVE;
+                });
             }
 
             // Measure after adding children; use a sensible fallback size
@@ -413,9 +551,10 @@ export default class SpacesManager {
             Main.uiGroup.add_child(osd);
 
             // Fade in
+            // Space switches come from the keyboard: appear almost at once
             osd.ease({
                 opacity: 255,
-                duration: 200,
+                duration: motion(MOTION.keyboard),
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
 
@@ -423,8 +562,8 @@ export default class SpacesManager {
             GLib.timeout_add(GLib.PRIORITY_DEFAULT, 3500, () => {
                 osd.ease({
                     opacity: 0,
-                    duration: 300,
-                    mode: Clutter.AnimationMode.EASE_IN_QUAD,
+                    duration: motion(MOTION.enter),
+                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
                     onComplete: () => {
                         try {
                             Main.uiGroup.remove_child(osd);
@@ -439,6 +578,23 @@ export default class SpacesManager {
         } catch (e) {
             console.warn('AxonShell: _showSpaceOSD error:', e.message);
         }
+    }
+
+    // Optional AI phrase for the OSD ("2 terminals and a browser").
+    _requestAISummary(windows, onText) {
+        const windowList = windows.map(w => {
+            const title = w.get_title() || 'Unknown';
+            const wmClass = w.get_wm_class() || 'Unknown';
+            return `- Title: "${title}" (Class: "${wmClass}")`;
+        }).join('\n');
+        const prompt = `Summarize what the user is doing on this desktop workspace in a single short phrase (under 10 words, e.g., "3 terminals running, 2 browser tabs open"). Do not include markdown, quotes, formatting, or prefixes. Open windows:\n${windowList}`;
+        callWithRetry(this._brainProxy, 'Generate', [prompt, '', '', false], (result, error) => {
+            if (!error && result) {
+                const text = String(result[0]).trim().replace(/^"|"$/g, '');
+                if (text && !text.startsWith('[Error'))
+                    onText(text);
+            }
+        }, 1);
     }
 
     // ── Workspace / space operations ───────────────────────────────────────────
@@ -463,20 +619,11 @@ export default class SpacesManager {
 
         this._updateIndicator();
         this._saveState();
+        // The OSD also carries the screen-reader announcement
         this._showSpaceOSD(this._spaces[idx], idx);
-
-        // Announce workspace switch for screen readers
-        try {
-            const atkWindow = Atk.get_default_root();
-            if (atkWindow) {
-                atkWindow.emit_children_changed();
-            }
-        } catch (e) {
-            // Atk announcement not critical
-        }
     }
 
-    createSpace(name, color = '#a78bfa') {
+    createSpace(name, color = '#5189d6') {
         const space = new SpaceDefinition({
             id: GLib.uuid_string_random(),
             name,
@@ -524,25 +671,155 @@ export default class SpacesManager {
         }
     }
 
-    _routeWindowToSpace(window, spaceName) {
-        let targetIdx = -1;
-        for (let i = 0; i < this._spaces.length; i++) {
-            if (this._spaces[i].name.toLowerCase() === spaceName.toLowerCase()) {
-                targetIdx = i;
-                break;
+    // ── Window routing ─────────────────────────────────────────────────────────
+
+    _onWindowCreated(window) {
+        // Only real app windows: no menus, tooltips, dialogs or panels
+        if (!window || window.is_skip_taskbar() ||
+            window.get_window_type() !== Meta.WindowType.NORMAL)
+            return;
+        window.connect('unmanaged', () => this._goneWindows.add(window));
+
+        const enabled = this._settings ? this._settings.get_boolean('auto-route-windows') : true;
+        const key = this._ruleKey(window);
+        const byRule = ruleDecision(enabled, this._getRules(), key);
+        if (byRule) {
+            // A remembered rule is what the user asked for: move without a
+            // notification, once the window has finished being created
+            if (byRule.kind === 'move') {
+                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                    this._routeWindowToSpace(window, byRule.space, {key, quiet: true});
+                    return GLib.SOURCE_REMOVE;
+                });
             }
+            return;
         }
-        
-        if (targetIdx !== -1) {
-            const workspaceManager = global.workspace_manager;
-            while (workspaceManager.get_n_workspaces() <= targetIdx) {
-                workspaceManager.append_new_workspace(false, global.get_current_time());
+        if (!this._brainProxy)
+            return;
+
+        const title = window.get_title() || 'None';
+        const wmClass = window.get_wm_class() || 'None';
+        const onReply = raw => {
+            const {space, confidence} = parseClassification(raw);
+            const decision = classificationDecision(space, confidence,
+                this._spaces.map(s => s.name), this._spaceNameOf(window));
+            if (decision.kind === 'move')
+                this._routeWindowToSpace(window, decision.space, {key});
+            else if (decision.kind === 'ask')
+                this._askToRoute(window, decision.space, key);
+        };
+        callWithRetry(this._brainProxy, 'ClassifyWindowDetailed', [title, wmClass], (result, error) => {
+            if (!error && result) {
+                onReply(result[0]);
+                return;
             }
-            let workspace = workspaceManager.get_workspace_by_index(targetIdx);
-            if (workspace) {
-                window.change_workspace(workspace);
-                console.log(`AxonShell: Auto-routed window "${window.get_title()}" to Space ${spaceName} (Workspace ${targetIdx})`);
-            }
+            // Older Brain without confidence: plain Space name, trusted as before
+            callWithRetry(this._brainProxy, 'ClassifyWindow', [title, wmClass], (res, err) => {
+                if (!err && res)
+                    onReply(res[0]);
+            }, 1);
+        }, 1);
+    }
+
+    _ruleKey(window) {
+        let appId = null;
+        try {
+            const app = Shell.WindowTracker.get_default().get_window_app(window);
+            appId = app ? app.get_id() : null;
+        } catch (_e) {
+            // fall back to WM_CLASS
         }
+        return ruleKeyFor(appId, window.get_wm_class());
+    }
+
+    _appName(window) {
+        try {
+            const app = Shell.WindowTracker.get_default().get_window_app(window);
+            if (app)
+                return app.get_name();
+        } catch (_e) {
+            // fall through
+        }
+        return window.get_wm_class() || window.get_title() || 'Window';
+    }
+
+    _getRules() {
+        if (!this._settings)
+            return {};
+        try {
+            return this._settings.get_value('space-rules').deepUnpack();
+        } catch (_e) {
+            return {};
+        }
+    }
+
+    _setRule(key, value) {
+        if (!key || !this._settings)
+            return;
+        const rules = this._getRules();
+        rules[key] = value;
+        this._settings.set_value('space-rules', new GLib.Variant('a{ss}', rules));
+    }
+
+    _spaceNameOf(window) {
+        const ws = window.get_workspace();
+        const space = ws ? this._spaces[ws.index()] : null;
+        return space ? space.name : null;
+    }
+
+    _indexOfSpace(spaceName) {
+        const wanted = String(spaceName).toLowerCase();
+        return this._spaces.findIndex(s => s.name.toLowerCase() === wanted);
+    }
+
+    // Returns false when the window is gone or the index is invalid.
+    _moveWindowToIndex(window, idx) {
+        if (idx < 0 || !window || this._goneWindows.has(window))
+            return false;
+        const workspaceManager = global.workspace_manager;
+        while (workspaceManager.get_n_workspaces() <= idx)
+            workspaceManager.append_new_workspace(false, global.get_current_time());
+        const workspace = workspaceManager.get_workspace_by_index(idx);
+        if (!workspace)
+            return false;
+        window.change_workspace(workspace);
+        return true;
+    }
+
+    _routeWindowToSpace(window, spaceName, {key = '', quiet = false} = {}) {
+        const targetIdx = this._indexOfSpace(spaceName);
+        if (targetIdx === -1)
+            return;
+        const fromWs = window.get_workspace();
+        const fromIdx = fromWs ? fromWs.index() : -1;
+        if (!this._moveWindowToIndex(window, targetIdx))
+            return;
+        console.log(`AxonShell: Auto-routed window "${window.get_title()}" to Space ${spaceName} (Workspace ${targetIdx})`);
+        if (quiet)
+            return;
+
+        const name = this._appName(window);
+        const undo = () => this._moveWindowToIndex(window, fromIdx);
+        notify(movedMessage(name, spaceName), _t('Axon moved this window to its Space.'), [
+            {label: _t('Undo'), callback: undo},
+            {label: _t('Always do this'), callback: () => this._setRule(key, spaceName)},
+            {label: _t('Never move this app'), callback: () => {
+                undo();
+                this._setRule(key, NEVER_ROUTE);
+            }},
+        ]);
+    }
+
+    // Low confidence: ask instead of moving.
+    _askToRoute(window, spaceName, key) {
+        const move = () => this._routeWindowToSpace(window, spaceName, {key, quiet: true});
+        notify(askMessage(this._appName(window), spaceName), 'Move it there?', [
+            {label: _t('Move'), callback: move},
+            {label: _t('Keep here'), callback: () => {}},
+            {label: _t('Always do this'), callback: () => {
+                this._setRule(key, spaceName);
+                move();
+            }},
+        ]);
     }
 }

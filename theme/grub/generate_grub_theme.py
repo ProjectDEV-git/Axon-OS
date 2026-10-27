@@ -11,13 +11,14 @@ ICONS_DIR = os.path.join(THEME_DIR, "icons")
 os.makedirs(THEME_DIR, exist_ok=True)
 os.makedirs(ICONS_DIR, exist_ok=True)
 
+
 # 1. Generate selection box (24x24 px, rounded corners, electric blue border)
 def draw_rounded_rect(draw, x0, y0, x1, y1, r, fill, outline, width=1):
     # draw corners
-    draw.ellipse([x0, y0, x0 + 2*r, y0 + 2*r], fill=fill, outline=outline, width=width)
-    draw.ellipse([x1 - 2*r, y0, x1, y0 + 2*r], fill=fill, outline=outline, width=width)
-    draw.ellipse([x0, y1 - 2*r, x0 + 2*r, y1], fill=fill, outline=outline, width=width)
-    draw.ellipse([x1 - 2*r, y1 - 2*r, x1, y1], fill=fill, outline=outline, width=width)
+    draw.ellipse([x0, y0, x0 + 2 * r, y0 + 2 * r], fill=fill, outline=outline, width=width)
+    draw.ellipse([x1 - 2 * r, y0, x1, y0 + 2 * r], fill=fill, outline=outline, width=width)
+    draw.ellipse([x0, y1 - 2 * r, x0 + 2 * r, y1], fill=fill, outline=outline, width=width)
+    draw.ellipse([x1 - 2 * r, y1 - 2 * r, x1, y1], fill=fill, outline=outline, width=width)
 
     # fill inner areas
     draw.rectangle([x0 + r, y0, x1 - r, y1], fill=fill)
@@ -29,13 +30,14 @@ def draw_rounded_rect(draw, x0, y0, x1, y1, r, fill, outline, width=1):
     draw.line([x0, y0 + r, x0, y1 - r], fill=outline, width=width)
     draw.line([x1, y0 + r, x1, y1 - r], fill=outline, width=width)
 
+
 # Create 24x24 canvas for selection box
 canvas = Image.new("RGBA", (24, 24), (0, 0, 0, 0))
 draw = ImageDraw.Draw(canvas)
 
 # Fill: dark grey (38, 38, 38, 255)
 # Border: electric blue (59, 130, 246, 255)
-draw_rounded_rect(draw, 0, 0, 23, 23, 5, (38, 38, 38, 255), (59, 130, 246, 255), width=1)
+draw_rounded_rect(draw, 0, 0, 23, 23, 5, (40, 40, 40, 255), (43, 111, 222, 255), width=1)
 
 # Slice selection box into 9-slice images (8x8 px each)
 slices = {
@@ -56,15 +58,16 @@ for name, box in slices.items():
 
 print("Selection slices generated.")
 
+
 # 2. Generate custom menu icons (24x24 px, white, transparent BG)
 def create_icon_canvas():
     return Image.new("RGBA", (24, 24), (0, 0, 0, 0))
 
+
 def draw_hexagon(draw, center, radius, fill=None, outline=None, width=1):
     cx, cy = center
     pts = [
-        (cx + radius * math.cos(i * math.pi / 3),
-         cy + radius * math.sin(i * math.pi / 3))
+        (cx + radius * math.cos(i * math.pi / 3), cy + radius * math.sin(i * math.pi / 3))
         for i in range(6)
     ]
     if fill:
@@ -72,13 +75,15 @@ def draw_hexagon(draw, center, radius, fill=None, outline=None, width=1):
     if outline:
         draw.polygon(pts, outline=outline, width=width)
 
-# A. Axon OS Logo Icon (axonos.png)
-img_axon = create_icon_canvas()
-draw_axon = ImageDraw.Draw(img_axon)
-draw_hexagon(draw_axon, (12, 12), 8, outline=(255, 255, 255, 255), width=2)
-draw_hexagon(draw_axon, (12, 12), 4.5, fill=(255, 255, 255, 255))
-draw_axon.ellipse([10.5, 10.5, 13.5, 13.5], fill=(0, 0, 0, 0)) # transparent inner core hole
-img_axon.save(os.path.join(ICONS_DIR, "axonos.png"))
+
+# A. Axon OS Logo Icon (axonos.png): the shared mark, in white like the other icons
+import sys  # noqa: E402
+
+sys.path.insert(0, os.path.join(HERE, ".."))
+from axon_mark import draw_mark  # noqa: E402
+
+white = (255, 255, 255, 255)
+draw_mark(24, line=white, node=white, fill=0.40).save(os.path.join(ICONS_DIR, "axonos.png"))
 
 # B. Safe Graphics Icon (safe.png)
 img_safe = create_icon_canvas()
@@ -110,7 +115,7 @@ theme_txt_content = """# Axon OS Zorin-Style GRUB Theme
 title-text: ""
 # No desktop-image or terminal-box: GRUB resolves an empty value to the theme
 # directory itself and fails with "bitmap file ... is of unsupported format".
-desktop-color: "#000000"
+desktop-color: "#161616"
 terminal-font: "Sans 12"
 
 + boot_menu {
@@ -120,7 +125,7 @@ terminal-font: "Sans 12"
   height = 50%
   item_font = "DejaVu Sans Regular 14"
   selected_item_font = "DejaVu Sans Bold 14"
-  item_color = "#999999"
+  item_color = "#b4b4b4"
   selected_item_color = "#ffffff"
   item_height = 44
   item_padding = 8
@@ -136,7 +141,7 @@ terminal-font: "Sans 12"
   top = 90%
   width = 60%
   align = "center"
-  color = "#666666"
+  color = "#9a9a9a"
   font = "DejaVu Sans Regular 11"
   text = "[Enter] Boot   [E] Edit   [C] Command Line"
 }

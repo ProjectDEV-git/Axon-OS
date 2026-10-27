@@ -5,7 +5,24 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 
+import * as AppFavorites from 'resource:///org/gnome/shell/ui/appFavorites.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {
+    ENTER_SCALE,
+    MOTION,
+    _t,
+    fitToWorkArea,
+    motionDuration,
+    pinnedStartApps,
+} from './ui-logic.js';
+
+// Animation length; 0 when the user turned animations off (reduced motion)
+const motion = ms => motionDuration(ms, St.Settings.get().enable_animations);
+
+// Preferred Start Menu size; shrunk to fit small work areas
+const MENU_WIDTH = 620;
+const MENU_HEIGHT = 520;
+const FILES_COLUMN_WIDTH = 280;
 
 const StartMenuPopup = GObject.registerClass(
 class StartMenuPopup extends St.BoxLayout {
@@ -16,6 +33,8 @@ class StartMenuPopup extends St.BoxLayout {
             reactive: true,
             visible: false,
         });
+        this._open = false;
+        this._fromKeyboard = false;
 
         this._extension = extension;
         this._spacesManager = spacesManager;
@@ -44,7 +63,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         this._searchEntry = new St.Entry({
             style_class: 'axon-startmenu-search',
-            hint_text: 'Search apps, files or ask AI...',
+            hint_text: _t('Search apps, files or ask AI...'),
             can_focus: true,
             x_expand: true,
         });
@@ -96,7 +115,7 @@ class StartMenuPopup extends St.BoxLayout {
 
         const appsTitle = new St.Label({
             style_class: 'axon-startmenu-section-title',
-            text: 'Pinned Apps',
+            text: _t('Pinned Apps'),
         });
         this._appsColumn.add_child(appsTitle);
 
@@ -110,13 +129,13 @@ class StartMenuPopup extends St.BoxLayout {
         this._filesColumn = new St.BoxLayout({
             style_class: 'axon-startmenu-files-column',
             vertical: true,
-            width: 280,
+            width: FILES_COLUMN_WIDTH,
         });
         contentBox.add_child(this._filesColumn);
 
         const filesTitle = new St.Label({
             style_class: 'axon-startmenu-section-title',
-            text: 'Recommended Files',
+            text: _t('Recent Files'),
         });
         this._filesColumn.add_child(filesTitle);
 
@@ -157,12 +176,14 @@ class StartMenuPopup extends St.BoxLayout {
         const powerBox = new St.BoxLayout({
             style_class: 'axon-startmenu-power-box',
             vertical: false,
-            spacing: 12,
+            style: 'spacing: 12px;',
         });
 
         const lockBtn = new St.Button({
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-lock-screen-symbolic', icon_size: 16 }),
+            can_focus: true,
+            accessible_name: _t('Lock screen'),
         });
         lockBtn.connect('clicked', () => {
             this.hide();
@@ -172,6 +193,8 @@ class StartMenuPopup extends St.BoxLayout {
         const restartBtn = new St.Button({
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-reboot-symbolic', icon_size: 16 }),
+            can_focus: true,
+            accessible_name: _t('Restart'),
         });
         restartBtn.connect('clicked', () => {
             this.hide();
@@ -181,6 +204,8 @@ class StartMenuPopup extends St.BoxLayout {
         const shutdownBtn = new St.Button({
             style_class: 'axon-startmenu-power-btn',
             child: new St.Icon({ icon_name: 'system-shutdown-symbolic', icon_size: 16 }),
+            can_focus: true,
+            accessible_name: _t('Power off'),
         });
         shutdownBtn.connect('clicked', () => {
             this.hide();
@@ -195,8 +220,15 @@ class StartMenuPopup extends St.BoxLayout {
         Main.uiGroup.add_child(this);
     }
 
-    show() {
-        if (this.visible) return;
+    /**
+     * @param {boolean} [fromKeyboard] - opened with the Super key: a 50 ms
+     *   fade only; from the dock button it grows out of the button
+     */
+    show(fromKeyboard = false) {
+        // _open, not visible: visible stays true while closing, and a press
+        // during the exit must reopen from wherever the menu is right now
+        if (this._open) return;
+        this._open = true;
         this.visible = true;
 
         this._searchEntry.set_text('');
@@ -204,11 +236,23 @@ class StartMenuPopup extends St.BoxLayout {
         this._populateRecentFiles();
         this._reposition();
 
-        this.set_opacity(0);
+        // Grows out of the dock button it came from, never from nothing.
+        // A reopen mid-exit eases on from the current opacity and scale.
+        this.set_pivot_point(0.0, 1.0);
+        if (this.opacity === 255)
+            this.set_opacity(0);
+        this._fromKeyboard = fromKeyboard;
+        if (fromKeyboard) {
+            this.set_scale(1.0, 1.0);
+        } else if (this.scale_x === 1.0) {
+            this.set_scale(ENTER_SCALE, ENTER_SCALE);
+        }
         this.ease({
             opacity: 255,
-            duration: 150,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            scale_x: 1.0,
+            scale_y: 1.0,
+            duration: motion(fromKeyboard ? MOTION.keyboard : MOTION.enter),
+            mode: Clutter.AnimationMode.EASE_OUT_QUINT,
         });
 
         this._searchEntry.grab_key_focus();
@@ -224,41 +268,50 @@ class StartMenuPopup extends St.BoxLayout {
     }
 
     hide() {
-        if (!this.visible) return;
-        
+        if (!this._open) return;
+        this._open = false;
+
         if (this._clickDismissId) {
             global.stage.disconnect(this._clickDismissId);
             this._clickDismissId = null;
         }
 
+        // Leaves the way it came, faster than it arrived
+        const scale = this._fromKeyboard ? 1.0 : ENTER_SCALE;
         this.ease({
             opacity: 0,
-            duration: 100,
-            mode: Clutter.AnimationMode.EASE_IN_QUAD,
+            scale_x: scale,
+            scale_y: scale,
+            duration: motion(this._fromKeyboard ? MOTION.keyboard : MOTION.exit),
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
-                this.visible = false;
+                if (!this._open)
+                    this.visible = false;
             },
         });
     }
 
-    toggle() {
-        if (this.visible) {
+    toggle(fromKeyboard = false) {
+        if (this._open) {
             this.hide();
         } else {
-            this.show();
+            this.show(fromKeyboard);
         }
     }
 
     _reposition() {
-        const monitor = Main.layoutManager.primaryMonitor;
+        const monitor = Main.layoutManager.currentMonitor || Main.layoutManager.primaryMonitor;
         if (!monitor) return;
 
-        const [, natW] = this.get_preferred_width(-1);
-        const [, natH] = this.get_preferred_height(natW);
+        // The taskbar sets struts, so the work area already excludes it
+        const workArea = Main.layoutManager.getWorkAreaForMonitor(monitor.index);
+        const {width, height} = fitToWorkArea(MENU_WIDTH, MENU_HEIGHT, workArea);
+        this.set_size(width, height);
+        this._filesColumn.width = Math.min(FILES_COLUMN_WIDTH, Math.floor(width * 0.42));
 
-        // Position bottom-left, floating slightly above taskbar (height ~48px)
-        const x = monitor.x + 20;
-        const y = monitor.y + monitor.height - natH - 60;
+        // Bottom-left of the work area, floating just above the taskbar
+        const x = workArea.x + 20;
+        const y = workArea.y + workArea.height - height - 12;
 
         this.set_position(x, y);
     }
@@ -267,7 +320,7 @@ class StartMenuPopup extends St.BoxLayout {
         // Clear grid
         this._appsGrid.destroy_all_children();
 
-        const defaultApps = [
+        const defaultIds = [
             'axon-welcome.desktop',
             'axon-ai-panel.desktop',
             'axon-terminal.desktop',
@@ -278,16 +331,29 @@ class StartMenuPopup extends St.BoxLayout {
             'io.missioncenter.MissionCenter.desktop',
         ];
 
-        let row = new St.BoxLayout({ vertical: false, spacing: 10 });
+        // The user's favourites (the apps pinned to the taskbar), or Axon's
+        // defaults before they have pinned anything
+        const favoriteIds = AppFavorites.getAppFavorites().getFavorites().map(app => app.get_id());
+        const appIds = pinnedStartApps(favoriteIds, defaultIds,
+            id => this._appSystem.lookup_app(id) !== null);
+        if (appIds.length === 0) {
+            this._appsGrid.add_child(new St.Label({
+                text: _t('No pinned apps. Type to search all apps.'),
+                style_class: 'axon-startmenu-no-files',
+            }));
+            return;
+        }
+
+        let row = new St.BoxLayout({ vertical: false, style: 'spacing: 10px;' });
         this._appsGrid.add_child(row);
         let count = 0;
 
-        defaultApps.forEach(appId => {
+        appIds.forEach(appId => {
             const app = this._appSystem.lookup_app(appId);
             if (!app) return;
 
             if (count > 0 && count % 3 === 0) {
-                row = new St.BoxLayout({ vertical: false, spacing: 10 });
+                row = new St.BoxLayout({ vertical: false, style: 'spacing: 10px;' });
                 this._appsGrid.add_child(row);
             }
 
@@ -343,6 +409,10 @@ class StartMenuPopup extends St.BoxLayout {
             row.add_child(btn);
             count++;
         });
+        // Fill the last row so its apps stay in the grid's columns
+        const columns = 3;
+        for (let i = count % columns; count > 0 && i > 0 && i < columns; i++)
+            row.add_child(new St.Widget({x_expand: true}));
     }
 
     _populateRecentFiles() {
@@ -378,7 +448,7 @@ class StartMenuPopup extends St.BoxLayout {
                                 reactive: true,
                                 x_expand: true,
                             });
-                            const box = new St.BoxLayout({ vertical: false, spacing: 8 });
+                            const box = new St.BoxLayout({ vertical: false, style: 'spacing: 8px;' });
                             const icon = new St.Icon({
                                 icon_name: 'document-open-symbolic',
                                 icon_size: 16,
@@ -423,7 +493,7 @@ class StartMenuPopup extends St.BoxLayout {
 
     _showNoRecentFiles() {
         const label = new St.Label({
-            text: 'No recent files found.',
+            text: _t('No recent files found.'),
             style_class: 'axon-startmenu-no-files',
         });
         this._filesList.add_child(label);
@@ -449,7 +519,7 @@ class StartMenuPopup extends St.BoxLayout {
         this._appsGrid.destroy_all_children();
         const apps = this._installedApps();
         let count = 0;
-        let row = new St.BoxLayout({ vertical: false, spacing: 10 });
+        let row = new St.BoxLayout({ vertical: false, style: 'spacing: 10px;' });
         this._appsGrid.add_child(row);
 
         apps.forEach(app => {
@@ -457,7 +527,7 @@ class StartMenuPopup extends St.BoxLayout {
             const desc = (app.get_description() || '').toLowerCase();
             if (name.includes(text) || desc.includes(text)) {
                 if (count > 0 && count % 3 === 0) {
-                    row = new St.BoxLayout({ vertical: false, spacing: 10 });
+                    row = new St.BoxLayout({ vertical: false, style: 'spacing: 10px;' });
                     this._appsGrid.add_child(row);
                 }
 

@@ -18,6 +18,18 @@ import dbus
 from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository import Adw, GLib, Gtk
 
+# Shared GTK helpers live in apps/shared next to every app
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from axon_gtk_utils import fit_default_size, load_app_css
+
+# services/ sits next to apps/ in the source tree and the .deb, and inside
+# the app directory for install.sh
+for _base in (Path(__file__).resolve().parents[3], Path(__file__).resolve().parents[2]):
+    if (_base / "services").is_dir():
+        sys.path.insert(0, str(_base / "services"))
+        break
+from i18n import _
+
 # Insert axon-brain path so we can run hardware profiler
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "services" / "axon-brain"))
 try:
@@ -36,107 +48,6 @@ OLLAMA_URL = "http://127.0.0.1:11434"
 # ---------------------------------------------------------------------------
 # Embedded CSS
 # ---------------------------------------------------------------------------
-
-_CSS = b"""
-.welcome-window {
-    background-color: #09090f;
-}
-.hero-logo {
-    font-size: 52px;
-    color: #8b5cf6;
-}
-.hero-title {
-    font-size: 32px;
-    font-weight: bold;
-    color: #e8e8f4;
-}
-.hero-subtitle {
-    font-size: 16px;
-    color: #9090b8;
-}
-.chip {
-    background-color: rgba(139, 92, 246, 0.18);
-    color: #8b5cf6;
-    border-radius: 9999px;
-    padding: 4px 14px;
-    font-size: 12px;
-    font-weight: bold;
-    border: 1px solid rgba(139, 92, 246, 0.35);
-}
-.hardware-badge {
-    background-color: rgba(34, 211, 238, 0.1);
-    color: #22d3ee;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 12px;
-    border: 1px solid rgba(34, 211, 238, 0.25);
-    margin-bottom: 12px;
-}
-.model-row {
-    background-color: #111119;
-    border-radius: 12px;
-    border: 1px solid #2a2a42;
-    padding: 12px 16px;
-}
-.model-name {
-    font-size: 14px;
-    font-weight: bold;
-    color: #e8e8f4;
-}
-.model-desc {
-    font-size: 12px;
-    color: #9090b8;
-}
-.model-size {
-    font-size: 11px;
-    color: #50507a;
-}
-.page-title {
-    font-size: 24px;
-    font-weight: bold;
-    color: #e8e8f4;
-}
-.page-subtitle {
-    font-size: 14px;
-    color: #9090b8;
-}
-.nav-btn-next {
-    background-color: #8b5cf6;
-    color: white;
-    border-radius: 9999px;
-    border: none;
-    padding: 10px 28px;
-    font-size: 15px;
-}
-.nav-btn-next:hover {
-    background-color: #7c3aed;
-}
-.nav-btn-back {
-    background-color: transparent;
-    color: #9090b8;
-    border: 1px solid #3a3a58;
-    border-radius: 9999px;
-    padding: 10px 22px;
-}
-.page-indicator-dot {
-    font-size: 8px;
-}
-.check-icon {
-    font-size: 64px;
-    color: #10b981;
-}
-.status-online {
-    color: #10b981;
-    font-size: 12px;
-}
-.status-offline {
-    color: #ef4444;
-    font-size: 12px;
-}
-"""
-
-
-_css_loaded = False
 
 
 def _add_class(widget: Gtk.Widget, css_class: str) -> None:
@@ -177,21 +88,11 @@ class WelcomeWindow(Adw.Window):
         self._run_profiling()
 
         # Window properties
-        self.set_title("Welcome to Axon OS")
-        self.set_default_size(640, 600)
+        self.set_title(_("Welcome to Axon OS"))
+        fit_default_size(self, 640, 600)
         self.set_decorated(True)
 
-        # Load CSS (guard against re-registration)
-        global _css_loaded
-        if not _css_loaded:
-            provider = Gtk.CssProvider()
-            provider.load_from_data(_CSS)
-            Gtk.StyleContext.add_provider_for_display(
-                self.get_display(),
-                provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
-            _css_loaded = True
+        load_app_css(Path(__file__).with_name("welcome.css"), self.get_display())
 
         # Root layout
         root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -301,7 +202,7 @@ class WelcomeWindow(Adw.Window):
         row.set_margin_bottom(16)
         row.set_margin_top(6)
 
-        for _ in self._PAGE_NAMES:
+        for _attempt in self._PAGE_NAMES:
             dot = Gtk.Label(label="●")
             _add_class(dot, "page-indicator-dot")
             dot.set_opacity(0.3)
@@ -312,12 +213,13 @@ class WelcomeWindow(Adw.Window):
 
     def _update_indicator(self) -> None:
         for i, dot in enumerate(self._dot_labels):
-            if i == self._current_page:
-                dot.set_opacity(1.0)
-                dot.set_markup('<span color="#8b5cf6">●</span>')
+            # Current page: full opacity and the accent colour (CSS)
+            current = i == self._current_page
+            dot.set_opacity(1.0 if current else 0.3)
+            if current:
+                dot.add_css_class("page-indicator-dot-current")
             else:
-                dot.set_opacity(0.3)
-                dot.set_markup('<span color="#50507a">●</span>')
+                dot.remove_css_class("page-indicator-dot-current")
 
     def _go_to(self, page_name: str) -> None:
         idx = self._PAGE_NAMES.index(page_name)
@@ -351,27 +253,27 @@ class WelcomeWindow(Adw.Window):
         logo.set_margin_bottom(8)
         page.append(logo)
 
-        title = Gtk.Label(label="Welcome to Axon OS")
+        title = Gtk.Label(label=_("Welcome to Axon OS"))
         _add_class(title, "hero-title")
         title.set_wrap(True)
+        title.set_width_chars(18)
         title.set_justify(Gtk.Justification.CENTER)
         page.append(title)
 
-        subtitle = Gtk.Label(label="Your AI-native desktop. Fully private. Entirely local.")
+        # Honest by default: cloud models are supported, so never promise
+        # "local only"; the AI panel and Intent Bar show where each request runs
+        subtitle = Gtk.Label(
+            label=_(
+                "Your AI-native desktop. AI runs on this computer unless you choose a cloud model."
+            )
+        )
         _add_class(subtitle, "hero-subtitle")
         subtitle.set_wrap(True)
+        # A readable measure: without it the column shrinks to one word per line
+        subtitle.set_width_chars(36)
+        subtitle.set_max_width_chars(48)
         subtitle.set_justify(Gtk.Justification.CENTER)
         page.append(subtitle)
-
-        # Chips
-        chips_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        chips_row.set_halign(Gtk.Align.CENTER)
-        chips_row.set_margin_top(20)
-        for chip_text in ["100% Local AI", "Zero Cloud", "GNOME Native"]:
-            chip = Gtk.Label(label=chip_text)
-            _add_class(chip, "chip")
-            chips_row.append(chip)
-        page.append(chips_row)
 
         # Spacer
         spacer = Gtk.Box()
@@ -379,7 +281,7 @@ class WelcomeWindow(Adw.Window):
         page.append(spacer)
 
         # Get Started button
-        btn = Gtk.Button(label="Get Started")
+        btn = Gtk.Button(label=_("Get Started"))
         _add_class(btn, "nav-btn-next")
         btn.set_halign(Gtk.Align.CENTER)
         btn.connect("clicked", lambda _: self._go_to("setup"))
@@ -399,12 +301,12 @@ class WelcomeWindow(Adw.Window):
         page.set_margin_end(32)
 
         # Title
-        title = Gtk.Label(label="Set Up Your AI")
+        title = Gtk.Label(label=_("Set Up Your AI"))
         _add_class(title, "page-title")
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
-        subtitle = Gtk.Label(label="Axon recommends local models customized for your hardware.")
+        subtitle = Gtk.Label(label=_("Axon recommends local models customized for your hardware."))
         _add_class(subtitle, "page-subtitle")
         subtitle.set_halign(Gtk.Align.START)
         subtitle.set_wrap(True)
@@ -438,7 +340,9 @@ class WelcomeWindow(Adw.Window):
             inner.set_hexpand(True)
 
             tier_lbl = Gtk.Label()
-            tier_lbl.set_markup(f"<b>{tier}</b>: <span color='#8b5cf6'>{model_id}</span>")
+            tier_lbl.set_markup(
+                f"<b>{GLib.markup_escape_text(tier)}</b>: {GLib.markup_escape_text(model_id)}"
+            )
             _add_class(tier_lbl, "model-name")
             tier_lbl.set_halign(Gtk.Align.START)
             inner.append(tier_lbl)
@@ -462,7 +366,7 @@ class WelcomeWindow(Adw.Window):
             page.append(outer)
 
         # Pull button + progress area
-        self._pull_btn = Gtk.Button(label="Download Recommended Model")
+        self._pull_btn = Gtk.Button(label=_("Download Recommended Model"))
         _add_class(self._pull_btn, "nav-btn-next")
         self._pull_btn.set_halign(Gtk.Align.CENTER)
         self._pull_btn.set_margin_top(8)
@@ -474,7 +378,7 @@ class WelcomeWindow(Adw.Window):
         self._progress_box.set_margin_top(6)
 
         self._pull_progress = Gtk.ProgressBar()
-        self._progress_lbl = Gtk.Label(label="Downloading: 0%")
+        self._progress_lbl = Gtk.Label(label=_("Downloading: 0%"))
         _add_class(self._progress_lbl, "model-desc")
         self._progress_lbl.set_halign(Gtk.Align.CENTER)
 
@@ -491,17 +395,17 @@ class WelcomeWindow(Adw.Window):
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         nav.set_halign(Gtk.Align.CENTER)
 
-        back_btn = Gtk.Button(label="← Back")
+        back_btn = Gtk.Button(label=_("← Back"))
         _add_class(back_btn, "nav-btn-back")
         back_btn.connect("clicked", lambda _: self._go_to("welcome"))
         nav.append(back_btn)
 
-        skip_btn = Gtk.Button(label="Skip")
+        skip_btn = Gtk.Button(label=_("Skip"))
         _add_class(skip_btn, "nav-btn-back")
         skip_btn.connect("clicked", lambda _: self._go_to("preferences"))
         nav.append(skip_btn)
 
-        continue_btn = Gtk.Button(label="Continue →")
+        continue_btn = Gtk.Button(label=_("Continue →"))
         _add_class(continue_btn, "nav-btn-next")
         continue_btn.connect("clicked", lambda _: self._go_to("preferences"))
         nav.append(continue_btn)
@@ -538,12 +442,12 @@ class WelcomeWindow(Adw.Window):
         if status == "success" or "verify" in status.lower():
             self._progress_box.set_visible(False)
             self._pull_btn.set_sensitive(True)
-            self._pull_btn.set_label("✓ Model Ready")
+            self._pull_btn.set_label(_("✓ Model Ready"))
             self._downloading_model = None
         elif "error" in status.lower():
             self._progress_box.set_visible(False)
             self._pull_btn.set_sensitive(True)
-            self._pull_btn.set_label("Download Failed — Retry")
+            self._pull_btn.set_label(_("Retry Download"))
             self._downloading_model = None
 
     # ------------------------------------------------------------------
@@ -575,11 +479,11 @@ class WelcomeWindow(Adw.Window):
         while shutil.which("ollama") is None and _firstboot_running():
             if time.monotonic() > deadline:
                 break
-            _status("Ollama is still being installed in the background...")
+            _status(_("Ollama is still being installed in the background..."))
             time.sleep(5)
 
         if shutil.which("ollama") is None:
-            _status("Installing Ollama runtime (a few minutes)...")
+            _status(_("Installing Ollama runtime (a few minutes)..."))
             try:
                 subprocess.run(
                     ["pkexec", OLLAMA_INSTALLER],
@@ -588,17 +492,17 @@ class WelcomeWindow(Adw.Window):
                     check=True,
                 )
             except (OSError, subprocess.CalledProcessError):
-                _status("error: Ollama install failed — check your internet connection")
+                _status(_("error: Ollama install failed — check your internet connection"))
                 return False
 
-        _status("Starting Ollama...")
-        for _ in range(30):
+        _status(_("Starting Ollama..."))
+        for _attempt in range(30):
             try:
                 with urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=2):  # nosec B310
                     return True
             except OSError:
                 time.sleep(2)
-        _status("error: Ollama did not start — try again in a moment")
+        _status(_("error: Ollama did not start — try again in a moment"))
         return False
 
     def _on_pull_clicked(self, _btn: Gtk.Button) -> None:
@@ -607,7 +511,7 @@ class WelcomeWindow(Adw.Window):
         self._pull_btn.set_sensitive(False)
         self._progress_box.set_visible(True)
         self._pull_progress.set_fraction(0.0)
-        self._progress_lbl.set_text("Connecting to Axon Brain...")
+        self._progress_lbl.set_text(_("Connecting to Axon Brain..."))
 
         # Fire D-Bus pull request
         def _trigger_dbus_pull():
@@ -661,12 +565,12 @@ class WelcomeWindow(Adw.Window):
         page.set_margin_end(32)
 
         # Title
-        title = Gtk.Label(label="Preferences & Privacy")
+        title = Gtk.Label(label=_("Preferences & Privacy"))
         _add_class(title, "page-title")
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
-        subtitle = Gtk.Label(label="Customize your default shell and AI context signals.")
+        subtitle = Gtk.Label(label=_("Customize your default shell and AI context signals."))
         _add_class(subtitle, "page-subtitle")
         subtitle.set_halign(Gtk.Align.START)
         subtitle.set_wrap(True)
@@ -674,7 +578,7 @@ class WelcomeWindow(Adw.Window):
 
         # Shell Selection Frame
         shell_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        shell_lbl = Gtk.Label(label="Preferred Terminal Shell:")
+        shell_lbl = Gtk.Label(label=_("Preferred terminal shell"))
         shell_lbl.set_halign(Gtk.Align.START)
         _add_class(shell_lbl, "model-name")
         shell_box.append(shell_lbl)
@@ -742,7 +646,7 @@ class WelcomeWindow(Adw.Window):
 
         # Context Privacy Options Frame
         privacy_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        privacy_lbl = Gtk.Label(label="AI Context Settings:")
+        privacy_lbl = Gtk.Label(label=_("AI Context Settings:"))
         privacy_lbl.set_halign(Gtk.Align.START)
         _add_class(privacy_lbl, "model-name")
         privacy_box.append(privacy_lbl)
@@ -766,10 +670,10 @@ class WelcomeWindow(Adw.Window):
         _add_class(clip_row, "model-row")
         clip_lbl_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         clip_lbl_box.set_hexpand(True)
-        clip_t = Gtk.Label(label="Clipboard Tracking")
+        clip_t = Gtk.Label(label=_("Clipboard Tracking"))
         clip_t.set_halign(Gtk.Align.START)
         _add_class(clip_t, "model-name")
-        clip_d = Gtk.Label(label="Provide recent copy-paste text to the AI context.")
+        clip_d = Gtk.Label(label=_("Provide recent copy-paste text to the AI context."))
         clip_d.set_halign(Gtk.Align.START)
         _add_class(clip_d, "model-desc")
         clip_lbl_box.append(clip_t)
@@ -790,10 +694,10 @@ class WelcomeWindow(Adw.Window):
         _add_class(term_row, "model-row")
         term_lbl_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         term_lbl_box.set_hexpand(True)
-        term_t = Gtk.Label(label="Terminal History Tracking")
+        term_t = Gtk.Label(label=_("Terminal History Tracking"))
         term_t.set_halign(Gtk.Align.START)
         _add_class(term_t, "model-name")
-        term_d = Gtk.Label(label="Provide recent bash/zsh/fish commands to the AI context.")
+        term_d = Gtk.Label(label=_("Provide recent bash/zsh/fish commands to the AI context."))
         term_d.set_halign(Gtk.Align.START)
         _add_class(term_d, "model-desc")
         term_lbl_box.append(term_t)
@@ -814,11 +718,11 @@ class WelcomeWindow(Adw.Window):
         _add_class(files_row, "model-row")
         files_lbl_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         files_lbl_box.set_hexpand(True)
-        files_t = Gtk.Label(label="Editor Files Tracking")
+        files_t = Gtk.Label(label=_("Editor Files Tracking"))
         files_t.set_halign(Gtk.Align.START)
         _add_class(files_t, "model-name")
         files_d = Gtk.Label(
-            label="Provide open file names from editors (VSCode, Vim, nano) to the AI."
+            label=_("Provide open file names from editors (VSCode, Vim, nano) to the AI.")
         )
         files_d.set_halign(Gtk.Align.START)
         _add_class(files_d, "model-desc")
@@ -846,12 +750,12 @@ class WelcomeWindow(Adw.Window):
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         nav.set_halign(Gtk.Align.CENTER)
 
-        back_btn = Gtk.Button(label="← Back")
+        back_btn = Gtk.Button(label=_("← Back"))
         _add_class(back_btn, "nav-btn-back")
         back_btn.connect("clicked", lambda _: self._go_to("setup"))
         nav.append(back_btn)
 
-        continue_btn = Gtk.Button(label="Continue →")
+        continue_btn = Gtk.Button(label=_("Continue →"))
         _add_class(continue_btn, "nav-btn-next")
         continue_btn.connect("clicked", lambda _: self._go_to("windows"))
         nav.append(continue_btn)
@@ -911,13 +815,13 @@ class WelcomeWindow(Adw.Window):
         page.set_margin_start(32)
         page.set_margin_end(32)
 
-        title = Gtk.Label(label="Windows Programs")
+        title = Gtk.Label(label=_("Windows Programs"))
         _add_class(title, "page-title")
         title.set_halign(Gtk.Align.START)
         page.append(title)
 
         subtitle = Gtk.Label(
-            label="Choose how Axon APEX opens Windows programs (.exe and .msi files)."
+            label=_("Choose how Axon APEX opens Windows programs (.exe and .msi files).")
         )
         _add_class(subtitle, "page-subtitle")
         subtitle.set_halign(Gtk.Align.START)
@@ -966,7 +870,9 @@ class WelcomeWindow(Adw.Window):
         self._windows_status.set_xalign(0)
         if not windows_mode.apex_installed():
             self._windows_status.set_label(
-                "Axon APEX isn't installed on this system yet, so this choice applies once it is."
+                _(
+                    "Axon APEX isn't installed on this system yet, so this choice applies once it is."
+                )
             )
         page.append(self._windows_status)
 
@@ -977,12 +883,12 @@ class WelcomeWindow(Adw.Window):
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         nav.set_halign(Gtk.Align.CENTER)
 
-        back_btn = Gtk.Button(label="← Back")
+        back_btn = Gtk.Button(label=_("← Back"))
         _add_class(back_btn, "nav-btn-back")
         back_btn.connect("clicked", lambda _: self._go_to("preferences"))
         nav.append(back_btn)
 
-        continue_btn = Gtk.Button(label="Continue →")
+        continue_btn = Gtk.Button(label=_("Continue →"))
         _add_class(continue_btn, "nav-btn-next")
         continue_btn.connect("clicked", lambda _: self._go_to("features"))
         nav.append(continue_btn)
@@ -1011,7 +917,7 @@ class WelcomeWindow(Adw.Window):
         page.set_margin_start(32)
         page.set_margin_end(32)
 
-        title = Gtk.Label(label="What Axon Can Do")
+        title = Gtk.Label(label=_("What Axon Can Do"))
         _add_class(title, "page-title")
         title.set_halign(Gtk.Align.START)
         page.append(title)
@@ -1022,10 +928,26 @@ class WelcomeWindow(Adw.Window):
         grid.set_margin_top(8)
 
         feature_data = [
-            ("⬡", "Intent Bar", "Press Super+Space. Ask anything in natural language."),
-            ("🤖", "AI Panel", "Press Super+A. Your persistent AI assistant."),
-            ("🏠", "Spaces", "Super+1-9. Named workspaces for each project."),
-            ("🔒", "Private", "All AI runs locally. Zero data leaves your machine."),
+            (
+                "axon-intent-bar-symbolic",
+                _("Intent Bar"),
+                _("Press Super+Space. Ask anything in natural language."),
+            ),
+            (
+                "axon-ai-panel-symbolic",
+                _("AI Panel"),
+                _("Press Super+A. Your assistant, with your conversations kept."),
+            ),
+            (
+                "view-grid-symbolic",
+                _("Spaces"),
+                _("Super+1–9. A named workspace for each project."),
+            ),
+            (
+                "security-high-symbolic",
+                _("You choose where AI runs"),
+                _("Local models by default. Axon says when a request would leave this computer."),
+            ),
         ]
 
         positions = [(0, 0), (1, 0), (0, 1), (1, 1)]
@@ -1043,12 +965,12 @@ class WelcomeWindow(Adw.Window):
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         nav.set_halign(Gtk.Align.CENTER)
 
-        back_btn = Gtk.Button(label="← Back")
+        back_btn = Gtk.Button(label=_("← Back"))
         _add_class(back_btn, "nav-btn-back")
         back_btn.connect("clicked", lambda _: self._go_to("windows"))
         nav.append(back_btn)
 
-        next_btn = Gtk.Button(label="Next →")
+        next_btn = Gtk.Button(label=_("Next →"))
         _add_class(next_btn, "nav-btn-next")
         next_btn.connect("clicked", lambda _: self._go_to("ready"))
         nav.append(next_btn)
@@ -1062,7 +984,8 @@ class WelcomeWindow(Adw.Window):
         card.set_hexpand(True)
         _add_class(card, "feature-card")
 
-        icon_lbl = Gtk.Label(label=icon)
+        icon_lbl = Gtk.Image.new_from_icon_name(icon)
+        icon_lbl.set_pixel_size(24)
         _add_class(icon_lbl, "feature-icon")
         icon_lbl.set_halign(Gtk.Align.START)
         card.append(icon_lbl)
@@ -1099,12 +1022,12 @@ class WelcomeWindow(Adw.Window):
         check_lbl.set_margin_bottom(4)
         page.append(check_lbl)
 
-        title = Gtk.Label(label="You're All Set!")
+        title = Gtk.Label(label=_("You're All Set!"))
         _add_class(title, "page-title")
         title.set_justify(Gtk.Justification.CENTER)
         page.append(title)
 
-        subtitle = Gtk.Label(label="Try Super+Space to open the Intent Bar.")
+        subtitle = Gtk.Label(label=_("Try Super+Space to open the Intent Bar."))
         _add_class(subtitle, "page-subtitle")
         subtitle.set_justify(Gtk.Justification.CENTER)
         subtitle.set_wrap(True)
@@ -1115,7 +1038,7 @@ class WelcomeWindow(Adw.Window):
         toggle_row.set_halign(Gtk.Align.CENTER)
         toggle_row.set_margin_top(16)
 
-        toggle_lbl = Gtk.Label(label="Show on startup:")
+        toggle_lbl = Gtk.Label(label=_("Show on startup:"))
         _add_class(toggle_lbl, "page-subtitle")
         toggle_row.append(toggle_lbl)
 
@@ -1152,12 +1075,12 @@ class WelcomeWindow(Adw.Window):
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         nav.set_halign(Gtk.Align.CENTER)
 
-        back_btn = Gtk.Button(label="← Back")
+        back_btn = Gtk.Button(label=_("← Back"))
         _add_class(back_btn, "nav-btn-back")
         back_btn.connect("clicked", lambda _: self._go_to("features"))
         nav.append(back_btn)
 
-        start_btn = Gtk.Button(label="Start Using Axon")
+        start_btn = Gtk.Button(label=_("Start Using Axon"))
         _add_class(start_btn, "nav-btn-next")
         start_btn.connect("clicked", lambda _: self.close())
         nav.append(start_btn)

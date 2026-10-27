@@ -42,19 +42,19 @@ slideshowAPI: 2
 # -----------------------------------------------------------------------
 style:
     # Sidebar background
-    sidebarBackground:  "#09090f"
+    sidebarBackground:  "#161616"
     # Sidebar text
-    sidebarText:        "#e2e8f0"
+    sidebarText:        "#f2f2f2"
     # Sidebar menu highlight background
-    sidebarTextSelect:  "#8b5cf6"
+    sidebarTextSelect:  "#2b6fde"
     # Sidebar menu selected text
     sidebarTextHighlight: "#ffffff"
 
     # Main window background
-    windowBackground:   "#0f0f17"
+    windowBackground:   "#1e1e1e"
 
-    # Accent / highlight color (violet)
-    highlightColor:     "#8b5cf6"
+    # Accent / highlight color (the Axon blue)
+    highlightColor:     "#2b6fde"
 
     # Fonts
     fontFamily:         "Inter"

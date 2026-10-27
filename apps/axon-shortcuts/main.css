@@ -1,64 +1,55 @@
-/* Axon Shortcuts Overlay — main.css */
-@import url("../shared/axon-design-tokens.css");
+/* Axon Shortcuts overlay. Colours come from the design tokens (@axon_*),
+ * loaded by axon_gtk_utils.load_app_css; see theme/tokens/axon-tokens.json. */
 
-/* Window background */
 window {
-    background-color: @bg_primary;
+    background-color: @axon_bg;
 }
 
-/* Header */
 .shortcuts-header {
-    background-color: rgba(15, 15, 20, 0.95);
-    border-bottom: 1px solid rgba(124, 58, 237, 0.3);
+    background-color: @axon_bg;
+    border-bottom: 1px solid @axon_border;
 }
 
-/* Title area */
 .title-icon {
-    font-size: 28px;
+    margin-right: 4px;
 }
 
 .overlay-title {
-    font-family: "Inter", "Cantarell", sans-serif;
-    font-size: 22px;
+    font-size: 18pt;
     font-weight: 700;
-    color: @text_primary;
-    letter-spacing: 0.5px;
+    letter-spacing: -0.4px;
+    color: @axon_fg;
 }
 
 .overlay-subtitle {
-    font-family: "Inter", "Cantarell", sans-serif;
-    font-size: 12px;
-    color: rgba(148, 163, 184, 0.7);
-    font-style: italic;
+    font-size: 9pt;
+    color: @axon_fg_secondary;
 }
 
 /* Shortcut group cards */
 .shortcut-card {
-    background-color: rgba(30, 30, 45, 0.8);
-    border: 1px solid rgba(124, 58, 237, 0.2);
-    border-radius: 12px;
-    transition: border-color 200ms ease;
+    background-color: @axon_surface;
+    border: 1px solid @axon_border;
+    border-radius: 8px;
+    transition: border-color 150ms ease;
 }
 
 .shortcut-card:hover {
-    border-color: rgba(124, 58, 237, 0.5);
+    border-color: @axon_border_strong;
 }
 
-/* Group header */
 .group-icon {
-    font-size: 18px;
+    color: @axon_fg_secondary;
 }
 
 .group-title {
-    font-family: "Inter", "Cantarell", sans-serif;
-    font-size: 15px;
+    font-size: 11.25pt;
     font-weight: 600;
-    color: @accent;
-    letter-spacing: 0.3px;
+    color: @axon_fg;
 }
 
 .group-separator {
-    background-color: rgba(124, 58, 237, 0.15);
+    background-color: @axon_border;
     min-height: 1px;
     margin-top: 4px;
     margin-bottom: 4px;
@@ -66,34 +57,17 @@ window {
 
 /* Key badges */
 .key-badge {
-    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-    font-size: 12px;
+    font-family: monospace;
+    font-size: 9pt;
     font-weight: 600;
-    color: @text_primary;
-    background-color: rgba(124, 58, 237, 0.15);
-    border: 1px solid rgba(124, 58, 237, 0.3);
+    color: @axon_fg;
+    background-color: @axon_surface_raised;
+    border: 1px solid @axon_border_strong;
     border-radius: 6px;
     padding: 4px 10px;
 }
 
-/* Key descriptions */
 .key-desc {
-    font-family: "Inter", "Cantarell", sans-serif;
-    font-size: 13px;
-    color: rgba(203, 213, 225, 0.85);
-}
-
-/* Scrollbar styling */
-scrollbar slider {
-    background-color: rgba(124, 58, 237, 0.3);
-    border-radius: 4px;
-    min-width: 6px;
-}
-
-scrollbar slider:hover {
-    background-color: rgba(124, 58, 237, 0.5);
-}
-
-scrollbar trough {
-    background-color: transparent;
+    font-size: 9.75pt;
+    color: @axon_fg_secondary;
 }

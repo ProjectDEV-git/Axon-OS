@@ -13,7 +13,10 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import SpacesManager from './spaces.js';
 import IntentBar from './intentbar.js';
 import DockManager from './dock.js';
+import SpaceSwitcher from './spaceswitcher.js';
+import AccentManager from './accent.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
+import {_t, setTranslator} from './ui-logic.js';
 
 // ─── AxonAIIndicator ──────────────────────────────────────────────────────────
 
@@ -43,27 +46,19 @@ class AxonAIIndicator extends PanelMenu.Button {
             vertical: false,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.CENTER,
-            style: 'margin: 0 10px;',
         });
 
         this._iconLabel = new St.Label({
             style_class: 'axon-ai-indicator-icon',
             text: '⬡ AI',
             y_align: Clutter.ActorAlign.CENTER,
-            style: [
-                'font-family: "Inter", "Ubuntu", system-ui, sans-serif;',
-                'font-size: 12px;',
-                'font-weight: 600;',
-                'color: #8b5cf6;',
-                'margin-right: 5px;',
-            ].join(' '),
         });
 
+        // Colour plus the accessible name: status never relies on colour alone
         this._statusDot = new St.Label({
-            style_class: 'axon-ai-indicator-dot',
-            text: '●',
+            style_class: 'axon-ai-indicator-dot axon-status-error',
+            text: '○',
             y_align: Clutter.ActorAlign.CENTER,
-            style: 'color: #ef4444; font-size: 10px;',
         });
 
         box.add_child(this._iconLabel);
@@ -119,8 +114,16 @@ class AxonAIIndicator extends PanelMenu.Button {
     }
 
     _setDotColor(online) {
-        const color = online ? '#10b981' : '#ef4444';
-        this._statusDot.set_style(`color: ${color}; font-size: 10px;`);
+        // Filled dot when online, hollow when offline: shape as well as colour
+        this._statusDot.set_text(online ? '●' : '○');
+        if (online) {
+            this._statusDot.remove_style_class_name('axon-status-error');
+            this._statusDot.add_style_class_name('axon-status-ok');
+        } else {
+            this._statusDot.remove_style_class_name('axon-status-ok');
+            this._statusDot.add_style_class_name('axon-status-error');
+        }
+        this.accessible_name = online ? _t('Axon AI: online') : _t('Axon AI: offline');
     }
 
     destroy() {
@@ -162,11 +165,28 @@ const BrainGenerateInterface = `
     <method name="GetStatus">
       <arg type="s" name="status_json" direction="out"/>
     </method>
+    <method name="ListProviders">
+      <arg type="s" name="providers_json" direction="out"/>
+    </method>
+    <method name="GetModelSettings">
+      <arg type="s" name="settings_json" direction="out"/>
+    </method>
   </interface>
 </node>
 `;
 
 const BrainFullProxy = Gio.DBusProxy.makeProxyWrapper(BrainGenerateInterface);
+
+// Lets the GTK apps (e.g. the GTK Intent Bar) switch Spaces.
+const AxonShellInterface = `
+<node>
+  <interface name="org.axonos.Shell">
+    <method name="SwitchToSpace">
+      <arg type="i" name="index" direction="in"/>
+    </method>
+  </interface>
+</node>
+`;
 
 export default class AxonShellExtension extends Extension {
     constructor(metadata) {
@@ -175,6 +195,7 @@ export default class AxonShellExtension extends Extension {
         this._intentBar     = null;
         this._aiIndicator   = null;
         this._dockManager   = null;
+        this._spaceSwitcher = null;
         this._keybindingIds = [];
         this._contextProxy  = null;
         this._brainProxy    = null;
@@ -182,9 +203,13 @@ export default class AxonShellExtension extends Extension {
         this._voiceOverlayProc = null;
         this._focusWindowId = null;
         this._overlayKeyId  = null;
+        this._dbusImpl      = null;
+        this._busNameId     = 0;
     }
 
     enable() {
+        // Shell strings go through the extension's gettext (domain axon-os).
+        setTranslator(msgid => this.gettext(msgid));
         try {
             // Async init: synchronous D-Bus proxy constructors block the whole
             // compositor while activation spawns the Python services, freezing
@@ -221,6 +246,13 @@ export default class AxonShellExtension extends Extension {
             this._intentBar = new IntentBar(this, this._spacesManager);
             this._intentBar.enable();
 
+            this._spaceSwitcher = new SpaceSwitcher(this._spacesManager);
+            this._spaceSwitcher.enable();
+
+            // The accent colour chosen in Axon Preferences
+            this._accent = new AccentManager(this);
+            this._accent.enable();
+
             this._dockManager = new DockManager(this, this._intentBar);
             this._dockManager.enable();
 
@@ -234,11 +266,12 @@ export default class AxonShellExtension extends Extension {
             }
 
             this._registerKeybindings();
+            this._exportDBus();
 
             // 1. Intercept the Super / Windows Key press to toggle Start Menu
             this._overlayKeyId = global.display.connect('overlay-key', () => {
                 if (this._dockManager && this._dockManager._startMenuPopup) {
-                    this._dockManager._startMenuPopup.toggle();
+                    this._dockManager._startMenuPopup.toggle(true);
                 }
             });
 
@@ -260,12 +293,41 @@ export default class AxonShellExtension extends Extension {
             if (Main.panel) {
                 Main.panel.hide();
             }
+
+            // The Axon taskbar replaces the Overview dash, and the session
+            // starts on the desktop rather than in the Overview
+            Main.overview.dash?.hide();
+            if (Main.layoutManager._startingUp) {
+                if ('startInOverview' in Main.layoutManager)
+                    Main.layoutManager.startInOverview = false;
+                this._startupId = Main.layoutManager.connect('startup-complete', () => {
+                    Main.overview.hide();
+                    Main.layoutManager.disconnect(this._startupId);
+                    this._startupId = 0;
+                });
+            }
         } catch (e) {
             console.error('AxonShell: enable() failed, restoring panel:', e);
             // Restore the panel so the desktop doesn't go black
             if (Main.panel) {
                 Main.panel.show();
             }
+        }
+    }
+
+    _exportDBus() {
+        try {
+            this._dbusImpl = Gio.DBusExportedObject.wrapJSObject(AxonShellInterface, {
+                SwitchToSpace: index => {
+                    if (this._spacesManager && Number.isInteger(index))
+                        this._spacesManager.switchToSpace(index);
+                },
+            });
+            this._dbusImpl.export(Gio.DBus.session, '/org/axonos/Shell');
+            this._busNameId = Gio.bus_own_name_on_connection(
+                Gio.DBus.session, 'org.axonos.Shell', Gio.BusNameOwnerFlags.NONE, null, null);
+        } catch (e) {
+            console.warn('AxonShell: could not export org.axonos.Shell:', e.message);
         }
     }
 
@@ -306,6 +368,22 @@ export default class AxonShellExtension extends Extension {
             this._keybindingIds.push('toggle-intent-bar');
         } catch (e) {
             console.warn('AxonShell: could not bind toggle-intent-bar:', e.message);
+        }
+
+        // Super+J → Space quick switcher
+        try {
+            Main.wm.addKeybinding(
+                'open-space-switcher',
+                settings,
+                Meta.KeyBindingFlags.NONE,
+                Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+                () => {
+                    this._spaceSwitcher.toggle();
+                }
+            );
+            this._keybindingIds.push('open-space-switcher');
+        } catch (e) {
+            console.warn('AxonShell: could not bind open-space-switcher:', e.message);
         }
 
         // Super+A → toggle AI panel
@@ -443,7 +521,7 @@ export default class AxonShellExtension extends Extension {
         try {
             let action = JSON.parse(intentJson);
             if (action && action.action === 'run_command' && action.command) {
-                confirmAndRun(action.command, `You said: "${transcription}"`);
+                confirmAndRun(action.command, _t('You said: “{text}”', {text: transcription}));
             } else if (action && action.action === 'open_app' && action.app) {
                 launchAppById(String(action.app));
             } else {
@@ -455,7 +533,7 @@ export default class AxonShellExtension extends Extension {
                         '--no-markup',
                         '--title=Axon Assistant',
                         '--text',
-                        `You said: "${transcription}"\n\nReply: ${intentJson}`,
+                        `${_t('You said: “{text}”', {text: transcription})}\n\n${_t('Reply: {reply}', {reply: intentJson})}`,
                         '--no-wrap',
                     ],
                     flags: Gio.SubprocessFlags.NONE,
@@ -491,12 +569,26 @@ export default class AxonShellExtension extends Extension {
     }
 
     disable() {
+        setTranslator(null);
+        if (this._startupId) {
+            Main.layoutManager.disconnect(this._startupId);
+            this._startupId = 0;
+        }
+        Main.overview.dash?.show();
         try {
             if (this._voiceOverlayProc) {
                 this._voiceOverlayProc.force_exit();
                 this._voiceOverlayProc = null;
             }
             this._voiceProxy = null;
+            if (this._busNameId) {
+                Gio.bus_unown_name(this._busNameId);
+                this._busNameId = 0;
+            }
+            if (this._dbusImpl) {
+                this._dbusImpl.unexport();
+                this._dbusImpl = null;
+            }
             // Remove Super key overlay listener
             if (this._overlayKeyId) {
                 global.display.disconnect(this._overlayKeyId);
@@ -525,6 +617,15 @@ export default class AxonShellExtension extends Extension {
             if (this._dockManager) {
                 this._dockManager.disable();
                 this._dockManager = null;
+            }
+
+            if (this._spaceSwitcher) {
+                this._spaceSwitcher.disable();
+                this._spaceSwitcher = null;
+            }
+            if (this._accent) {
+                this._accent.disable();
+                this._accent = null;
             }
 
             if (this._intentBar) {
