@@ -58,6 +58,11 @@ the version in `pyproject.toml`.
 2. Enable GitHub Pages for the `gh-pages` branch (root folder) after the
    first publish creates it.
 
+## Moving from Ubuntu 24.04 to 26.04
+
+The daily update never changes the Ubuntu release. `sudo axon-update --release-upgrade` does, after
+taking a BTRFS snapshot you can boot from; see [ubuntu-26.04.md](ubuntu-26.04.md).
+
 ## Systems installed before the package existed
 
 Installs from ISOs before the update channel have no `axon-os` package and

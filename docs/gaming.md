@@ -35,6 +35,9 @@ program needs them; they are not in the ISO.
 
 ## Known gaps in Ubuntu 24.04 (checked 2026-10-27 against the noble archive)
 
+Ubuntu 26.04 closes most of these (Gamescope, ntsync, newer Mesa are in the archive); see
+[ubuntu-26.04.md](ubuntu-26.04.md). The list below is for 24.04 images and installs.
+
 - **Gamescope is not packaged in noble.** It is not in `axon-gaming-core` and will come from
   the Axon-built packages (plan Phase 6) before the Console session (Phase 5).
 - **MangoHud has no i386 build in noble**, so the overlay works for 64-bit games only.
@@ -175,7 +178,7 @@ Steam ends Gamescope and the session and brings back the login screen; `steamos-
 go in `AXON_GAMESCOPE_ARGS` or `~/.config/axon-os/console.conf` (for example `-W 1920 -H 1080 -r 60`).
 There is no desktop to show errors, so `~/.local/state/axon-console.log` records what the session did.
 
-**Not in the ISO yet.** The package depends on Gamescope, which Ubuntu 24.04 does not have. The image build
+**On 24.04 images, not in the ISO yet.** (On 26.04 Gamescope is in the archive, so `axon-console` is included.) The package depends on Gamescope, which Ubuntu 24.04 does not have. The image build
 leaves `axon-console` out until `apt-cache policy gamescope` finds one (plan phase 6 builds it for the Axon
 repository); until then it is published to the Axon repository but not installable. The session and its helper
 are tested with stub programs; nothing has run in a real login session yet.

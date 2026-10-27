@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Build & Lint](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build.yml/badge.svg)](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build.yml)
 
-Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 24.04 LTS. Every AI capability runs entirely on-device through Ollama by default — no cloud accounts, no API keys, no data leaving your machine. If you want, you can also pick any cloud or company model (OpenAI, Anthropic, Gemini, OpenRouter, any OpenAI-compatible endpoint) with an API key or sign-in; see [docs/ai-providers.md](docs/ai-providers.md).
+Axon OS is a local-first, AI-native Linux distribution built on Ubuntu 26.04 LTS (24.04 installs can upgrade: [docs/ubuntu-26.04.md](docs/ubuntu-26.04.md)). Every AI capability runs entirely on-device through Ollama by default — no cloud accounts, no API keys, no data leaving your machine. If you want, you can also pick any cloud or company model (OpenAI, Anthropic, Gemini, OpenRouter, any OpenAI-compatible endpoint) with an API key or sign-in; see [docs/ai-providers.md](docs/ai-providers.md).
 
 The operating system is built around two centralized D-Bus services — **Axon Brain** (AI inference, model management, conversation history) and **Axon Context** (ambient desktop awareness) — that power a purpose-built GNOME Shell environment with named workspaces, an intent-driven command bar, a persistent AI side panel, and AI-native applications.
 
@@ -161,7 +161,7 @@ For the full architecture document, see [docs/architecture.md](docs/architecture
 
 | Component | Version / Detail |
 |-----------|-----------------|
-| Base OS | Ubuntu 24.04 LTS |
+| Base OS | Ubuntu 26.04 LTS (24.04 still builds) |
 | Desktop | GNOME Shell 45+ |
 | UI Toolkit | GTK4 + libadwaita |
 | IPC Layer | D-Bus (session bus) |

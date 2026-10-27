@@ -211,9 +211,10 @@ cifs-utils
 gstreamer1.0-vaapi
 
 # Power Management
+# GNOME's power-mode switch needs power-profiles-daemon, which conflicts with tlp (found
+# 2026-10-27 by an apt simulation; the same conflict is in 24.04): one of them, and GNOME's wins
 power-profiles-daemon
 thermald
-tlp
 acpi
 acpid
 upower

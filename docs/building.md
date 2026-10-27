@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Host OS:** Ubuntu 24.04 LTS (other Debian-based distros may work but are untested)
+- **Host OS:** Ubuntu 24.04 LTS (other Debian-based distros may work but are untested). The image it builds is Ubuntu 26.04 by default; see [ubuntu-26.04.md](ubuntu-26.04.md) for `AXON_UBUNTU_RELEASE=noble`
 - **Disk space:** 20 GB free in the build directory
 - **RAM:** 8 GB minimum (16 GB recommended for parallel builds)
 - **CPU:** x86-64, 4+ cores recommended
@@ -32,7 +32,7 @@ sudo bash build/build.sh
 ```
 
 The script will:
-1. Bootstrap a minimal Ubuntu 24.04 (noble) root filesystem with `debootstrap`.
+1. Bootstrap a minimal Ubuntu 26.04 (resolute; 24.04 with `AXON_UBUNTU_RELEASE=noble`) root filesystem with `debootstrap`.
 2. Install the kernel, `casper` (Ubuntu live-boot), GNOME, and all Axon OS components into the chroot (`build/config/chroot-setup.sh`).
 3. Apply Axon branding: GTK theme, gschema defaults, Plymouth splash, wallpaper, and the native Axon Installer.
 4. Build a SquashFS image of the root filesystem.
@@ -70,7 +70,7 @@ Packages come from `build/package-lists/`: `common.list` (both editions), plus `
 `common.list` that fail are skipped with a warning, so check names first:
 
 ```bash
-python3 scripts/verify-packages.py     # every name in the lists and metapackages exists in noble
+python3 scripts/verify-packages.py     # every name in the lists and metapackages exists in the release (--ubuntu-release noble for 24.04)
 ```
 
 The NVIDIA edition installs `axon-nvidia` (`packaging/axon-nvidia`): Ubuntu's prebuilt and signed
