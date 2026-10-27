@@ -731,11 +731,14 @@ fn handle_launch(req: &LaunchRequest, state: &Arc<Mutex<DaemonState>>) -> Result
         None => None,
     };
     let code = dispatch::execute(&mut args, &req.exe_path, &req.hash, &rules, &app_db)?;
-    Ok(if code == std::process::ExitCode::SUCCESS {
-        0
-    } else {
-        1
-    })
+    Ok(if exit_code_is_success(code) { 0 } else { 1 })
+}
+
+/// `ExitCode` only implements `PartialEq` from Rust 1.78, and this crate builds with the 1.75
+/// that Ubuntu 24.04 ships (`rust-version` in the workspace), so compare the `Debug` text. The
+/// test below fails on any toolchain whose text stops distinguishing the two.
+fn exit_code_is_success(code: std::process::ExitCode) -> bool {
+    format!("{code:?}") == format!("{:?}", std::process::ExitCode::SUCCESS)
 }
 
 /// Build the `Args` used to dispatch a daemon launch request.
@@ -1307,5 +1310,18 @@ mod tests {
             "C would take credentials from a setuid .exe"
         );
         assert!(fields[7].contains('F'), "F = fix binary");
+    }
+}
+
+#[cfg(test)]
+mod exit_code_tests {
+    use super::exit_code_is_success;
+    use std::process::ExitCode;
+
+    #[test]
+    fn success_is_told_from_failure() {
+        assert!(exit_code_is_success(ExitCode::SUCCESS));
+        assert!(!exit_code_is_success(ExitCode::FAILURE));
+        assert!(!exit_code_is_success(ExitCode::from(2)));
     }
 }
