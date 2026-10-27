@@ -114,9 +114,12 @@ gsettings set org.gnome.desktop.wm.preferences num-workspaces 9 || true
 gsettings set org.gnome.mutter dynamic-workspaces false || true
 gsettings set org.gnome.desktop.interface enable-animations true || true
 
-# Apply theme preferences
-gsettings set org.gnome.desktop.interface gtk-theme axon-gtk || true
-gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
+# Apply theme preferences. Only on Axon OS itself (or when asked): on another distribution the theme,
+# which has GTK 4 files only, would break GTK 3 apps' menus, and install.sh leaves the system theme alone.
+if grep -qx 'ID=axonos' /etc/os-release 2>/dev/null || [[ "${AXON_APPLY_SYSTEM_THEME:-0}" == "1" ]]; then
+    gsettings set org.gnome.desktop.interface gtk-theme axon-gtk || true
+    gsettings set org.gnome.desktop.interface color-scheme prefer-dark || true
+fi
 
 # Windows muscle-memory keybindings: Super+D shows desktop, Super+E opens
 # the file manager (GNOME's "home" media key launches the default one).

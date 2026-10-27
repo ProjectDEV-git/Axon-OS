@@ -262,15 +262,36 @@ success "GNOME extension installed to ${DEST}"
 # STEP 5: Install GTK theme
 # ---------------------------------------------------------------------------
 step "Step 5/9 — Installing Axon GTK theme"
+# The theme is installed but, by default, NOT made the system theme. It only ships GTK 4 files, so
+# GTK 3 apps (gedit, Zorin's own apps...) would fall back to default styling and draw doubled menu
+# borders. Libadwaita apps ignore GTK themes and read ~/.config/gtk-4.0/gtk.css, so the Axon accent
+# goes there. Set AXON_APPLY_SYSTEM_THEME=1 to also switch the theme and dark style (the Axon OS image does).
 mkdir -p "${HOME}/.themes/axon-gtk/gtk-4.0"
 cp "${SCRIPT_DIR}/theme/axon-gtk/gtk-dark.css" \
    "${HOME}/.themes/axon-gtk/gtk-4.0/gtk.css"
 cp "${SCRIPT_DIR}/theme/axon-gtk/index.theme" \
    "${HOME}/.themes/axon-gtk/"
 
-gsettings set org.gnome.desktop.interface gtk-theme axon-gtk
-gsettings set org.gnome.desktop.interface color-scheme prefer-dark
-success "Axon GTK theme installed and applied"
+ADW_CSS="${HOME}/.config/gtk-4.0/gtk.css"
+mkdir -p "$(dirname "${ADW_CSS}")"
+if [[ -f "${ADW_CSS}" ]] && ! grep -q "generated from theme/tokens/axon-tokens.json" "${ADW_CSS}"; then
+    cp -n "${ADW_CSS}" "${ADW_CSS}.before-axon"
+    warn "Kept your ${ADW_CSS} as ${ADW_CSS}.before-axon"
+fi
+cp "${SCRIPT_DIR}/theme/axon-gtk/libadwaita.css" "${ADW_CSS}"
+
+if [[ "${AXON_APPLY_SYSTEM_THEME:-0}" == "1" ]]; then
+    gsettings set org.gnome.desktop.interface gtk-theme axon-gtk
+    gsettings set org.gnome.desktop.interface color-scheme prefer-dark
+    success "Axon GTK theme installed and applied"
+else
+    # An earlier version of this script set it for everyone; undo that
+    if [[ "$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null)" == "'axon-gtk'" ]]; then
+        gsettings reset org.gnome.desktop.interface gtk-theme
+        info "Put the system GTK theme back to your distribution's default"
+    fi
+    success "Axon accent installed for libadwaita apps (system theme left alone)"
+fi
 
 # ---------------------------------------------------------------------------
 # STEP 6: Install apps and .desktop files

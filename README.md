@@ -85,6 +85,8 @@ sudo bash build/config/install-ollama.sh
 ```
 
 > **Note**: Running from source requires an existing Ubuntu 24.04 GNOME session.
+>
+> To undo it: `./uninstall.sh --dry-run` shows what would be removed, `./uninstall.sh` removes it (your files, Ollama and its models are kept unless you ask).
 
 ## Building the ISO
 
