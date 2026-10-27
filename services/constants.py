@@ -41,6 +41,7 @@ DBUS_NAME_SEARCH = "org.axonos.Search"
 DBUS_NAME_VOICE = "org.axonos.Voice"
 DBUS_NAME_GUI_AGENT = "org.axonos.GuiAgent"
 DBUS_NAME_SANDBOX = "org.axonos.Sandbox"
+DBUS_NAME_GAMING = "org.axonos.Gaming"
 
 # ---------------------------------------------------------------------------
 # Limits

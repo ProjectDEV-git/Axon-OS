@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-26 11:30+0000\n"
+"POT-Creation-Date: 2026-10-27 07:12+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -828,6 +828,12 @@ msgstr ""
 msgid "Accent colour"
 msgstr ""
 
+#: apps/axon-settings/preferences_window.py
+msgid ""
+"Answers questions with your cloud model instead of pausing. Your prompts "
+"leave this computer."
+msgstr ""
+
 #: apps/axon-settings/preferences_window.py services/suggestions.py
 msgid "Appearance"
 msgstr ""
@@ -884,6 +890,16 @@ msgid "Forget this rule"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
+msgid ""
+"Game mode starts by itself when a game launched through Steam, Lutris, "
+"Heroic or a Windows program starts, and ends shortly after it closes."
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Gaming"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
 msgid "Graphite"
 msgstr ""
 
@@ -905,6 +921,14 @@ msgstr ""
 
 #: apps/axon-settings/preferences_window.py
 msgid "Orange"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Pause AI during games"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Pause file indexing during games"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -945,12 +969,24 @@ msgid "Stop allowing {command}"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
+msgid "Stops scanning your files until the game ends"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
 msgid "Teal"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
 msgid ""
 "These settings need the Axon Shell extension, which isn't installed here."
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Unloads local AI models so they don't take GPU memory from your game"
+msgstr ""
+
+#: apps/axon-settings/preferences_window.py
+msgid "Use cloud provider during games"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -1300,6 +1336,10 @@ msgstr ""
 msgid "Copied {text}"
 msgstr ""
 
+#: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
+msgid "Couldn't change game mode."
+msgstr ""
+
 #: apps/intent-bar/ui/window.py
 #, python-brace-format
 msgid "Couldn't open {name}."
@@ -1317,6 +1357,14 @@ msgstr ""
 
 #: apps/intent-bar/ui/window.py
 msgid "GNOME Settings isn't available."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "Game mode is off."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
+msgid "Game mode is on."
 msgstr ""
 
 #: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
@@ -1548,6 +1596,10 @@ msgid "Bluetooth"
 msgstr ""
 
 #: services/suggestions.py
+msgid "Bring AI back"
+msgstr ""
+
+#: services/suggestions.py
 msgid "Calculator"
 msgstr ""
 
@@ -1581,7 +1633,15 @@ msgid "Free disk space"
 msgstr ""
 
 #: services/suggestions.py
+msgid "Game mode"
+msgstr ""
+
+#: services/suggestions.py
 msgid "How long the computer has been on"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Is game mode on?"
 msgstr ""
 
 #: services/suggestions.py
@@ -1599,6 +1659,10 @@ msgstr ""
 #: services/suggestions.py shell/axon-shell/ui-logic.js
 #, python-brace-format
 msgid "Open Settings → {panel}"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Pause AI while you play"
 msgstr ""
 
 #: services/suggestions.py
@@ -1624,6 +1688,10 @@ msgstr ""
 msgid "Search your files for “{query}”"
 msgstr ""
 
+#: services/suggestions.py
+msgid "See what is running"
+msgstr ""
+
 #: services/suggestions.py shell/axon-shell/ui-logic.js
 msgid "Semantic search in your files"
 msgstr ""
@@ -1639,6 +1707,14 @@ msgstr ""
 
 #: services/suggestions.py
 msgid "System and kernel version"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Turn game mode off"
+msgstr ""
+
+#: services/suggestions.py
+msgid "Turn game mode on"
 msgstr ""
 
 #: services/suggestions.py
@@ -1869,6 +1945,18 @@ msgstr ""
 msgid "Reply: {reply}"
 msgstr ""
 
+#: shell/axon-shell/gamemode.js
+msgid "Exit game mode"
+msgstr ""
+
+#: shell/axon-shell/gamemode.js
+msgid "Game mode is on"
+msgstr ""
+
+#: shell/axon-shell/gamemode.js
+msgid "Game mode is on. AI is paused."
+msgstr ""
+
 #: shell/axon-shell/intentbar.js
 msgid "What do you want to do?"
 msgstr ""
@@ -1883,6 +1971,10 @@ msgstr ""
 
 #: shell/axon-shell/intentbar.js
 msgid "Couldn't open {app}."
+msgstr ""
+
+#: shell/axon-shell/intentbar.js
+msgid "on"
 msgstr ""
 
 #: shell/axon-shell/intentbar.js
@@ -2039,6 +2131,10 @@ msgstr ""
 
 #: shell/axon-shell/ui-logic.js
 msgid "default model"
+msgstr ""
+
+#: shell/axon-shell/ui-logic.js
+msgid "A game"
 msgstr ""
 
 #: shell/axon-shell/ui-logic.js

@@ -27,9 +27,12 @@ from shell_settings import describe_rule, load_shell_settings
 for _base in (Path(__file__).resolve().parents[2], Path(__file__).resolve().parents[1]):
     if (_base / "services").is_dir():
         sys.path.insert(0, str(_base / "services"))
+        sys.path.insert(0, str(_base / "services" / "axon-gaming"))
         break
 import command_approvals
 import context_settings
+import gaming_settings
+from constants import AXON_CONFIG_DIR
 from i18n import N_, _
 
 # Accent swatches: (setting value, name, fill). The fills are the accents'
@@ -71,6 +74,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         shell_settings: Gio.Settings | None = None,
         context_path: Path | None = None,
         approvals_path: Path | None = None,
+        gaming_path: Path | None = None,
         **kwargs: object,
     ) -> None:
         super().__init__(**kwargs)
@@ -80,6 +84,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         self._shell = shell_settings if shell_settings is not None else load_shell_settings()
         self._context_path = context_path or context_settings.CONFIG_PATH
         self._approvals_path = approvals_path or command_approvals.APPROVALS_PATH
+        self._gaming_path = gaming_path or AXON_CONFIG_DIR / "gaming.json"
 
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(Adw.HeaderBar())
@@ -90,6 +95,7 @@ class PreferencesWindow(Adw.ApplicationWindow):
         toolbar.set_content(self._page)
         self._page.add(self._build_privacy_group())
         self._page.add(self._build_approvals_group())
+        self._page.add(self._build_gaming_group())
         self._page.add(self._build_spaces_group())
         self._page.add(self._build_appearance_group())
 
@@ -137,6 +143,77 @@ class PreferencesWindow(Adw.ApplicationWindow):
             )
         except OSError:
             pass  # read-only home: the switches still show the choice
+
+    # -- Gaming: what Axon does while a game runs --------------------------
+
+    _GAMING_ROWS = (  # (setting, title, subtitle)
+        (
+            "pause_ai",
+            N_("Pause AI during games"),
+            N_("Unloads local AI models so they don't take GPU memory from your game"),
+        ),
+        (
+            "use_cloud",
+            N_("Use cloud provider during games"),
+            N_(
+                "Answers questions with your cloud model instead of pausing. "
+                "Your prompts leave this computer."
+            ),
+        ),
+        (
+            "pause_indexing",
+            N_("Pause file indexing during games"),
+            N_("Stops scanning your files until the game ends"),
+        ),
+    )
+
+    def _build_gaming_group(self) -> Adw.PreferencesGroup:
+        group = Adw.PreferencesGroup(
+            title=_("Gaming"),
+            description=_(
+                "Game mode starts by itself when a game launched through Steam, Lutris, "
+                "Heroic or a Windows program starts, and ends shortly after it closes."
+            ),
+        )
+        settings = gaming_settings.load(self._gaming_path)
+        self._gaming_switches: dict[str, Adw.SwitchRow] = {}
+        for key, title, subtitle in self._GAMING_ROWS:
+            row = Adw.SwitchRow(title=_(title), subtitle=_(subtitle))
+            row.set_active(settings[key])
+            row.connect("notify::active", self._on_gaming_changed, key)
+            group.add(row)
+            self._gaming_switches[key] = row
+        self._gaming_switches["use_cloud"].set_sensitive(settings["pause_ai"])
+        return group
+
+    def _on_gaming_changed(self, row: Adw.SwitchRow, _pspec: object, key: str) -> None:
+        value = row.get_active()
+        if key == "pause_ai":
+            self._gaming_switches["use_cloud"].set_sensitive(value)
+        settings = gaming_settings.load(self._gaming_path)
+        settings[key] = value
+        try:
+            gaming_settings.save(self._gaming_path, settings)
+        except OSError:
+            return  # read-only home: the switch still shows the choice
+        # Tell a running game mode service now. Never start one just for this: it
+        # reads the file when it starts.
+        try:
+            bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            bus.call(
+                "org.axonos.Gaming",
+                "/org/axonos/Gaming",
+                "org.axonos.Gaming",
+                "SetSetting",
+                GLib.Variant("(sb)", (key, value)),
+                None,
+                Gio.DBusCallFlags.NO_AUTO_START,
+                3000,
+                None,
+                None,
+            )
+        except GLib.Error:
+            pass
 
     # -- Commands that run without asking ---------------------------------
 

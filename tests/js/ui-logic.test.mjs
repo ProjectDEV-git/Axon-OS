@@ -321,3 +321,15 @@ test('pinnedStartApps prefers installed favourites, then the defaults', async ()
     assert.deepEqual(pinnedStartApps([], ['1', '2', '3'], installed, 2), ['1', '2']);
     assert.deepEqual(pinnedStartApps([], [], installed), []);
 });
+
+test('game mode intents', async () => {
+    const {gameModeOps} = await import('./ui-logic.mjs');
+    assert.deepEqual(gameModeOps('game mode on'), ['on']);
+    assert.deepEqual(gameModeOps('Turn game mode OFF'), ['off']);
+    assert.deepEqual(gameModeOps('is game mode on'), ['status']);
+    assert.deepEqual(gameModeOps('game mode?'), ['status']);
+    assert.deepEqual(gameModeOps('game mode'), ['status', 'on', 'off']);
+    assert.deepEqual(gameModeOps('gamemode stop'), ['off']);
+    for (const q of ['', 'game', 'mode on', 'firefox', 'dark mode'])
+        assert.deepEqual(gameModeOps(q), [], q);
+});

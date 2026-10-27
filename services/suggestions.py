@@ -9,6 +9,7 @@ checks the two lists match.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -21,9 +22,10 @@ APPS = N_("Applications")
 FILES = N_("Files")
 SETTINGS = N_("Settings")
 SPACES = N_("Spaces")
+GAME_MODE = N_("Game mode")
 COMMANDS = N_("Commands")
 ASK = N_("Ask AI")
-CATEGORIES = (CALCULATOR, APPS, FILES, SETTINGS, SPACES, COMMANDS, ASK)
+CATEGORIES = (CALCULATOR, APPS, FILES, SETTINGS, SPACES, GAME_MODE, COMMANDS, ASK)
 
 # (title, GNOME Settings panel, extra search words)
 SETTINGS_PANELS: list[tuple[str, str, str]] = [
@@ -49,6 +51,13 @@ SUGGESTED_COMMANDS: list[tuple[str, str, str]] = [
     ("whoami", N_("Your user name"), "user account"),
     ("date", N_("Date and time"), "time clock"),
 ]
+
+# (operation, title, subtitle) for the "game mode" intents
+GAME_MODE_ROWS: dict[str, tuple[str, str]] = {
+    "on": (N_("Turn game mode on"), N_("Pause AI while you play")),
+    "off": (N_("Turn game mode off"), N_("Bring AI back")),
+    "status": (N_("Is game mode on?"), N_("See what is running")),
+}
 
 _MAX_PER_CATEGORY = 3
 
@@ -86,6 +95,24 @@ def match_score(query: str, *texts: str) -> int:
         elif " " not in q and len(q) >= 3 and q in t:
             best = max(best, 1)
     return best
+
+
+def game_mode_ops(query: str) -> list[str]:
+    """Which game mode intents *query* asks for: [] if it is not about game mode.
+
+    "game mode on" turns it on, "game mode off" turns it off, "is game mode on"
+    asks; a bare "game mode" offers all three.
+    """
+    words = set(re.findall(r"[a-z]+", query.lower()))
+    if not ("game" in words and "mode" in words) and "gamemode" not in words:
+        return []
+    if "is" in words or "status" in words or query.rstrip().endswith("?"):
+        return ["status"]
+    if words & {"off", "stop", "disable", "exit", "end"}:
+        return ["off"]
+    if words & {"on", "start", "enable"}:
+        return ["on"]
+    return ["status", "on", "off"]
 
 
 def _top(scored: list[tuple[int, Suggestion]], limit: int) -> list[Suggestion]:
@@ -185,6 +212,15 @@ def build_suggestions(
         ],
         limit,
     )
+    out += [
+        Suggestion(
+            GAME_MODE,
+            _(GAME_MODE_ROWS[op][0]),
+            _(GAME_MODE_ROWS[op][1]),
+            {"type": "game_mode", "op": op},
+        )
+        for op in game_mode_ops(q)
+    ]
     out += _top(
         [
             (
@@ -216,12 +252,14 @@ def describe(suggestion: Suggestion) -> str:
         return _("Open Settings → {panel}").format(panel=suggestion.title)
     if kind == "space":
         return _("Switch to {name} Space").format(name=action.get("name", ""))
+    if kind == "game_mode":
+        return _(GAME_MODE_ROWS.get(str(action.get("op")), ("", ""))[0])
     if kind == "command":
         return _("Run: {command} (asks first)").format(command=action.get("command", ""))
     return _("Ask Axon AI")
 
 
-_STRONG = frozenset({CALCULATOR, APPS, SETTINGS, SPACES, COMMANDS})
+_STRONG = frozenset({CALCULATOR, APPS, SETTINGS, SPACES, GAME_MODE, COMMANDS})
 
 
 def default_index(rows: list[Suggestion]) -> int:

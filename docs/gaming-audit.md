@@ -17,9 +17,10 @@ the sandbox this was written in has neither, so the commands to collect them are
 3. **Ollama is not in the ISO at all.** It is installed on first boot by a hash-pinned
    installer (`build/config/install-ollama.sh`, pinned in `ollama-release.env`, v0.35.1). Plan
    §8.2 ("ISO contains the Ollama binary, CPU only") describes a change, not the current state.
-4. **Brain is not the only Ollama client.** The AI Panel (`apps/axon-ai-panel/ui/panel.py:90,127`)
-   and the Intent Bar (`apps/intent-bar/ollama_client.py`) call Ollama directly on `:11434`.
-   `Brain.Suspend` alone will not stop them from loading a model onto the GPU during a game.
+4. ~~Brain is not the only Ollama client.~~ **Corrected in Phase 2:** the AI Panel and Intent
+   Bar reach Ollama through Brain (`apps/intent-bar/ollama_client.py` is a Brain D-Bus proxy).
+   The direct-to-Ollama `OllamaClient` in `apps/axon-ai-panel/ui/panel.py` is only an import
+   fallback used when the Intent Bar module is missing. Gating Brain is enough.
 5. **`packaging/` does not contain multiple Debian packages.** It holds only `build-deb.sh`,
    which builds the single `axon-os` package, and the archive keyring. The plan's
    `packaging/axon-gaming-*` directories are new infrastructure, not additions to an existing layout.
@@ -107,10 +108,9 @@ the sandbox this was written in has neither, so the commands to collect them are
   Suspend must unload *all* `/api/ps` models, including the embed model, and Search must be paused.
 - No `Suspend/Resume` exist. Cloud routing exists (`providers.py`, `docs/ai-providers.md`),
   so "Use cloud during games" is feasible. `num_gpu: 0` for CPU-only fallback is not used today.
-- **Bypass paths** (must be handled in Phase 2): AI Panel `panel.py`, Intent Bar
-  `ollama_client.py`, `apps/axon-welcome/ui/welcome.py:46`, `services/diagnostics.py`,
-  `model_marketplace.py` (tags/pull/delete only — harmless). Recommend routing the panel and
-  Intent Bar through Brain, or having them check `org.axonos.Gaming.Active`.
+- **Other Ollama callers** (checked in Phase 2): the AI Panel and Intent Bar go through Brain.
+  `apps/axon-welcome/ui/welcome.py:46` and `services/diagnostics.py` only query status;
+  `model_marketplace.py` only lists, pulls and deletes models. None loads a model.
 - **Hardware Profiler** (`hardware_profiler.py`): `get_gpu_info()` → `{vendor, model, vram, status}`;
   tries `nvidia-smi`, then `rocm-smi`, then `lspci`-based fallbacks (NVIDIA/AMD fixed at 4 GB
   guess, Intel by name). **It only recognises AMD when `rocm-smi` exists**, so an AMD GPU on a
@@ -185,7 +185,7 @@ Removing any of these changes the product for non-gamers, so it needs your sign-
 | 1 | Standard ISO target ≤ 3.5 GB, hard 3.9 GB | Already ~3.83 GB | Do the package diet in Phase 1 or reorder Phase 4 first; ask before removing non-gaming apps |
 | 2 | ISO ships Ollama CPU binary | Ollama installed at first boot, GPU libs included in the tarball | Keep first-boot install; model GPU libs as components |
 | 3 | Gaming service is a plugin w/ TOML | Core services are top-level dirs; plugin loader is for third parties | Top-level `services/axon-gaming/` (needs your call) |
-| 4 | Brain Suspend is enough | AI Panel and Intent Bar hit Ollama directly | Route via Brain or gate on `Active` |
+| 4 | Brain Suspend is enough | Correct: panel and Intent Bar go through Brain (see §1.4 correction) | Gate in Brain (done in Phase 2) |
 | 5 | `packaging/axon-gaming-*` debs | Only `build-deb.sh` for one package; `publish-apt.yml` publishes one | Generalise `build-deb.sh`/`publish-apt.yml` in Phase 1 |
 | 6 | `build/package-lists/*.list` | `build/config/packages.list` | Split during Phase 4; for Phase 1 add a gaming block via the metapackage |
 | 7 | Enable multiverse, add i386 | Already done | Skip |

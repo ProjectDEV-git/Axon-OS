@@ -764,10 +764,29 @@ export function calculate(query) {
     }
 }
 
+// ── Game mode indicator ─────────────────────────────────────────────────────
+
+/**
+ * Names of the running games for the top-bar menu. GameMode's own hook doesn't
+ * know the game, so it reports "gamemode" (or nothing): shown as "A game".
+ *
+ * @param {Array<[string, string, number]>} games - [token, app_id, pid] from org.axonos.Gaming
+ * @returns {string[]} one entry per distinct name
+ */
+export function gameModeNames(games) {
+    const names = [];
+    for (const [, appId] of games ?? []) {
+        const name = !appId || appId === 'gamemode' ? _t('A game') : String(appId);
+        if (!names.includes(name))
+            names.push(name);
+    }
+    return names;
+}
+
 // ── Intent Bar suggestions (twin of services/suggestions.py) ────────────────
 
 export const SUGGESTION_CATEGORIES = Object.freeze(
-    ['Calculator', 'Applications', 'Files', 'Settings', 'Spaces', 'Commands', 'Ask AI']);
+    ['Calculator', 'Applications', 'Files', 'Settings', 'Spaces', 'Game mode', 'Commands', 'Ask AI']);
 
 /** [title, GNOME Settings panel, extra search words] */
 export const SETTINGS_PANELS = Object.freeze([
@@ -782,6 +801,35 @@ export const SETTINGS_PANELS = Object.freeze([
     ['Privacy', 'privacy', 'location camera'],
     ['Accessibility', 'universal-access', 'a11y large text contrast zoom'],
 ]);
+
+/** Game mode intents: operation → [title, subtitle] */
+export const GAME_MODE_ROWS = Object.freeze({
+    on: ['Turn game mode on', 'Pause AI while you play'],
+    off: ['Turn game mode off', 'Bring AI back'],
+    status: ['Is game mode on?', 'See what is running'],
+});
+
+/**
+ * Which game mode intents `query` asks for: [] if it is not about game mode.
+ * "game mode on" turns it on, "game mode off" off, "is game mode on" asks; a
+ * bare "game mode" offers all three (twin of suggestions.game_mode_ops()).
+ *
+ * @param {string} query
+ * @returns {string[]}
+ */
+export function gameModeOps(query) {
+    const q = String(query ?? '');
+    const words = new Set(q.toLowerCase().match(/[a-z]+/g) ?? []);
+    if (!(words.has('game') && words.has('mode')) && !words.has('gamemode'))
+        return [];
+    if (words.has('is') || words.has('status') || q.trimEnd().endsWith('?'))
+        return ['status'];
+    if (['off', 'stop', 'disable', 'exit', 'end'].some(w => words.has(w)))
+        return ['off'];
+    if (['on', 'start', 'enable'].some(w => words.has(w)))
+        return ['on'];
+    return ['status', 'on', 'off'];
+}
 
 /** [exact allowlisted command, what it shows, extra search words] */
 export const SUGGESTED_COMMANDS = Object.freeze([
@@ -863,6 +911,8 @@ export function buildSuggestions(query, apps = [], spaces = [], limit = 3) {
         .map((name, i) =>
             [matchScore(q, name, `${name} space`), row('Spaces', _t('{name} Space', {name}), `Super+${i + 1}`, {type: 'space', index: i, name})])
         .filter(([s]) => s >= 2), limit));
+    out.push(...gameModeOps(q).map(op =>
+        row('Game mode', _t(GAME_MODE_ROWS[op][0]), _t(GAME_MODE_ROWS[op][1]), {type: 'game_mode', op})));
     out.push(...topRows(SUGGESTED_COMMANDS
         .map(([command, description, words]) =>
             [matchScore(q, command, description, _t(description), words),
@@ -881,12 +931,13 @@ export function describeSuggestion(s) {
     case 'files': return _t('Search your files for “{query}”', {query: a.query ?? ''});
     case 'settings': return _t('Open Settings → {panel}', {panel: s.title});
     case 'space': return _t('Switch to {name} Space', {name: a.name ?? ''});
+    case 'game_mode': return _t(GAME_MODE_ROWS[a.op]?.[0] ?? 'Ask Axon AI');
     case 'command': return _t('Run: {command} (asks first)', {command: a.command ?? ''});
     default: return _t('Ask Axon AI');
     }
 }
 
-const STRONG_CATEGORIES = new Set(['Calculator', 'Applications', 'Settings', 'Spaces', 'Commands']);
+const STRONG_CATEGORIES = new Set(['Calculator', 'Applications', 'Settings', 'Spaces', 'Game mode', 'Commands']);
 
 /**
  * Row Enter runs when the selection wasn't moved (twin of default_index()):

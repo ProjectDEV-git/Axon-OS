@@ -447,10 +447,44 @@ export default class IntentBar {
         } else if (a.type === 'space') {
             this.hide();
             this._spacesManager.switchToSpace(a.index);
+        } else if (a.type === 'game_mode') {
+            this._runGameMode(a.op);
         } else if (a.type === 'command') {
             this._runCommand(a.command);
         } else if (a.type === 'files') {
             this._searchFiles(a.query);
+        }
+    }
+
+    // Game mode intents run axon-game-mode with fixed arguments, never query text.
+    // "Off" is a reset, so it works however game mode was started.
+    _runGameMode(op) {
+        const argv = {
+            on: ['axon-game-mode', 'on', '--app-id', 'manual'],
+            off: ['axon-game-mode', 'reset'],
+            status: ['axon-game-mode', 'status'],
+        }[op];
+        if (!argv)
+            return;
+        try {
+            const proc = Gio.Subprocess.new(argv,
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE);
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                try {
+                    const [, out] = p.communicate_utf8_finish(res);
+                    const ok = p.get_successful();
+                    const text = op === 'status' ? (out || '').trim()
+                        : ok ? _t(op === 'on' ? 'Game mode is on.' : 'Game mode is off.')
+                            : (out || '').trim() || _t("Couldn't change game mode.");
+                    this._setResponse(text, {error: !ok});
+                    announce(text);
+                } catch (e) {
+                    logError(e, 'AxonShell: game mode command failed');
+                    this._setResponse(_t("Couldn't change game mode."), {error: true});
+                }
+            });
+        } catch (e) {
+            this._setResponse(_t("Couldn't change game mode."), {error: true});
         }
     }
 

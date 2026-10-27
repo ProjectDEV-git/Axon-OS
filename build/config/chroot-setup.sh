@@ -219,13 +219,12 @@ rm -rf /tmp/axon-deb
 # steam-installer asks for the Steam Subscriber Agreement through debconf; an
 # unattended image build needs the answer preseeded. Steam itself shows the
 # agreement again on its first start, before anyone can log in or play.
-log "Installing gaming packages (axon-gaming-core, axon-gaming-tweaks)..."
+log "Installing gaming packages (packaging/*/)..."
 echo "steam steam/question select I AGREE" | debconf-set-selections
 echo "steam steam/license note" | debconf-set-selections
 rm -rf /tmp/axon-gaming-debs
 bash "${SRC}/packaging/build-pkg.sh" --all /tmp/axon-gaming-debs
-rm -f /tmp/axon-gaming-debs/axon-os_*.deb
-apt-get install -y --reinstall /tmp/axon-gaming-debs/axon-gaming-*_all.deb
+apt-get install -y --reinstall /tmp/axon-gaming-debs/*_all.deb
 rm -rf /tmp/axon-gaming-debs
 
 # The live-session installer stays out of the package: the install engine

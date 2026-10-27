@@ -15,6 +15,7 @@ import IntentBar from './intentbar.js';
 import DockManager from './dock.js';
 import SpaceSwitcher from './spaceswitcher.js';
 import AccentManager from './accent.js';
+import {GameModeIndicator} from './gamemode.js';
 import {confirmAndRun, launchAppById} from './ai-actions.js';
 import {_t, setTranslator} from './ui-logic.js';
 
@@ -194,6 +195,7 @@ export default class AxonShellExtension extends Extension {
         this._spacesManager = null;
         this._intentBar     = null;
         this._aiIndicator   = null;
+        this._gameModeIndicator = null;
         this._dockManager   = null;
         this._spaceSwitcher = null;
         this._keybindingIds = [];
@@ -262,6 +264,9 @@ export default class AxonShellExtension extends Extension {
                 const rightBox = this._dockManager._actor.get_children().find(c => c.style_class === 'axon-taskbar-right');
                 if (rightBox) {
                     rightBox.insert_child_at_index(this._aiIndicator, 0);
+                    // Game mode icon, left of the AI one; hidden until a game runs
+                    this._gameModeIndicator = new GameModeIndicator();
+                    rightBox.insert_child_at_index(this._gameModeIndicator, 0);
                 }
             }
 
@@ -612,6 +617,11 @@ export default class AxonShellExtension extends Extension {
             if (this._aiIndicator) {
                 this._aiIndicator.destroy();
                 this._aiIndicator = null;
+            }
+
+            if (this._gameModeIndicator) {
+                this._gameModeIndicator.destroy();
+                this._gameModeIndicator = null;
             }
 
             if (this._dockManager) {

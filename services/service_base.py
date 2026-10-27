@@ -13,6 +13,7 @@ Services subclass ServiceBase and implement their D-Bus methods on top.
 import sys
 import threading
 import time
+from typing import Any
 
 import dbus
 import dbus.mainloop.glib
@@ -126,6 +127,49 @@ class ServiceBase(dbus.service.Object):
     def GetServiceName(self):
         """Return the service name."""
         return self.SERVICE_NAME
+
+    # ------------------------------------------------------------------
+    # D-Bus properties (org.freedesktop.DBus.Properties)
+    # ------------------------------------------------------------------
+
+    def get_dbus_properties(self, interface: str) -> dict[str, Any]:
+        """Return the read-only properties of ``interface`` as ``{name: value}``.
+
+        Services that expose properties override this and return typed dbus
+        values (``dbus.Boolean``, ``dbus.Array`` ...). Others expose none.
+        """
+        return {}
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="ss", out_signature="v")
+    def Get(self, interface_name, property_name):
+        props = self.get_dbus_properties(str(interface_name))
+        if str(property_name) not in props:
+            raise dbus.exceptions.DBusException(
+                f"No property {property_name} on {interface_name}",
+                name="org.freedesktop.DBus.Error.UnknownProperty",
+            )
+        return props[str(property_name)]
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface_name):
+        return dbus.Dictionary(self.get_dbus_properties(str(interface_name)), signature="sv")
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="ssv", out_signature="")
+    def Set(self, interface_name, property_name, value):
+        raise dbus.exceptions.DBusException(
+            f"Property {property_name} is read-only",
+            name="org.freedesktop.DBus.Error.PropertyReadOnly",
+        )
+
+    @dbus.service.signal(dbus.PROPERTIES_IFACE, signature="sa{sv}as")
+    def PropertiesChanged(self, interface_name, changed, invalidated):
+        """Emitted when a property changes (see ``notify_property_changed``)."""
+
+    def notify_property_changed(self, interface: str, *names: str) -> None:
+        """Emit ``PropertiesChanged`` with the current values of ``names``."""
+        props = self.get_dbus_properties(interface)
+        changed = {n: props[n] for n in names if n in props}
+        self.PropertiesChanged(interface, dbus.Dictionary(changed, signature="sv"), [])
 
     # ------------------------------------------------------------------
     # Main loop entry point

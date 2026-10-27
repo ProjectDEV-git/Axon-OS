@@ -120,8 +120,12 @@ class SearchService(ServiceBase):
             "vector_backend": False,
             "last_scan": 0.0,
             "indexing": False,
+            "paused": False,
         }
         self._rescan_event = threading.Event()
+        # Cleared while game mode has indexing paused
+        self._running = threading.Event()
+        self._running.set()
         self._pull_attempted = False
         threading.Thread(target=self._index_loop, daemon=True).start()
         # Start the watchdog watcher (falls back to polling watcher if watchdog is not available)
@@ -166,6 +170,7 @@ class SearchService(ServiceBase):
     def _index_loop(self):
         time.sleep(20)  # let the session settle before the first scan
         while True:
+            self._running.wait()  # paused by game mode: sleep until Resume
             try:
                 self._scan_once()
             except Exception as exc:  # never kill the loop
@@ -288,6 +293,11 @@ class SearchService(ServiceBase):
                 for row in db.execute("SELECT path, mtime FROM chunks GROUP BY path").fetchall()
             }
             for path in indexer.iter_candidate_files(Path.home()):
+                if not self._running.is_set():
+                    # Paused mid-scan: keep what is indexed so far and stop. The
+                    # scan starts over (cheaply, by mtime) after Resume.
+                    db.commit()
+                    return
                 try:
                     mtime = Path(path).stat().st_mtime
                 except OSError:
@@ -468,6 +478,25 @@ class SearchService(ServiceBase):
     def Reindex(self):
         """Trigger a rescan now."""
         self._rescan_event.set()
+        return True
+
+    @dbus.service.method("org.axonos.Search", in_signature="", out_signature="b")
+    def Pause(self):
+        """Stop indexing (game mode). The scan in progress stops at the next file."""
+        self._running.clear()
+        with self._lock:
+            self._stats["paused"] = True
+        return True
+
+    @dbus.service.method("org.axonos.Search", in_signature="", out_signature="b")
+    def Resume(self):
+        """Continue indexing."""
+        with self._lock:
+            was_paused = self._stats["paused"]
+            self._stats["paused"] = False
+        self._running.set()
+        if was_paused:
+            self._rescan_event.set()
         return True
 
     @dbus.service.method("org.axonos.Search", in_signature="", out_signature="s")

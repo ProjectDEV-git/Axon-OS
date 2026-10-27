@@ -83,7 +83,11 @@ def test_tweaks_ship_the_documented_settings():
 def test_build_pkg_builds_every_small_package(tmp_path):
     subprocess.run(["bash", str(PKG / "build-pkg.sh"), "--all", str(tmp_path)], check=True)
     debs = sorted(p.name for p in tmp_path.glob("*.deb"))
-    assert [d.split("_")[0] for d in debs] == ["axon-gaming-core", "axon-gaming-tweaks"]
+    assert [d.split("_")[0] for d in debs] == [
+        "axon-game-mode",
+        "axon-gaming-core",
+        "axon-gaming-tweaks",
+    ]
     info = subprocess.run(
         ["dpkg-deb", "-f", str(tmp_path / debs[0]), "Version"],
         check=True,
@@ -138,3 +142,41 @@ def test_proton_runner_choice_is_dropped_when_the_build_is_removed(tmp_path):
     _runners(tmp_path, "set", "GE-Proton9-1")
     shutil.rmtree(tmp_path / ".local/share/Steam/compatibilitytools.d/GE-Proton9-1")
     assert _runners(tmp_path, "resolve").stdout.strip() == ""
+
+
+@pytest.mark.unit
+def test_gamemode_config_runs_the_axon_hooks():
+    ini = (PKG / "axon-game-mode" / "files" / "etc" / "gamemode.ini").read_text()
+    keys = {}
+    section = ""
+    for line in ini.splitlines():
+        line = line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1]
+        elif "=" in line and not line.startswith(";"):
+            key, _, value = line.partition("=")
+            keys[(section, key.strip())] = value.strip()
+    assert keys[("custom", "start")] == "axon-game-mode on"
+    assert keys[("custom", "end")] == "axon-game-mode off"
+    # GPU overclocking is the user's choice, never a default
+    assert ("gpu", "apply_gpu_optimisations") not in keys
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(shutil.which("dpkg-deb") is None, reason="needs dpkg-deb")
+def test_game_mode_package_ships_an_executable_command(tmp_path):
+    subprocess.run(["bash", str(PKG / "build-pkg.sh"), "axon-game-mode", str(tmp_path)], check=True)
+    deb = next(tmp_path.glob("axon-game-mode_*.deb"))
+    listing = subprocess.run(
+        ["dpkg-deb", "-c", str(deb)], check=True, capture_output=True, text=True
+    ).stdout
+    command = next(ln for ln in listing.splitlines() if ln.endswith("./usr/bin/axon-game-mode"))
+    assert command.startswith("-rwxr-xr-x")
+    assert any(ln.endswith("./etc/gamemode.ini") for ln in listing.splitlines())
+
+
+@pytest.mark.unit
+def test_iso_build_installs_every_small_package():
+    """The glob must not miss a package (axon-game-mode once did not match axon-gaming-*)."""
+    script = (ROOT / "build" / "config" / "chroot-setup.sh").read_text()
+    assert "build-pkg.sh" in script and "/tmp/axon-gaming-debs/*_all.deb" in script

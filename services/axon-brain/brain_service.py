@@ -51,6 +51,7 @@ from constants import (
 )
 from conversation_store import ConversationStore
 from credentials import CredentialError, CredentialStore
+from game_gate import GameGate
 from prompts import CHAT_SYSTEM_PROMPT
 from providers import (
     OLLAMA_ID,
@@ -259,6 +260,9 @@ class BrainService(ServiceBase):
             flush_interval=0.1,
             max_tokens=10,
         )
+        # Game mode: Brain always starts awake. The Gaming service puts it back to
+        # sleep when it sees Brain (re)appear during a game.
+        self._gate = GameGate()
         threading.Thread(target=self._warm_up_ollama, daemon=True).start()
 
     def _warm_up_ollama(self, wait_seconds: float = 180.0) -> None:
@@ -277,6 +281,9 @@ class BrainService(ServiceBase):
         with self._config_lock:
             speed = str(self.config.get("speed_model", ""))
         if not speed or self._is_cloud(speed):
+            return
+        if self._gate.suspended:
+            logger.info("Game mode is on; skipping model warm-up")
             return
         model = self._resolve_local_model(self._local_name(speed))
         try:
@@ -365,9 +372,41 @@ class BrainService(ServiceBase):
     def _http_post(self, url, payload, stream=False, timeout=60.0, max_retries=5):
         """POST JSON to Ollama, retrying only while it refuses connections."""
         _require_http_url(url)
+        payload = self._game_mode_payload(url, payload)
         data = json.dumps(payload).encode()
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         return self._open_with_retry(req, timeout, max_retries)
+
+    def _game_mode_payload(self, url, payload):
+        """Apply game mode to a request for Ollama (raises if it must not run)."""
+        gate = getattr(self, "_gate", None)
+        if gate is None or not gate.suspended or not url.startswith(OLLAMA_BASE_URL):
+            return payload
+        cpu_model = ""
+        if gate.cpu_allowed:
+            with self._config_lock:
+                speed = str(self.config.get("speed_model", ""))
+            if speed and not self._is_cloud(speed):
+                cpu_model = self._resolve_local_model(self._local_name(speed))
+        return gate.apply(url[len(OLLAMA_BASE_URL) :], payload, cpu_model)
+
+    def _game_mode_model(self, model):
+        """The model to use for a request: a cloud one if game mode asks for it.
+
+        Local models stay as they are otherwise; ``_http_post`` then refuses (or
+        moves to CPU) the request. Never loads anything onto the GPU.
+        """
+        gate = getattr(self, "_gate", None)
+        if gate is None or not gate.suspended or not gate.use_cloud or self._is_cloud(model):
+            return model
+        with self._config_lock:
+            candidates = [str(self.config.get("game_mode_cloud_model", ""))] + [
+                str(self.config.get(k, "")) for k in MODEL_TIERS
+            ]
+        for cand in candidates:
+            if cand and self._validate_model_name(cand) and self._is_cloud(cand):
+                return cand
+        return model
 
     def _http_get(self, url, timeout=5.0, max_retries=5):
         """GET from Ollama, retrying only while it refuses connections."""
@@ -496,6 +535,86 @@ class BrainService(ServiceBase):
     # D-Bus Methods
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Game mode (driven by org.axonos.Gaming)
+    # ------------------------------------------------------------------
+
+    def get_dbus_properties(self, interface):
+        if interface != "org.axonos.Brain":
+            return {}
+        return {"Suspended": dbus.Boolean(self._gate.suspended)}
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="b")
+    def Suspend(self, reason):
+        """Free the GPU: unload every Ollama model and refuse GPU work until Resume."""
+        changed = self._gate.suspend()
+        logger.info("Suspended (%s)", str(reason)[:80])
+        with self._streams_lock:
+            for flag in self._active_streams.values():
+                flag.set()  # stop streams that would keep a model busy
+        threading.Thread(target=self._unload_all_models, daemon=True).start()
+        if changed:
+            self.SuspendedChanged(True)
+            self.notify_property_changed("org.axonos.Brain", "Suspended")
+        return True
+
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="b")
+    def Resume(self):
+        """Back to normal. Models load again on the next request, not now."""
+        if self._gate.resume():
+            logger.info("Resumed")
+            self.SuspendedChanged(False)
+            self.notify_property_changed("org.axonos.Brain", "Suspended")
+        return True
+
+    @dbus.service.method("org.axonos.Brain", in_signature="b", out_signature="")
+    def SetGameModeCloud(self, enabled):
+        """Answer requests with the user's cloud provider while suspended."""
+        self._gate.use_cloud = bool(enabled)
+
+    @dbus.service.method("org.axonos.Brain", in_signature="u", out_signature="b")
+    def AllowCpuOnly(self, seconds):
+        """The user chose "Run anyway": allow Speed-model, CPU-only requests for a while."""
+        return self._gate.allow_cpu(float(seconds))
+
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="b")
+    def IsSuspended(self):
+        return self._gate.suspended
+
+    @dbus.service.signal("org.axonos.Brain", signature="b")
+    def SuspendedChanged(self, suspended):
+        """Fires when game mode pauses or resumes the AI."""
+        pass
+
+    def _unload_all_models(self):
+        """Ask Ollama to drop every loaded model. Tries twice to catch a load in flight."""
+        for attempt in range(2):
+            if attempt:
+                time.sleep(2.0)
+            if not self._gate.suspended:
+                return
+            try:
+                with self._http_get(f"{OLLAMA_BASE_URL}/api/ps", timeout=3.0, max_retries=1) as r:
+                    loaded = [
+                        m.get("name") or m.get("model")
+                        for m in json.loads(r.read()).get("models", [])
+                    ]
+            except Exception as e:
+                logger.debug("Could not list loaded models: %s", e)
+                return
+            for name in filter(None, loaded):
+                try:
+                    with self._http_post(
+                        f"{OLLAMA_BASE_URL}/api/generate",
+                        {"model": name, "keep_alive": 0},
+                        timeout=10.0,
+                        max_retries=1,
+                    ) as r:
+                        r.read()
+                    logger.info("Unloaded %s", name)
+                except Exception as e:
+                    logger.debug("Could not unload %s: %s", name, e)
+
     @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="s")
     def GetStatus(self):
         """Returns JSON about Ollama and model config status."""
@@ -543,6 +662,7 @@ class BrainService(ServiceBase):
         if not model:
             model, _reason = self.router.select_model(str(prompt), str(context))
         model = self._local_name(str(model))
+        model = self._game_mode_model(model)
 
         system_prompt = ""
         if context:
@@ -632,6 +752,7 @@ class BrainService(ServiceBase):
         if not model:
             model, _reason = self.router.select_model(str(message), str(context))
         model = self._local_name(str(model))
+        model = self._game_mode_model(model)
 
         if stream:
             tx_id = str(uuid.uuid4())

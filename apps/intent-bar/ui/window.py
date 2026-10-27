@@ -9,7 +9,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import gi
 
@@ -888,8 +888,44 @@ class IntentBarWindow(Adw.Window):
                 self._show_error(_("GNOME Settings isn't available."))
         elif kind == "space":
             self._switch_space(int(action.get("index", 0)), str(action.get("name", "")))
+        elif kind == "game_mode":
+            self._run_game_mode(str(action.get("op", "")))
         elif kind == "command":
             self._run_command(str(action.get("command", "")))
+
+    # Fixed argument lists: query text never reaches the command line. "Off" is a
+    # reset, so it works however game mode was started.
+    _GAME_MODE_ARGV: ClassVar[dict[str, list[str]]] = {
+        "on": ["axon-game-mode", "on", "--app-id", "manual"],
+        "off": ["axon-game-mode", "reset"],
+        "status": ["axon-game-mode", "status"],
+    }
+
+    def _run_game_mode(self, op: str) -> None:
+        argv = self._GAME_MODE_ARGV.get(op)
+        if argv is None:
+            return
+
+        def worker() -> None:
+            try:
+                result = subprocess.run(  # nosec B603 - fixed argv
+                    argv, capture_output=True, text=True, timeout=10, check=False
+                )
+            except (OSError, subprocess.SubprocessError):
+                GLib.idle_add(self._show_error, _("Couldn't change game mode."))
+                return
+            output = (result.stdout or result.stderr).strip()
+            if result.returncode != 0:
+                GLib.idle_add(self._show_error, output or _("Couldn't change game mode."))
+            elif op == "status":
+                GLib.idle_add(self._set_response, output)
+            else:
+                GLib.idle_add(
+                    self._set_response,
+                    _("Game mode is on.") if op == "on" else _("Game mode is off."),
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _switch_space(self, index: int, name: str) -> None:
         """Ask the Axon Shell extension (org.axonos.Shell) to switch Space."""
