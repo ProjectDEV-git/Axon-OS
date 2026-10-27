@@ -22,3 +22,16 @@ def test_libadwaita_accent_is_installed_and_user_css_is_kept():
     assert "gsettings reset org.gnome.desktop.interface gtk-theme" in SCRIPT, (
         "undoes the old behaviour"
     )
+
+
+def test_first_login_script_applies_the_theme_only_on_axon_os():
+    text = (Path(__file__).resolve().parent.parent / "build/config/firstboot.sh").read_text()
+    guard = text.index("ID=axonos")
+    assert guard < text.index("gtk-theme axon-gtk") < text.index("\nfi", guard)
+
+
+def test_uninstall_removes_the_autostart_before_resetting_settings():
+    text = (Path(__file__).resolve().parent.parent / "uninstall.sh").read_text()
+    # the autostart re-applies the theme at every login, so it must go first
+    assert text.index("axon-firstboot.desktop") < text.index("gsettings reset")
+    assert "--dry-run" in text and "EUID} -eq 0" in text
