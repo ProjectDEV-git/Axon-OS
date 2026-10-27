@@ -117,3 +117,69 @@ def test_hwe_kernels_use_the_hwe_signed_module_packages(kernel):
         "linux-modules-nvidia-580-open-generic-hwe-24.04",
         "nvidia-driver-580-open",
     ]
+
+
+# -- NVIDIA branch by architecture -----------------------------------------------------------
+
+
+def _nv(name):
+    from gpu_drivers import Gpu
+
+    return Gpu("nvidia", name, "10de:0000", "")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("name", "generation"),
+    [
+        ("NVIDIA Corporation GP106 [GeForce GTX 1060 6GB]", "maxwell-volta"),
+        ("NVIDIA Corporation GM204 [GeForce GTX 970]", "maxwell-volta"),
+        ("NVIDIA Corporation GV100 [TITAN V]", "maxwell-volta"),
+        ("NVIDIA Corporation GP108 [GeForce GT 1030]", "maxwell-volta"),
+        ("NVIDIA Corporation TU117 [GeForce GTX 1650]", "turing+"),  # GTX, but Turing
+        ("NVIDIA Corporation TU106 [GeForce RTX 2060]", "turing+"),
+        ("NVIDIA Corporation AD104 [GeForce RTX 4070]", "turing+"),
+        ("NVIDIA Corporation GB202 [GeForce RTX 5090]", "turing+"),
+        ("GeForce GTX 1660 Ti", "turing+"),  # no chip code: the name decides
+        ("GeForce GTX 1070", "maxwell-volta"),
+        ("NVIDIA Corporation GK107 [GeForce GT 640]", "older"),
+        ("Something New", "unknown"),
+    ],
+)
+def test_nvidia_generation(name, generation):
+    from gpu_drivers import nvidia_generation
+
+    assert nvidia_generation(name) == generation
+
+
+@pytest.mark.unit
+def test_driver_branch_follows_the_architecture():
+    from gpu_drivers import choose_nvidia_driver
+
+    turing = _nv("NVIDIA Corporation TU106 [GeForce RTX 2060]")
+    pascal = _nv("NVIDIA Corporation GP106 [GeForce GTX 1060 6GB]")
+    kepler = _nv("NVIDIA Corporation GK107 [GeForce GT 640]")
+    assert choose_nvidia_driver([turing], "nvidia-driver-580-open") == "nvidia-driver-595-open"
+    assert choose_nvidia_driver([pascal], "nvidia-driver-595-open") == "nvidia-driver-580"
+    # the older card decides in a mixed machine: 580 supports both
+    assert choose_nvidia_driver([turing, pascal], None) == "nvidia-driver-580"
+    # not placed: ubuntu-drivers knows the PCI ids better than the name does
+    assert choose_nvidia_driver([kepler], "nvidia-driver-470") == "nvidia-driver-470"
+    assert choose_nvidia_driver([_nv("Something New")], "nvidia-driver-580") == "nvidia-driver-580"
+    # no NVIDIA card: nothing changes
+    from gpu_drivers import Gpu
+
+    assert choose_nvidia_driver([Gpu("amd", "Radeon", "1002:0", "")], None) is None
+
+
+@pytest.mark.unit
+def test_both_branches_have_signed_modules_on_both_releases():
+    for driver, modules in (
+        ("nvidia-driver-595-open", "linux-modules-nvidia-595-open-generic"),
+        ("nvidia-driver-580", "linux-modules-nvidia-580-generic"),
+    ):
+        assert signed_modules_package(driver, "6.8.0-147-generic", "noble") == modules
+        assert signed_modules_package(driver, "7.0.0-38-generic", "resolute") == modules
+        assert signed_modules_package(driver, "7.0.0-38-generic", "noble") == (
+            modules + "-hwe-24.04"
+        )

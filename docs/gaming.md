@@ -77,10 +77,13 @@ to keep your game smooth."* Instead:
 - **Run anyway** (`Brain.AllowCpuOnly`) allows the Speed model on the CPU only (`num_gpu: 0`,
   unloaded right after) for two minutes.
 
-Nothing loads a model onto the GPU during game mode.
+Nothing loads a model onto the GPU during game mode. The Ollama service itself stays enabled and running
+(an idle Ollama with no model loaded uses almost no memory): a model leaves GPU memory after 5 idle
+minutes (`OLLAMA_KEEP_ALIVE=5m` in the unit `install-ollama.sh` writes), and game mode unloads it at once.
 
 Settings (`~/.config/axon/gaming.json`, Axon Preferences → Gaming): *Pause AI during games*
-(on), *Use cloud provider during games* (off), *Pause file indexing during games* (on).
+(on), *Use cloud provider during games* (off), *Pause file indexing during games* (on), *Recognize Steam
+games automatically* (on).
 In the Intent Bar: "game mode on", "game mode off", "is game mode on". A controller icon appears
 in the taskbar while game mode is on; its menu lists the games and has **Exit game mode**.
 
@@ -91,8 +94,13 @@ axon-game-mode reset      # force game mode off
 
 ### Limits
 
-- GameMode only knows about a game if the launcher uses it. Lutris does by default; for Steam
-  add `gamemoderun %command%` to a game's launch options; Heroic has a GameMode toggle. Windows
+- GameMode only knows about a game if the launcher uses it. Lutris does by default; Heroic has a
+  GameMode toggle. **Steam games are found without it:** the Gaming service looks every 4 seconds for
+  Steam's own `reaper SteamLaunch AppId=<id>` helper, which exists for as long as a game runs (native
+  and Proton), and turns game mode on and off with it (`services/axon-gaming/steam_games.py`). That is on
+  by default; *Recognize Steam games automatically* in Game Center → Performance and in Preferences →
+  Gaming turns it off. `gamemoderun %command%` in a launch options is still worth adding for what
+  GameMode itself does (CPU governor, process priority); both together count as one game mode. Windows
   programs started with `axon-apex-run` always use it.
 - GameMode's hook does not say which game started, so those games show as "A game" and are not
   tracked by pid (GameMode itself reports when the last one exits).
@@ -157,7 +165,7 @@ Offline, it skips itself with "You can install these later from Game Center."
 ## Editions and size
 
 Two ISOs are built from the same sources (`build.sh --edition standard|nvidia`): **Standard** for AMD,
-Intel and older NVIDIA cards, and **NVIDIA** for GTX 16-series and newer, with the signed 580 driver and
+Intel and older NVIDIA cards, and **NVIDIA** for GTX 16-series and newer, with the signed 595 driver and
 the 32-bit libraries Steam needs. Both stay inside the budgets in `build/size-budget.conf` (3.5 / 3.9 GB
 and 4.3 / 4.7 GB); the build fails above the second number. Details, the release checklist and where
 the ISOs are hosted are in [docs/building.md](building.md).
@@ -201,7 +209,7 @@ the shortcut overlay (Super + /).
 
 ## Secure Boot and the NVIDIA driver
 
-- **NVIDIA edition:** the driver is Ubuntu's prebuilt, signed `linux-modules-nvidia-580-open-generic`.
+- **NVIDIA edition:** the driver is Ubuntu's prebuilt, signed `linux-modules-nvidia-595-open-generic`.
   Secure Boot trusts Canonical's signature already, so nothing needs enrolling.
 - **Standard edition, driver from Game Center:** on the 6.8 kernel Axon ships, Game Center installs the matching
   signed `linux-modules-nvidia-…-generic` package first, so apt does not choose the DKMS version. Signed this

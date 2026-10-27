@@ -165,6 +165,14 @@ class PreferencesWindow(Adw.ApplicationWindow):
             N_("Pause file indexing during games"),
             N_("Stops scanning your files until the game ends"),
         ),
+        (
+            "steam_games",
+            N_("Recognize Steam games automatically"),
+            N_(
+                "Starts game mode when a Steam game opens, even without a GameMode launch "
+                "option. Turn off if you only want game mode for games that ask for it"
+            ),
+        ),
     )
 
     def _build_gaming_group(self) -> Adw.PreferencesGroup:

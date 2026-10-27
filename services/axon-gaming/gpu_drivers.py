@@ -49,6 +49,60 @@ def parse_lspci(text: str) -> list[Gpu]:
     return gpus
 
 
+# The driver branch each NVIDIA generation gets. 595 (590 and later) dropped Maxwell, Pascal and
+# Volta, which 580 still supports with security updates until 2028; both are in the 24.04 and
+# 26.04 archives (checked 2026-10-27; on 26.04 the "590" names are transitional packages for
+# 595). Turing and newer use the open kernel modules, which pre-Turing cards cannot.
+NEW_BRANCH_DRIVER = "nvidia-driver-595-open"
+LEGACY_BRANCH_DRIVER = "nvidia-driver-580"
+
+_TURING_PLUS_CHIP = re.compile(r"\b(?:TU|GA|AD|GB|GH)\d{2,3}[A-Z]?\b")
+_PRE_TURING_CHIP = re.compile(r"\b(?:GM|GP|GV)\d{3}[A-Z]?\b")
+_OLDER_CHIP = re.compile(r"\b(?:GK|GF|G[0-9]{2}|GT2[0-9]{2})[0-9A-Z]*\b")
+_TURING_PLUS_NAME = re.compile(
+    r"\bRTX\b|\bGTX 16\d{2}\b|\bTITAN RTX\b|\bT[0-9]{3,4}\b|\b(?:A|L|H|B)[0-9]{2,3}\b", re.I
+)
+_PRE_TURING_NAME = re.compile(
+    r"\bGTX (?:9\d{2}|10\d{2}|TITAN)|\bGT 10\d{2}\b|\bTITAN (?:X|Xp|V)\b|\bQuadro [PMG][0-9]|\bTesla [PMV]",
+    re.I,
+)
+
+
+def nvidia_generation(name: str) -> str:
+    """ "turing+", "maxwell-volta", "older" (Kepler and before) or "unknown", from lspci's name.
+
+    The chip code ("GP106") says more than the marketing name, so it goes first.
+    """
+    if _TURING_PLUS_CHIP.search(name):
+        return "turing+"
+    if _PRE_TURING_CHIP.search(name):
+        return "maxwell-volta"
+    if _OLDER_CHIP.search(name):
+        return "older"
+    if _PRE_TURING_NAME.search(name):
+        return "maxwell-volta"
+    if _TURING_PLUS_NAME.search(name):
+        return "turing+"
+    return "unknown"
+
+
+def choose_nvidia_driver(gpus: list[Gpu], recommended: str | None) -> str | None:
+    """The driver package to offer, chosen by the cards' generation, not just "NVIDIA".
+
+    Turing and newer get the current branch with open modules; Maxwell, Pascal and Volta get
+    580. A card this cannot place (older, or a name it does not know) keeps whatever
+    ``ubuntu-drivers`` recommended, which knows the exact PCI ids.
+    """
+    generations = {nvidia_generation(g.name) for g in gpus if g.vendor == "nvidia"}
+    if not generations:
+        return recommended
+    if generations & {"older", "unknown"}:
+        return recommended
+    if "maxwell-volta" in generations:
+        return LEGACY_BRANCH_DRIVER
+    return NEW_BRANCH_DRIVER
+
+
 def sysfs_vram_gb(drm_root: Path = Path("/sys/class/drm")) -> dict[str, float]:
     """Dedicated video memory by PCI vendor id ("1002"), from amdgpu's sysfs files."""
     found: dict[str, float] = {}
@@ -114,7 +168,7 @@ def detect_graphics() -> dict:
 
     gpus = detect_gpus()
     nvidia = any(g.vendor == "nvidia" for g in gpus)
-    recommended = recommended_nvidia_driver() if nvidia else None
+    recommended = choose_nvidia_driver(gpus, recommended_nvidia_driver() if nvidia else None)
     return {
         "gpus": gpus,
         "recommended": recommended,

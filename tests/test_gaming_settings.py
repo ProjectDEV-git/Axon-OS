@@ -12,6 +12,7 @@ def test_defaults_when_file_is_missing(tmp_path):
         "pause_ai": True,
         "use_cloud": False,
         "pause_indexing": True,
+        "steam_games": True,
     }
 
 

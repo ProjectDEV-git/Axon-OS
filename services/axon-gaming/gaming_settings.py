@@ -15,6 +15,8 @@ DEFAULTS: dict[str, bool] = {
     "use_cloud": False,
     # Stop the file indexer while a game runs
     "pause_indexing": True,
+    # Start game mode for Steam games on their own, whether or not they use GameMode
+    "steam_games": True,
 }
 
 

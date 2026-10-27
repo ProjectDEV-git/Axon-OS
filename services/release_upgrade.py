@@ -181,8 +181,10 @@ def check_available_command() -> list[str]:
 
 
 def upgrade_command() -> list[str]:
-    """Ubuntu's upgrader without questions. Third-party sources stay: that keeps the Axon one,
-    whose suite is ``stable`` and so needs no change."""
+    """Ubuntu's upgrader without questions. ``--allow-third-party`` only stops it from touching
+    the sources: ``disable_third_party`` has already turned the others off, and the Axon one
+    (suite ``stable``, no change needed) must stay on, or the upgrader would call the Axon
+    packages obsolete."""
     return [
         "do-release-upgrade",
         "-f",
@@ -227,6 +229,224 @@ def post_upgrade_commands() -> list[list[str]]:
         ["apt-get", "-y", "-f", "install"],
         ["update-grub"],
     ]
+
+
+# -- Third-party apt sources -------------------------------------------------------------
+#
+# Outside repositories built for 24.04 are the commonest reason a release upgrade breaks, so,
+# like Ubuntu's own upgrader, we turn them off first. Ubuntu's archive and the Axon repository
+# stay on. Each change carries a marker, so it can be undone from the file alone.
+
+SOURCES_LIST = "etc/apt/sources.list"
+SOURCES_DIR = "etc/apt/sources.list.d"
+DISABLED_MARK = "# axon-update: turned off for the Ubuntu upgrade"
+LIST_PREFIX = "#axon-off# "
+
+_UBUNTU_HOST = re.compile(r"(?:^|\.)(?:ubuntu\.com|canonical\.com)$")
+_AXON_URI = re.compile(r"projectdev-git\.github\.io/Axon-OS", re.I)
+
+
+def _host(uri: str) -> str:
+    match = re.match(r"^[a-z+]+://([^/:]+)", uri.strip(), re.I)
+    return match.group(1).lower() if match else ""
+
+
+def is_official_source(uris: Sequence[str], suites: Sequence[str], codename: str) -> bool:
+    """True for Ubuntu's archive and its mirrors: an Ubuntu pocket of this release, from an
+    ubuntu.com host or from a mirror whose path ends in ``/ubuntu`` (PPAs and vendors use
+    other hosts, and often the same suite names, so the host decides first)."""
+    pocket = re.compile(rf"^{re.escape(codename)}(?:-(?:updates|security|backports|proposed))?$")
+    if not suites or not all(pocket.match(x) for x in suites):
+        return False
+    for uri in uris:
+        host = _host(uri)
+        if _UBUNTU_HOST.search(host):
+            continue
+        if re.search(r"/ubuntu/?$", uri.strip()) and "ppa" not in host and "launchpad" not in host:
+            continue  # a mirror
+        return False
+    return bool(uris)
+
+
+def is_axon_source(uris: Sequence[str]) -> bool:
+    return any(_AXON_URI.search(u) for u in uris)
+
+
+@dataclass(frozen=True)
+class SourceFile:
+    """One apt source file, and what the upgrade does with it."""
+
+    path: str  # relative to the root, e.g. etc/apt/sources.list.d/foo.list
+    summary: str  # what it points at, for the user
+
+
+def _stanzas(text: str) -> list[list[str]]:
+    out: list[list[str]] = [[]]
+    for line in text.splitlines():
+        if line.strip():
+            out[-1].append(line)
+        elif out[-1]:
+            out.append([])
+    return [s for s in out if s]
+
+
+def _field(stanza: list[str], name: str) -> list[str]:
+    for line in stanza:
+        key, _, value = line.partition(":")
+        if key.strip().lower() == name.lower():
+            return value.split()
+    return []
+
+
+def _list_line(line: str) -> tuple[list[str], list[str]] | None:
+    """(uris, suites) of a ``deb ...`` line, or None for anything else."""
+    parts = line.split("#", 1)[0].split()
+    if not parts or parts[0] not in ("deb", "deb-src"):
+        return None
+    rest = parts[1:]
+    if rest and rest[0].startswith("["):  # options
+        while rest and not rest[0].endswith("]"):
+            rest.pop(0)
+        rest = rest[1:]
+    if len(rest) < 2:
+        return None
+    return [rest[0]], [rest[1]]
+
+
+def disable_third_party(root: Path, codename: str) -> list[SourceFile]:
+    """Turn off every enabled third-party source file entry; returns what was turned off."""
+    changed: list[SourceFile] = []
+    files = [root / SOURCES_LIST, *sorted((root / SOURCES_DIR).glob("*"))]
+    for path in files:
+        if not path.is_file() or path.suffix not in ("", ".list", ".sources"):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        rel = str(path.relative_to(root))
+        if path.suffix == ".sources":
+            new, summaries = _disable_deb822(text, codename)
+        else:
+            new, summaries = _disable_list(text, codename)
+        if summaries:
+            path.write_text(new, encoding="utf-8")
+            changed += [SourceFile(rel, s) for s in summaries]
+    return changed
+
+
+def _disable_deb822(text: str, codename: str) -> tuple[str, list[str]]:
+    blocks: list[str] = []
+    summaries: list[str] = []
+    for stanza in _stanzas(text):
+        uris, suites = _field(stanza, "URIs"), _field(stanza, "Suites")
+        enabled = (_field(stanza, "Enabled") or ["yes"])[0].lower() != "no"
+        keep = is_official_source(uris, suites, codename) or is_axon_source(uris)
+        if enabled and not keep and uris:
+            stanza = [DISABLED_MARK, "Enabled: no", *stanza]
+            summaries.append(f"{uris[0]} {' '.join(suites)}".strip())
+        blocks.append("\n".join(stanza))
+    return "\n\n".join(blocks) + "\n", summaries
+
+
+def _disable_list(text: str, codename: str) -> tuple[str, list[str]]:
+    lines: list[str] = []
+    summaries: list[str] = []
+    for line in text.splitlines():
+        parsed = _list_line(line) if not line.lstrip().startswith("#") else None
+        if parsed and not (is_official_source(*parsed, codename) or is_axon_source(parsed[0])):
+            lines.append(LIST_PREFIX + line)
+            summaries.append(f"{parsed[0][0]} {parsed[1][0]}")
+        else:
+            lines.append(line)
+    return "\n".join(lines) + "\n", summaries
+
+
+def third_party_preview(root: Path, codename: str) -> list[SourceFile]:
+    """What ``disable_third_party`` would turn off, without changing anything."""
+    found: list[SourceFile] = []
+    for path in [root / SOURCES_LIST, *sorted((root / SOURCES_DIR).glob("*"))]:
+        if not path.is_file() or path.suffix not in ("", ".list", ".sources"):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        rel = str(path.relative_to(root))
+        _new, summaries = (
+            _disable_deb822(text, codename)
+            if path.suffix == ".sources"
+            else _disable_list(text, codename)
+        )
+        found += [SourceFile(rel, x) for x in summaries]
+    return found
+
+
+def disabled_sources(root: Path) -> list[SourceFile]:
+    """The entries ``disable_third_party`` turned off and nobody has turned back on."""
+    found: list[SourceFile] = []
+    for path in [*sorted((root / SOURCES_DIR).glob("*")), root / SOURCES_LIST]:
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        found += turned_off_in(text, str(path.relative_to(root)))
+    return found
+
+
+def enable_sources(root: Path, only: str | None = None) -> list[SourceFile]:
+    """Turn the entries back on (all, or those in the file ``only``); returns what was done."""
+    done: list[SourceFile] = []
+    for entry_file in sorted({f.path for f in disabled_sources(root)}):
+        if only and only not in (entry_file, Path(entry_file).name):
+            continue
+        path = root / entry_file
+        text = path.read_text(encoding="utf-8")
+        if path.suffix == ".sources":
+            blocks = []
+            for stanza in _stanzas(text):
+                if DISABLED_MARK in stanza:
+                    stanza = [
+                        ln
+                        for ln in stanza
+                        if ln != DISABLED_MARK and ln.strip().lower() != "enabled: no"
+                    ]
+                blocks.append("\n".join(stanza))
+            new = "\n\n".join(blocks) + "\n"
+        else:
+            new = (
+                "\n".join(
+                    ln[len(LIST_PREFIX) :] if ln.startswith(LIST_PREFIX) else ln
+                    for ln in text.splitlines()
+                )
+                + "\n"
+            )
+        path.write_text(new, encoding="utf-8")
+        done += turned_off_in(text, entry_file)
+    return done
+
+
+def turned_off_in(text: str, rel: str) -> list[SourceFile]:
+    """What ``text`` (a file's content) has turned off, for reporting after it was turned on."""
+    found: list[SourceFile] = []
+    if rel.endswith(".sources"):
+        for stanza in _stanzas(text):
+            if DISABLED_MARK in stanza:
+                uris = _field(stanza, "URIs")
+                found.append(
+                    SourceFile(
+                        rel, f"{(uris or ['?'])[0]} {' '.join(_field(stanza, 'Suites'))}".strip()
+                    )
+                )
+    else:
+        for line in text.splitlines():
+            if line.startswith(LIST_PREFIX):
+                parsed = _list_line(line[len(LIST_PREFIX) :])
+                if parsed:
+                    found.append(SourceFile(rel, f"{parsed[0][0]} {parsed[1][0]}"))
+    return found
 
 
 # -- Reading the machine ----------------------------------------------------------------
@@ -397,6 +617,17 @@ def run_release_upgrade(
             encoding="utf-8",
         )
 
+    turned_off = disable_third_party(root, facts.codename)
+    if turned_off:
+        names = ", ".join(sorted({f.summary.split()[0] for f in turned_off}))
+        progress(
+            0.28,
+            _("Step 3 / 5"),
+            _("Turned off {n} outside software sources: {names}").format(
+                n=len(turned_off), names=names
+            ),
+        )
+
     progress(
         0.30,
         _("Step 4 / 5"),
@@ -413,6 +644,10 @@ def run_release_upgrade(
         if snapshot
         else ""
     )
+    if turned_off:
+        way_back += _(
+            " Outside software sources stay off; axon-update --enable-sources turns them on."
+        )
     if rc != 0:
         return _("The upgrade failed: {error}").format(error=out.strip()[-300:]) + way_back
 
@@ -438,12 +673,19 @@ def run_release_upgrade(
                 )
                 + way_back
             )
+    note = ""
+    if turned_off:
+        note = " " + _(
+            "{n} outside software sources were turned off; turn them back on with "
+            "axon-update --enable-sources once their makers support Ubuntu {version}."
+        ).format(n=len(turned_off), version=RELEASE_NAMES[target])
     progress(
         1.0,
         "",
         _("Upgrade complete. Restart to start Ubuntu {version}.").format(
             version=RELEASE_NAMES[target]
-        ),
+        )
+        + note,
     )
     return None
 

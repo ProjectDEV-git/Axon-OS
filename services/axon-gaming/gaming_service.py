@@ -39,6 +39,7 @@ if _this not in sys.path:
     sys.path.insert(0, _this)
 import game_mode
 import gaming_settings
+import steam_games
 from service_base import ServiceBase
 
 IFACE = DBUS_NAME_GAMING
@@ -46,6 +47,9 @@ SETTINGS_FILE = AXON_CONFIG_DIR / "gaming.json"
 
 # Short D-Bus timeout (seconds): a stuck service must not stall game launch.
 _CALL_TIMEOUT = 5
+# How often to look for Steam games (a scan reads the command line of the few processes
+# that mention Steam; the grace period hides a launcher that restarts its game)
+STEAM_POLL_SECONDS = 4
 
 
 class GamingService(ServiceBase):
@@ -59,9 +63,11 @@ class GamingService(ServiceBase):
             on_change=self._on_mode_change, clock=time.monotonic
         )
         self._grace_source = 0
+        self._steam = steam_games.SteamWatcher(self._steam_enter, self._steam_leave)
         # Start from a known state: nothing suspended, whatever happened before.
         self._resume_all()
         GLib.timeout_add_seconds(int(game_mode.DEFAULT_POLL_SECONDS), self._on_poll)
+        GLib.timeout_add_seconds(STEAM_POLL_SECONDS, self._on_steam_poll)
         # A service that (re)starts during a game must be put back to sleep.
         self.session_bus.add_signal_receiver(
             self._on_name_owner_changed,
@@ -103,12 +109,14 @@ class GamingService(ServiceBase):
 
     @dbus.service.method(IFACE, in_signature="sb", out_signature="b")
     def SetSetting(self, key, value):
-        """Change one setting ("pause_ai", "use_cloud" or "pause_indexing")."""
+        """Change one setting ("pause_ai", "use_cloud", "pause_indexing" or "steam_games")."""
         key = str(key)
         if key not in gaming_settings.DEFAULTS:
             return False
         self._settings[key] = bool(value)
         gaming_settings.save(SETTINGS_FILE, self._settings)
+        if key == "steam_games":
+            self._on_steam_poll()  # look now (or let go of the games it was holding)
         if self._manager.active:
             self._apply_active()  # take effect now, not at the next game
         return True
@@ -140,6 +148,29 @@ class GamingService(ServiceBase):
         self.logger.info("Game mode %s", "on" if active else "off")
         self.GameModeChanged(active, app_id)
         self.notify_property_changed(IFACE, "Active", "ActiveGames")
+
+    def _steam_enter(self, app_id, pid):
+        token = self._manager.enter(app_id, pid)
+        self.logger.info("Steam game started: %s (pid %d)", app_id, pid)
+        self.notify_property_changed(IFACE, "ActiveGames")
+        return token
+
+    def _steam_leave(self, token):
+        if self._manager.exit(token):
+            self.logger.info("Steam game ended")
+            self.notify_property_changed(IFACE, "ActiveGames")
+            self._arm_grace_timer()
+
+    def _on_steam_poll(self):
+        """Follow Steam's own games. Off when the user turned the setting off."""
+        try:
+            if self._settings["steam_games"]:
+                self._steam.poll()
+            elif self._steam.tracked:
+                self._steam.stop()
+        except Exception:  # a scan problem must never stop the timer
+            self.logger.exception("Steam game scan failed")
+        return True
 
     def _on_poll(self):
         self._manager.tick()

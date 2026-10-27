@@ -25,7 +25,12 @@ def gaming(tmp_path):
     """A GamingService without a bus: calls to other services are recorded."""
     service = gaming_service.GamingService.__new__(gaming_service.GamingService)
     service.logger = MagicMock()
-    service._settings = {"pause_ai": True, "use_cloud": False, "pause_indexing": True}
+    service._settings = {
+        "pause_ai": True,
+        "use_cloud": False,
+        "pause_indexing": True,
+        "steam_games": True,
+    }
     service._calls = []
     service._call = lambda name, path, method, *args: service._calls.append((name, method, *args))
     service.GameModeChanged = MagicMock()
@@ -327,3 +332,52 @@ def test_service_base_properties():
         demo.Get("demo.Iface", "Nope")
     with pytest.raises(dbus.exceptions.DBusException, match="read-only"):
         demo.Set("demo.Iface", "Flag", dbus.Boolean(False))
+
+
+@pytest.mark.unit
+class TestSteamGames:
+    """The service follows Steam's own games when the setting is on (the default)."""
+
+    @pytest.fixture
+    def steam(self, gaming):
+        import steam_games
+
+        procs = []
+        gaming._steam = steam_games.SteamWatcher(
+            gaming._steam_enter, gaming._steam_leave, scan=lambda: list(procs)
+        )
+        gaming._procs = procs
+        return gaming
+
+    def game(self, steam, app_id="620", pid=100):
+        steam._procs[:] = [(pid, ["/s/reaper", "SteamLaunch", f"AppId={app_id}", "--", "/g"])]
+
+    def test_a_steam_game_turns_game_mode_on_and_off(self, steam):
+        self.game(steam)
+        steam._on_steam_poll()
+        assert steam._manager.active
+        assert ("org.axonos.Brain", "Suspend", "game mode") in steam._calls
+        steam._procs.clear()
+        steam._on_steam_poll()
+        assert steam._manager.grace_pending, "ends after the usual grace period"
+
+    def test_turning_the_setting_off_lets_go_of_the_game(self, steam):
+        self.game(steam)
+        steam._on_steam_poll()
+        steam._settings["steam_games"] = False
+        steam._on_steam_poll()
+        assert steam._steam.tracked == [] and steam._manager.grace_pending
+
+    def test_nothing_is_looked_at_while_the_setting_is_off(self, steam):
+        steam._settings["steam_games"] = False
+        self.game(steam)
+        steam._on_steam_poll()
+        assert not steam._manager.active
+
+    def test_a_game_that_also_uses_gamemode_counts_once_it_is_over_twice(self, steam):
+        steam._manager.enter("A game", 0)  # GameMode's hook
+        self.game(steam)
+        steam._on_steam_poll()
+        steam._procs.clear()
+        steam._on_steam_poll()
+        assert steam._manager.active, "GameMode's game is still running"

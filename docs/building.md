@@ -75,9 +75,9 @@ python3 scripts/verify-packages.py     # every name in the lists and metapackage
 
 The NVIDIA edition installs `axon-nvidia` (`packaging/axon-nvidia`): Ubuntu's prebuilt and signed
 `linux-modules-nvidia-580-open-generic` (no DKMS, so no compiler on the image and Secure Boot works),
-the 580 userspace libraries and the 32-bit OpenGL libraries Steam needs. The open kernel modules
+the 595 userspace libraries and the 32-bit OpenGL libraries Steam needs. The open kernel modules
 need a GTX 16-series or newer card; older cards use the Standard edition and the driver Game Center
-offers. **Driver branch:** 580, checked against the noble archive on 2026-10-27. To move to another
+offers. **Driver branch:** 595 (Turing and newer), checked against the noble and resolute archives on 2026-10-27; cards before Turing get 580 from Game Center (see [ubuntu-26.04.md](ubuntu-26.04.md)). To move to another
 branch, change every `580` in `packaging/axon-nvidia/control` together (a test checks they match) and
 run `scripts/verify-packages.py`.
 

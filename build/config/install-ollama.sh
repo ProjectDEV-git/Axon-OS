@@ -121,6 +121,9 @@ Group=ollama
 Restart=always
 RestartSec=3
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# The service stays on, but an idle model leaves GPU memory after 5 minutes (Ollama's default,
+# written down so it is not changed by accident). Game mode unloads models at once.
+Environment="OLLAMA_KEEP_ALIVE=5m"
 
 [Install]
 WantedBy=multi-user.target

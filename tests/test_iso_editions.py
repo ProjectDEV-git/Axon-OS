@@ -59,11 +59,11 @@ def test_the_nvidia_edition_installs_the_nvidia_metapackage():
 @pytest.mark.unit
 def test_nvidia_metapackage_uses_signed_prebuilt_modules_and_has_32_bit_gl():
     depends = [d.strip() for d in control("axon-nvidia")["Depends"].split(",")]
-    assert "linux-modules-nvidia-580-open-generic" in depends, "prebuilt, Secure Boot signed"
-    assert "libnvidia-gl-580:i386" in depends, "Steam on NVIDIA needs the 32-bit GL libraries"
+    assert "linux-modules-nvidia-595-open-generic" in depends, "prebuilt, Secure Boot signed"
+    assert "libnvidia-gl-595:i386" in depends, "Steam on NVIDIA needs the 32-bit GL libraries"
     assert not any("dkms" in d or "kernel-source" in d for d in depends), "no compiler on the image"
     branches = {m.group(1) for d in depends if (m := re.search(r"nvidia[a-z0-9-]*?-(\d{3})\b", d))}
-    assert branches == {"580"}, f"every NVIDIA package must be the same branch: {branches}"
+    assert branches == {"595"}, f"every NVIDIA package must be the same branch: {branches}"
 
 
 @pytest.mark.unit
@@ -79,7 +79,7 @@ def test_chroot_setup_reads_the_edition_lists_and_fails_without_the_driver():
     text = (ROOT / "build" / "config" / "chroot-setup.sh").read_text()
     assert "build/package-lists/common.list" in text
     assert "build/package-lists/${EDITION}.list" in text
-    assert "dpkg -s axon-nvidia" in text and "libnvidia-gl-580:i386" in text
+    assert "dpkg -s axon-nvidia" in text and "libnvidia-gl-595:i386" in text
     assert "snapd" in text and "language-pack-" in text, "slimming step"
     assert "rm -f /tmp/axon-gaming-debs/axon-nvidia_*.deb" in text, "standard edition has no driver"
 

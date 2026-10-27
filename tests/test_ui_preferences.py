@@ -171,6 +171,7 @@ def test_gaming_switches_write_settings(tmp_path: Path) -> None:
         "pause_ai": True,
         "use_cloud": True,
         "pause_indexing": False,
+        "steam_games": True,
     }
     # The cloud option only makes sense while AI is paused
     switches["pause_ai"].set_active(False)

@@ -121,6 +121,32 @@ def _disk_free_mb(path: str) -> int:
         return 0
 
 
+def _sources_cli(ru, argv: list[str]) -> int:
+    """``--list-sources`` (what the upgrade turns off, and what it has) and ``--enable-sources``."""
+    from pathlib import Path
+
+    root = Path("/")
+    if "--enable-sources" in argv:
+        rest = argv[argv.index("--enable-sources") + 1 :]
+        only = rest[0] if rest and not rest[0].startswith("-") else None
+        done = ru.enable_sources(root, only)
+        for item in done:
+            print(_("Turned on: {name}  ({file})").format(name=item.summary, file=item.path))  # noqa: T201
+        if not done:
+            print(_("Nothing to turn on."))  # noqa: T201
+        return 0
+    off = ru.disabled_sources(root)
+    for item in off:
+        print(_("Off: {name}  ({file})").format(name=item.summary, file=item.path))  # noqa: T201
+    codename = ru.read_codename(root)
+    would = ru.third_party_preview(root, codename)
+    for item in would:
+        print(_("Would be turned off: {name}  ({file})").format(name=item.summary, file=item.path))  # noqa: T201
+    if not off and not would:
+        print(_("No outside software sources."))  # noqa: T201
+    return 0
+
+
 def run_release_upgrade_cli(argv: list[str]) -> int:
     """``axon-update --release-upgrade`` and its companions; see services/release_upgrade.py."""
     import tempfile
@@ -140,6 +166,8 @@ def run_release_upgrade_cli(argv: list[str]) -> int:
     if os.geteuid() != 0:
         logger.error("the release upgrade must run as root (use sudo)")
         return 1
+    if "--list-sources" in argv or "--enable-sources" in argv:
+        return _sources_cli(ru, argv)
     if "--check-release" in argv:
         target = ru.target_for(ru.read_codename())
         if target is None:

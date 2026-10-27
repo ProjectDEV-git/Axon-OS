@@ -276,7 +276,7 @@ rm -rf /tmp/axon-gaming-debs
 if [[ "${EDITION}" == "nvidia" ]]; then
     # The driver is the whole point of this edition: fail the build if it is not there
     dpkg -s axon-nvidia >/dev/null 2>&1 || { log "ERROR: axon-nvidia is not installed"; exit 1; }
-    dpkg -s libnvidia-gl-580:i386 >/dev/null 2>&1 \
+    dpkg -s libnvidia-gl-595:i386 >/dev/null 2>&1 \
         || { log "ERROR: 32-bit NVIDIA GL libraries (needed by Steam) are missing"; exit 1; }
 fi
 

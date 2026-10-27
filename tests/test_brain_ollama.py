@@ -174,3 +174,11 @@ class TestStreamErrors:
         )
         assert out == ["hi"]
         assert service._http_post.call_args.kwargs["timeout"] == bs._OLLAMA_LOAD_TIMEOUT
+
+
+def test_ollama_service_stays_on_and_models_unload_when_idle():
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parent.parent / "build/config/install-ollama.sh").read_text()
+    assert "WantedBy=multi-user.target" in text and "systemctl enable --now ollama.service" in text
+    assert 'Environment="OLLAMA_KEEP_ALIVE=5m"' in text

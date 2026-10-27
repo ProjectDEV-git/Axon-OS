@@ -159,6 +159,7 @@ def test_upgrade_command_keeps_third_party_sources_and_asks_nothing():
     cmd = ru.upgrade_command()
     assert cmd[0] == "do-release-upgrade"
     assert "DistUpgradeViewNonInteractive" in cmd and "--allow-third-party" in cmd
+    # the sources were already handled by us; the upgrader must leave the Axon one on
 
 
 # -- reading the machine -------------------------------------------------------------------
@@ -244,7 +245,11 @@ def tree(tmp_path, codename="noble"):
     (tmp_path / "etc" / "os-release").write_text(f"UBUNTU_CODENAME={codename}\nLOGO=axon-os\n")
     (tmp_path / "etc" / "update-manager" / "release-upgrades").write_text("Prompt=normal\n")
     (tmp_path / "etc" / "apt" / "sources.list.d" / "axon-os.sources").write_text(
-        "Types: deb\nEnabled: no\nSuites: stable\n"
+        "Types: deb\nURIs: https://projectdev-git.github.io/Axon-OS/apt\nSuites: stable\n"
+        "Components: main\n"
+    )
+    (tmp_path / "etc" / "apt" / "sources.list.d" / "brave.sources").write_text(
+        "Types: deb\nURIs: https://brave-browser-apt-release.s3.brave.com\nSuites: stable\n"
     )
     return tmp_path
 
@@ -275,7 +280,13 @@ def test_a_full_upgrade_snapshots_first_then_fixes_up(tmp_path):
     assert "mount -o subvolid=5 /dev/sda2 /mnt/top" in cmds and "umount /mnt/top" in cmds
     assert cmds[-1] == "update-grub"
     assert "UBUNTU_CODENAME=resolute" in (root / "etc/os-release").read_text()
-    assert "Enabled" not in (root / "etc/apt/sources.list.d/axon-os.sources").read_text()
+    axon = (root / "etc/apt/sources.list.d/axon-os.sources").read_text()
+    assert "Enabled" not in axon, "the Axon source stays on"
+    assert "Enabled: no" in (root / "etc/apt/sources.list.d/brave.sources").read_text()
+    assert any("Turned off 1 outside" in m for _f, m in machine.progress)
+    assert any("--enable-sources" in m for _f, m in machine.progress)
+    brave_off = [i for i, c in enumerate(cmds) if c.startswith("do-release-upgrade -f")]
+    assert brave_off, "upgrade ran after the sources were changed"
     assert "Prompt=lts" in (root / "etc/update-manager/release-upgrades").read_text()
     record = json.loads((root / ru.RECORD).read_text())
     assert record == {
@@ -433,3 +444,122 @@ def test_grub_output_is_a_valid_script(tmp_path):
     cfg.write_text(run_rollback_script(tmp_path).stdout)
     check = subprocess.run(["grub-script-check", str(cfg)], capture_output=True, text=True)
     assert check.returncode == 0, check.stderr
+
+
+# -- Third-party apt sources ---------------------------------------------------------------
+
+UBUNTU_SOURCES = """Types: deb
+URIs: http://archive.ubuntu.com/ubuntu
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+
+Types: deb
+URIs: http://security.ubuntu.com/ubuntu
+Suites: noble-security
+Components: main
+"""
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("uris", "suites", "official"),
+    [
+        (["http://archive.ubuntu.com/ubuntu"], ["noble", "noble-updates"], True),
+        (["https://security.ubuntu.com/ubuntu/"], ["noble-security"], True),
+        (["https://mirror.example.edu/ubuntu/"], ["noble"], True),  # a mirror
+        (["https://archive.canonical.com/ubuntu"], ["noble"], True),  # partner
+        (["https://ppa.launchpadcontent.net/x/y/ubuntu"], ["noble"], False),
+        (["https://dl.google.com/linux/chrome/deb/"], ["stable"], False),
+        (["http://archive.ubuntu.com/ubuntu"], ["jammy"], False),  # another release
+        ([], ["noble"], False),
+    ],
+)
+def test_what_counts_as_ubuntu(uris, suites, official):
+    assert ru.is_official_source(uris, suites, "noble") is official
+
+
+@pytest.mark.unit
+def test_third_party_sources_are_turned_off_and_ubuntu_and_axon_stay(tmp_path):
+    d = tmp_path / "etc/apt/sources.list.d"
+    d.mkdir(parents=True)
+    (d / "ubuntu.sources").write_text(UBUNTU_SOURCES)
+    (d / "axon-os.sources").write_text(
+        "Types: deb\nURIs: https://projectdev-git.github.io/Axon-OS/apt\nSuites: stable\n"
+    )
+    (d / "multi.sources").write_text(
+        "Types: deb\nURIs: https://one.example/apt\nSuites: stable\n\n"
+        "Types: deb\nURIs: http://archive.ubuntu.com/ubuntu\nSuites: noble\n"
+    )
+    (d / "ppa.list").write_text(
+        "deb https://ppa.launchpadcontent.net/a/b/ubuntu noble main\n# deb https://old.example/ noble main\n"
+        "deb [arch=amd64 signed-by=/k.gpg] https://vendor.example/deb stable main\n"
+    )
+    (tmp_path / "etc/apt/sources.list").write_text(
+        "deb http://archive.ubuntu.com/ubuntu noble main\n"
+    )
+    before = {p.name: p.read_text() for p in d.iterdir()}
+
+    changed = ru.disable_third_party(tmp_path, "noble")
+
+    assert sorted(c.summary for c in changed) == [
+        "https://one.example/apt stable",
+        "https://ppa.launchpadcontent.net/a/b/ubuntu noble",
+        "https://vendor.example/deb stable",
+    ]
+    assert (d / "ubuntu.sources").read_text() == before["ubuntu.sources"]
+    assert (d / "axon-os.sources").read_text() == before["axon-os.sources"]
+    multi = (d / "multi.sources").read_text()
+    assert multi.count("Enabled: no") == 1 and "archive.ubuntu.com" in multi.split("\n\n")[1]
+    listed = (d / "ppa.list").read_text()
+    assert listed.splitlines()[0].startswith(ru.LIST_PREFIX)
+    assert "# deb https://old.example/ noble main" in listed, "comments are left alone"
+    assert (
+        tmp_path / "etc/apt/sources.list"
+    ).read_text() == "deb http://archive.ubuntu.com/ubuntu noble main\n"
+    # a second run finds nothing more to turn off
+    assert ru.disable_third_party(tmp_path, "noble") == []
+
+
+@pytest.mark.unit
+def test_turned_off_sources_can_be_listed_and_turned_back_on(tmp_path):
+    d = tmp_path / "etc/apt/sources.list.d"
+    d.mkdir(parents=True)
+    original = {
+        "multi.sources": "Types: deb\nURIs: https://one.example/apt\nSuites: stable\n\n"
+        "Types: deb\nURIs: http://archive.ubuntu.com/ubuntu\nSuites: noble\n",
+        "ppa.list": "deb https://ppa.launchpadcontent.net/a/b/ubuntu noble main\n",
+        "other.list": "deb https://other.example/ stable main\n",
+    }
+    for name, text in original.items():
+        (d / name).write_text(text)
+    ru.disable_third_party(tmp_path, "noble")
+
+    off = ru.disabled_sources(tmp_path)
+    assert {(o.path.split("/")[-1], o.summary) for o in off} == {
+        ("multi.sources", "https://one.example/apt stable"),
+        ("ppa.list", "https://ppa.launchpadcontent.net/a/b/ubuntu noble"),
+        ("other.list", "https://other.example/ stable"),
+    }
+    # one file back on
+    assert [o.path for o in ru.enable_sources(tmp_path, "ppa.list")] == [
+        "etc/apt/sources.list.d/ppa.list"
+    ]
+    assert (d / "ppa.list").read_text().strip() == original["ppa.list"].strip()
+    assert len(ru.disabled_sources(tmp_path)) == 2
+    # everything else back on: the files read as before (up to blank lines)
+    assert len(ru.enable_sources(tmp_path)) == 2
+    assert ru.disabled_sources(tmp_path) == []
+    for name, text in original.items():
+        assert (d / name).read_text().split() == text.split(), name
+
+
+@pytest.mark.unit
+def test_preview_changes_nothing(tmp_path):
+    d = tmp_path / "etc/apt/sources.list.d"
+    d.mkdir(parents=True)
+    (d / "x.list").write_text("deb https://x.example/ stable main\n")
+    assert [p.summary for p in ru.third_party_preview(tmp_path, "noble")] == [
+        "https://x.example/ stable"
+    ]
+    assert (d / "x.list").read_text() == "deb https://x.example/ stable main\n"
+    assert ru.disabled_sources(tmp_path) == []

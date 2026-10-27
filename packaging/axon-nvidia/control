@@ -2,12 +2,12 @@ Package: axon-nvidia
 Version: @VERSION@
 Architecture: all
 Maintainer: Axon OS <axon-os@users.noreply.github.com>
-Depends: linux-modules-nvidia-580-open-generic, nvidia-kernel-common-580, libnvidia-gl-580, libnvidia-gl-580:i386, libnvidia-compute-580, libnvidia-extra-580, libnvidia-decode-580, libnvidia-encode-580, libnvidia-fbc1-580, libnvidia-cfg1-580, nvidia-utils-580, nvidia-compute-utils-580, xserver-xorg-video-nvidia-580
+Depends: linux-modules-nvidia-595-open-generic, nvidia-kernel-common-595, libnvidia-gl-595, libnvidia-gl-595:i386, libnvidia-compute-595, libnvidia-extra-595, libnvidia-decode-595, libnvidia-encode-595, libnvidia-fbc1-595, libnvidia-cfg1-595, nvidia-utils-595, nvidia-compute-utils-595, xserver-xorg-video-nvidia-595
 Section: libs
 Priority: optional
 Homepage: https://github.com/ProjectDEV-git/Axon-OS
 Description: NVIDIA driver for Axon OS (GTX 16-series, RTX and newer)
- The NVIDIA 580 driver with the open kernel modules, as Ubuntu's prebuilt
+ The NVIDIA 595 driver with the open kernel modules, as Ubuntu's prebuilt
  and signed packages, so it loads with Secure Boot on and needs no compiler
  on the machine. Includes the 32-bit OpenGL libraries Steam needs. Cards
  older than the GTX 16-series are not supported by the open modules; use the

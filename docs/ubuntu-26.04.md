@@ -54,7 +54,24 @@ on 24.04's HWE kernels. The GRUB fallback entry (`41_axon_kernel_fallback`) is n
 kernel series, if a newer one exists", which also gives an upgraded system its old 6.8 kernel to fall
 back to until it is cleaned up.
 
-**Driver branch.** 580 is still in 26.04 (580.178), next to 590 (595.99). It was not changed.
+**Driver branches (NVIDIA).** The NVIDIA ISO uses **595**; 580 is for older cards. 590 and 595 dropped
+Maxwell, Pascal and Volta; 595 supports Turing (GTX 16-series) and newer
+([sources](https://wiki.nobaraproject.org/graphics/nvidia/supported-gpus)); 580 keeps security
+updates for the older cards. Checked in the archives on 2026-10-27:
+
+| Package | 24.04 | 26.04 |
+|---|---|---|
+| `nvidia-driver-595[-open]`, `linux-modules-nvidia-595-open-generic`, `libnvidia-gl-595` (+ `:i386`) | 595.99 | 595.99 |
+| `nvidia-driver-590[-open]` | **590.48 (real)** | transitional package for 595 |
+| `nvidia-driver-580[-open]` | 580.178 | 580.178 |
+
+So "590" is not one driver across both releases; **595 is the same on both**, and is what
+`packaging/axon-nvidia` depends on. The Hardware Profiler (`gpu_drivers.choose_nvidia_driver`) picks the
+branch from the card's generation (chip code such as `GP106` or `TU117` in the `lspci` name, then the
+marketing name): Turing and newer get `nvidia-driver-595-open`, Maxwell/Pascal/Volta get
+`nvidia-driver-580` (open modules do not support them), and a card it cannot place keeps what
+`ubuntu-drivers` recommends. A machine with both kinds gets 580, which covers both. Both branches have
+signed prebuilt modules on both releases.
 
 ## GNOME Shell 50
 
@@ -105,14 +122,27 @@ snapshot. It is a normal system; to make it *the* system again, run `sudo axon-u
 from there: the upgraded `@` is renamed `@axon-failed-upgrade-<time>` and a new `@` is made from the
 snapshot. The factory rollback entry (`@axon-fallback`) stays as before.
 
-Not done: a button in the updater window (the command can be started with `pkexec`, the polkit action
-covers `axon-update`), and a prompt that offers the upgrade. Both should wait until the upgrade has been
-tried on a real machine, which has not happened. The module and its decisions are covered by
+Not done, on purpose: a button in the updater window. It waits until `--release-upgrade` and
+`--rollback-upgrade` have passed on real BTRFS machines (the command can already be started with `pkexec`;
+the polkit action covers `axon-update`). When it is added it must only appear if a snapshot can be taken,
+and on a system that is not on BTRFS it must say why the upgrade is not offered there. The module and its decisions are covered by
 `tests/test_release_upgrade.py`, including the GRUB entry; `do-release-upgrade` itself, BTRFS and
 GRUB are faked or stubbed there.
 
-Known cost: Ubuntu's upgrader disables third-party sources it does not know; `--allow-third-party`
-keeps them, so a source that does not support 26.04 will make `apt update` complain afterwards.
+**Outside software sources are turned off first**, like Ubuntu's own upgrader does, because repositories
+built for 24.04 are the commonest reason an upgrade breaks. Ubuntu's archive (and its mirrors) and
+the Axon repository stay on; the Axon one has to, or the upgrader would call the Axon packages obsolete.
+Each entry that is turned off gets a marker (`Enabled: no` for `.sources`, a `#axon-off# ` prefix for
+`.list` lines), so it can be undone from the file alone. At the end the upgrade lists how many were turned
+off. Flatpak apps are not touched.
+
+```bash
+sudo axon-update --list-sources            # what is off, and what the upgrade would turn off
+sudo axon-update --enable-sources          # turn all back on
+sudo axon-update --enable-sources foo.list # or one file
+```
+
+Turn a source back on only once its maker supports 26.04; otherwise `apt update` will complain.
 
 ## Size check (estimate)
 

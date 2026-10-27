@@ -625,6 +625,14 @@ class GameCenterWindow(Adw.ApplicationWindow):
                 _("Pause file indexing during games"),
                 _("Stops scanning your files until the game ends"),
             ),
+            (
+                "steam_games",
+                _("Recognize Steam games automatically"),
+                _(
+                    "Starts game mode when a Steam game opens, even without a GameMode launch option. "
+                    "Turn off if you only want game mode for games that ask for it"
+                ),
+            ),
         )
         group = self._group(_("While you play"))
         for key, title, subtitle in rows:
