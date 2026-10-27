@@ -80,13 +80,28 @@ def test_suggestion_data_and_ranking_match_python(tmp_path: Path) -> None:
         "gamemode?",
         "game",
         "mode on",
+        "install heroic",
+        "install epic games",
+        "install the gaming starter pack",
+        "install retro",
+        "install retro pack",
+        "install minecraft",
+        "open game center",
+        "game center",
+        "update proton",
+        "install",
+        "install zzzz",
+        "update firefox",
     ]
+    catalog = suggestions.load_catalog_entries()
+    assert catalog is not None
+    js_catalog = {"items": catalog[0], "presets": catalog[1]}
     script = (
         "import('./ui-logic.mjs').then(m => console.log(JSON.stringify({"
         "settings: m.SETTINGS_PANELS, commands: m.SUGGESTED_COMMANDS,"
         "categories: m.SUGGESTION_CATEGORIES, gameRows: m.GAME_MODE_ROWS,"
         f"rows: {json.dumps(queries)}.map(q => m.buildSuggestions(q, {json.dumps(apps)}, "
-        f"{json.dumps(spaces)}).map(r => [r.category, r.title, r.subtitle, r.action]))"
+        f"{json.dumps(spaces)}, 3, {json.dumps(js_catalog)}).map(r => [r.category, r.title, r.subtitle, r.action]))"
         "})))"
     )
     result = subprocess.run(
@@ -105,7 +120,9 @@ def test_suggestion_data_and_ranking_match_python(tmp_path: Path) -> None:
     for query, js_rows in zip(queries, js["rows"], strict=True):
         py_rows = [
             [r.category, r.title, r.subtitle, r.action]
-            for r in suggestions.build_suggestions(query, [tuple(a) for a in apps], spaces)
+            for r in suggestions.build_suggestions(
+                query, [tuple(a) for a in apps], spaces, catalog=catalog
+            )
         ]
         assert js_rows == py_rows, query
 

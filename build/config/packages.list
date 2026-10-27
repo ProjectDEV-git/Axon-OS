@@ -268,6 +268,9 @@ polkitd
 # ── Everyday Tasks & Utilities ────────────────────────────────────────────────
 flatpak
 gnome-software-plugin-flatpak
+# Game Center installs apt packages through PackageKit (pkcon) with polkit
+packagekit
+packagekit-tools
 vlc
 transmission-gtk
 file-roller

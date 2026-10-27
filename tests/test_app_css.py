@@ -20,6 +20,7 @@ APP_CSS = [
     "apps/axon-welcome/ui/welcome.css",
     "apps/axon-installer/ui/wizard.css",
     "apps/axon-files/main.css",
+    "apps/axon-game-center/main.css",
     "apps/axon-settings/main.css",
     "apps/axon-shortcuts/main.css",
     "apps/axon-terminal/main.css",

@@ -1,0 +1,1034 @@
+{
+  "version": 1,
+  "updated": "2026-10-27",
+  "categories": [
+    {
+      "id": "launchers",
+      "name": "Game launchers"
+    },
+    {
+      "id": "compat",
+      "name": "Compatibility tools"
+    },
+    {
+      "id": "performance",
+      "name": "Performance and tools"
+    },
+    {
+      "id": "chat",
+      "name": "Chat and community"
+    },
+    {
+      "id": "recording",
+      "name": "Recording and streaming"
+    },
+    {
+      "id": "emulators",
+      "name": "Emulators"
+    },
+    {
+      "id": "peripherals",
+      "name": "Peripherals"
+    },
+    {
+      "id": "games",
+      "name": "Free and open-source games"
+    },
+    {
+      "id": "media",
+      "name": "Media"
+    },
+    {
+      "id": "system",
+      "name": "System components"
+    }
+  ],
+  "presets": [
+    {
+      "id": "starter",
+      "name": "Starter Pack",
+      "summary": "A launcher for every store, Proton-GE, FPS overlay settings and Discord",
+      "items": [
+        "heroic",
+        "lutris",
+        "protonplus",
+        "goverlay",
+        "discord"
+      ]
+    },
+    {
+      "id": "streamer",
+      "name": "Streamer",
+      "summary": "The Starter Pack plus OBS and a low-overhead recorder",
+      "items": [
+        "heroic",
+        "lutris",
+        "protonplus",
+        "goverlay",
+        "discord",
+        "obs",
+        "gpu-screen-recorder"
+      ]
+    },
+    {
+      "id": "retro",
+      "name": "Retro",
+      "summary": "RetroArch, Dolphin, PCSX2 and PPSSPP",
+      "items": [
+        "retroarch",
+        "dolphin",
+        "pcsx2",
+        "ppsspp"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "heroic",
+      "name": "Heroic Games Launcher",
+      "summary": "Epic Games, GOG and Amazon Prime Gaming library",
+      "category": "launchers",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.heroicgameslauncher.hgl"
+      },
+      "size_mb_estimate": 450,
+      "starter_pack": true,
+      "aliases": [
+        "epic games",
+        "epic",
+        "gog",
+        "amazon games"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "lutris",
+      "name": "Lutris",
+      "summary": "Run games from many platforms with one launcher",
+      "category": "launchers",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "net.lutris.Lutris"
+      },
+      "size_mb_estimate": 700,
+      "starter_pack": true,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "bottles",
+      "name": "Bottles",
+      "summary": "Run Windows software in separate bottles",
+      "category": "launchers",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.usebottles.bottles"
+      },
+      "size_mb_estimate": 600,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "itch",
+      "name": "itch",
+      "summary": "The itch.io game store app",
+      "category": "launchers",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "io.itch.itch"
+      },
+      "size_mb_estimate": 250,
+      "starter_pack": false,
+      "aliases": [
+        "itch.io"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "minigalaxy",
+      "name": "Minigalaxy",
+      "summary": "Simple GOG library client",
+      "category": "launchers",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "io.github.sharkwouter.Minigalaxy"
+      },
+      "size_mb_estimate": 150,
+      "starter_pack": false,
+      "aliases": [
+        "gog"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "prism",
+      "name": "Prism Launcher",
+      "summary": "Manage Minecraft installations",
+      "category": "launchers",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.prismlauncher.PrismLauncher"
+      },
+      "size_mb_estimate": 300,
+      "starter_pack": false,
+      "aliases": [
+        "minecraft"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "protonplus",
+      "name": "ProtonPlus",
+      "summary": "Install Proton-GE, Wine-GE and other compatibility tools",
+      "category": "compat",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.vysp3r.ProtonPlus"
+      },
+      "size_mb_estimate": 120,
+      "starter_pack": true,
+      "aliases": [
+        "proton ge",
+        "proton-ge",
+        "protonup",
+        "wine ge"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "protonup-qt",
+      "name": "ProtonUp-Qt",
+      "summary": "Another installer for Proton-GE and Wine-GE",
+      "category": "compat",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "net.davidotek.pupgui2"
+      },
+      "size_mb_estimate": 200,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "mangohud-flatpak",
+      "name": "MangoHud for Flatpak games",
+      "summary": "Performance overlay layer for Flatpak games",
+      "category": "compat",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.freedesktop.Platform.VulkanLayer.MangoHud"
+      },
+      "size_mb_estimate": 30,
+      "starter_pack": false,
+      "aliases": [
+        "mangohud flatpak"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "The version must match the runtime of the Flatpak game; Flatpak picks the newest.",
+      "verified": null
+    },
+    {
+      "id": "gamescope-flatpak",
+      "name": "Gamescope for Flatpak games",
+      "summary": "Gamescope compositor layer for Flatpak games",
+      "category": "compat",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.freedesktop.Platform.VulkanLayer.gamescope"
+      },
+      "size_mb_estimate": 30,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "The version must match the runtime of the Flatpak game; Flatpak picks the newest.",
+      "verified": null
+    },
+    {
+      "id": "goverlay",
+      "name": "GOverlay",
+      "summary": "Settings for the MangoHud performance overlay",
+      "category": "performance",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "io.github.benjamimgois.goverlay"
+      },
+      "size_mb_estimate": 150,
+      "starter_pack": true,
+      "aliases": [
+        "mangohud settings"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "lact",
+      "name": "LACT",
+      "summary": "Control and monitor AMD and NVIDIA graphics cards",
+      "category": "performance",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "io.github.ilya_zlobintsev.LACT"
+      },
+      "size_mb_estimate": 60,
+      "starter_pack": false,
+      "aliases": [
+        "gpu control",
+        "overclock"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "Can change fan speeds and clocks. Use with care.",
+      "verified": null
+    },
+    {
+      "id": "mission-center",
+      "name": "Mission Center",
+      "summary": "System monitor with CPU, memory and GPU graphs",
+      "category": "performance",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "io.missioncenter.MissionCenter"
+      },
+      "size_mb_estimate": 90,
+      "starter_pack": false,
+      "aliases": [
+        "task manager",
+        "system monitor"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "flatseal",
+      "name": "Flatseal",
+      "summary": "Review and change Flatpak app permissions",
+      "category": "performance",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.github.tchx84.Flatseal"
+      },
+      "size_mb_estimate": 10,
+      "starter_pack": false,
+      "aliases": [
+        "flatpak permissions"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "summary": "Voice and text chat",
+      "category": "chat",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.discordapp.Discord"
+      },
+      "size_mb_estimate": 180,
+      "starter_pack": true,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "vesktop",
+      "name": "Vesktop",
+      "summary": "Discord client with better screen sharing on Wayland",
+      "category": "chat",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "dev.vencord.Vesktop"
+      },
+      "size_mb_estimate": 200,
+      "starter_pack": false,
+      "aliases": [
+        "discord wayland"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "obs",
+      "name": "OBS Studio",
+      "summary": "Record and stream video",
+      "category": "recording",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.obsproject.Studio"
+      },
+      "size_mb_estimate": 250,
+      "starter_pack": false,
+      "aliases": [
+        "obs studio",
+        "streaming"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "gpu-screen-recorder",
+      "name": "GPU Screen Recorder",
+      "summary": "Low-overhead game recording and replay",
+      "category": "recording",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.dec05eba.gpu_screen_recorder"
+      },
+      "size_mb_estimate": 40,
+      "starter_pack": false,
+      "aliases": [
+        "replay",
+        "shadowplay"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "sunshine",
+      "name": "Sunshine",
+      "summary": "Stream your PC's games to other devices",
+      "category": "recording",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "dev.lizardbyte.app.Sunshine"
+      },
+      "size_mb_estimate": 150,
+      "starter_pack": false,
+      "aliases": [
+        "game streaming host"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "moonlight",
+      "name": "Moonlight",
+      "summary": "Play games streamed from another PC",
+      "category": "recording",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.moonlight_stream.Moonlight"
+      },
+      "size_mb_estimate": 120,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "steam-link",
+      "name": "Steam Link",
+      "summary": "Play your Steam games from another computer",
+      "category": "recording",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.valvesoftware.SteamLink"
+      },
+      "size_mb_estimate": 200,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "kdenlive",
+      "name": "Kdenlive",
+      "summary": "Video editor",
+      "category": "recording",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.kde.kdenlive"
+      },
+      "size_mb_estimate": 500,
+      "starter_pack": false,
+      "aliases": [
+        "video editor"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "retroarch",
+      "name": "RetroArch",
+      "summary": "Many retro consoles in one app",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.libretro.RetroArch"
+      },
+      "size_mb_estimate": 350,
+      "starter_pack": false,
+      "aliases": [
+        "retro"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games and BIOS files.",
+      "verified": null
+    },
+    {
+      "id": "dolphin",
+      "name": "Dolphin",
+      "summary": "GameCube and Wii emulator",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.DolphinEmu.dolphin-emu"
+      },
+      "size_mb_estimate": 250,
+      "starter_pack": false,
+      "aliases": [
+        "gamecube",
+        "wii"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games and BIOS files.",
+      "verified": null
+    },
+    {
+      "id": "pcsx2",
+      "name": "PCSX2",
+      "summary": "PlayStation 2 emulator",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "net.pcsx2.PCSX2"
+      },
+      "size_mb_estimate": 200,
+      "starter_pack": false,
+      "aliases": [
+        "ps2",
+        "playstation 2"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games and BIOS files.",
+      "verified": null
+    },
+    {
+      "id": "ppsspp",
+      "name": "PPSSPP",
+      "summary": "PSP emulator",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.ppsspp.PPSSPP"
+      },
+      "size_mb_estimate": 100,
+      "starter_pack": false,
+      "aliases": [
+        "psp"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games and BIOS files.",
+      "verified": null
+    },
+    {
+      "id": "rpcs3",
+      "name": "RPCS3",
+      "summary": "PlayStation 3 emulator",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "net.rpcs3.RPCS3"
+      },
+      "size_mb_estimate": 250,
+      "starter_pack": false,
+      "aliases": [
+        "ps3",
+        "playstation 3"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games and BIOS files.",
+      "verified": null
+    },
+    {
+      "id": "cemu",
+      "name": "Cemu",
+      "summary": "Wii U emulator",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "info.cemu.Cemu"
+      },
+      "size_mb_estimate": 150,
+      "starter_pack": false,
+      "aliases": [
+        "wii u"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games and BIOS files.",
+      "verified": null
+    },
+    {
+      "id": "melonds",
+      "name": "melonDS",
+      "summary": "Nintendo DS emulator",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "net.kuribo64.melonDS"
+      },
+      "size_mb_estimate": 60,
+      "starter_pack": false,
+      "aliases": [
+        "ds",
+        "nintendo ds"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games and BIOS files.",
+      "verified": null
+    },
+    {
+      "id": "mgba",
+      "name": "mGBA",
+      "summary": "Game Boy Advance emulator",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "io.mgba.mGBA"
+      },
+      "size_mb_estimate": 40,
+      "starter_pack": false,
+      "aliases": [
+        "gba",
+        "game boy"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games and BIOS files.",
+      "verified": null
+    },
+    {
+      "id": "scummvm",
+      "name": "ScummVM",
+      "summary": "Run classic adventure games",
+      "category": "emulators",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.scummvm.ScummVM"
+      },
+      "size_mb_estimate": 80,
+      "starter_pack": false,
+      "aliases": [
+        "adventure games"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "You must provide your own legally obtained games.",
+      "verified": null
+    },
+    {
+      "id": "piper",
+      "name": "Piper",
+      "summary": "Configure gaming mice",
+      "category": "peripherals",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.freedesktop.Piper"
+      },
+      "size_mb_estimate": 30,
+      "starter_pack": false,
+      "aliases": [
+        "mouse",
+        "gaming mouse"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64",
+        "apt": [
+          "ratbagd"
+        ]
+      },
+      "notes": "Also installs ratbagd, the service that talks to the mouse.",
+      "verified": null
+    },
+    {
+      "id": "openrgb",
+      "name": "OpenRGB",
+      "summary": "Control RGB lighting",
+      "category": "peripherals",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.openrgb.OpenRGB"
+      },
+      "size_mb_estimate": 100,
+      "starter_pack": false,
+      "aliases": [
+        "rgb",
+        "lighting"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "Some devices need extra permissions (udev rules) that Flatpak apps cannot add by themselves.",
+      "verified": null
+    },
+    {
+      "id": "antimicrox",
+      "name": "AntiMicroX",
+      "summary": "Use a gamepad as keyboard and mouse",
+      "category": "peripherals",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "io.github.antimicrox.antimicrox"
+      },
+      "size_mb_estimate": 60,
+      "starter_pack": false,
+      "aliases": [
+        "gamepad keyboard"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "input-remapper",
+      "name": "Input Remapper",
+      "summary": "Change what keyboard, mouse and gamepad buttons do",
+      "category": "peripherals",
+      "source": {
+        "type": "apt",
+        "packages": [
+          "input-remapper"
+        ]
+      },
+      "size_mb_estimate": 10,
+      "starter_pack": false,
+      "aliases": [
+        "remap keys"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": "2026-10-27"
+    },
+    {
+      "id": "supertuxkart",
+      "name": "SuperTuxKart",
+      "summary": "Open-source kart racing",
+      "category": "games",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "net.supertuxkart.SuperTuxKart"
+      },
+      "size_mb_estimate": 700,
+      "starter_pack": false,
+      "aliases": [
+        "tux kart"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "zeroad",
+      "name": "0 A.D.",
+      "summary": "Open-source ancient warfare strategy",
+      "category": "games",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.play0ad.zeroad"
+      },
+      "size_mb_estimate": 1500,
+      "starter_pack": false,
+      "aliases": [
+        "0ad",
+        "0 a.d."
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "xonotic",
+      "name": "Xonotic",
+      "summary": "Open-source arena shooter",
+      "category": "games",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "org.xonotic.Xonotic"
+      },
+      "size_mb_estimate": 1000,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "summary": "Music streaming",
+      "category": "media",
+      "source": {
+        "type": "flatpak",
+        "remote": "flathub",
+        "ref": "com.spotify.Client"
+      },
+      "size_mb_estimate": 300,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": null,
+      "verified": null
+    },
+    {
+      "id": "media-codecs",
+      "name": "Media codecs",
+      "summary": "Extra audio and video formats (MP3 and H.264 playback, ffmpeg)",
+      "category": "media",
+      "source": {
+        "type": "apt",
+        "packages": [
+          "gstreamer1.0-plugins-bad",
+          "gstreamer1.0-plugins-ugly",
+          "gstreamer1.0-libav",
+          "ffmpeg"
+        ]
+      },
+      "size_mb_estimate": 120,
+      "starter_pack": false,
+      "aliases": [
+        "codecs",
+        "mp3",
+        "h264"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "Some of these formats are covered by patents in some countries.",
+      "verified": "2026-10-27"
+    },
+    {
+      "id": "ollama-cuda",
+      "name": "Ollama GPU libraries (NVIDIA CUDA)",
+      "summary": "Run local AI models on your NVIDIA graphics card",
+      "category": "system",
+      "source": {
+        "type": "component",
+        "component": "ollama-cuda"
+      },
+      "size_mb_estimate": 1500,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": "nvidia",
+        "arch": "x86_64"
+      },
+      "notes": "Installed automatically when an NVIDIA graphics card is found.",
+      "verified": null
+    },
+    {
+      "id": "ollama-rocm",
+      "name": "Ollama GPU libraries (AMD ROCm)",
+      "summary": "Run local AI models on a supported AMD graphics card",
+      "category": "system",
+      "source": {
+        "type": "component",
+        "component": "ollama-rocm"
+      },
+      "size_mb_estimate": 1500,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": "amd",
+        "arch": "x86_64"
+      },
+      "notes": "Installed automatically when a supported AMD graphics card is found.",
+      "verified": null
+    },
+    {
+      "id": "ai-models",
+      "name": "AI models",
+      "summary": "Speed, General and Deep models for the Axon assistant",
+      "category": "system",
+      "source": {
+        "type": "component",
+        "component": "ai-models"
+      },
+      "size_mb_estimate": 4000,
+      "starter_pack": false,
+      "aliases": [],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "Chosen in the welcome app or Settings.",
+      "verified": null
+    }
+  ]
+}

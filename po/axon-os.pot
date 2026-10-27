@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-27 07:12+0000\n"
+"POT-Creation-Date: 2026-10-27 07:30+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -56,7 +56,8 @@ msgid "Axon suggested an action it can't perform here."
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py apps/axon-confirm/main.py
-#: apps/axon-settings/ai_models.py apps/axon-terminal/terminal_widget.py
+#: apps/axon-game-center/ui.py apps/axon-settings/ai_models.py
+#: apps/axon-terminal/terminal_widget.py
 msgid "Cancel"
 msgstr ""
 
@@ -204,6 +205,11 @@ msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Review and Run…"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py apps/intent-bar/ui/window.py
+#: shell/axon-shell/intentbar.js
+msgid "Run anyway"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -388,6 +394,343 @@ msgstr ""
 msgid "Sync Index"
 msgstr ""
 
+#: apps/axon-game-center/main.py apps/axon-game-center/ui.py
+#: services/suggestions.py
+msgid "Game Center"
+msgstr ""
+
+#: apps/axon-game-center/main.py
+msgid "Your gaming apps are ready."
+msgstr ""
+
+#: apps/axon-game-center/ui.py shell/axon-shell/ui-logic.js
+msgid "A game"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "AI acceleration"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid ""
+"After installing, restart and enroll the key when asked, or the driver will "
+"not load."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Also remove runtimes no other app uses"
+msgstr ""
+
+#: apps/axon-game-center/ui.py apps/axon-settings/preferences_window.py
+msgid ""
+"Answers questions with your cloud model instead of pausing. Your prompts "
+"leave this computer."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Apps you install from Discover show up here."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Are We Anti-Cheat Yet: which anti-cheats work"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Checking…"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Choose what the overlay shows"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Compatibility"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Discover"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Download Proton-GE, Wine-GE and other compatibility tools"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Driver"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid "Driver in use: {driver}"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Drivers"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Everything in the Starter Pack is installed"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "GOverlay"
+msgstr ""
+
+#: apps/axon-game-center/ui.py services/suggestions.py
+msgid "Game mode"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Get more versions"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Graphics"
+msgstr ""
+
+#: apps/axon-game-center/ui.py apps/axon-installer/ui/wizard.py
+msgid "Install"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid "Install {names} — about {size}"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Installed"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Installed from Game Center"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Installing…"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid ""
+"Lets local AI models use your graphics card instead of only the processor."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Looking for graphics cards…"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Managed by Axon OS"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid ""
+"Most Windows games run through Proton. Some games whose anti-cheat needs a "
+"Windows kernel driver do not run on Linux at all."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid "NVIDIA driver {version} is installed"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "No Proton or Wine versions found yet. Open ProtonPlus below to get one."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "No graphics card found"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Not available yet. It will arrive in an update."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Nothing installed yet"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Nothing to install. AMD and Intel graphics work out of the box."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Off. It turns on by itself when a game starts."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid "On: {games}. AI is paused."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Open"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Open GOverlay"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Open ProtonPlus"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Overlay"
+msgstr ""
+
+#: apps/axon-game-center/ui.py apps/axon-settings/preferences_window.py
+msgid "Pause AI during games"
+msgstr ""
+
+#: apps/axon-game-center/ui.py apps/axon-settings/preferences_window.py
+msgid "Pause file indexing during games"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Performance"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Proton and Wine versions"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "ProtonDB: player reports for each game"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "ProtonPlus"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid "Recommended driver: {name}"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Remove"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid "Remove {name}?"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Removing…"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Retry"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Secure Boot is on"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Show FPS overlay in all games"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Starter Pack"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Status"
+msgstr ""
+
+#: apps/axon-game-center/ui.py apps/axon-settings/preferences_window.py
+msgid "Stops scanning your files until the game ends"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "System Wine"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid ""
+"The app is removed from this computer. Its settings and saved games are kept."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid ""
+"The first Flatpak app also downloads a shared runtime (about {size}) that "
+"many apps use."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "The game mode service isn't running"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid ""
+"The open-source driver is slow in games. The NVIDIA driver is much faster."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "The open-source graphics driver is in use"
+msgstr ""
+
+#: apps/axon-game-center/ui.py apps/axon-settings/preferences_window.py
+msgid "Unloads local AI models so they don't take GPU memory from your game"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Update"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Updating…"
+msgstr ""
+
+#: apps/axon-game-center/ui.py apps/axon-settings/preferences_window.py
+msgid "Use cloud provider during games"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Uses MangoHud. Takes effect the next time you sign in."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Waiting…"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "While you play"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "Will it run?"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid ""
+"Windows programs started with Axon APEX use the version you choose here."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "a game"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "is ready"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "none"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "removed"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid "{name} {done}"
+msgstr ""
+
 #: apps/axon-installer/ui/wizard.py
 msgid ""
 "A connection lets the installer set up Ollama and download your AI model "
@@ -486,10 +829,6 @@ msgstr ""
 
 #: apps/axon-installer/ui/wizard.py
 msgid "How Do You Want to Install?"
-msgstr ""
-
-#: apps/axon-installer/ui/wizard.py
-msgid "Install"
 msgstr ""
 
 #: apps/axon-installer/ui/wizard.py
@@ -828,12 +1167,6 @@ msgstr ""
 msgid "Accent colour"
 msgstr ""
 
-#: apps/axon-settings/preferences_window.py
-msgid ""
-"Answers questions with your cloud model instead of pausing. Your prompts "
-"leave this computer."
-msgstr ""
-
 #: apps/axon-settings/preferences_window.py services/suggestions.py
 msgid "Appearance"
 msgstr ""
@@ -924,14 +1257,6 @@ msgid "Orange"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
-msgid "Pause AI during games"
-msgstr ""
-
-#: apps/axon-settings/preferences_window.py
-msgid "Pause file indexing during games"
-msgstr ""
-
-#: apps/axon-settings/preferences_window.py
 msgid "Per-app rules"
 msgstr ""
 
@@ -969,24 +1294,12 @@ msgid "Stop allowing {command}"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
-msgid "Stops scanning your files until the game ends"
-msgstr ""
-
-#: apps/axon-settings/preferences_window.py
 msgid "Teal"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
 msgid ""
 "These settings need the Axon Shell extension, which isn't installed here."
-msgstr ""
-
-#: apps/axon-settings/preferences_window.py
-msgid "Unloads local AI models so they don't take GPU memory from your game"
-msgstr ""
-
-#: apps/axon-settings/preferences_window.py
-msgid "Use cloud provider during games"
 msgstr ""
 
 #: apps/axon-settings/preferences_window.py
@@ -1154,6 +1467,73 @@ msgstr ""
 msgid "⬡ AI Diagnosis"
 msgstr ""
 
+#: apps/axon-welcome/gaming_page.py
+msgid "Customize"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+#, python-brace-format
+msgid "Download: about {size}"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid "Gaming setup"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid "Install and continue →"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid "Install media codecs"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+#, python-brace-format
+msgid "Install the {driver} graphics driver for {gpu}"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid ""
+"MP3, H.264 and other formats. Some are covered by patents in some countries."
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid ""
+"Needed to play some music and video files. Some formats are covered by "
+"patents in some countries."
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid "Nothing for now"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid "Nothing will be installed."
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid ""
+"Pick what to install. It downloads in the background while you use the "
+"desktop."
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py apps/axon-welcome/ui/welcome.py
+msgid "Skip"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid "You can install apps later from Game Center"
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py
+msgid "You can install these later from Game Center."
+msgstr ""
+
+#: apps/axon-welcome/gaming_page.py apps/axon-welcome/ui/welcome.py
+msgid "← Back"
+msgstr ""
+
 #: apps/axon-welcome/ui/welcome.py
 msgid "AI Context Settings:"
 msgstr ""
@@ -1266,10 +1646,6 @@ msgid "Show on startup:"
 msgstr ""
 
 #: apps/axon-welcome/ui/welcome.py
-msgid "Skip"
-msgstr ""
-
-#: apps/axon-welcome/ui/welcome.py
 msgid "Start Using Axon"
 msgstr ""
 
@@ -1320,10 +1696,6 @@ msgid "error: Ollama install failed — check your internet connection"
 msgstr ""
 
 #: apps/axon-welcome/ui/welcome.py
-msgid "← Back"
-msgstr ""
-
-#: apps/axon-welcome/ui/welcome.py
 msgid "✓ Model Ready"
 msgstr ""
 
@@ -1346,6 +1718,10 @@ msgid "Couldn't open {name}."
 msgstr ""
 
 #: apps/intent-bar/ui/window.py
+msgid "Couldn't reach the AI service."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py
 #, python-brace-format
 msgid "Couldn't switch to {name}: Axon Shell isn't running."
 msgstr ""
@@ -1357,6 +1733,10 @@ msgstr ""
 
 #: apps/intent-bar/ui/window.py
 msgid "GNOME Settings isn't available."
+msgstr ""
+
+#: apps/intent-bar/ui/window.py shell/axon-shell/intentbar.js
+msgid "Game Center isn't available."
 msgstr ""
 
 #: apps/intent-bar/ui/window.py
@@ -1633,11 +2013,21 @@ msgid "Free disk space"
 msgstr ""
 
 #: services/suggestions.py
-msgid "Game mode"
+msgid "How long the computer has been on"
 msgstr ""
 
-#: services/suggestions.py
-msgid "How long the computer has been on"
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Install launchers, Proton and tools"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Install the {name} pack"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Install {name}"
 msgstr ""
 
 #: services/suggestions.py
@@ -1657,8 +2047,20 @@ msgid "Mouse & Touchpad"
 msgstr ""
 
 #: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Open Game Center"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Open Game Center to pick a version"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
 #, python-brace-format
 msgid "Open Settings → {panel}"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Opens Game Center"
 msgstr ""
 
 #: services/suggestions.py
@@ -1715,6 +2117,10 @@ msgstr ""
 
 #: services/suggestions.py
 msgid "Turn game mode on"
+msgstr ""
+
+#: services/suggestions.py shell/axon-shell/ui-logic.js
+msgid "Update Proton"
 msgstr ""
 
 #: services/suggestions.py
@@ -2131,10 +2537,6 @@ msgstr ""
 
 #: shell/axon-shell/ui-logic.js
 msgid "default model"
-msgstr ""
-
-#: shell/axon-shell/ui-logic.js
-msgid "A game"
 msgstr ""
 
 #: shell/axon-shell/ui-logic.js

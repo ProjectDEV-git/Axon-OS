@@ -1,6 +1,6 @@
 # Gaming on Axon OS
 
-Status: Phases 1 (gaming core and system tweaks) and 2 (game mode) of `docs/gaming-masterplan.md`.
+Status: Phases 1 (gaming core and system tweaks), 2 (game mode) and 3 (catalog and Game Center) of `docs/gaming-masterplan.md`.
 Audit and background: `docs/gaming-audit.md`.
 
 ## What ships in the ISO
@@ -94,3 +94,58 @@ axon-game-mode reset      # force game mode off
   tracked by pid (GameMode itself reports when the last one exits).
 - GPU optimisations in `gamemode.ini` (`apply_gpu_optimisations`, `amd_performance_level`) are
   not enabled; turn them on in `~/.config/gamemode.ini` if you want them.
+
+## Game Center and the catalog
+
+Everything optional installs after the system is installed, never from the ISO (see the ISO
+policy in `AGENTS.md`). `data/gaming/catalog.json` lists it, validated by
+`data/gaming/catalog.schema.json` in CI. The `axon-gaming-catalog` package puts both in
+`/usr/share/axon/gaming/`, so **a new list reaches installed systems through the normal update,
+without a new ISO**. Game Center, the welcome app and the Intent Bar all read that file.
+
+Each item has a source, a size estimate, a category and a `verified` date:
+
+| `source.type` | Installed with |
+|---|---|
+| `flatpak` | `flatpak install --user` from Flathub: no password. The first app also downloads a shared runtime (about 800 MB). |
+| `apt`, `axon-apt` | PackageKit (`pkcon`), which asks for authorisation with polkit |
+| `component` | Other Axon services (AI models, Ollama GPU libraries). Game Center only shows them. |
+
+`pinned` (URL + SHA-256) is allowed by the plan but not implemented: no item needs it.
+`scripts/verify-catalog.py --write` checks Flatpak refs on Flathub and apt names in the Ubuntu
+archive and stamps `verified`. An item that has never been checked has `verified: null`.
+Re-run it on a machine that can reach Flathub whenever the list changes.
+
+**Axon Game Center** (`axon-game-center`, app id `org.axonos.GameCenter`):
+
+- *Discover*: the Starter Pack (Heroic, Lutris, ProtonPlus, GOverlay, Discord) with its total size,
+  then every category. Emulators carry the "bring your own games" note.
+- *Installed*: Open, Update and Remove (with an option to remove runtimes nothing uses).
+- *Compatibility*: Proton and Wine versions found in Steam's folders, the one Axon APEX uses,
+  ProtonPlus, and links to ProtonDB and Are We Anti-Cheat Yet.
+- *Performance*: game mode status and the game mode switches, an FPS overlay switch
+  (`MANGOHUD=1` in `~/.config/environment.d`, from the next sign-in), and GOverlay.
+- *Drivers*: graphics cards, VRAM, driver in use, the NVIDIA driver `ubuntu-drivers` recommends
+  (with a Secure Boot warning) and the Ollama GPU libraries.
+
+Installs queue per backend (one Flatpak and one apt job at a time), show progress, and send a
+notification when done. Offline, the buttons are disabled with "Connect to the internet to install
+apps." and a failed install offers Retry. Every action is logged through `axon-game-center`.
+`axon-game-center --background --install heroic lutris` installs with no window, which is how the
+welcome app keeps installing after it is closed.
+
+**Welcome app**: a *Gaming setup* step after the AI model step offers Starter Pack (default),
+Streamer, Retro or nothing, a *Customize* list, an opt-in *media codecs* box, the NVIDIA driver
+when one is needed (on by default) and the total download size. It installs in the background.
+Offline, it skips itself with "You can install these later from Game Center."
+
+**Intent Bar**: "install heroic", "install epic games" (aliases come from the catalog),
+"install the gaming starter pack", "open game center", "update proton".
+
+### Not done yet
+
+- **Microsoft core fonts** are left out: the package asks for a licence click-through that
+  PackageKit cannot answer without a root helper.
+- **Ollama CUDA/ROCm libraries and Wine Mono/Gecko** are in the catalog as components, but nothing
+  installs them yet; they need the packages planned for Phase 4. Their Install button is disabled.
+- **OpenRGB** may need udev rules that a Flatpak cannot add.

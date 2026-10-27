@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
@@ -240,3 +241,35 @@ def announce(widget: Gtk.Widget, text: str, important: bool = False) -> None:
         else Gtk.AccessibleAnnouncementPriority.MEDIUM
     )
     widget.announce(text, priority)
+
+
+def allow_cpu_only(callback: Callable[[bool], None], seconds: int = 120) -> None:
+    """Ask Brain to allow the Speed model on the CPU while game mode has the AI paused.
+
+    This is "Run anyway": it never uses the GPU. *callback* gets True once Brain
+    agreed, on the GTK thread; the call itself does not block.
+    """
+
+    def done(conn: Gio.DBusConnection, result: Gio.AsyncResult) -> None:
+        try:
+            ok = bool(conn.call_finish(result).unpack()[0])
+        except GLib.Error:
+            ok = False
+        callback(ok)
+
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        bus.call(
+            "org.axonos.Brain",
+            "/org/axonos/Brain",
+            "org.axonos.Brain",
+            "AllowCpuOnly",
+            GLib.Variant("(u)", (seconds,)),
+            None,
+            Gio.DBusCallFlags.NONE,
+            5000,
+            None,
+            done,
+        )
+    except GLib.Error:
+        callback(False)

@@ -34,6 +34,12 @@ build_one() {
 
     [[ -d "${dir}/files" ]] && cp -a "${dir}/files/." "${root}/"
     sed "s/@VERSION@/${VERSION}/g" "${dir}/control" > "${root}/DEBIAN/control"
+    # The catalog's source of truth is data/gaming/, not a copy under packaging/
+    if [[ "${name}" == "axon-gaming-catalog" ]]; then
+        install -Dm644 "${SRC}/data/gaming/catalog.json" "${root}/usr/share/axon/gaming/catalog.json"
+        install -Dm644 "${SRC}/data/gaming/catalog.schema.json" \
+            "${root}/usr/share/axon/gaming/catalog.schema.json"
+    fi
     local script
     for script in postinst prerm postrm; do
         if [[ -f "${dir}/${script}" ]]; then

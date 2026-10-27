@@ -85,6 +85,7 @@ def test_build_pkg_builds_every_small_package(tmp_path):
     debs = sorted(p.name for p in tmp_path.glob("*.deb"))
     assert [d.split("_")[0] for d in debs] == [
         "axon-game-mode",
+        "axon-gaming-catalog",
         "axon-gaming-core",
         "axon-gaming-tweaks",
     ]

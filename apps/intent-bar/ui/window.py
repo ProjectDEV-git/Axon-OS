@@ -31,11 +31,18 @@ for _services in (Path(__file__).resolve().parents[3], Path(__file__).resolve().
         break
 from constants import AXON_DIR
 from service_utils import confirm_and_exec
-from suggestions import SETTINGS_PANELS, Suggestion, build_suggestions, default_index
+from suggestions import (
+    SETTINGS_PANELS,
+    Suggestion,
+    build_suggestions,
+    default_index,
+    game_center_argv,
+    load_catalog_entries,
+)
 from suggestions import describe as describe_suggestion
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from axon_gtk_utils import announce, load_app_css, monitor_size
+from axon_gtk_utils import allow_cpu_only, announce, load_app_css, monitor_size
 from i18n import _
 from ui_logic import (
     EXAMPLE_PROMPTS,
@@ -52,6 +59,7 @@ from ui_logic import (
     escape_action,
     format_command_output,
     intent_bar_width,
+    is_game_mode_error,
     load_history,
     origin_tooltip,
     parse_action,
@@ -240,6 +248,13 @@ class IntentBarWindow(Adw.Window):
         self._start_ollama_btn.set_valign(Gtk.Align.START)
         self._start_ollama_btn.set_visible(False)
 
+        # "Run anyway", shown instead of a plain error while a game has the AI paused
+        self._run_anyway_btn = Gtk.Button(label=_("Run anyway"))
+        self._run_anyway_btn.add_css_class("start-ollama-btn")
+        self._run_anyway_btn.set_valign(Gtk.Align.START)
+        self._run_anyway_btn.set_visible(False)
+        self._run_anyway_btn.connect("clicked", self._on_run_anyway)
+
         # ---- Row 2: separator -------------------------------------------
         sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep1.add_css_class("entry-sep")
@@ -324,6 +339,7 @@ class IntentBarWindow(Adw.Window):
         response_row.append(self._error_icon)
         response_row.append(self._response_label)
         response_row.append(self._start_ollama_btn)
+        response_row.append(self._run_anyway_btn)
         self._response_scroll.set_child(response_row)
         self._response_label.bind_property(
             "visible", self._response_scroll, "visible", GObject.BindingFlags.SYNC_CREATE
@@ -769,6 +785,12 @@ class IntentBarWindow(Adw.Window):
         self._pending_action = None  # typing changes the request
         self._update_suggestions()
 
+    def _gaming_catalog(self):
+        """Names for the install intents; read once, None when no catalog is installed."""
+        if not hasattr(self, "_catalog_entries"):
+            self._catalog_entries = load_catalog_entries()
+        return self._catalog_entries
+
     def _update_suggestions(self) -> None:
         query = self._entry.get_text()
         spaces = (
@@ -776,7 +798,9 @@ class IntentBarWindow(Adw.Window):
             if hasattr(self._spaces, "get_spaces")
             else []
         )
-        self._suggestions = build_suggestions(query, self._apps, spaces)
+        self._suggestions = build_suggestions(
+            query, self._apps, spaces, catalog=self._gaming_catalog()
+        )
         self._suggest_list.remove_all()
         for suggestion in self._suggestions:
             self._suggest_list.append(self._suggestion_row(suggestion))
@@ -888,6 +912,13 @@ class IntentBarWindow(Adw.Window):
                 self._show_error(_("GNOME Settings isn't available."))
         elif kind == "space":
             self._switch_space(int(action.get("index", 0)), str(action.get("name", "")))
+        elif kind == "game_center":
+            argv = game_center_argv(action)
+            if argv is None or shutil.which(argv[0]) is None:
+                self._show_error(_("Game Center isn't available."))
+            else:
+                subprocess.Popen(argv, start_new_session=True)  # nosec B603 - ids checked above
+                self.close()
         elif kind == "game_mode":
             self._run_game_mode(str(action.get("op", "")))
         elif kind == "command":
@@ -1057,10 +1088,22 @@ class IntentBarWindow(Adw.Window):
         else:
             self._response_label.remove_css_class("response-error")
             self._start_ollama_btn.set_visible(False)
+        self._run_anyway_btn.set_visible(error and is_game_mode_error(text))
         self._queue_fit()
 
     def _show_error(self, text: str) -> None:
         self._set_response(text, error=True)
+
+    def _on_run_anyway(self, _btn: Gtk.Button) -> None:
+        """Let Brain answer on the CPU for a while, then ask the same question again."""
+
+        def allowed(ok: bool) -> None:
+            if ok:
+                self._on_activate(self._entry)
+            else:
+                self._show_error(_("Couldn't reach the AI service."))
+
+        allow_cpu_only(allowed)
 
     def _on_start_ollama(self, _btn: Gtk.Button) -> None:
         """Attempt to launch the Ollama daemon."""

@@ -333,3 +333,10 @@ test('game mode intents', async () => {
     for (const q of ['', 'game', 'mode on', 'firefox', 'dark mode'])
         assert.deepEqual(gameModeOps(q), [], q);
 });
+
+test('game mode pause message is recognised', async () => {
+    const {GAME_MODE_MESSAGE, isGameModeError} = await import('./ui-logic.mjs');
+    assert.equal(isGameModeError(`[Error: ${GAME_MODE_MESSAGE}]`), true);
+    assert.equal(isGameModeError('Ollama is not running'), false);
+    assert.equal(isGameModeError(null), false);
+});

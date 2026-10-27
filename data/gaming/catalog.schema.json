@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ProjectDEV-git/Axon-OS/data/gaming/catalog.schema.json",
+  "title": "Axon OS gaming catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "updated", "categories", "presets", "items"],
+  "properties": {
+    "version": {"const": 1},
+    "updated": {"$ref": "#/$defs/date"},
+    "categories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {"id": {"$ref": "#/$defs/id"}, "name": {"type": "string", "minLength": 1}}
+      }
+    },
+    "presets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "summary", "items"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "name": {"type": "string", "minLength": 1},
+          "summary": {"type": "string", "minLength": 1},
+          "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/id"}}
+        }
+      }
+    },
+    "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/item"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "package": {"type": "string", "pattern": "^[a-z0-9][a-z0-9+.-]+$"},
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "summary", "category", "source", "size_mb_estimate", "starter_pack", "requires", "verified"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "category": {"$ref": "#/$defs/id"},
+        "aliases": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "source": {"$ref": "#/$defs/source"},
+        "size_mb_estimate": {"type": "integer", "minimum": 1},
+        "starter_pack": {"type": "boolean"},
+        "requires": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["gpu", "arch"],
+          "properties": {
+            "gpu": {"enum": [null, "nvidia", "amd", "intel"]},
+            "arch": {"const": "x86_64"},
+            "apt": {"type": "array", "items": {"$ref": "#/$defs/package"}}
+          }
+        },
+        "notes": {"type": ["string", "null"]},
+        "verified": {
+          "description": "Date the identifier was last checked against its source; null if it never was.",
+          "oneOf": [{"$ref": "#/$defs/date"}, {"type": "null"}]
+        }
+      }
+    },
+    "source": {
+      "description": "Where an item comes from. 'pinned' (URL + SHA-256) is not supported yet.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "remote", "ref"],
+          "properties": {
+            "type": {"const": "flatpak"},
+            "remote": {"const": "flathub"},
+            "ref": {"type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_-]+)+$"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "packages"],
+          "properties": {
+            "type": {"enum": ["apt", "axon-apt"]},
+            "packages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/package"}}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "component"],
+          "properties": {
+            "type": {"const": "component"},
+            "component": {"enum": ["ollama-cuda", "ollama-rocm", "ai-models", "nvidia-driver", "wine-mono-gecko"]}
+          }
+        }
+      ]
+    }
+  }
+}

@@ -48,6 +48,7 @@ from ui_logic import (
     describe_action,
     escape_action,
     format_command_output,
+    is_game_mode_error,
     origin_tooltip,
     parse_action,
     routing_origin,
@@ -56,7 +57,7 @@ from ui_logic import (
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
-from axon_gtk_utils import announce, fit_default_size, load_app_css
+from axon_gtk_utils import allow_cpu_only, announce, fit_default_size, load_app_css
 from command_risk import assess
 from context_settings import (
     ITEM_LABELS,
@@ -1290,6 +1291,10 @@ class AIPanelWindow(Adw.Window):
         bubble.set_error(message)
         announce(self, announcement("error", message), important=True)
         prompt = self._stream_prompt
+        if is_game_mode_error(message):
+            # The AI is paused for a game: retrying would fail the same way
+            bubble.add_action(_("Run anyway"), lambda: self._run_anyway(bubble, prompt))
+            return
         bubble.add_action(_("Try again"), lambda: self._retry(bubble, prompt))
         if offline:
             bubble.add_action(_("Diagnostics"), self._open_diagnostics)
@@ -1415,6 +1420,15 @@ class AIPanelWindow(Adw.Window):
             return
         self._messages_box.remove(bubble)
         self._start_request(prompt)
+
+    def _run_anyway(self, bubble: MessageBubble, prompt: str) -> None:
+        """Let Brain answer on the CPU for a while (never the GPU), then ask again."""
+
+        def allowed(ok: bool) -> None:
+            if ok:
+                self._retry(bubble, prompt)
+
+        allow_cpu_only(allowed)
 
     def _open_diagnostics(self) -> None:
         """Open the Diagnostics window in Axon Settings, if installed."""

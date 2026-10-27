@@ -257,6 +257,13 @@ GLYPHS = {
         f'<path d="M57,56 L57,78 L76,67 Z" fill="{WHITE}" stroke="{WHITE}" stroke-width="3" '
         'stroke-linejoin="round"/>'
     ),
+    "axon-game-center": (
+        f'<rect x="22" y="40" width="84" height="44" rx="22" {_stroke(WHITE, 6)}/>'
+        f'<rect x="38" y="57" width="20" height="6" rx="2" fill="{WHITE}"/>'
+        f'<rect x="45" y="50" width="6" height="20" rx="2" fill="{WHITE}"/>'
+        f'<circle cx="82" cy="54" r="4.5" fill="{BLUE_LIGHT}"/>'
+        f'<circle cx="92" cy="65" r="4.5" fill="{WHITE}"/>'
+    ),
     "axon-shortcuts": (
         f'<rect x="26" y="37" width="76" height="46" rx="10" {_stroke(WHITE, 6)}/>'
         + "".join(
@@ -284,6 +291,7 @@ TILES = {
     "axon-updater": ("#43bf80", "#25915a", False),
     "axon-windows-app": ("#687a8e", "#47566a", False),
     "axon-shortcuts": ("#f2766f", "#d34d46", False),
+    "axon-game-center": ("#8d6bf2", "#5a3dcf", False),
 }
 
 TITLES = {
@@ -298,6 +306,7 @@ TITLES = {
     "axon-updater": "Axon Update",
     "axon-windows-app": "Windows program",
     "axon-shortcuts": "Axon Shortcuts",
+    "axon-game-center": "Game Center",
 }
 
 
@@ -377,6 +386,13 @@ SYMBOLIC = {
     "axon-windows-app": [
         rrect(1, 2, 14, 12, 2) + " " + rrect(2.6, 5.4, 10.8, 7, 0.8, reverse=True),
         "M6.5,6.8 L6.5,11.2 L10.3,9 Z",
+    ],
+    "axon-game-center": [
+        rrect(0.5, 3.5, 15, 9, 4.5) + " " + rrect(2, 5, 12, 6, 3, reverse=True),
+        rrect(3.4, 7.2, 3.6, 1.2, 0.4),
+        rrect(4.6, 6, 1.2, 3.6, 0.4),
+        circle_path(10.6, 6.9, 0.8),
+        circle_path(12.2, 8.7, 0.8),
     ],
     "axon-shortcuts": [
         rrect(0.5, 3, 15, 10, 2.2) + " " + rrect(2, 4.5, 12, 7, 1.2, reverse=True),

@@ -4,6 +4,7 @@ import logging
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,20 @@ def get_system_ram():
     except Exception as e:
         logger.warning("Failed to read /proc/meminfo: %s — defaulting to 8 GB", e)
     return 8.0  # Default fallback
+
+
+def _sysfs_vram_gb(vendor_id):
+    """Dedicated video memory (GB) of the largest card from this PCI vendor, or 0.0."""
+    best = 0.0
+    for card in sorted(Path("/sys/class/drm").glob("card[0-9]*")):
+        try:
+            vendor = (card / "device" / "vendor").read_text().strip().removeprefix("0x")
+            total = int((card / "device" / "mem_info_vram_total").read_text().strip())
+        except (OSError, ValueError):
+            continue
+        if vendor == vendor_id:
+            best = max(best, round(total / 1024**3, 1))
+    return best
 
 
 def get_gpu_info():
@@ -83,10 +98,12 @@ def get_gpu_info():
                 "status": "unsupported_driver",
             }
         elif "Advanced Micro Devices" in lspci_out or "ATI" in lspci_out:
+            # amdgpu reports the real amount even without ROCm; 4 GB only if it can't
+            amd_vram = _sysfs_vram_gb("1002")
             return {
                 "vendor": "AMD",
                 "model": "AMD Radeon GPU (unconfigured)",
-                "vram": 4.0,
+                "vram": amd_vram if amd_vram else 4.0,
                 "status": "unsupported_driver",
             }
         elif "Intel" in lspci_out:

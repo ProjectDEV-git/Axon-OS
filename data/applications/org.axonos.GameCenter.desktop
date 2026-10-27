@@ -1,0 +1,22 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Game Center
+GenericName=Gaming Apps
+Comment=Install launchers, Proton, emulators and tools for gaming
+Exec=python3 AXON_APPS_DIR/axon-game-center/main.py
+Icon=axon-game-center
+Terminal=false
+StartupNotify=true
+DBusActivatable=false
+Categories=Game;Utility;
+Keywords=games;gaming;steam;proton;heroic;lutris;emulator;install;
+Actions=Drivers;Compatibility;
+
+[Desktop Action Drivers]
+Name=Graphics drivers
+Exec=python3 AXON_APPS_DIR/axon-game-center/main.py --page drivers
+
+[Desktop Action Compatibility]
+Name=Proton and Wine versions
+Exec=python3 AXON_APPS_DIR/axon-game-center/main.py --page compatibility

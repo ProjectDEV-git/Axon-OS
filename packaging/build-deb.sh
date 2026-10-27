@@ -117,6 +117,11 @@ cat > "${B}/axon-shield" <<EOF
 exec /usr/bin/python3 ${SERVICES_DIR}/axon-sandbox/shield.py "\$@"
 EOF
 chmod 755 "${B}/axon-shield"
+cat > "${B}/axon-game-center" <<EOF
+#!/bin/sh
+exec /usr/bin/python3 ${APPS_DIR}/axon-game-center/main.py "\$@"
+EOF
+chmod 755 "${B}/axon-game-center"
 cat > "${B}/axon-diagnose" <<EOF
 #!/bin/sh
 exec /usr/bin/python3 ${SERVICES_DIR}/diagnostics.py "\$@"
