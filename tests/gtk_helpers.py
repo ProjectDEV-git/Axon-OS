@@ -1,8 +1,8 @@
 """Helpers for GTK smoke tests.
 
 GTK4 needs a display. These helpers skip the calling test module when GTK,
-libadwaita or a display is missing (CI has the libraries but no display), so
-the smoke tests only run where they can, e.g. under ``xvfb-run``.
+libadwaita or a display is missing, so the smoke tests only run where they
+can, e.g. under ``xvfb-run`` (as in CI).
 """
 
 from __future__ import annotations
@@ -16,6 +16,11 @@ from typing import Any
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# The UI font Axon OS sets (font-name in build/config/chroot-setup.sh). Without
+# GNOME's settings daemon GTK uses "Sans", which is DejaVu Sans on a bare CI
+# runner and much wider, so layout tests would measure a font users never see.
+OS_FONT = "Inter 11"
 
 
 def require_gtk() -> tuple[Any, Any, Any]:
@@ -31,6 +36,7 @@ def require_gtk() -> tuple[Any, Any, Any]:
     if not Gtk.init_check() or Gdk.Display.get_default() is None:
         pytest.skip("no display for GTK", allow_module_level=True)
     Adw.init()
+    Gtk.Settings.get_default().set_property("gtk-font-name", OS_FONT)
     return Gtk, Adw, GLib
 
 
