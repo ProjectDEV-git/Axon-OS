@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import gi
 
@@ -37,9 +37,10 @@ def monitor_size(display: Gdk.Display | None = None) -> tuple[int, int]:
     if display is None:
         return 0, 0
     monitors = display.get_monitors()
-    monitor = monitors.get_item(0) if monitors.get_n_items() else None
-    if monitor is None:
+    item = monitors.get_item(0) if monitors.get_n_items() else None
+    if item is None:
         return 0, 0
+    monitor = cast(Gdk.Monitor, item)
     geometry = monitor.get_geometry()
     return int(geometry.width), int(geometry.height)
 
