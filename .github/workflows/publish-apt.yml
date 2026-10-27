@@ -1,6 +1,7 @@
 name: Publish apt repo
 
-# Builds the axon-os .deb and publishes it to the signed apt repository on
+# Builds the axon-os .deb and the small packages in packaging/*/, and publishes
+# them to the signed apt repository on
 # GitHub Pages (gh-pages branch, served at
 # https://projectdev-git.github.io/Axon-OS/apt). Installed systems pick it up
 # through axon-update.
@@ -81,7 +82,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y apt-utils libglib2.0-bin
 
       - name: Build package
-        run: bash src/packaging/build-deb.sh "${GITHUB_WORKSPACE}/out"
+        run: |
+          bash src/packaging/build-deb.sh "${GITHUB_WORKSPACE}/out"
+          bash src/packaging/build-pkg.sh --all "${GITHUB_WORKSPACE}/out"
 
       - name: Import signing key
         env:
@@ -118,10 +121,12 @@ jobs:
           set -euo pipefail
           pool=apt/pool/main
           mkdir -p "${pool}"
-          cp "${GITHUB_WORKSPACE}"/out/axon-os_*_all.deb "${pool}/"
+          cp "${GITHUB_WORKSPACE}"/out/*_all.deb "${pool}/"
 
-          # Keep the newest KEEP_VERSIONS packages
-          ls "${pool}"/axon-os_*_all.deb | sort -V | head -n -"${KEEP_VERSIONS}" | xargs -r rm -f
+          # Keep the newest KEEP_VERSIONS of each package
+          for name in $(ls "${pool}" | sed 's/_.*//' | sort -u); do
+            ls "${pool}/${name}"_*_all.deb | sort -V | head -n -"${KEEP_VERSIONS}" | xargs -r rm -f
+          done
 
           cd apt
           rm -rf dists
@@ -153,7 +158,7 @@ jobs:
         run: |
           tag="${REF#refs/tags/}"
           if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            gh release upload "${tag}" "${GITHUB_WORKSPACE}"/out/axon-os_*_all.deb \
+            gh release upload "${tag}" "${GITHUB_WORKSPACE}"/out/*_all.deb \
               --repo "${GITHUB_REPOSITORY}" --clobber
           fi
 

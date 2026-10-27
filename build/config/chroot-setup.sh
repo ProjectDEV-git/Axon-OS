@@ -188,17 +188,6 @@ x-scheme-handler/about=${BROWSER_DESKTOP}
 x-scheme-handler/unknown=${BROWSER_DESKTOP}
 MIMEEOF
 
-# ── System monitor: Mission Center (Flathub, GPL-3.0) ───────────────────────
-# Not packaged for Ubuntu 24.04, so it ships as a system-wide Flatpak. Keeps
-# GNOME System Monitor only if the Flatpak cannot be installed.
-log "Installing Mission Center..."
-if flatpak install --system --noninteractive -y flathub io.missioncenter.MissionCenter; then
-    apt-get purge -y gnome-system-monitor 2>/dev/null || true
-else
-    log "WARNING: Mission Center install failed — keeping GNOME System Monitor"
-    apt-get install -y gnome-system-monitor || true
-fi
-
 log "Installing Python AI libraries inside chroot..."
 # Pinned versions: unpinned installs pulled whatever PyPI served at build time
 # pip can't upgrade Debian's typing_extensions in place (no RECORD file), so put a
@@ -225,6 +214,19 @@ bash "${SRC}/packaging/build-deb.sh" /tmp/axon-deb
 # force-confmiss: restores the apt source removed above on reused chroots
 apt-get install -y --reinstall -o Dpkg::Options::=--force-confmiss /tmp/axon-deb/axon-os_*_all.deb
 rm -rf /tmp/axon-deb
+
+# Gaming: small packages built by packaging/build-pkg.sh (see docs/gaming.md).
+# steam-installer asks for the Steam Subscriber Agreement through debconf; an
+# unattended image build needs the answer preseeded. Steam itself shows the
+# agreement again on its first start, before anyone can log in or play.
+log "Installing gaming packages (axon-gaming-core, axon-gaming-tweaks)..."
+echo "steam steam/question select I AGREE" | debconf-set-selections
+echo "steam steam/license note" | debconf-set-selections
+rm -rf /tmp/axon-gaming-debs
+bash "${SRC}/packaging/build-pkg.sh" --all /tmp/axon-gaming-debs
+rm -f /tmp/axon-gaming-debs/axon-os_*.deb
+apt-get install -y --reinstall /tmp/axon-gaming-debs/axon-gaming-*_all.deb
+rm -rf /tmp/axon-gaming-debs
 
 # The live-session installer stays out of the package: the install engine
 # deletes it from installed systems and an upgrade must not bring it back.
@@ -421,6 +423,7 @@ else
     log "WARNING: APEX-WIN runner was not built — .exe files will open with plain Wine"
 fi
 install -Dm755 "${SRC}/scripts/axon-apex-run" /usr/bin/axon-apex-run
+install -Dm755 "${SRC}/scripts/axon-proton-runners" /usr/bin/axon-proton-runners
 install -Dm644 "${SRC}/data/applications/axon-apex-win.desktop" \
     /usr/share/applications/axon-apex-win.desktop
 update-desktop-database /usr/share/applications || true

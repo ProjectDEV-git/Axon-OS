@@ -1,0 +1,13 @@
+Package: axon-gaming-core
+Version: @VERSION@
+Architecture: all
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: steam-installer, steam-devices, gamemode, libgamemode0, libgamemode0:i386, mangohud, mesa-vulkan-drivers, mesa-vulkan-drivers:i386, libgl1-mesa-dri:i386, libglx-mesa0:i386, vulkan-tools, libvulkan1, libvulkan1:i386
+Section: games
+Priority: optional
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon OS gaming essentials
+ Metapackage for "gaming works out of the box": the Steam launcher (the
+ Steam runtime downloads on first start), controller udev rules, GameMode,
+ MangoHud, the Vulkan loader and the 32-bit graphics libraries 32-bit
+ Proton games need. Everything else is a download from Axon Game Center.

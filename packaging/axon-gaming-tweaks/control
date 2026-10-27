@@ -1,0 +1,12 @@
+Package: axon-gaming-tweaks
+Version: @VERSION@
+Architecture: all
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: systemd-zram-generator, udev
+Section: admin
+Priority: optional
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon OS system settings for gaming
+ Kernel and systemd settings that Windows games running under Proton need:
+ a large memory-map limit, a high open-file limit, the ntsync device when
+ the kernel has it, and compressed-RAM (zram) swap.

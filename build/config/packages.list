@@ -17,8 +17,8 @@ gedit
 eog
 evince
 gnome-calculator
-# System monitor: Mission Center (Flatpak) is installed by chroot-setup.sh
 gnome-disk-utility
+gnome-system-monitor
 gnome-keyring
 xdg-user-dirs
 xdg-user-dirs-gtk
@@ -213,13 +213,9 @@ ethtool
 nfs-common
 cifs-utils
 
-# Media Codecs
-gstreamer1.0-plugins-bad
-gstreamer1.0-plugins-ugly
-gstreamer1.0-libav
+# Media Codecs: the patent-encumbered set (plugins-bad/ugly, libav, ffmpeg) is an
+# opt-in download (docs/gaming.md, rule 2.2); only hardware decode stays here.
 gstreamer1.0-vaapi
-ffmpeg
-libavcodec-extra
 
 # Power Management
 power-profiles-daemon
@@ -230,6 +226,7 @@ acpid
 upower
 
 # ── App Development ───────────────────────────────────────────────────────────
+# (Node, Go and Docker are not shipped: install them from the app catalog.)
 build-essential
 cmake
 pkg-config
@@ -238,18 +235,11 @@ curl
 wget
 python3-venv
 python3-dev
-nodejs
-npm
-golang
-docker.io
-docker-compose-v2
 
 # ── Gaming ────────────────────────────────────────────────────────────────────
-steam-installer
-steam-devices
-lutris
-gamemode
-mangohud
+# Steam, GameMode, MangoHud, Vulkan and the 32-bit graphics libraries come from
+# the axon-gaming-core metapackage (packaging/axon-gaming-core), installed by
+# chroot-setup.sh. Other launchers (Lutris, Heroic...) are download-later.
 # DirectX translation layers (DXVK + vkd3d-proton)
 dxvk
 vkd3d-proton
@@ -278,7 +268,6 @@ polkitd
 # ── Everyday Tasks & Utilities ────────────────────────────────────────────────
 flatpak
 gnome-software-plugin-flatpak
-libreoffice
 vlc
 transmission-gtk
 file-roller

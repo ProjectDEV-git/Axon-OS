@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    # ntsync is in the mainline kernel from 6.14; Ubuntu 24.04's stock 6.8 does
+    # not have it. Load it at boot only where the module exists, so kernels
+    # without it do not log a failed systemd-modules-load.
+    if modinfo ntsync >/dev/null 2>&1; then
+        echo ntsync > /etc/modules-load.d/axon-ntsync.conf
+    else
+        rm -f /etc/modules-load.d/axon-ntsync.conf
+    fi
+    if [ -d /run/systemd/system ]; then
+        sysctl -q --system >/dev/null 2>&1 || true
+        udevadm control --reload >/dev/null 2>&1 || true
+        systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+fi
+exit 0

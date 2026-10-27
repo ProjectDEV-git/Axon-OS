@@ -329,6 +329,7 @@ class StartMenuPopup extends St.BoxLayout {
             'brave-browser.desktop',
             'org.gnome.Epiphany.desktop',
             'io.missioncenter.MissionCenter.desktop',
+            'org.gnome.SystemMonitor.desktop',
         ];
 
         // The user's favourites (the apps pinned to the taskbar), or Axon's

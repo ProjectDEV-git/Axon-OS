@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    rm -f /etc/modules-load.d/axon-ntsync.conf
+    if [ -d /run/systemd/system ]; then
+        udevadm control --reload >/dev/null 2>&1 || true
+        systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+fi
+exit 0

@@ -21,6 +21,8 @@
 #
 # AXON_APEX_TIER=0|1|2|3 overrides the choice for a single launch, e.g.
 #   AXON_APEX_TIER=2 axon-apex-run untrusted.exe
+# AXON_GAMEMODE=0 skips GameMode; AXON_WINE_DIR=<runner dir> overrides the
+# Proton/Wine build chosen with axon-proton-runners (Tier 0 only).
 set -eu
 
 RUNNER="${AXON_APEX_RUNNER:-/usr/bin/win-sandbox-runner}"
@@ -106,10 +108,26 @@ case "$EXE" in
         ;;
 esac
 
+# Run through GameMode so Axon game mode (AI paused, GPU freed) starts for
+# Windows games too. AXON_GAMEMODE=0 turns it off for one launch.
+GAMEMODE=""
+if [ "${AXON_GAMEMODE:-1}" != 0 ] && command -v gamemoderun >/dev/null 2>&1; then
+    GAMEMODE=gamemoderun
+fi
+
 if [ -x "$RUNNER" ]; then
+    # A Proton/Wine build picked in Game Center (see axon-proton-runners). Only
+    # Tier 0 uses it: the sandbox tiers keep the system Wine they were built for.
+    if [ "$TIER" = 0 ] && [ -z "${AXON_WINE_DIR:-}" ] \
+        && command -v axon-proton-runners >/dev/null 2>&1; then
+        AXON_WINE_DIR="$(axon-proton-runners resolve 2>/dev/null || true)"
+        [ -z "$AXON_WINE_DIR" ] || export AXON_WINE_DIR
+    fi
     # --exe runs APEX-WIN in this process, as this user (never via the root
     # daemon). --no-gui skips the first-launch trust prompt: the tier is fixed.
-    exec "$RUNNER" --tier "$TIER" --no-gui --exe "$EXE" -- "$@"
+    # $GAMEMODE is deliberately unquoted: empty means no wrapper.
+    # shellcheck disable=SC2086
+    exec $GAMEMODE "$RUNNER" --tier "$TIER" --no-gui --exe "$EXE" -- "$@"
 fi
 
 # APEX-WIN missing (e.g. a source install without cargo): plain Wine still
