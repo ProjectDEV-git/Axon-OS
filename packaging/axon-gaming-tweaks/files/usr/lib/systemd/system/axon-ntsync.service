@@ -1,0 +1,14 @@
+[Unit]
+Description=Load the ntsync module (fast Windows game synchronisation)
+Documentation=https://docs.kernel.org/userspace-api/ntsync.html
+# Only kernels that have the module as a file: the 6.8 kernel of Ubuntu 24.04 does not,
+# a 6.14 or newer one (the Ubuntu HWE kernel, or 26.04's 7.0) does. %v is the running kernel.
+ConditionPathExistsGlob=/lib/modules/%v/kernel/drivers/misc/ntsync.ko*
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/modprobe ntsync
+
+[Install]
+WantedBy=multi-user.target
