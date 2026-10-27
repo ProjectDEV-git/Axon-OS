@@ -171,6 +171,13 @@ def installed_ids(items: list[Item], runner: Runner = run_command) -> set[str]:
     return done
 
 
+def installed_linux_packages(runner: Runner = run_command) -> list[str]:
+    """Names of the installed ``linux-*`` packages (kernels, modules, headers)."""
+    lines: list[str] = []
+    runner(["dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\\n", "linux-*"], lines.append)
+    return [ln.split(None, 1)[1] for ln in lines if ln.startswith("ii ") and len(ln.split()) == 2]
+
+
 def flatpak_runtime_present(runner: Runner = run_command) -> bool:
     """True once any user Flatpak runtime is installed (so the next app is small)."""
     lines: list[str] = []

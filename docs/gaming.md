@@ -1,6 +1,6 @@
 # Gaming on Axon OS
 
-Status: Phases 1 (gaming core and system tweaks), 2 (game mode), 3 (catalog and Game Center), 4 (editions and size enforcement) and 5 (console mode and polish) of `docs/gaming-masterplan.md`.
+Status: Phases 1 (gaming core and system tweaks), 2 (game mode), 3 (catalog and Game Center), 4 (editions and size enforcement) and 5 (console mode and polish) and 6 (kernel and graphics stack) of `docs/gaming-masterplan.md`.
 Audit and background: `docs/gaming-audit.md`.
 
 ## What ships in the ISO
@@ -38,8 +38,9 @@ program needs them; they are not in the ISO.
 - **Gamescope is not packaged in noble.** It is not in `axon-gaming-core` and will come from
   the Axon-built packages (plan Phase 6) before the Console session (Phase 5).
 - **MangoHud has no i386 build in noble**, so the overlay works for 64-bit games only.
-- **ntsync:** the stock noble 6.8 kernel lacks it (mainline since 6.14). `axon-gaming-tweaks`
-  adds the module to `modules-load.d` only when `modinfo ntsync` succeeds at install time.
+- **ntsync:** the stock noble 6.8 kernel lacks it (mainline since 6.14). `axon-gaming-tweaks` ships
+  `axon-ntsync.service`, which loads the module at boot on any kernel that has it (the gaming kernel below
+  does) and does nothing on the 6.8 kernel.
 - **Mesa** in `noble-updates` is already 25.2.x (amd64 and i386), so no third-party Mesa PPA is used.
 - `steam-installer` asks to accept the Steam license through debconf. The ISO build preseeds
   the answer; Steam shows the Steam Subscriber Agreement again on its first start.
@@ -207,3 +208,68 @@ the shortcut overlay (Super + /).
   and a blue enrollment screen on the next boot. That cannot be done from a background PackageKit install, and
   a half-finished enrollment leaves the driver unusable. Using Canonical's signed modules avoids the need.
   A custom kernel (plan phase 6) will need its own signing key and this decision revisited.
+
+## Kernel and graphics stack (phase 6)
+
+### Gaming kernel: Ubuntu's own HWE kernel
+
+The plan asked for an Axon-built `linux-axon` with NTSYNC and sched_ext. **Not built, on purpose.** Ubuntu's
+noble HWE kernel (`linux-image-generic-hwe-24.04`, 7.0.0-38 on 2026-10-27) was downloaded and its config read:
+`CONFIG_NTSYNC=m`, `CONFIG_SCHED_CLASS_EXT=y`, `CONFIG_HZ_1000`, `PREEMPT_DYNAMIC` with lazy preemption, MGLRU on,
+BTF on, `X86_AMD_PSTATE`. Everything the plan needed is already there, in a kernel Canonical builds, signs for
+Secure Boot, and ships signed NVIDIA modules for (`linux-modules-nvidia-<branch>-generic-hwe-24.04`). Building our
+own would add a signing key to manage, no benefit anyone has measured, and a package whose modules alone are
+166 MB (GitHub Pages rejects files over 100 MB, so the Axon repository could not even hold it). XanMod was
+compared and rejected for the same reasons (own signing key, no signed NVIDIA modules, same hosting problem).
+
+So the "gaming kernel" is an optional install in **Game Center > Performance**. It installs the HWE kernel, and
+the matching signed NVIDIA modules when an NVIDIA driver is installed (without them a restart would lose the
+driver). Remove takes it out again, but not while it is the running kernel. The 6.8 kernel stays installed:
+
+- GRUB lists it under Advanced options; `41_axon_kernel_fallback` adds an **Axon OS — previous kernel** entry.
+- The boot watchdog sets `axon_try_ga` on the second boot attempt in a row, so a gaming kernel that does not
+  start falls back to the 6.8 kernel on the same system, and only a third failure goes to the factory rollback
+  snapshot (which already contained the 6.8 kernel). Both fallbacks need the root file system to be btrfs, like
+  the watchdog itself. The generated GRUB script is tested with stub tools and `grub-script-check`; it has not
+  run in a real boot.
+
+`sched_ext` schedulers (`scx_lavd` and friends) are **not offered**: Ubuntu 24.04 to 26.04 do not package them,
+so they would have to be built from upstream Rust sources. The default stays the kernel's own scheduler, as the
+plan says, until a benchmark (docs/benchmarks) shows a gain that justifies maintaining that package.
+
+### Gamescope: rebuilt for 24.04
+
+Gamescope is in Ubuntu 25.04 and newer (multiverse) but not in 24.04. `packaging/backports/backports.list` rebuilds
+version 3.16.15 and the libraries it needs that 24.04 lacks, unchanged except for the version number
+(`~24.04.axon1`, so any later official Ubuntu version wins), by `scripts/build-backports.sh` in a clean 24.04
+chroot with `sbuild`:
+
+| Source | Version | Why |
+|---|---|---|
+| libliftoff | 0.5.0 | Gamescope needs 0.5, noble has 0.4.1 |
+| vkroots | 0~202404300106 | noble's is older |
+| xcb-util-errors | 1.0.1 | not in noble |
+| wayland | 1.24.0 | wlroots 0.18 needs 1.23, noble has 1.22 |
+| wlroots | 0.18.2 (one patch) | not in noble; the patch keeps Meson 1.3 away from `c_std=c23` |
+| gamescope | 3.16.15 | the point |
+
+The workflow `publish-apt.yml` builds them when started with **backports** ticked and puts the packages in the
+Axon apt repository. The `wayland` rebuild is the one entry that replaces something the whole desktop uses; the
+repository's apt pin (`/etc/apt/preferences.d/axon-os`) gives everything in it priority 100, so these libraries
+are installed only when a package asks for them and never replace Ubuntu's by themselves. Once published, the
+image build finds Gamescope (`axon-gaming-core` recommends it), and the Axon Console session is included.
+`scripts/verify-packages.py` checks that every listed source still exists at its pinned version.
+
+### Mesa: not rebuilt
+
+`noble-updates` has Mesa 25.2.8 for amd64 and i386; Ubuntu 25.10 has an older 25.2.3 and only 26.04 has a newer
+one (26.0), whose build needs a toolchain (LLVM) 24.04 does not have. Rebuilding it would be the largest and
+riskiest package in the repository for an unmeasured gain, and the plan says to add packages only when there is
+a measured benefit. Adding it later is one line in `backports.list` once `docs/benchmarks` shows a difference.
+
+### Benchmarks
+
+`scripts/bench-mangohud.py` summarises MangoHud logs (average and 1% low) and compares two result folders, with
+three runs per game and a warning for noisy ones. The method, the five-game list and the decision rule are in
+[docs/benchmarks/README.md](benchmarks/README.md). **No results have been recorded:** they need real AMD and
+NVIDIA machines with the games installed.

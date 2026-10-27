@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import platform
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -142,25 +142,124 @@ def load_catalog(path: Path | None = None) -> Catalog:
     raise CatalogError("gaming catalog not found")
 
 
+HWE_KERNEL_META = "linux-image-generic-hwe-24.04"
+_HWE_IMAGE_RE = re.compile(r"^linux-image-(?:unsigned-)?((\d+)\.(\d+)\.\d+-\d+)-generic$")
+_GA_MAJOR_MINOR = (6, 8)  # the kernel Axon OS ships; Ubuntu's HWE kernels are newer
+
+
+def _running_version(release: str) -> str:
+    return release.removesuffix("-generic")
+
+
+def hwe_kernel_removal(installed: list[str], running_release: str) -> list[str] | None:
+    """Packages that remove the gaming (HWE) kernel and what came with it.
+
+    ``installed`` is every installed ``linux-*`` package name. Returns None while the
+    running kernel is one of the HWE kernels: it cannot be removed from under itself, so the
+    caller should ask for a restart into the standard kernel first. The standard 6.8 kernel
+    is never in the list.
+    """
+    present = set(installed)
+    versions = set()
+    for name in installed:
+        m = _HWE_IMAGE_RE.match(name)
+        if m and (int(m.group(2)), int(m.group(3))) > _GA_MAJOR_MINOR:
+            versions.add(m.group(1))
+    if _running_version(running_release) in versions:
+        return None
+    remove = [
+        meta
+        for meta in (
+            "linux-generic-hwe-24.04",
+            HWE_KERNEL_META,
+            "linux-headers-generic-hwe-24.04",
+        )
+        if meta in present
+    ]
+    remove += sorted(
+        n for n in present if re.fullmatch(r"linux-modules-nvidia-.*-generic-hwe-24\.04", n)
+    )
+    for v in sorted(versions):
+        for pattern in (
+            f"linux-image-{v}-generic",
+            f"linux-image-unsigned-{v}-generic",
+            f"linux-modules-{v}-generic",
+            f"linux-modules-extra-{v}-generic",
+            f"linux-headers-{v}-generic",
+            f"linux-headers-{v}",
+            f"linux-tools-{v}-generic",
+        ):
+            if pattern in present:
+                remove.append(pattern)
+        remove += sorted(
+            n
+            for n in present
+            if re.fullmatch(rf"linux-modules-nvidia-.*-{re.escape(v)}-generic", n)
+        )
+    return remove
+
+
+def hwe_nvidia_modules(installed: list[str]) -> list[str]:
+    """Signed NVIDIA modules for the HWE kernel that match the driver already installed.
+
+    The standard kernel's ``linux-modules-nvidia-580-open-generic`` has a twin for the HWE
+    kernel, ``...-generic-hwe-24.04``. Without it a restart into the new kernel would have no
+    NVIDIA driver, and the NVIDIA edition blacklists the open driver.
+    """
+    return [
+        n + "-hwe-24.04"
+        for n in sorted(set(installed))
+        if re.fullmatch(r"linux-modules-nvidia-[0-9]+(-open|-server|-server-open)?-generic", n)
+    ]
+
+
+def gaming_kernel_item(base: Item, installed: list[str]) -> Item:
+    """The catalog's gaming kernel with the NVIDIA modules that must come with it."""
+    packages = [*base.source["packages"], *hwe_nvidia_modules(installed)]
+    return replace(base, source={**base.source, "packages": packages})
+
+
+def gaming_kernel_removal_item(
+    base: Item, installed: list[str], running_release: str
+) -> Item | None:
+    """The gaming kernel as an item whose removal takes out everything that came with it."""
+    packages = hwe_kernel_removal(installed, running_release)
+    if packages is None:
+        return None
+    return replace(
+        base, source={**base.source, "packages": packages or list(base.source["packages"])}
+    )
+
+
 _DRIVER_RE = re.compile(r"^nvidia-driver-([0-9]+)(-open|-server|-server-open)?$")
 # Ubuntu builds and signs NVIDIA kernel modules only for its own kernels; the 6.8 GA kernel
 # (the one Axon OS ships) has them for every driver branch.
 _SIGNED_KERNEL_RE = re.compile(r"^6\.8\.0-[0-9]+-generic$")
+# Ubuntu's HWE kernels (6.11 and newer) have their own metapackages, for the same driver branches
+_HWE_KERNEL_RE = re.compile(
+    r"^(?:6\.(?:1[1-9]|[2-9][0-9])|(?:[7-9]|[1-9][0-9]+)\.[0-9]+)\.[0-9]+-[0-9]+-generic$"
+)
 
 
 def signed_modules_package(package: str, kernel_release: str | None = None) -> str | None:
     """The prebuilt, Secure Boot signed kernel modules for an NVIDIA driver package, if any.
 
     ``nvidia-driver-580-open`` on kernel ``6.8.0-147-generic`` gives
-    ``linux-modules-nvidia-580-open-generic``. With them there is no DKMS build, and no key to
-    enroll: Canonical's signature is already trusted by Secure Boot. On other kernels the
-    driver would be built with DKMS and unsigned, so this returns None.
+    ``linux-modules-nvidia-580-open-generic``; on an HWE kernel (6.11 or newer) the same name
+    ends in ``-hwe-24.04``. With them there is no DKMS build, and no key to enroll: Canonical's
+    signature is already trusted by Secure Boot. On other kernels the driver would be built
+    with DKMS and unsigned, so this returns None.
     """
     match = _DRIVER_RE.match(package)
     kernel = platform.release() if kernel_release is None else kernel_release
-    if not match or not _SIGNED_KERNEL_RE.match(kernel):
+    if not match:
         return None
-    return f"linux-modules-nvidia-{match.group(1)}{match.group(2) or ''}-generic"
+    base = f"linux-modules-nvidia-{match.group(1)}{match.group(2) or ''}-generic"
+    if _SIGNED_KERNEL_RE.match(kernel):
+        return base
+    if _HWE_KERNEL_RE.match(kernel):
+        return base + "-hwe-24.04"
+    return None
 
 
 def driver_item(package: str, kernel_release: str | None = None) -> Item:

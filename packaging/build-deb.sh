@@ -150,6 +150,7 @@ install -Dm644 "${SRC}/axon_logger.py" "${R}/usr/lib/python3/dist-packages/axon_
 
 # Self-healing boot watchdog: GRUB counter + rollback entry
 install -Dm755 "${SRC}/build/config/grub.d-06_axon_watchdog" "${R}/etc/grub.d/06_axon_watchdog"
+install -Dm755 "${SRC}/build/config/grub.d-41_axon_kernel_fallback" "${R}/etc/grub.d/41_axon_kernel_fallback"
 install -Dm755 "${SRC}/build/config/grub.d-42_axon_rollback" "${R}/etc/grub.d/42_axon_rollback"
 
 # ── System units ─────────────────────────────────────────────────────────────
@@ -222,13 +223,26 @@ if [[ -f "${KEYRING_ASC}" ]]; then
     install -d "${R}/usr/share/keyrings"
     gpg --batch --yes --dearmor -o "${R}/usr/share/keyrings/axon-os-archive-keyring.gpg" "${KEYRING_ASC}"
     chmod 644 "${R}/usr/share/keyrings/axon-os-archive-keyring.gpg"
-    install -d "${R}/etc/apt/sources.list.d"
+    install -d "${R}/etc/apt/sources.list.d" "${R}/etc/apt/preferences.d"
     cat > "${R}/etc/apt/sources.list.d/axon-os.sources" <<EOF
 Types: deb
 URIs: ${APT_URL}
 Suites: stable
 Components: main
 Signed-By: /usr/share/keyrings/axon-os-archive-keyring.gpg
+EOF
+    # The repository also holds rebuilds of newer Ubuntu libraries (Gamescope's: see
+    # packaging/backports). They must only be installed when something asks for them, never
+    # replace what Ubuntu provides on their own: priority 100 means "only if needed". The
+    # Axon packages themselves keep the normal priority so they update as usual.
+    cat > "${R}/etc/apt/preferences.d/axon-os" <<EOF
+Package: *
+Pin: release o=Axon OS
+Pin-Priority: 100
+
+Package: axon-*
+Pin: release o=Axon OS
+Pin-Priority: 500
 EOF
 else
     log "WARNING: ${KEYRING_ASC#"${SRC}/"} missing; package will not add the Axon apt repository"

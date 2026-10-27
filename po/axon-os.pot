@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-27 08:33+0000\n"
+"POT-Creation-Date: 2026-10-27 08:57+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -504,6 +504,10 @@ msgid "Installing…"
 msgstr ""
 
 #: apps/axon-game-center/ui.py
+msgid "Kernel"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
 msgid ""
 "Lets local AI models use your graphics card instead of only the processor."
 msgstr ""
@@ -541,6 +545,10 @@ msgstr ""
 
 #: apps/axon-game-center/ui.py
 msgid "Nothing to install. AMD and Intel graphics work out of the box."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid "OK"
 msgstr ""
 
 #: apps/axon-game-center/ui.py
@@ -611,7 +619,16 @@ msgid "Removing…"
 msgstr ""
 
 #: apps/axon-game-center/ui.py
+msgid "Restart into the standard kernel first"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
 msgid "Retry"
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+#, python-brace-format
+msgid "Running kernel: {release}"
 msgstr ""
 
 #: apps/axon-game-center/ui.py
@@ -710,6 +727,13 @@ msgstr ""
 #: apps/axon-game-center/ui.py
 msgid ""
 "Windows programs started with Axon APEX use the version you choose here."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid ""
+"You are running the gaming kernel, which cannot be removed while it is in "
+"use. Restart, choose the standard kernel under Advanced options in the boot "
+"menu, then remove it here."
 msgstr ""
 
 #: apps/axon-game-center/ui.py

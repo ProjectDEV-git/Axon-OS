@@ -41,6 +41,10 @@
     {
       "id": "system",
       "name": "System components"
+    },
+    {
+      "id": "kernel",
+      "name": "Kernel"
     }
   ],
   "presets": [
@@ -1028,6 +1032,32 @@
         "arch": "x86_64"
       },
       "notes": "Chosen in the welcome app or Settings.",
+      "verified": null
+    },
+    {
+      "id": "gaming-kernel",
+      "name": "Gaming kernel (Ubuntu HWE)",
+      "summary": "A newer Linux kernel with fast Windows-game synchronisation (ntsync) and the sched_ext scheduler framework",
+      "category": "kernel",
+      "source": {
+        "type": "apt",
+        "packages": [
+          "linux-image-generic-hwe-24.04"
+        ]
+      },
+      "size_mb_estimate": 230,
+      "starter_pack": false,
+      "aliases": [
+        "kernel",
+        "newer kernel",
+        "hwe kernel",
+        "ntsync"
+      ],
+      "requires": {
+        "gpu": null,
+        "arch": "x86_64"
+      },
+      "notes": "Ubuntu's own signed kernel, so Secure Boot keeps working. Needs a restart. The standard kernel stays installed and is tried again automatically if this one does not start.",
       "verified": null
     }
   ]

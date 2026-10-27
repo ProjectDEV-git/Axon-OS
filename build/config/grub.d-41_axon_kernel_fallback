@@ -1,0 +1,63 @@
+#!/bin/sh
+# Axon OS — keep the Ubuntu 24.04 release kernel (6.8) as a fallback for a newer kernel.
+# Installed as /etc/grub.d/41_axon_kernel_fallback.
+#
+# The gaming kernel (Ubuntu's HWE kernel, installed from Game Center) is newer than the
+# 6.8 kernel Axon OS ships, and GRUB boots the newest kernel first. If it does not boot, the
+# boot watchdog (06_axon_watchdog) sets axon_try_ga on the second attempt, and this entry,
+# which boots the 6.8 kernel on the same system, is chosen. A third failed boot still goes
+# to the factory rollback (42_axon_rollback).
+#
+# Emits nothing unless a 6.8 kernel and a newer one are both installed, and never fails:
+# a problem here must not stop grub.cfg from being written.
+BOOT_DIR="${AXON_BOOT_DIR:-/boot}"
+
+# shellcheck disable=SC2012  # kernel file names are plain
+ga="$(ls -1 "${BOOT_DIR}"/vmlinuz-6.8.0-*-generic 2>/dev/null | sort -V | tail -n 1)"
+[ -n "${ga}" ] || exit 0
+# shellcheck disable=SC2012
+newest="$(ls -1 "${BOOT_DIR}"/vmlinuz-* 2>/dev/null | sort -V | tail -n 1)"
+[ -n "${newest}" ] && [ "${newest}" != "${ga}" ] || exit 0
+
+ver="$(basename "${ga}")"
+ver="${ver#vmlinuz-}"
+initrd="${BOOT_DIR}/initrd.img-${ver}"
+[ -f "${initrd}" ] || exit 0
+
+boot_uuid="$(grub-probe --target=fs_uuid "${BOOT_DIR}" 2>/dev/null)" || exit 0
+root_uuid="$(grub-probe --target=fs_uuid / 2>/dev/null)" || exit 0
+fs="$(grub-probe --target=fs "${BOOT_DIR}" 2>/dev/null)" || exit 0
+boot_rel="$(grub-mkrelpath "${BOOT_DIR}" 2>/dev/null)" || exit 0
+[ -n "${boot_uuid}" ] && [ -n "${root_uuid}" ] && [ -n "${boot_rel}" ] || exit 0
+
+# Same btrfs sub-volume as the newest kernel's entry (Ubuntu's 10_linux adds the same option)
+rootflags=""
+if [ "$(grub-probe --target=fs / 2>/dev/null)" = "btrfs" ]; then
+    subvol="$(grub-mkrelpath / 2>/dev/null)" || subvol=""
+    [ -n "${subvol}" ] && [ "${subvol}" != "/" ] && rootflags="rootflags=subvol=${subvol#/}"
+fi
+
+case "${fs}" in
+    btrfs) fsmod="btrfs" ;;
+    xfs) fsmod="xfs" ;;
+    *) fsmod="ext2" ;;
+esac
+
+# GRUB_CMDLINE_LINUX* come from /etc/default/grub through grub-mkconfig
+cmdline="${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}"
+
+cat <<ENTRY
+menuentry 'Axon OS — previous kernel (${ver})' --class axon --class gnu-linux --id axon-ga-kernel {
+    insmod part_gpt
+    insmod ${fsmod}
+    search --no-floppy --fs-uuid --set=root ${boot_uuid}
+    linux ${boot_rel}/vmlinuz-${ver} root=UUID=${root_uuid} ro ${rootflags} ${cmdline}
+    initrd ${boot_rel}/initrd.img-${ver}
+}
+# Second boot attempt in a row (set by 06_axon_watchdog): try the previous kernel
+if [ "\${axon_try_ga}" = "1" ]; then
+    set default='axon-ga-kernel'
+    set timeout_style=menu
+    set timeout=3
+fi
+ENTRY

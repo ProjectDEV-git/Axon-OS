@@ -239,6 +239,10 @@ rm -rf /tmp/axon-deb
 log "Installing Ollama (CPU only)..."
 bash /usr/lib/axon/ollama/install-ollama.sh --cpu-only
 
+# The axon-os package added the Axon apt repository (and the pin that keeps its rebuilt Ubuntu
+# libraries from replacing Ubuntu's own). Read it so Gamescope can be found there.
+apt-get update || log "WARNING: could not read the Axon repository; Gamescope will be left out"
+
 # Gaming: small packages built by packaging/build-pkg.sh (see docs/gaming.md).
 # steam-installer asks for the Steam Subscriber Agreement through debconf; an
 # unattended image build needs the answer preseeded. Steam itself shows the

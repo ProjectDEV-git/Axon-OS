@@ -13,12 +13,16 @@ cat <<'EOF'
 # Counts boot attempts in a grubenv file on the ESP (GRUB cannot write to
 # btrfs). A systemd unit resets the counter to 0 once the boot reaches the
 # display manager. Two consecutive failures => the third boot automatically
-# selects the factory rollback snapshot.
+# selects the factory rollback snapshot. The second boot first tries the previous
+# kernel (see 41_axon_kernel_fallback), in case a newer kernel is what fails.
 if search --no-floppy --label --set=axon_esp AXONESP; then
     if [ -e (${axon_esp})/axon/grubenv ]; then
         load_env --file (${axon_esp})/axon/grubenv boot_attempts
         if [ "${boot_attempts}" = "1" ]; then
             set boot_attempts=2
+            # The last boot did not finish: if a newer kernel is installed, try the 6.8 one
+            # (41_axon_kernel_fallback reads this)
+            set axon_try_ga=1
         elif [ "${boot_attempts}" = "2" ]; then
             set boot_attempts=3
         elif [ "${boot_attempts}" = "3" ]; then

@@ -3,7 +3,8 @@
 
 Reads build/package-lists/*.list and the Depends of the metapackages in packaging/,
 and looks each name up in the release's Packages indexes (amd64, and i386 for
-":i386" names). A name that is missing would otherwise only show up as a warning
+":i386" names). Also checks that every source package in packaging/backports/backports.list
+exists, at exactly that version, in the release it is taken from. A name that is missing would otherwise only show up as a warning
 or a failed build hours into an ISO build.
 
 Usage: scripts/verify-packages.py [--ubuntu-release noble]
@@ -21,6 +22,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+AXON_REPO_PACKAGES = {"gamescope"}
 ARCHIVE = "https://archive.ubuntu.com/ubuntu/dists/{suite}/{component}/binary-{arch}/Packages.xz"
 COMPONENTS = ("main", "restricted", "universe", "multiverse")
 POCKETS = ("{release}", "{release}-updates", "{release}-security")
@@ -71,6 +73,52 @@ def archive_index(release: str, arch: str) -> set[str] | None:
     return names
 
 
+SOURCES = "https://archive.ubuntu.com/ubuntu/dists/{suite}/{component}/source/Sources.xz"
+
+
+def source_versions(suite: str) -> dict[str, set[str]] | None:
+    """Source package -> versions available in a release (all components), or None."""
+    found: dict[str, set[str]] = {}
+    for component in COMPONENTS:
+        url = SOURCES.format(suite=suite, component=component)
+        try:
+            with urllib.request.urlopen(url, timeout=180) as resp:  # nosec B310 - https
+                text = lzma.decompress(resp.read()).decode("utf-8", "replace")
+        except (urllib.error.URLError, OSError):
+            return None
+        for stanza in text.split("\n\n"):
+            name = re.search(r"^Package: (.+)$", stanza, re.M)
+            version = re.search(r"^Version: (.+)$", stanza, re.M)
+            if name and version:
+                found.setdefault(name.group(1), set()).add(version.group(1))
+    return found
+
+
+def check_backports() -> int:
+    """Number of backport entries that do not exist, or -1 if the archive cannot be reached."""
+    listing = ROOT / "packaging" / "backports" / "backports.list"
+    if not listing.is_file():
+        return 0
+    entries = [
+        ln.split()
+        for ln in listing.read_text().splitlines()
+        if ln.strip() and not ln.startswith("#")
+    ]
+    indexes: dict[str, dict[str, set[str]] | None] = {}
+    missing = 0
+    for name, suite, version in entries:
+        if suite not in indexes:
+            indexes[suite] = source_versions(suite)
+        index = indexes[suite]
+        if index is None:
+            return -1
+        if version not in index.get(name, set()):
+            say(f"MISSING  backport {name} {version} in {suite}")
+            missing += 1
+    say(f"checked {len(entries)} backport sources: {missing} missing")
+    return missing
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--ubuntu-release", default="noble")
@@ -81,6 +129,8 @@ def main() -> int:
         wanted.setdefault(name, []).extend(where)
     # Packages built in this repository do not come from the archive
     own = {p.parent.name for p in (ROOT / "packaging").glob("*/control")}
+    # Binary packages the Axon repository provides from packaging/backports (not in noble)
+    own |= AXON_REPO_PACKAGES
     indexes: dict[str, set[str] | None] = {}
     missing = 0
     for name in sorted(wanted):
@@ -98,7 +148,11 @@ def main() -> int:
             say(f"MISSING  {name}  (in {', '.join(sorted(set(wanted[name])))})")
             missing += 1
     say(f"checked {len(wanted)} package names against {args.ubuntu_release}: {missing} missing")
-    return 1 if missing else 0
+    backports = check_backports()
+    if backports < 0:
+        say("archive unreachable; backports not verified")
+        return 2
+    return 1 if missing or backports else 0
 
 
 if __name__ == "__main__":

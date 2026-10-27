@@ -7,6 +7,7 @@ pytest-cov==4.1.0
 pytest-timeout==2.2.0
 pytest-xdist==3.5.0
 jsonschema>=4.0
+PyYAML>=6.0
 
 # Linting & Code Quality
 # Keep ruff in sync with .pre-commit-config.yaml and .github/workflows/build.yml

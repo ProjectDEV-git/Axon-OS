@@ -51,7 +51,7 @@ def test_nothing_chosen_installs_nothing():
     "name", ["nvidia-driver-550", "nvidia-driver-570-open", "nvidia-driver-535-server"]
 )
 def test_driver_item_accepts_nvidia_driver_packages(name):
-    item = driver_item(name, kernel_release="6.14.0-1-generic")
+    item = driver_item(name, kernel_release="6.10.0-1-generic")
     assert item.source == {"type": "apt", "packages": [name]}  # no signed modules for this kernel
 
 
@@ -83,7 +83,14 @@ def test_signed_modules_are_installed_first_so_apt_does_not_pick_dkms(driver, mo
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "kernel",
-    ["6.14.0-37-generic", "6.8.0-1015-nvidia", "6.8.0-147-lowlatency", "6.11.0-1-generic", ""],
+    [
+        "6.10.0-37-generic",
+        "6.9.0-1-generic",
+        "6.8.0-1015-nvidia",
+        "6.8.0-147-lowlatency",
+        "6.14.0-37-lowlatency",
+        "",
+    ],
 )
 def test_no_signed_modules_for_kernels_ubuntu_does_not_sign_them_for(kernel):
     assert signed_modules_package("nvidia-driver-580-open", kernel) is None
@@ -95,3 +102,18 @@ def test_no_signed_modules_for_kernels_ubuntu_does_not_sign_them_for(kernel):
 @pytest.mark.unit
 def test_signed_modules_only_for_nvidia_driver_names():
     assert signed_modules_package("bash", "6.8.0-147-generic") is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "kernel", ["7.0.0-38-generic", "6.14.0-37-generic", "6.11.0-1-generic", "6.17.0-5-generic"]
+)
+def test_hwe_kernels_use_the_hwe_signed_module_packages(kernel):
+    assert signed_modules_package("nvidia-driver-580-open", kernel) == (
+        "linux-modules-nvidia-580-open-generic-hwe-24.04"
+    )
+    item = driver_item("nvidia-driver-580-open", kernel)
+    assert item.source["packages"] == [
+        "linux-modules-nvidia-580-open-generic-hwe-24.04",
+        "nvidia-driver-580-open",
+    ]

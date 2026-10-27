@@ -39,6 +39,15 @@ checked by hand with this list. Copy it into the release pull request and tick i
 - [ ] Steam > Power > Exit (or Switch to Desktop) returns to the login screen; game mode is off again afterwards.
 - [ ] `~/.local/state/axon-console.log` shows the session starting and ending without errors.
 
+## Gaming kernel
+
+- [ ] Game Center > Performance > Kernel > Install; restart; the boot menu starts the newer kernel (`uname -r` shows 7.x or newer).
+- [ ] `ls /dev/ntsync` exists and `systemctl status axon-ntsync` is active; a Proton game starts.
+- [ ] NVIDIA machine: `nvidia-smi` still works on the new kernel (the signed HWE modules came with it).
+- [ ] Boot menu > Advanced options lists the 6.8 kernel, and **Axon OS — previous kernel** is there.
+- [ ] Simulate a broken kernel (add `init=/nonexistent` to the newest entry, boot it twice): the third start comes up on the 6.8 kernel, not the factory rollback.
+- [ ] Remove the gaming kernel while running the 6.8 kernel: it goes away. Try it while running the gaming kernel: Game Center asks for a restart first.
+
 ## Secure Boot
 
 - [ ] NVIDIA edition with Secure Boot on: the desktop starts on the NVIDIA driver (`nvidia-smi` works), no key enrollment screen.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import platform
 import shutil
 import subprocess
 import sys
@@ -29,7 +30,14 @@ import catalog_installer as inst
 import gaming_settings
 import gpu_drivers
 from _log_helper import resolve_logger
-from catalog import Catalog, Item, driver_item, load_catalog
+from catalog import (
+    Catalog,
+    Item,
+    driver_item,
+    gaming_kernel_item,
+    gaming_kernel_removal_item,
+    load_catalog,
+)
 from constants import AXON_CONFIG_DIR
 from i18n import _
 
@@ -279,7 +287,13 @@ class GameCenterWindow(Adw.ApplicationWindow):
         for item in items:
             if item.id in self.installed:
                 continue
-            log.info("install requested: %s", item.id)
+            if item.id == "gaming-kernel":
+                # A restart into the new kernel needs the matching NVIDIA modules, or the
+                # driver is gone
+                item = gaming_kernel_item(item, inst.installed_linux_packages(self._runner))
+            log.info(
+                "install requested: %s (%s)", item.id, ", ".join(item.source.get("packages", []))
+            )
             self.jobs_queue.install(item)
 
     def queue_update(self, item: Item) -> None:
@@ -300,11 +314,32 @@ class GameCenterWindow(Adw.ApplicationWindow):
             dialog.set_extra_child(check)
 
         def on_response(_d: Adw.AlertDialog, response: str) -> None:
-            if response == "remove":
-                log.info("remove requested: %s", item.id)
-                self.jobs_queue.remove(item, remove_unused=bool(check and check.get_active()))
+            if response != "remove":
+                return
+            target = item
+            if item.id == "gaming-kernel":
+                target = gaming_kernel_removal_item(
+                    item, inst.installed_linux_packages(self._runner), platform.release()
+                )
+                if target is None:
+                    self._tell(
+                        _("Restart into the standard kernel first"),
+                        _(
+                            "You are running the gaming kernel, which cannot be removed while it "
+                            "is in use. Restart, choose the standard kernel under Advanced "
+                            "options in the boot menu, then remove it here."
+                        ),
+                    )
+                    return
+            log.info("remove requested: %s", item.id)
+            self.jobs_queue.remove(target, remove_unused=bool(check and check.get_active()))
 
         dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _tell(self, heading: str, body: str) -> None:
+        dialog = Adw.AlertDialog(heading=heading, body=body)
+        dialog.add_response("ok", _("OK"))
         dialog.present(self)
 
     def _on_event(self, event: inst.Event) -> None:
@@ -384,6 +419,8 @@ class GameCenterWindow(Adw.ApplicationWindow):
         self._update_starter_card()
         for category, name in self.catalog.categories.items():
             # Items for one kind of graphics card live on the Drivers page
+            if category == "kernel":
+                continue  # on the Performance page
             items = [i for i in self.catalog.in_category(category) if not i.requires.get("gpu")]
             if not items:
                 continue
@@ -596,6 +633,15 @@ class GameCenterWindow(Adw.ApplicationWindow):
             self._perf_switches[key] = row
         self._perf_switches["use_cloud"].set_sensitive(settings["pause_ai"])
         box.append(group)
+
+        kernel = self.catalog.items.get("gaming-kernel")
+        if kernel is not None:
+            kernel_group = self._group(
+                _("Kernel"),
+                _("Running kernel: {release}").format(release=platform.release()),
+            )
+            kernel_group.add(self._item_row(kernel, "installed"))
+            box.append(kernel_group)
 
         overlay = self._group(_("Overlay"))
         self._fps_row = Adw.SwitchRow(
