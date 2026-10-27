@@ -110,7 +110,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "lutris",
@@ -130,7 +130,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "bottles",
@@ -150,7 +150,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "itch",
@@ -172,7 +172,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "minigalaxy",
@@ -194,7 +194,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "prism",
@@ -216,7 +216,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "protonplus",
@@ -241,7 +241,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "protonup-qt",
@@ -261,7 +261,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "mangohud-flatpak",
@@ -283,7 +283,7 @@
         "arch": "x86_64"
       },
       "notes": "The version must match the runtime of the Flatpak game; Flatpak picks the newest.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "gamescope-flatpak",
@@ -303,7 +303,7 @@
         "arch": "x86_64"
       },
       "notes": "The version must match the runtime of the Flatpak game; Flatpak picks the newest.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "goverlay",
@@ -325,7 +325,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "lact",
@@ -348,7 +348,7 @@
         "arch": "x86_64"
       },
       "notes": "Can change fan speeds and clocks. Use with care.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "mission-center",
@@ -371,7 +371,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "flatseal",
@@ -393,7 +393,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "discord",
@@ -413,7 +413,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "vesktop",
@@ -435,7 +435,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "obs",
@@ -458,7 +458,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "gpu-screen-recorder",
@@ -481,7 +481,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "sunshine",
@@ -503,7 +503,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "moonlight",
@@ -523,7 +523,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "steam-link",
@@ -543,7 +543,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "kdenlive",
@@ -565,7 +565,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "retroarch",
@@ -587,7 +587,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games and BIOS files.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "dolphin",
@@ -610,7 +610,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games and BIOS files.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "pcsx2",
@@ -633,7 +633,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games and BIOS files.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "ppsspp",
@@ -655,7 +655,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games and BIOS files.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "rpcs3",
@@ -678,7 +678,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games and BIOS files.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "cemu",
@@ -700,7 +700,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games and BIOS files.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "melonds",
@@ -723,7 +723,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games and BIOS files.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "mgba",
@@ -746,7 +746,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games and BIOS files.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "scummvm",
@@ -768,7 +768,7 @@
         "arch": "x86_64"
       },
       "notes": "You must provide your own legally obtained games.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "piper",
@@ -794,7 +794,7 @@
         ]
       },
       "notes": "Also installs ratbagd, the service that talks to the mouse.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "openrgb",
@@ -817,7 +817,7 @@
         "arch": "x86_64"
       },
       "notes": "Some devices need extra permissions (udev rules) that Flatpak apps cannot add by themselves.",
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "antimicrox",
@@ -839,7 +839,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "input-remapper",
@@ -884,7 +884,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "zeroad",
@@ -907,7 +907,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "xonotic",
@@ -927,7 +927,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "spotify",
@@ -947,7 +947,7 @@
         "arch": "x86_64"
       },
       "notes": null,
-      "verified": null
+      "verified": "2026-10-27"
     },
     {
       "id": "media-codecs",
@@ -1058,7 +1058,7 @@
         "arch": "x86_64"
       },
       "notes": "Ubuntu's own signed kernel, so Secure Boot keeps working. Needs a restart. The standard kernel stays installed and is tried again automatically if this one does not start.",
-      "verified": null
+      "verified": "2026-10-27"
     }
   ]
 }
