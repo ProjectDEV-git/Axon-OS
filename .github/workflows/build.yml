@@ -45,6 +45,8 @@ jobs:
           # Gaming and release helpers (new scripts must stay clean)
           shellcheck packaging/build-pkg.sh scripts/check-iso-size.sh scripts/pin-ollama.sh \
             scripts/axon-apex-run scripts/axon-proton-runners \
+            packaging/axon-console/files/usr/bin/axon-console-session \
+            packaging/axon-console/files/usr/bin/steamos-session-select \
             packaging/axon-gaming-tweaks/postinst packaging/axon-gaming-tweaks/postrm
 
   validate-json:

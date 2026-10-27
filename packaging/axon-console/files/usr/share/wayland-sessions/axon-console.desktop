@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Axon Console
+Comment=Steam Big Picture in Gamescope, for TVs and handhelds
+Exec=/usr/bin/axon-console-session
+TryExec=/usr/bin/axon-console-session
+Type=Application
+DesktopNames=AxonConsole

@@ -252,6 +252,12 @@ bash "${SRC}/packaging/build-pkg.sh" --all /tmp/axon-gaming-debs
 if [[ "${EDITION}" != "nvidia" ]]; then
     rm -f /tmp/axon-gaming-debs/axon-nvidia_*.deb
 fi
+# axon-console needs Gamescope, which Ubuntu 24.04 does not have; it joins the image once the
+# Axon repository provides one (plan phase 6).
+if ! apt-cache policy gamescope | grep -q 'Candidate: [^(]'; then
+    log "gamescope is not available; leaving out axon-console"
+    rm -f /tmp/axon-gaming-debs/axon-console_*.deb
+fi
 apt-get install -y --reinstall /tmp/axon-gaming-debs/*_all.deb
 rm -rf /tmp/axon-gaming-debs
 

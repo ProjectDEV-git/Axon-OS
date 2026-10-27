@@ -600,7 +600,10 @@ class GameCenterWindow(Adw.ApplicationWindow):
         overlay = self._group(_("Overlay"))
         self._fps_row = Adw.SwitchRow(
             title=_("Show FPS overlay in all games"),
-            subtitle=_("Uses MangoHud. Takes effect the next time you sign in."),
+            subtitle=_(
+                "Uses MangoHud. Takes effect the next time you sign in. "
+                "Right Shift + F12 shows or hides it in a game."
+            ),
         )
         self._fps_row.set_active(self._overlay_file().exists())
         self._fps_row.connect("notify::active", self._on_fps_toggled)
@@ -616,12 +619,31 @@ class GameCenterWindow(Adw.ApplicationWindow):
     def _overlay_file(self) -> Path:
         return self._config_dir / "environment.d" / "90-axon-mangohud.conf"
 
+    def _ensure_overlay_layout(self) -> None:
+        """Give the user Axon's overlay layout unless they already have their own.
+
+        MangoHud only reads ~/.config/MangoHud/MangoHud.conf; new users get it from /etc/skel,
+        but an upgraded system may not have it.
+        """
+        target = self._config_dir / "MangoHud" / "MangoHud.conf"
+        if target.exists():
+            return
+        for source in (
+            Path("/usr/share/axon/mangohud/MangoHud.conf"),
+            Path(__file__).resolve().parents[2] / "data" / "mangohud" / "MangoHud.conf",
+        ):
+            if source.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+                return
+
     def _on_fps_toggled(self, row: Adw.SwitchRow, _pspec: object) -> None:
         path = self._overlay_file()
         try:
             if row.get_active():
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("MANGOHUD=1\n", encoding="utf-8")
+                self._ensure_overlay_layout()
             else:
                 path.unlink(missing_ok=True)
         except OSError as exc:
@@ -755,12 +777,16 @@ class GameCenterWindow(Adw.ApplicationWindow):
             self._driver_group.add(row)
             self._extra_rows.append(row)
             if info["secure_boot"]:  # type: ignore[index]
-                warn = Adw.ActionRow(
-                    title=_("Secure Boot is on"),
-                    subtitle=_(
-                        "After installing, restart and enroll the key when asked, or the driver will not load."
-                    ),
-                )
+                if info.get("signed_modules"):  # type: ignore[union-attr]
+                    detail = _(
+                        "This driver comes signed by Ubuntu, so it loads with Secure Boot on."
+                    )
+                else:
+                    detail = _(
+                        "This kernel has no signed NVIDIA driver, so the driver would not load. "
+                        "Turn Secure Boot off in your computer's firmware settings first."
+                    )
+                warn = Adw.ActionRow(title=_("Secure Boot is on"), subtitle=detail)
                 self._driver_group.add(warn)
                 self._extra_rows.append(warn)
         elif nvidia and version:

@@ -242,3 +242,31 @@ def test_command_line_accepts_only_nvidia_driver_packages():
     assert driver_item("nvidia-driver-550").id == "gpu-driver"
     with pytest.raises(ValueError):
         driver_item("sudo")
+
+
+def test_turning_the_overlay_on_gives_the_user_axon_s_layout_but_never_overwrites_theirs(tmp_path):
+    win, _ = make(tmp_path)
+    layout = tmp_path / "config" / "MangoHud" / "MangoHud.conf"
+    win._fps_row.set_active(True)
+    assert layout.is_file() and "toggle_hud=Shift_R+F12" in layout.read_text()
+    win._fps_row.set_active(False)
+    layout.write_text("fps_only\n")  # the user's own layout, e.g. saved by GOverlay
+    win._fps_row.set_active(True)
+    assert layout.read_text() == "fps_only\n"
+    win.destroy()
+
+
+def test_drivers_page_says_when_the_driver_is_signed_for_secure_boot(tmp_path):
+    gpu = gpu_drivers.Gpu("nvidia", "NVIDIA GeForce RTX 3060", "10de:2503", "", 12.0)
+    base = {"gpus": [gpu], "recommended": "nvidia-driver-580-open", "nvidia_version": None,
+            "secure_boot": True}  # fmt: skip
+    win, _ = make(tmp_path, detect={**base, "signed_modules": True})
+    settle(win, lambda: len(win._extra_rows) >= 3)
+    warn = next(r for r in win._extra_rows if r.get_title() == "Secure Boot is on")
+    assert "signed by Ubuntu" in warn.get_subtitle()
+    win.destroy()
+    win, _ = make(tmp_path, detect={**base, "signed_modules": False})
+    settle(win, lambda: len(win._extra_rows) >= 3)
+    warn = next(r for r in win._extra_rows if r.get_title() == "Secure Boot is on")
+    assert "Turn Secure Boot off" in warn.get_subtitle()
+    win.destroy()

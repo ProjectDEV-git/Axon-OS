@@ -2,7 +2,7 @@
 
 import gaming_setup
 import pytest
-from catalog import driver_item, load_catalog
+from catalog import driver_item, load_catalog, signed_modules_package
 
 
 @pytest.fixture(scope="module")
@@ -51,8 +51,8 @@ def test_nothing_chosen_installs_nothing():
     "name", ["nvidia-driver-550", "nvidia-driver-570-open", "nvidia-driver-535-server"]
 )
 def test_driver_item_accepts_nvidia_driver_packages(name):
-    item = driver_item(name)
-    assert item.source == {"type": "apt", "packages": [name]}
+    item = driver_item(name, kernel_release="6.14.0-1-generic")
+    assert item.source == {"type": "apt", "packages": [name]}  # no signed modules for this kernel
 
 
 @pytest.mark.unit
@@ -62,3 +62,36 @@ def test_driver_item_accepts_nvidia_driver_packages(name):
 def test_driver_item_rejects_anything_else(name):
     with pytest.raises(ValueError):
         driver_item(name)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("driver", "modules"),
+    [
+        ("nvidia-driver-580-open", "linux-modules-nvidia-580-open-generic"),
+        ("nvidia-driver-580", "linux-modules-nvidia-580-generic"),
+        ("nvidia-driver-535-server", "linux-modules-nvidia-535-server-generic"),
+        ("nvidia-driver-535-server-open", "linux-modules-nvidia-535-server-open-generic"),
+    ],
+)
+def test_signed_modules_are_installed_first_so_apt_does_not_pick_dkms(driver, modules):
+    item = driver_item(driver, kernel_release="6.8.0-147-generic")
+    assert item.source["packages"] == [modules, driver]
+    assert signed_modules_package(driver, "6.8.0-147-generic") == modules
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "kernel",
+    ["6.14.0-37-generic", "6.8.0-1015-nvidia", "6.8.0-147-lowlatency", "6.11.0-1-generic", ""],
+)
+def test_no_signed_modules_for_kernels_ubuntu_does_not_sign_them_for(kernel):
+    assert signed_modules_package("nvidia-driver-580-open", kernel) is None
+    assert driver_item("nvidia-driver-580-open", kernel).source["packages"] == [
+        "nvidia-driver-580-open"
+    ]
+
+
+@pytest.mark.unit
+def test_signed_modules_only_for_nvidia_driver_names():
+    assert signed_modules_package("bash", "6.8.0-147-generic") is None

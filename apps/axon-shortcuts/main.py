@@ -84,6 +84,15 @@ SHORTCUTS = [
         ],
     },
     {
+        "title": N_("Gaming"),
+        "icon": "input-gaming-symbolic",
+        "bindings": [
+            ("Right Shift + F12", N_("Show or hide the FPS overlay (in games)")),
+            ("Right Shift + F11", N_("Move the FPS overlay (in games)")),
+            ("Shift + Tab", N_("Steam overlay (in games)")),
+        ],
+    },
+    {
         "title": N_("Axon Terminal"),
         "icon": "axon-terminal-symbolic",
         "bindings": [

@@ -1,6 +1,6 @@
 # Gaming on Axon OS
 
-Status: Phases 1 (gaming core and system tweaks), 2 (game mode), 3 (catalog and Game Center) and 4 (editions and size enforcement) of `docs/gaming-masterplan.md`.
+Status: Phases 1 (gaming core and system tweaks), 2 (game mode), 3 (catalog and Game Center), 4 (editions and size enforcement) and 5 (console mode and polish) of `docs/gaming-masterplan.md`.
 Audit and background: `docs/gaming-audit.md`.
 
 ## What ships in the ISO
@@ -162,3 +162,48 @@ the ISOs are hosted are in [docs/building.md](building.md).
 graphics card it offers the matching GPU libraries (NVIDIA CUDA, about 1.4 GB to download; AMD ROCm, about
 1 GB), installed by `install-ollama-gpu.sh` after a password prompt. The AMD option is off by default because
 only recent cards are supported. See [docs/building.md](building.md#local-ai-in-the-image).
+
+## Console mode (TV and handheld)
+
+`axon-console` (package, `packaging/axon-console`) adds an **Axon Console** entry to the login screen. It
+runs `gamescope -e -f -- steam -gamepadui`: Steam's Big Picture interface as the whole session. Game mode
+is turned on for the session (`axon-game-mode on --app-id console --pid <session>`), so Brain stays
+suspended and file indexing stays paused until it ends, whatever games start and stop inside it. Leaving
+Steam ends Gamescope and the session and brings back the login screen; `steamos-session-select desktop`
+(what Steam's "Switch to Desktop" calls) ends the session the same way. Options for a particular screen
+go in `AXON_GAMESCOPE_ARGS` or `~/.config/axon-os/console.conf` (for example `-W 1920 -H 1080 -r 60`).
+There is no desktop to show errors, so `~/.local/state/axon-console.log` records what the session did.
+
+**Not in the ISO yet.** The package depends on Gamescope, which Ubuntu 24.04 does not have. The image build
+leaves `axon-console` out until `apt-cache policy gamescope` finds one (plan phase 6 builds it for the Axon
+repository); until then it is published to the Axon repository but not installable. The session and its helper
+are tested with stub programs; nothing has run in a real login session yet.
+
+ChimeraOS's `gamescope-session` and `gamescope-session-steam` were considered and not used: the repositories
+could not be fetched from the build sandbox (so their licences were not checked), and they depend on
+SteamOS-specific parts (`steamos-polkit-helpers`, Deck-only Steam flags) that could not be tested here. The Axon
+session is about 50 lines. Revisit when Gamescope is packaged and real hardware is available.
+
+## FPS overlay and shortcuts
+
+Ubuntu 24.04's MangoHud (0.6.9.1) reads only `~/.config/MangoHud/MangoHud.conf`; it does **not** read the
+`/etc/MangoHud/MangoHud.conf` the plan assumed (checked in the shipped library, 2026-10-27). So the default
+layout, one line in the top-left corner with FPS, frame time and processor and graphics card load and
+temperature, is copied from `/etc/skel` for new users and by Game Center when it turns the overlay on, and
+never overwrites a layout the user has (GOverlay edits that one). The overlay is off until Game Center >
+Performance sets `MANGOHUD=1`. **Right Shift + F12** shows or hides it in a game and **Right Shift + F11**
+moves it (MangoHud's own defaults; nothing in the Axon shell uses F11 or F12). They are listed under *Gaming* in
+the shortcut overlay (Super + /).
+
+## Secure Boot and the NVIDIA driver
+
+- **NVIDIA edition:** the driver is Ubuntu's prebuilt, signed `linux-modules-nvidia-580-open-generic`.
+  Secure Boot trusts Canonical's signature already, so nothing needs enrolling.
+- **Standard edition, driver from Game Center:** on the 6.8 kernel Axon ships, Game Center installs the matching
+  signed `linux-modules-nvidia-…-generic` package first, so apt does not choose the DKMS version. Signed this
+  way, the driver also loads with Secure Boot on. On any other kernel the driver would be built with DKMS and
+  unsigned; Game Center then says so and tells the user to turn Secure Boot off in the firmware settings.
+- **MOK enrollment is not implemented.** Ubuntu's DKMS flow asks for a one-time password in a terminal dialog
+  and a blue enrollment screen on the next boot. That cannot be done from a background PackageKit install, and
+  a half-finished enrollment leaves the driver unusable. Using Canonical's signed modules avoids the need.
+  A custom kernel (plan phase 6) will need its own signing key and this decision revisited.

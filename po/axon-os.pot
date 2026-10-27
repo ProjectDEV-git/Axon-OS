@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-27 08:19+0000\n"
+"POT-Creation-Date: 2026-10-27 08:33+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -412,12 +412,6 @@ msgid "AI acceleration"
 msgstr ""
 
 #: apps/axon-game-center/ui.py
-msgid ""
-"After installing, restart and enroll the key when asked, or the driver will "
-"not load."
-msgstr ""
-
-#: apps/axon-game-center/ui.py
 msgid "Also remove runtimes no other app uses"
 msgstr ""
 
@@ -669,6 +663,16 @@ msgstr ""
 msgid "The open-source graphics driver is in use"
 msgstr ""
 
+#: apps/axon-game-center/ui.py
+msgid "This driver comes signed by Ubuntu, so it loads with Secure Boot on."
+msgstr ""
+
+#: apps/axon-game-center/ui.py
+msgid ""
+"This kernel has no signed NVIDIA driver, so the driver would not load. Turn "
+"Secure Boot off in your computer's firmware settings first."
+msgstr ""
+
 #: apps/axon-game-center/ui.py apps/axon-settings/preferences_window.py
 msgid "Unloads local AI models so they don't take GPU memory from your game"
 msgstr ""
@@ -686,7 +690,9 @@ msgid "Use cloud provider during games"
 msgstr ""
 
 #: apps/axon-game-center/ui.py
-msgid "Uses MangoHud. Takes effect the next time you sign in."
+msgid ""
+"Uses MangoHud. Takes effect the next time you sign in. Right Shift + F12 "
+"shows or hides it in a game."
 msgstr ""
 
 #: apps/axon-game-center/ui.py
@@ -1224,7 +1230,7 @@ msgid ""
 "Heroic or a Windows program starts, and ends shortly after it closes."
 msgstr ""
 
-#: apps/axon-settings/preferences_window.py
+#: apps/axon-settings/preferences_window.py apps/axon-shortcuts/main.py
 msgid "Gaming"
 msgstr ""
 
@@ -1340,6 +1346,10 @@ msgid "Maximize window"
 msgstr ""
 
 #: apps/axon-shortcuts/main.py
+msgid "Move the FPS overlay (in games)"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
 msgid "Move window to Space 1–9"
 msgstr ""
 
@@ -1380,11 +1390,19 @@ msgid "Search Spaces and windows, then jump"
 msgstr ""
 
 #: apps/axon-shortcuts/main.py
+msgid "Show or hide the FPS overlay (in games)"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
 msgid "Show this shortcut overlay"
 msgstr ""
 
 #: apps/axon-shortcuts/main.py
 msgid "Spaces and Navigation"
+msgstr ""
+
+#: apps/axon-shortcuts/main.py
+msgid "Steam overlay (in games)"
 msgstr ""
 
 #: apps/axon-shortcuts/main.py

@@ -84,6 +84,7 @@ def test_build_pkg_builds_every_small_package(tmp_path):
     subprocess.run(["bash", str(PKG / "build-pkg.sh"), "--all", str(tmp_path)], check=True)
     debs = sorted(p.name for p in tmp_path.glob("*.deb"))
     assert [d.split("_")[0] for d in debs] == [
+        "axon-console",
         "axon-game-mode",
         "axon-gaming-catalog",
         "axon-gaming-core",

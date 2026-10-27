@@ -8,6 +8,7 @@ This module only reads it.
 from __future__ import annotations
 
 import json
+import platform
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -141,23 +142,43 @@ def load_catalog(path: Path | None = None) -> Catalog:
     raise CatalogError("gaming catalog not found")
 
 
-_DRIVER_RE = re.compile(r"^nvidia-driver-[0-9]+(-open|-server|-server-open)?$")
+_DRIVER_RE = re.compile(r"^nvidia-driver-([0-9]+)(-open|-server|-server-open)?$")
+# Ubuntu builds and signs NVIDIA kernel modules only for its own kernels; the 6.8 GA kernel
+# (the one Axon OS ships) has them for every driver branch.
+_SIGNED_KERNEL_RE = re.compile(r"^6\.8\.0-[0-9]+-generic$")
 
 
-def driver_item(package: str) -> Item:
+def signed_modules_package(package: str, kernel_release: str | None = None) -> str | None:
+    """The prebuilt, Secure Boot signed kernel modules for an NVIDIA driver package, if any.
+
+    ``nvidia-driver-580-open`` on kernel ``6.8.0-147-generic`` gives
+    ``linux-modules-nvidia-580-open-generic``. With them there is no DKMS build, and no key to
+    enroll: Canonical's signature is already trusted by Secure Boot. On other kernels the
+    driver would be built with DKMS and unsigned, so this returns None.
+    """
+    match = _DRIVER_RE.match(package)
+    kernel = platform.release() if kernel_release is None else kernel_release
+    if not match or not _SIGNED_KERNEL_RE.match(kernel):
+        return None
+    return f"linux-modules-nvidia-{match.group(1)}{match.group(2) or ''}-generic"
+
+
+def driver_item(package: str, kernel_release: str | None = None) -> Item:
     """A catalog-style item for a graphics driver package ``ubuntu-drivers`` recommended.
 
     Only NVIDIA driver package names are accepted, so a name taken from a command
-    line or another process can never install something else.
+    line or another process can never install something else. The signed modules are
+    installed first when they exist, so apt does not pick the DKMS alternative.
     """
     if not _DRIVER_RE.match(package):
         raise ValueError(f"not an NVIDIA driver package: {package!r}")
+    modules = signed_modules_package(package, kernel_release)
     return Item(
         id="gpu-driver",
         name=package,
         summary="Graphics driver",
         category="system",
-        source={"type": "apt", "packages": [package]},
+        source={"type": "apt", "packages": [modules, package] if modules else [package]},
         size_mb=300,
         requires={"gpu": "nvidia", "arch": "x86_64"},
     )

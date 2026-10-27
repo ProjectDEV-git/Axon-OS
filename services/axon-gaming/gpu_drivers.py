@@ -110,11 +110,15 @@ def secure_boot_enabled() -> bool | None:
 
 def detect_graphics() -> dict:
     """Everything the Drivers page and the welcome app need. Slow (ubuntu-drivers)."""
+    from catalog import signed_modules_package
+
     gpus = detect_gpus()
     nvidia = any(g.vendor == "nvidia" for g in gpus)
+    recommended = recommended_nvidia_driver() if nvidia else None
     return {
         "gpus": gpus,
-        "recommended": recommended_nvidia_driver() if nvidia else None,
+        "recommended": recommended,
+        "signed_modules": bool(recommended and signed_modules_package(recommended)),
         "nvidia_version": nvidia_driver_version() if nvidia else None,
         "secure_boot": secure_boot_enabled() if nvidia else None,
     }

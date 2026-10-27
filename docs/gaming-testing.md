@@ -32,6 +32,19 @@ checked by hand with this list. Copy it into the release pull request and tick i
 - [ ] `sysctl vm.max_map_count` is 2147483642; `ulimit -Hn` is at least 1048576.
 - [ ] Offline: Game Center says to connect to the internet and nothing hangs.
 
+## Console session (once Gamescope is packaged)
+
+- [ ] "Axon Console" appears on the login screen and starts Steam Big Picture; the controller works.
+- [ ] `ollama ps` stays empty and the AI answers "Game mode is on…" for the whole session.
+- [ ] Steam > Power > Exit (or Switch to Desktop) returns to the login screen; game mode is off again afterwards.
+- [ ] `~/.local/state/axon-console.log` shows the session starting and ending without errors.
+
+## Secure Boot
+
+- [ ] NVIDIA edition with Secure Boot on: the desktop starts on the NVIDIA driver (`nvidia-smi` works), no key enrollment screen.
+- [ ] Standard edition, GTX 10-series, Secure Boot on: Game Center > Drivers installs the driver, and after a restart `nvidia-smi` works.
+- [ ] Game Center > Performance: turn the FPS overlay on, sign in again, start a game: the overlay shows, Right Shift + F12 hides it.
+
 ## Size
 
 - [ ] The Build ISO run summary shows both editions under their limits, and every package that grew by more than 50 MB is explained in its pull request.
