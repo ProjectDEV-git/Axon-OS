@@ -544,9 +544,16 @@ check_size_budget() {
     local previous=()
     [[ -n "${AXON_PREVIOUS_PACKAGES:-}" && -f "${AXON_PREVIOUS_PACKAGES}" ]] \
         && previous=(--previous "${AXON_PREVIOUS_PACKAGES}")
+    local rc=0
     bash "${BASE_DIR}/scripts/check-iso-size.sh" --edition "${EDITION}" \
-        --packages "${list}" "${previous[@]}" "${DIST_DIR}/${ISO_NAME}" \
-        || die "ISO is over its size limit (see build/size-budget.conf)"
+        --packages "${list}" "${previous[@]}" "${DIST_DIR}/${ISO_NAME}" || rc=$?
+    # 1 is "over the hard limit"; anything else is the check itself breaking, which must not be
+    # reported as a size problem
+    case "${rc}" in
+        0) ;;
+        1) die "ISO is over its size limit (see build/size-budget.conf)" ;;
+        *) die "size check failed (exit ${rc}); the ISO was built: ${DIST_DIR}/${ISO_NAME}" ;;
+    esac
 }
 
 # ---------------------------------------------------------------------------

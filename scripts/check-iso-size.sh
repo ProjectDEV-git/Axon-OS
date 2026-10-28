@@ -66,8 +66,10 @@ if [[ -n "${packages}" && -f "${packages}" ]]; then
     echo
     echo "== ${top} biggest installed packages =="
     # size_kb <TAB> package <TAB> version; lines starting with # are metadata
-    grep -v '^#' "${packages}" | sort -t$'\t' -k1,1nr | head -n "${top}" |
-        awk -F'\t' '{ printf "%8.1f MB  %s %s\n", $1 / 1024, $2, $3 }'
+    # awk reads all of sort's output; `| head -n N` would close the pipe early and, under pipefail,
+    # make a long list (a real image has about 1900 packages) abort the script with SIGPIPE
+    grep -v '^#' "${packages}" | sort -t$'\t' -k1,1nr |
+        awk -F'\t' -v n="${top}" 'NR <= n { printf "%8.1f MB  %s %s\n", $1 / 1024, $2, $3 }'
     total_kb="$(grep -v '^#' "${packages}" | awk -F'\t' '{ s += $1 } END { print s + 0 }')"
     printf '%8.1f MB  installed in total (%d packages)\n' \
         "$(awk -v k="${total_kb}" 'BEGIN { print k / 1024 }')" \
