@@ -144,6 +144,8 @@ sudo rm -rf /var/lib/axon-build/apt-cache
 
 Every push to `main` that touches `build/`, `apps/`, `services/`, `shell/`, `theme/`, `data/`, `installer/`, or `plymouth/` runs the **Build ISO** workflow (`.github/workflows/build-iso.yml`). It builds both editions in parallel (one failing does not stop the other). For each edition it checks the package names, builds the ISO, enforces the size limit, verifies the boot catalog, and uploads two artifacts: `axon-os-iso-<edition>` (the ISO, its `.sha256` and SBOM) and `axon-os-packages-<edition>` (package sizes, which the next build compares against; the size report is in the run summary).
 
+When both editions build, a run on `main` (a push or a manual run) also publishes them to the **`nightly` pre-release** on the Releases page, replacing the previous nightly. A run for a `v*` tag attaches them to that version's release instead. Runs on other branches only upload artifacts.
+
 ## Releasing
 
 Release hosting: **GitHub Releases, with ISOs over 2 GiB split into `.partNN` files** plus a `.sha256`

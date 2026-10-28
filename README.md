@@ -52,7 +52,7 @@ Axon OS comes in two editions. Pick by graphics card:
 | **Standard** | AMD, Intel and older NVIDIA cards (GTX 10-series and earlier) | `axon-os-<version>-standard-amd64.iso` |
 | **NVIDIA** | GTX 16-series, RTX and newer. Includes the NVIDIA driver, signed so it works with Secure Boot on | `axon-os-<version>-nvidia-amd64.iso` |
 
-1. Download an `.iso` from the [Releases](https://github.com/ProjectDEV-git/Axon-OS/releases) page, or a fresh build from the latest [Build ISO workflow run](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build-iso.yml) (Artifacts → `axon-os-iso-standard` or `axon-os-iso-nvidia`).
+1. Download an `.iso` from the [Releases](https://github.com/ProjectDEV-git/Axon-OS/releases) page (a version release, or `nightly` for the newest build of `main`), or a fresh build from the latest [Build ISO workflow run](https://github.com/ProjectDEV-git/Axon-OS/actions/workflows/build-iso.yml) (Artifacts → `axon-os-iso-standard` or `axon-os-iso-nvidia`).
    GitHub limits release files to 2 GB, so a release ISO is split into `.part00`, `.part01`, ... files. Put all the parts and the `.sha256` file in one folder, then join and check them:
    ```bash
    cat axon-os-<version>-standard-amd64.iso.part* > axon-os-<version>-standard-amd64.iso

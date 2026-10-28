@@ -156,13 +156,20 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
+  # Version tags (vX.Y.Z, from release.yml) publish a normal release. Builds of
+  # main publish a rolling "nightly" pre-release that each new main build
+  # replaces, so the newest ISO is always on the Releases page. Builds of other
+  # branches stay downloadable artifacts only.
   publish-release:
-    name: Attach ISO to release (tags only)
-    if: startsWith(github.ref, 'refs/tags/v')
+    name: Publish ISO to Releases
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
     needs: build-iso
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    concurrency:
+      group: publish-release-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - name: Download ISO artifacts
         uses: actions/download-artifact@v4
@@ -171,29 +178,56 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - name: Attach ISOs to release
+      - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "Axon OS ${GITHUB_REF_NAME}" \
-            --generate-notes || true
-          gh release upload "${GITHUB_REF_NAME}" dist/*.sha256 dist/*.sbom.spdx.json --clobber
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            # release.yml normally creates it first; a hand-pushed tag has none yet
+            if ! gh release view "${TAG}" >/dev/null 2>&1; then
+              gh release create "${TAG}" --verify-tag --title "Axon OS ${TAG}" --generate-notes
+            fi
+          else
+            TAG="nightly"
+            # Replace the previous nightly and move its tag to this commit
+            gh release delete "${TAG}" --cleanup-tag --yes 2>/dev/null || true
+            gh api -X DELETE "repos/${GH_REPO}/git/refs/tags/${TAG}" >/dev/null 2>&1 || true
+            gh release create "${TAG}" --target "${GITHUB_SHA}" --prerelease \
+              --title "Axon OS nightly ($(date -u +%Y-%m-%d), ${GITHUB_SHA::7})" \
+              --notes "Automatic build of \`main\` at ${GITHUB_SHA::7}. Each new build of \`main\` replaces this pre-release.
+
+          For a versioned release, run Actions → Release → Run workflow."
+          fi
+          echo "TAG=${TAG}" >> "${GITHUB_ENV}"
+
+      - name: Upload ISOs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release upload "${TAG}" dist/*.sha256 dist/*.sbom.spdx.json --clobber
+          NOTES="$(gh release view "${TAG}" --json body --jq .body)"
           # Release assets are capped at 2 GiB, so a larger ISO is attached in
           # parts; `cat` joins them back and the .sha256 checks the result.
           for ISO in dist/*.iso; do
             NAME="$(basename "${ISO}")"
             if [ "$(stat -c%s "${ISO}")" -lt 2147000000 ]; then
-              gh release upload "${GITHUB_REF_NAME}" "${ISO}" --clobber
+              gh release upload "${TAG}" "${ISO}" --clobber
               continue
             fi
             split -b 1900M -d -a 2 "${ISO}" "${ISO}.part"
             rm -f "${ISO}"
-            gh release upload "${GITHUB_REF_NAME}" "${ISO}".part* --clobber
-            NOTES="$(gh release view "${GITHUB_REF_NAME}" --json body --jq .body)"
-            printf '%s\n\n### Download %s\n\nThe ISO is split into parts because GitHub caps release files at 2 GB. Download every `%s.partNN` file and `%s.sha256` into one folder, then run:\n\n```bash\ncat %s.part* > %s && sha256sum -c %s.sha256\n```\n' \
-              "${NOTES}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" > notes.md
-            gh release edit "${GITHUB_REF_NAME}" --notes-file notes.md
+            gh release upload "${TAG}" "${ISO}".part* --clobber
+            # A re-run must not add the same instructions twice
+            case "${NOTES}" in *"### Download ${NAME}"*) continue ;; esac
+            # shellcheck disable=SC2016 # the backticks are Markdown, not shell
+            NOTES="$(printf '%s\n\n### Download %s\n\nThe ISO is split into parts because GitHub caps release files at 2 GB. Download every `%s.partNN` file and `%s.sha256` into one folder, then run:\n\n```bash\ncat %s.part* > %s && sha256sum -c %s.sha256\n```\n' \
+              "${NOTES}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" "${NAME}" "${NAME}")"
           done
+          printf '%s\n' "${NOTES}" > notes.md
+          gh release edit "${TAG}" --notes-file notes.md
+          echo "Published to $(gh release view "${TAG}" --json url --jq .url)" | tee -a "${GITHUB_STEP_SUMMARY}"
