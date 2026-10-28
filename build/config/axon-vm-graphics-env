@@ -3,14 +3,20 @@
 # Installed as /usr/lib/systemd/user-environment-generators/60-axon-vm-graphics
 # and run by every `systemd --user` instance, which starts gnome-shell for
 # both the GDM greeter and user sessions. Prints KEY=VALUE lines only.
-#
+[ "$(/usr/bin/systemd-detect-virt --vm 2>/dev/null)" = "oracle" ] || exit 0
+
+# GNOME on Wayland puts the mouse pointer on a hardware cursor plane, which
+# VirtualBox's VMSVGA adapter does not show: the pointer works but is
+# invisible. Have mutter draw the pointer itself (checked in mutter 50.1,
+# 2026-10-28: it still honours this variable).
+echo "MUTTER_DEBUG_DISABLE_HW_CURSORS=1"
+
 # VirtualBox's VMSVGA 3D acceleration (Mesa's svga driver) frequently leaves
-# Ubuntu 24.04 based desktops on a black screen or a frozen GNOME Shell.
-# Inside VirtualBox, render with Mesa's llvmpipe instead. When 3D
-# acceleration is disabled (VirtualBox's default) Mesa already falls back to
-# llvmpipe, so this only changes anything when the broken path is enabled.
+# Ubuntu based desktops on a black screen or a frozen GNOME Shell. Render
+# with Mesa's llvmpipe instead. When 3D acceleration is disabled
+# (VirtualBox's default) Mesa already falls back to llvmpipe, so this only
+# changes anything when the broken path is enabled.
 #
 # Opt out (e.g. to test VirtualBox 3D): sudo touch /etc/axon/vbox-3d
 [ -e /etc/axon/vbox-3d ] && exit 0
-[ "$(/usr/bin/systemd-detect-virt --vm 2>/dev/null)" = "oracle" ] || exit 0
 echo "LIBGL_ALWAYS_SOFTWARE=1"

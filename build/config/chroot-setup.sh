@@ -645,8 +645,19 @@ gtk-theme='${GTK_THEME_NAME}'
 icon-theme='${ICON_THEME_NAME}'
 font-name='Inter 11'
 enable-animations=true
+cursor-theme='Adwaita'
 cursor-size=24
 text-scaling-factor=1.0
+
+# ubuntu-settings (pulled in through ubuntu-session) sets the Yaru cursor for
+# the "ubuntu" session and the login screen, but no package list asks for the
+# Yaru icons. A missing cursor theme leaves GNOME on Wayland with an invisible
+# pointer, so name Adwaita (always installed: GTK depends on it) there too.
+[org.gnome.desktop.interface:ubuntu]
+cursor-theme='Adwaita'
+
+[org.gnome.desktop.interface:GNOME-Greeter]
+cursor-theme='Adwaita'
 
 [org.gnome.desktop.background]
 picture-uri='file:///usr/share/backgrounds/axon/axon-neural-light.png'

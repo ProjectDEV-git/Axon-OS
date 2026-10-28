@@ -111,8 +111,9 @@ def test_vm_graphics_generator_is_installed():
 @pytest.mark.parametrize(
     ("virt", "opt_out", "expected"),
     [
-        ("oracle", False, "LIBGL_ALWAYS_SOFTWARE=1"),
-        ("oracle", True, ""),
+        ("oracle", False, "MUTTER_DEBUG_DISABLE_HW_CURSORS=1\nLIBGL_ALWAYS_SOFTWARE=1"),
+        # The 3D opt-out keeps the cursor fix
+        ("oracle", True, "MUTTER_DEBUG_DISABLE_HW_CURSORS=1"),
         ("vmware", False, ""),
         ("kvm", False, ""),
         ("none", False, ""),

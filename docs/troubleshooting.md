@@ -141,6 +141,25 @@ falls back to the generic `vesa` driver.
   `/usr/lib/systemd/user-environment-generators/60-axon-vm-graphics`). To
   re-enable VirtualBox 3D: `sudo touch /etc/axon/vbox-3d` and log in again.
 
+### Mouse Pointer Is Invisible in VirtualBox
+
+The pointer moves and clicks but cannot be seen. GNOME on Wayland draws the
+pointer on a hardware cursor plane, and VirtualBox's VMSVGA adapter does not
+show it. Inside VirtualBox, Axon OS now sets `MUTTER_DEBUG_DISABLE_HW_CURSORS=1`
+(same generator as above) so GNOME draws the pointer itself, and names the
+`Adwaita` cursor theme for every session, including Ubuntu's (which asks for
+`Yaru`, which may not be installed).
+
+On an older ISO, open a terminal from the keyboard (**Super**, type
+`terminal`, **Enter**), run this, then log out and back in (live session: user
+`axon`, no password):
+
+```bash
+mkdir -p ~/.config/environment.d
+echo MUTTER_DEBUG_DISABLE_HW_CURSORS=1 > ~/.config/environment.d/90-cursor.conf
+gsettings set org.gnome.desktop.interface cursor-theme Adwaita
+```
+
 **Recommended VirtualBox settings** (Settings → Display → Screen):
 
 | Setting | Value |
