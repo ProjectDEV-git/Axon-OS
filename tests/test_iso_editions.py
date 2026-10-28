@@ -395,3 +395,26 @@ def test_pinned_release_names_both_gpu_assets():
     policy = (ROOT / "data" / "polkit" / "org.axonos.ollama-gpu.policy").read_text()
     assert "/usr/lib/axon/ollama/install-ollama-gpu.sh" in policy
     assert "auth_admin" in policy and "<allow_active>auth_admin_keep" in policy
+
+
+@pytest.mark.unit
+def test_a_large_package_list_does_not_make_the_size_check_fail(tmp_path):
+    """A real list has 1900 packages. `sort | head` used to die of SIGPIPE under pipefail, and
+    build.sh reported that as "ISO is over its size limit" for an ISO that was 540 MB under it."""
+    pkgs = tmp_path / "packages.tsv"
+    rows = [
+        f"{(i * 7919) % 100000}\tpackage-with-a-fairly-long-name-{i}\t1.2.{i}-0ubuntu1"
+        for i in range(6000)
+    ]
+    pkgs.write_text("# iso_bytes=2960793600\n" + "\n".join(rows) + "\n")
+    result = check(tmp_path, "standard", 2960, "--packages", str(pkgs))
+    assert result.returncode == 0, result.stderr
+    assert "biggest installed packages" in result.stdout
+    assert "installed in total (6000 packages)" in result.stdout, "the report reaches its last line"
+    assert "Broken pipe" not in result.stderr
+
+
+@pytest.mark.unit
+def test_build_tells_a_failed_size_check_from_an_over_limit_iso():
+    text = (ROOT / "build" / "build.sh").read_text()
+    assert "size check failed" in text, "exit code other than 1 is the script's own failure"
