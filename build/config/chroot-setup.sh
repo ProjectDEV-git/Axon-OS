@@ -638,8 +638,20 @@ if [[ -f "${USER_THEME_SCHEMA}" ]]; then
 fi
 
 log "Applying GNOME defaults..."
-cat > /usr/share/glib-2.0/schemas/90_axon-os.gschema.override <<EOF
-[org.gnome.desktop.interface]
+# GLib uses a desktop-specific group ([schema:GNOME]) over a plain one whenever that name is in
+# XDG_CURRENT_DESKTOP, whatever the file number. gnome-shell-common sets
+# [org.gnome.mutter:GNOME] dynamic-workspaces=true, which beat Axon's fixed 9 workspaces in the
+# GNOME session; Ubuntu's ubuntu-settings sets Yaru themes and fonts for the "ubuntu" session
+# (XDG_CURRENT_DESKTOP=ubuntu:GNOME) should a later build pull it in. So the Axon defaults are
+# written once as plain groups and again for each of those desktop names.
+AXON_GSCHEMA_OVERRIDE=/usr/share/glib-2.0/schemas/90_axon-os.gschema.override
+AXON_DESKTOP_NAMES=(GNOME ubuntu)
+
+# $1: group suffix, '' for the plain groups or ':<desktop>'
+axon_gnome_defaults() {
+    local d="$1"
+    cat <<EOF
+[org.gnome.desktop.interface${d}]
 color-scheme='prefer-dark'
 gtk-theme='${GTK_THEME_NAME}'
 icon-theme='${ICON_THEME_NAME}'
@@ -648,26 +660,36 @@ enable-animations=true
 cursor-size=24
 text-scaling-factor=1.0
 
-[org.gnome.desktop.background]
+[org.gnome.desktop.background${d}]
 picture-uri='file:///usr/share/backgrounds/axon/axon-neural-light.png'
 picture-uri-dark='file:///usr/share/backgrounds/axon/axon-neural-dark.png'
 picture-options='zoom'
 
-[org.gnome.desktop.screensaver]
+[org.gnome.desktop.screensaver${d}]
 picture-uri='file:///usr/share/backgrounds/axon/axon-neural-dark.png'
 
-[org.gnome.desktop.wm.preferences]
+[org.gnome.desktop.wm.preferences${d}]
 num-workspaces=9
 workspace-names=['Code', 'Web', 'Chat', 'Files', 'Media', 'Work', 'Personal', 'Terminal', 'Notes']
 button-layout='close,minimize,maximize:'
 
-[org.gnome.mutter]
+[org.gnome.mutter${d}]
 dynamic-workspaces=false
 edge-tiling=true
-experimental-features=['scale-monitor-framebuffer']
+experimental-features=['scale-monitor-framebuffer', 'xwayland-native-scaling']
 
-[org.gnome.desktop.peripherals.touchpad]
+[org.gnome.desktop.peripherals.touchpad${d}]
 tap-to-click=true
+
+[org.gnome.shell${d}]
+enabled-extensions=['axon-shell@axon-os', '${USER_THEME_EXT}']
+favorite-apps=['axon-welcome.desktop', 'install-axon-os.desktop', 'org.gnome.Nautilus.desktop', '${BROWSER_DESKTOP}', 'axon-terminal.desktop', 'axon-ai-panel.desktop', 'axon-settings.desktop']
+EOF
+}
+
+{
+    axon_gnome_defaults ''
+    cat <<'EOF'
 
 [org.gnome.settings-daemon.plugins.media-keys]
 custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/axon-voice/']
@@ -676,14 +698,15 @@ custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybin
 name='Axon Voice (push-to-talk)'
 command='/usr/local/bin/axon-voice-toggle'
 binding='<Super>v'
-
-[org.gnome.shell]
-enabled-extensions=['axon-shell@axon-os', '${USER_THEME_EXT}']
-favorite-apps=['axon-welcome.desktop', 'install-axon-os.desktop', 'org.gnome.Nautilus.desktop', '${BROWSER_DESKTOP}', 'axon-terminal.desktop', 'axon-ai-panel.desktop', 'axon-settings.desktop']
 EOF
+    for desktop in "${AXON_DESKTOP_NAMES[@]}"; do
+        echo
+        axon_gnome_defaults ":${desktop}"
+    done
+} > "${AXON_GSCHEMA_OVERRIDE}"
 
 if [[ -n "${SHELL_THEME_NAME}" && -f /usr/share/glib-2.0/schemas/org.gnome.shell.extensions.user-theme.gschema.xml ]]; then
-    cat >> /usr/share/glib-2.0/schemas/90_axon-os.gschema.override <<EOF
+    cat >> "${AXON_GSCHEMA_OVERRIDE}" <<EOF
 
 [org.gnome.shell.extensions.user-theme]
 name='${SHELL_THEME_NAME}'

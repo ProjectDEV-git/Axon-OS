@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
 import pytest
 
@@ -137,6 +138,164 @@ def test_vm_graphics_generator_output(tmp_path, virt, opt_out, expected):
     result = subprocess.run(["sh", str(generator)], capture_output=True, text=True, check=False)
     assert result.returncode == 0
     assert result.stdout.strip() == expected
+
+
+# ---------------------------------------------------------------------------
+# GNOME defaults (90_axon-os.gschema.override from chroot-setup.sh)
+# ---------------------------------------------------------------------------
+
+AXON_OVERRIDE_PATH = "/usr/share/glib-2.0/schemas/90_axon-os.gschema.override"
+# Desktop names GNOME sessions put in XDG_CURRENT_DESKTOP: "GNOME" for the gnome session,
+# "ubuntu:GNOME" for Ubuntu's session. Desktop-specific groups win over plain ones for them.
+SESSION_DESKTOPS = ("GNOME", "ubuntu")
+
+
+def _generate_override(tmp_path: Path) -> Path:
+    """Run the override-writing block of chroot-setup.sh into tmp_path."""
+    setup = CHROOT_SETUP.read_text()
+    match = re.search(
+        r'^log "Applying GNOME defaults\.\.\."\n.*?(?=^glib-compile-schemas )',
+        setup,
+        re.S | re.M,
+    )
+    assert match, "GNOME defaults block not found in chroot-setup.sh"
+    block = match.group(0)
+    assert f"AXON_GSCHEMA_OVERRIDE={AXON_OVERRIDE_PATH}" in block
+    out = tmp_path / "90_axon-os.gschema.override"
+    script = tmp_path / "gnome-defaults.sh"
+    script.write_text(
+        "log() { :; }\n"
+        "GTK_THEME_NAME=axon-gtk ICON_THEME_NAME=Papirus-Dark SHELL_THEME_NAME=\n"
+        "USER_THEME_EXT=user-theme@gnome-shell-extensions.gcampax.github.com\n"
+        "BROWSER_DESKTOP=brave-browser.desktop\n" + block.replace(AXON_OVERRIDE_PATH, str(out))
+    )
+    subprocess.run(["bash", str(script)], check=True, capture_output=True, text=True)
+    return out
+
+
+def _parse_override(path: Path) -> dict[str, dict[str, str]]:
+    """Group name -> {key: value text} for a gschema override file."""
+    groups: dict[str, dict[str, str]] = {}
+    current: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = groups.setdefault(line[1:-1], {})
+        else:
+            key, _, value = line.partition("=")
+            current[key.strip()] = value.strip()
+    return groups
+
+
+def _plain_groups(groups: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+    """Groups without a desktop suffix or relocatable path."""
+    return {name: keys for name, keys in groups.items() if ":" not in name}
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+def test_gnome_override_sets_axon_values_for_session_desktops(tmp_path):
+    # GLib picks [schema:<desktop>] over [schema] whenever <desktop> is in
+    # XDG_CURRENT_DESKTOP, whatever the file number: gnome-shell-common's
+    # [org.gnome.mutter:GNOME] turned dynamic workspaces back on, and
+    # ubuntu-settings' [*:ubuntu] groups set Yaru and Ubuntu Sans.
+    groups = _parse_override(_generate_override(tmp_path))
+    plain = _plain_groups(groups)
+    assert plain["org.gnome.desktop.interface"]["gtk-theme"] == "'axon-gtk'"
+    mirrored = {name for name in plain if not name.startswith("org.gnome.settings-daemon.")}
+    for desktop in SESSION_DESKTOPS:
+        for name in mirrored:
+            assert groups.get(f"{name}:{desktop}") == plain[name], f"{name}:{desktop}"
+
+    ubuntu_interface = groups["org.gnome.desktop.interface:ubuntu"]
+    assert ubuntu_interface["gtk-theme"] == "'axon-gtk'"
+    assert ubuntu_interface["icon-theme"] == "'Papirus-Dark'"
+    assert ubuntu_interface["font-name"] == "'Inter 11'"
+    assert groups["org.gnome.mutter:GNOME"]["dynamic-workspaces"] == "false"
+    assert groups["org.gnome.shell:ubuntu"]["favorite-apps"].startswith("['axon-welcome.desktop'")
+
+
+def _gvariant_type(value: str) -> str:
+    if value.startswith("'"):
+        return "s"
+    if value.startswith("["):
+        return "as"
+    if value in ("true", "false"):
+        return "b"
+    return "d" if "." in value else "i"
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not all(shutil.which(tool) for tool in ("bash", "glib-compile-schemas", "gsettings")),
+    reason="needs bash and GLib's schema tools",
+)
+@pytest.mark.parametrize("current_desktop", ["GNOME", "ubuntu:GNOME"])
+def test_gnome_override_wins_over_desktop_specific_defaults(tmp_path, current_desktop):
+    # Same check through GLib itself: stand-in schemas for the keys Axon sets,
+    # the desktop-specific defaults Ubuntu 26.04 ships, then Axon's file.
+    schema_dir = tmp_path / "schemas"
+    schema_dir.mkdir()
+    axon = _generate_override(schema_dir)
+    plain = _plain_groups(_parse_override(axon))
+
+    schemas = []
+    for name, keys in plain.items():
+        key_xml = "".join(
+            f'<key name="{key}" type="{_gvariant_type(value)}">'
+            f"<default>{xml_escape(value)}</default></key>"
+            for key, value in keys.items()
+        )
+        path = "/" + name.replace(".", "/") + "/"
+        schemas.append(f'<schema id="{name}" path="{path}">{key_xml}</schema>')
+    (schema_dir / "axon-test.gschema.xml").write_text(
+        f"<schemalist>{''.join(schemas)}</schemalist>"
+    )
+    # Abridged from gnome-shell-common 50.1 and ubuntu-settings 26.04.6
+    (schema_dir / "00_org.gnome.shell.gschema.override").write_text(
+        "[org.gnome.mutter:GNOME]\ndynamic-workspaces=true\nedge-tiling=true\n"
+    )
+    (schema_dir / "10_ubuntu-settings.gschema.override").write_text(
+        "[org.gnome.desktop.interface:ubuntu]\n"
+        "gtk-theme='Yaru'\nicon-theme='Yaru'\nfont-name='Ubuntu Sans 11'\n\n"
+        "[org.gnome.desktop.background:ubuntu]\n"
+        "picture-uri='file:///usr/share/backgrounds/warty-final-ubuntu.png'\n\n"
+        "[org.gnome.mutter:ubuntu]\ndynamic-workspaces=true\n\n"
+        "[org.gnome.desktop.wm.preferences:ubuntu]\nbutton-layout=':minimize,maximize,close'\n\n"
+        "[org.gnome.shell:ubuntu]\nfavorite-apps=['firefox_firefox.desktop']\n"
+    )
+    subprocess.run(
+        ["glib-compile-schemas", str(schema_dir)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    env = {
+        **os.environ,
+        "GSETTINGS_SCHEMA_DIR": str(schema_dir),
+        "GSETTINGS_BACKEND": "memory",
+        "XDG_CURRENT_DESKTOP": current_desktop,
+    }
+    for schema, key in [
+        ("org.gnome.desktop.interface", "gtk-theme"),
+        ("org.gnome.desktop.interface", "icon-theme"),
+        ("org.gnome.desktop.interface", "font-name"),
+        ("org.gnome.desktop.background", "picture-uri"),
+        ("org.gnome.mutter", "dynamic-workspaces"),
+        ("org.gnome.desktop.wm.preferences", "button-layout"),
+        ("org.gnome.shell", "favorite-apps"),
+    ]:
+        result = subprocess.run(
+            ["gsettings", "get", schema, key],
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert result.stdout.strip() == plain[schema][key], f"{schema} {key}"
 
 
 # ---------------------------------------------------------------------------
