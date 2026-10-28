@@ -80,26 +80,21 @@ url="https://github.com/ollama/ollama/releases/download/${OLLAMA_VERSION}/${OLLA
 tmp="$(mktemp -d /var/tmp/axon-ollama.XXXXXX)"
 trap 'rm -rf "${tmp}"' EXIT
 
-log "downloading ${url}"
-# Resume after dropped transfers, and give up on a stalled connection
-# (under 1 KB/s for a minute) so the retry reconnects instead of hanging.
-curl -fL --retry 10 --retry-delay 5 --retry-all-errors -C - \
-    --speed-limit 1024 --speed-time 60 \
-    -o "${tmp}/${OLLAMA_ASSET}" "${url}"
-
-log "verifying SHA-256"
-if ! echo "${OLLAMA_SHA256}  ${tmp}/${OLLAMA_ASSET}" | sha256sum -c --status -; then
-    log "SHA-256 mismatch for ${OLLAMA_ASSET}; refusing to install"
-    exit 1
-fi
+# The tarball is about 2 GB (it carries the GPU libraries even for a --cpu-only install), so it is
+# kept between runs: a rebuild, or a retry after a dropped connection, must not start from zero.
+# The build mounts a directory that outlives the chroot at the default (build/build.sh).
+# shellcheck source=/dev/null
+source "${HERE}/download-cached.sh"
+archive="$(fetch_cached "${url}" "${OLLAMA_SHA256}" "${OLLAMA_ASSET}" \
+    "${AXON_DOWNLOAD_CACHE:-/var/cache/axon-downloads}" "${tmp}")" || exit 1
 
 log "extracting into ${PREFIX}"
 # GPU backends are separate directories under lib/ollama (cuda_v12, cuda_v13, rocm_*, vulkan)
 skip=()
 [[ "${CPU_ONLY}" == "true" ]] && skip=(--exclude='lib/ollama/cuda_*' --exclude='lib/ollama/rocm*' --exclude='lib/ollama/vulkan')
 case "${OLLAMA_ASSET}" in
-    *.tgz|*.tar.gz) tar -xzf "${tmp}/${OLLAMA_ASSET}" -C "${PREFIX}" "${skip[@]}" ;;
-    *.tar.zst) tar --zstd -xf "${tmp}/${OLLAMA_ASSET}" -C "${PREFIX}" "${skip[@]}" ;;
+    *.tgz|*.tar.gz) tar -xzf "${archive}" -C "${PREFIX}" "${skip[@]}" ;;
+    *.tar.zst) tar --zstd -xf "${archive}" -C "${PREFIX}" "${skip[@]}" ;;
     *) log "unsupported asset type: ${OLLAMA_ASSET}"; exit 1 ;;
 esac
 

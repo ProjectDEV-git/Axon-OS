@@ -104,6 +104,7 @@ fi
 CHROOT="${WORK_DIR}/chroot"
 IMAGE="${WORK_DIR}/image"
 APT_CACHE="${BUILD_ROOT}/apt-cache"  # persistent .deb cache, shared by every edition
+DOWNLOAD_CACHE="${BUILD_ROOT}/download-cache"  # big pinned downloads (Ollama), shared too
 BASE_IMAGE="${WORK_DIR}/base-${DIST}-${ARCH}.tar.xz"  # cached chroot tarball
 STAGING="${WORK_DIR}/staging"
 
@@ -191,6 +192,10 @@ mount_chroot() {
     mkdir -p "${APT_CACHE}"
     mkdir -p "${CHROOT}/var/cache/apt/archives"
     mount --bind "${APT_CACHE}" "${CHROOT}/var/cache/apt/archives"
+    # Big pinned downloads (the 2 GB Ollama tarball) survive the chroot and a failed build here;
+    # install-ollama.sh looks for this directory (AXON_DOWNLOAD_CACHE default)
+    mkdir -p "${DOWNLOAD_CACHE}" "${CHROOT}/var/cache/axon-downloads"
+    mount --bind "${DOWNLOAD_CACHE}" "${CHROOT}/var/cache/axon-downloads"
     if grep -q "127.0.0.53" /etc/resolv.conf; then
         log "Host uses systemd-resolved. Writing fallback DNS to chroot resolv.conf..."
         printf "nameserver 8.8.8.8\nnameserver 1.1.1.1\n" > "${CHROOT}/etc/resolv.conf"
@@ -202,6 +207,8 @@ mount_chroot() {
 
 umount_chroot() {
     [[ "${MOUNTED}" == "true" ]] || return 0
+    umount -lf "${CHROOT}/var/cache/axon-downloads" 2>/dev/null || true
+    rmdir "${CHROOT}/var/cache/axon-downloads" 2>/dev/null || true  # the image gets no empty mount point
     umount -lf "${CHROOT}/var/cache/apt/archives" 2>/dev/null || true
     umount -lf "${CHROOT}/dev/pts" 2>/dev/null || true
     umount -lf "${CHROOT}/dev" 2>/dev/null || true
