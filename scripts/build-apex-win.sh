@@ -42,7 +42,21 @@ if [[ -z "${CARGO}" ]]; then
     exit 3
 fi
 
-log "building win-sandbox-runner with $("${CARGO}" --version)"
+# Files in the user's Rust directories owned by someone else (an earlier run as root) make cargo
+# fail with "Permission denied"; say so with the fix instead of leaving the user to find it.
+if [[ ${#RUN_AS[@]} -gt 0 && -n "${user_home:-}" ]]; then
+    foreign="$(find "${user_home}/.cargo" "${user_home}/.rustup" -maxdepth 4 ! -user "${SUDO_USER}" -print -quit 2>/dev/null || true)"
+    if [[ -n "${foreign}" ]]; then
+        log "${foreign} is not owned by ${SUDO_USER}; fix with: sudo chown -R ${SUDO_USER}: ${user_home}/.cargo ${user_home}/.rustup"
+        exit 1
+    fi
+fi
+
+# Ask the version as the same user the build runs as. As root, rustup's cargo shim has no
+# toolchain ("could not choose a version of cargo") and, when sudo keeps HOME, it can leave
+# root-owned files in the user's ~/.cargo that later make the real build fail with
+# "Permission denied" on the registry cache.
+log "building win-sandbox-runner with $("${RUN_AS[@]}" "${CARGO}" --version 2>&1 | head -n 1)"
 if ! "${RUN_AS[@]}" "${CARGO}" build --release --locked \
         --manifest-path "${SRC}/Cargo.toml" -p win-sandbox-runner; then
     log "build failed"
