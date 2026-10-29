@@ -1,0 +1,136 @@
+Package: axon-console
+Architecture: all
+Version: 1.2.1
+Priority: optional
+Section: games
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: gamescope, steam-installer, axon-gaming-core, axon-game-mode, systemd
+Filename: pool/main/axon-console_1.2.1_all.deb
+Size: 2304
+MD5sum: a300927b76001f2b9f547de3a9f4019e
+SHA1: 81cfc0a9dbc74d3db604567db5b61d8d097c9d05
+SHA256: 73dd66deb5edcd22f3f0409651143cb60caa1f1df3e7179d75316ba2f5e7ac2f
+SHA512: c85687af3c11fcd8939c406fd6640856041af48cae6d6b3e7bd019324e3cde814b6d32240c293ef49617fb71e63eeb716d3c0c0b0381d94146766686be1b1965
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon Console: a TV and handheld session for Steam
+ Adds "Axon Console" to the login screen. It starts Steam's Big Picture
+ (gamepad) interface inside Gamescope, with Axon game mode on for the whole
+ session so the AI services stay out of the way of the games. Leaving Steam
+ returns to the login screen.
+
+Package: axon-game-mode
+Architecture: all
+Version: 1.2.1
+Priority: optional
+Section: games
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: gamemode, python3, python3-dbus
+Filename: pool/main/axon-game-mode_1.2.1_all.deb
+Size: 3320
+MD5sum: 6a2b8e1deb2a359b21b2378d853e451e
+SHA1: c4de4a12c611046741fe6f9fe3fba8998afe8094
+SHA256: 1da1637d2a5a57189d31a35e420f89da18cea13ffb0094d2a29fcfc3b60387c2
+SHA512: 00d07ee07c3d02188e3f12aafc11e477f6ff592b416b16627b7a90dac7e51f6ccff720795532a0900bac13728fcf723abc7a68902003610ad0297358a79e8372
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon OS game mode command and GameMode hooks
+ Installs the axon-game-mode command and the GameMode configuration that runs
+ it, so starting a game through gamemoderun, Steam or Lutris pauses the AI
+ services (see org.axonos.Gaming) and ending it brings them back.
+
+Package: axon-gaming-catalog
+Architecture: all
+Version: 1.2.1
+Priority: optional
+Section: games
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Filename: pool/main/axon-gaming-catalog_1.2.1_all.deb
+Size: 5468
+MD5sum: ff5176857a0aaf935e1b361c0e4c36a7
+SHA1: 38cc4beae9574f9de07945ffc6014191d66a3777
+SHA256: 1b55d9ae6eacfe503226ae8b0ba1d19d985895c6fabacf9d957cd128635bbd4f
+SHA512: 1bdabc186bd8a4eb6f130cbd0f0dfdd56c35fcaac3cb51c666342bcf3d2e49d4bdfb8a5c5aef6b21bcb1a30b8863637c2caee698a82672a0219a5388747d56a3
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon OS gaming app catalog
+ The list of apps, tools and presets that Axon Game Center and the welcome
+ app offer to install. Shipped as its own package so a new list reaches
+ installed systems through the normal update, without a new ISO.
+
+Package: axon-gaming-core
+Architecture: all
+Version: 1.2.1
+Priority: optional
+Section: games
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: steam-installer, steam-devices, gamemode, libgamemode0, libgamemode0:i386, mangohud, mesa-vulkan-drivers, mesa-vulkan-drivers:i386, libgl1-mesa-dri:i386, libglx-mesa0:i386, vulkan-tools, libvulkan1, libvulkan1:i386
+Recommends: gamescope
+Filename: pool/main/axon-gaming-core_1.2.1_all.deb
+Size: 1032
+MD5sum: 3cb4aa3579e508f6df3d50348ea4c8cb
+SHA1: 4a8f1d7935d25671dd6afe08dc79b8946eaab721
+SHA256: 32750267a785c130096433f1cc2cd50658ff9029729a3028732c28b46f6ebf46
+SHA512: 7bad7e027c0a1649e481ae068363f92d09099dcc6515d83e8f09e639cd2a8b7390c1fd92d88c2e4b6ccaacbcfac2eeab8f83de38d2b8c8892ae0f3d7ac17859f
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon OS gaming essentials
+ Metapackage for "gaming works out of the box": the Steam launcher (the
+ Steam runtime downloads on first start), controller udev rules, GameMode,
+ MangoHud, the Vulkan loader and the 32-bit graphics libraries 32-bit
+ Proton games need. Everything else is a download from Axon Game Center.
+
+Package: axon-gaming-tweaks
+Architecture: all
+Version: 1.2.1
+Priority: optional
+Section: admin
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: systemd-zram-generator, udev
+Filename: pool/main/axon-gaming-tweaks_1.2.1_all.deb
+Size: 2684
+MD5sum: 9c14a495d6440bfe9dea2cb51390c8f1
+SHA1: 72d8bf9735589706d204bb05c22519b3a49fd481
+SHA256: 9befcc6782dc2a8bb056af2df8428db6e0e73ab8808e69d2b2afa78bb1160200
+SHA512: debf07655877361c3e5802c41bf463d77547baa8b9d8ba6a265d8f5aa6af95b0763d554c9a17088dbedeb44e4a4ed38c6e5ff2c3d584c243754b77b7caf80e70
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon OS system settings for gaming
+ Kernel and systemd settings that Windows games running under Proton need:
+ a large memory-map limit, a high open-file limit, the ntsync device when
+ the kernel has it, and compressed-RAM (zram) swap.
+
+Package: axon-nvidia
+Architecture: all
+Version: 1.2.1
+Priority: optional
+Section: libs
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: linux-modules-nvidia-595-open-generic, nvidia-kernel-common-595, libnvidia-gl-595, libnvidia-gl-595:i386, libnvidia-compute-595, libnvidia-extra-595, libnvidia-decode-595, libnvidia-encode-595, libnvidia-fbc1-595, libnvidia-cfg1-595, nvidia-utils-595, nvidia-compute-utils-595, xserver-xorg-video-nvidia-595
+Filename: pool/main/axon-nvidia_1.2.1_all.deb
+Size: 1096
+MD5sum: 3ca5da495b1e72e7b4067a4af9c3c78c
+SHA1: 550d6da7e55e2a32888ec8922a10fcc424d84ba7
+SHA256: dc669507d2f6879e63f17f2255f341513eaba3d67dd724ec9f81cc6aae21885e
+SHA512: 2b3a321595738c3275789cc8962091ae28080640c9f01af26d02a7d0504b3781da7dc5d2378cf3cd7a61eef89e3fb2e435c1f699d4e83079651b6432c190cae9
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: NVIDIA driver for Axon OS (GTX 16-series, RTX and newer)
+ The NVIDIA 595 driver with the open kernel modules, as Ubuntu's prebuilt
+ and signed packages, so it loads with Secure Boot on and needs no compiler
+ on the machine. Includes the 32-bit OpenGL libraries Steam needs. Cards
+ older than the GTX 16-series are not supported by the open modules; use the
+ Standard edition and install the driver from Game Center.
+
+Package: axon-os
+Architecture: all
+Version: 1.2.1
+Priority: optional
+Section: misc
+Maintainer: Axon OS <axon-os@users.noreply.github.com>
+Depends: python3 (>= 3.10), python3-gi, gir1.2-secret-1, init-system-helpers (>= 1.60)
+Filename: pool/main/axon-os_1.2.1_all.deb
+Size: 5050320
+MD5sum: 882d1dfae0632d33c8038a91296e8fc9
+SHA1: a97878688d2280e718764bba6d194d666891e5a2
+SHA256: 2e9995ffb34c45247c6aeeee913fd10885ae2d6db0320585999a0305fd45dce8
+SHA512: 16bb395a7d654d0ff32f3555dd8c5486991481458afdfc7d57107d4651b13911b4a6ccde4101192d48a01871bcab331a4f27e12bd9d7e1754e3210bb0d214033
+Homepage: https://github.com/ProjectDEV-git/Axon-OS
+Description: Axon OS desktop components
+ The Axon AI services, apps, GNOME Shell extension, theme and system
+ helpers. Upgrading this package updates Axon OS itself.
+

@@ -1,0 +1,50 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64 all
+Codename: stable
+Components: main
+Date: Thu, 29 Oct 2026 04:26:12 +0000
+Label: Axon OS
+Origin: Axon OS
+Suite: stable
+MD5Sum:
+ 0c340b8eb2b773fcbae1e39c52c89a64              142 Release
+ ceef093dd550361eea7472a3b5d985d4             6725 main/binary-all/Packages
+ e173230d66ae7f13050d4388f503fa60             2918 main/binary-all/Packages.gz
+ ceef093dd550361eea7472a3b5d985d4             6725 main/binary-amd64/Packages
+ e173230d66ae7f13050d4388f503fa60             2918 main/binary-amd64/Packages.gz
+SHA1:
+ af941fcd9c33f59409a7aec7445e3c3189441e3a              142 Release
+ 2a52cc225435a0a2d414f2c8c6baa9de87f466a3             6725 main/binary-all/Packages
+ e945b90c7334aee4c8b646479a577c11b477a2df             2918 main/binary-all/Packages.gz
+ 2a52cc225435a0a2d414f2c8c6baa9de87f466a3             6725 main/binary-amd64/Packages
+ e945b90c7334aee4c8b646479a577c11b477a2df             2918 main/binary-amd64/Packages.gz
+SHA256:
+ 3db916f325ff4ab210177f4e0ea2b196018d658cb9a988f19cbf59068b7ba5bd              142 Release
+ 78ab6329a9b05a01b286cfd5d59e9a2c315e28ceebdf52e3b4b743f0db8bd10a             6725 main/binary-all/Packages
+ 6a96f2c5d4039464e79fce8ec118bc625cdc61b43ad6c17637e52f425199f81e             2918 main/binary-all/Packages.gz
+ 78ab6329a9b05a01b286cfd5d59e9a2c315e28ceebdf52e3b4b743f0db8bd10a             6725 main/binary-amd64/Packages
+ 6a96f2c5d4039464e79fce8ec118bc625cdc61b43ad6c17637e52f425199f81e             2918 main/binary-amd64/Packages.gz
+SHA512:
+ 86ef973b374226593fe6bc936ccb066324569af5d11f659bb62783267f1c438c184da5512bb33da898ff999870d553b7cdc7abdecb9a9ab4fbfd1e937f9b4532              142 Release
+ 21dffb383b900770d4077a1844a8326afbfd1d7544ecb034096754e5c4d08d26c919029be9f5b269cc02d87b713080419e7913b33655ca6d477aa96bef7e14b0             6725 main/binary-all/Packages
+ bdd17c129aecd5ba9d45119dfd841423f358faad0e42eadb3597f27c22b452e3eee136b2ba2ee4e0c7fd6663220c241aa02aec9408c57871024c0e310457ff7b             2918 main/binary-all/Packages.gz
+ 21dffb383b900770d4077a1844a8326afbfd1d7544ecb034096754e5c4d08d26c919029be9f5b269cc02d87b713080419e7913b33655ca6d477aa96bef7e14b0             6725 main/binary-amd64/Packages
+ bdd17c129aecd5ba9d45119dfd841423f358faad0e42eadb3597f27c22b452e3eee136b2ba2ee4e0c7fd6663220c241aa02aec9408c57871024c0e310457ff7b             2918 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEINd4SvkaA7dmjyjbZaT+uG3VdRcFAmriyuQACgkQZaT+uG3V
+dReNTBAAg/ZfRJv57/6kztztxre+unBEhE4DyPVTdKnhubtP2/ETWb6AW8/J3kvb
+aTmuQfqVp1MXU6duyYEZtn0lNcpZxoSSfmy4RGnXey5oxKOuLADti1kRi9FISePX
+/bRM73h0KV9x2UMrg6VJThSdQILB864Iyvw1NFgH8MS0l3//az6JLSdYRT1SSLSA
+PQpEPuPvdRTcmvlfDxNE3pIlCbx2EKSveccf2plTT9zlBiPMQmCIIKGXzEJtJC4c
+iBYfLf1MdIhq7lNh5g3HsL/dtGroCbVQj7Lu2TOhTTvcbpx0OW26XDvPlblM2CBa
+ZYmm2FOx+poInWFOwA5+vbgvCFL6SVtYXIT2Rqqq6U7bdb5uekv+TAtnBtCArY4X
+92o5ltA/U/+Den/yv16z8jSzvk+kEl94pUNhU89oCMCOWAH2RdLFtXAsTe0mkz9A
+Y2QWAtAUpsHTtxh8Ztm8KIS/95pVPNlxwwGmTwrnAsbWdNdKIOAH4s9CQI2oeF7e
+hFSiw1lvashMim1iLBVo0WfYzAjc4vePzR5gYjp6W6IYDUuGez537hLZE86GF6qk
+1hK5nzZ3SjEln36PmywhwdGO9Fdj9FOMAecf6SoG1qQBc2JZIH3I4ukDx1Sx2Aij
+R9ULx8ZEmBAZPzVo5C2bP1HPDNXP7iLbhpCLnvppe+pJpExvirE=
+=fJSV
+-----END PGP SIGNATURE-----
