@@ -1,8 +1,16 @@
 """The welcome app's gaming step: choices become one background install command."""
 
+import catalog as catalog_module
 import gaming_setup
 import pytest
 from catalog import driver_item, load_catalog, signed_modules_package
+
+
+@pytest.fixture(autouse=True)
+def _ubuntu_noble(monkeypatch):
+    # These tests cover the Ubuntu 24.04 package names. Without this they would follow the
+    # machine's own /etc/os-release, and fail on a 26.04 host such as CI's ubuntu-latest.
+    monkeypatch.setattr(catalog_module, "ubuntu_codename", lambda *_args, **_kwargs: "noble")
 
 
 @pytest.fixture(scope="module")
