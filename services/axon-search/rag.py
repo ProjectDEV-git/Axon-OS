@@ -32,7 +32,9 @@ def rrf_merge(
     return fused[:limit] if limit is not None else fused
 
 
-def select_context(chunks: list[dict[str, Any]], budget: int = MAX_CONTEXT_CHARS) -> list[dict[str, Any]]:
+def select_context(
+    chunks: list[dict[str, Any]], budget: int = MAX_CONTEXT_CHARS
+) -> list[dict[str, Any]]:
     """Take chunks in order until the character budget is used."""
     out: list[dict[str, Any]] = []
     used = 0

@@ -252,9 +252,19 @@ class OllamaClient:
             self.q.put(None)
 
     def send_message_stream(
-        self, conversation_id: str, message: str, model: str = "", ctx: str = ""
+        self,
+        conversation_id: str,
+        message: str,
+        model: str = "",
+        ctx: str = "",
+        agent: bool = True,
     ) -> Iterator[str]:
-        """Send a message to a conversation and yield response tokens via D-Bus."""
+        """Send a message to a conversation and yield response tokens via D-Bus.
+
+        With ``agent`` the Brain may use tools (file search, calculator,
+        memory, desktop settings) before answering; older Brains without
+        SendMessageAgent fall back to plain chat.
+        """
         try:
             brain = self._get_brain()
             with self._stream_lock:
@@ -262,8 +272,19 @@ class OllamaClient:
                 while not self.q.empty():
                     self.q.get_nowait()
 
-            # Call SendMessage to start stream and get transaction ID
-            self.current_tx = str(brain.SendMessage(conversation_id, message, ctx, model, True))
+            # Start the stream and get its transaction ID
+            tx = ""
+            if agent:
+                try:
+                    tx = str(brain.SendMessageAgent(conversation_id, message, ctx, model))
+                except Exception:
+                    tx = ""  # Brain without the agent API
+                if tx.startswith("{"):
+                    yield f"\n[error] {json.loads(tx).get('error', tx)}"
+                    return
+            if not tx:
+                tx = str(brain.SendMessage(conversation_id, message, ctx, model, True))
+            self.current_tx = tx
 
             # Consume tokens from queue
             while True:

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -192,3 +193,43 @@ def sent_files(
     if not snapshot or not settings.allows(OPEN_FILES) or OPEN_FILES in exclude:
         return []
     return [str(f) for f in snapshot.get("open_files") or []]
+
+
+# Values that look like credentials. Matched text is replaced before context
+# leaves the Context service, so a copied API key never reaches a model.
+_SECRET_PATTERNS = (
+    re.compile(r"\b(sk|pk|rk)-[A-Za-z0-9_-]{16,}"),  # OpenAI/Stripe-style keys
+    re.compile(r"\bsk-ant-[A-Za-z0-9_-]{16,}"),
+    re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"),  # GitHub tokens
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),  # AWS access key id
+    re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),  # Google API key
+    re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,}"),  # Slack tokens
+    re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),  # JWT
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)"),
+    re.compile(
+        r"(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key)\b"
+        r"(\s*[:=]\s*|\s+)\S+"
+    ),
+)
+REDACTED = "[redacted]"
+
+
+def redact_secrets(text: str) -> str:
+    """Replace credential-looking values in *text* with ``[redacted]``."""
+    for pattern in _SECRET_PATTERNS:
+        if pattern.groups >= 2 and "password" in pattern.pattern:
+            text = pattern.sub(lambda m: f"{m.group(1)}{m.group(2)}{REDACTED}", text)
+        else:
+            text = pattern.sub(REDACTED, text)
+    return text
+
+
+def clip_context(text: str, max_chars: int) -> str:
+    """Trim context to *max_chars*, cutting at a line break when possible."""
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text
+    cut = text[:max_chars]
+    nl = cut.rfind("\n")
+    if nl > max_chars // 2:
+        cut = cut[:nl]
+    return cut + "\n[context truncated]"

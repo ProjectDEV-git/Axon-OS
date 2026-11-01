@@ -13,6 +13,7 @@ desktop notification. Everything runs on-device.
 
 import logging
 import os
+import queue
 import re
 import shutil
 import signal
@@ -39,6 +40,7 @@ if _this not in sys.path:
     sys.path.insert(0, _this)
 from intent_router import clean_transcript, parse_intent_response
 from service_base import ServiceBase
+from speech_stream import SentenceBuffer, speakable
 from vad_helper import is_speech_wav
 
 log = configure_app_logger("axon-voice", level=logging.INFO)
@@ -77,6 +79,10 @@ class VoiceService(ServiceBase):
         self._ambient_stop = threading.Event()
         # TTS engine cached choice (env var overrides)
         self._tts_engine = os.environ.get("AXON_TTS_ENGINE", "")
+        # Spoken agent replies: set while speaking; Toggle sets cancel to interrupt
+        self._speaking = threading.Event()
+        self._speech_cancel = threading.Event()
+        self._voice_conv = ""
 
     def _cleanup(self):
         """Kill recorder subprocess on shutdown."""
@@ -99,6 +105,8 @@ class VoiceService(ServiceBase):
                 GLib.idle_add(self._stop_and_process)
                 return False
             if self._busy:
+                if self._speaking.is_set():
+                    self._speech_cancel.set()  # barge-in: stop the spoken reply
                 return False
             self._busy = True  # claim immediately inside lock
         GLib.idle_add(self._start_recording)
@@ -282,9 +290,104 @@ class VoiceService(ServiceBase):
             else:
                 GLib.idle_add(self._finish, "", f"Did not run: {payload}")
         else:
-            spoken = payload if payload else "I don't have an answer for that."
-            self._speak(spoken)
+            spoken = self._ask_agent(text)
+            if spoken is None:  # agent unavailable: speak the intent answer
+                spoken = speakable(payload) if payload else "I don't have an answer for that."
+                self._speak(spoken)
             GLib.idle_add(self._finish, spoken, "")
+
+    AGENT_TIMEOUT = 120
+    VOICE_PROMPT = (
+        "The user is talking to you by voice and hears your reply through text-to-speech. "
+        "Answer in one to three short sentences of plain speech: no markdown, lists or code."
+    )
+
+    def _ask_agent(self, text):
+        """Ask the Brain agent and speak its reply sentence by sentence.
+
+        Returns the full spoken text, or None when the agent is unavailable
+        (the caller then falls back to the ClassifyIntent answer).
+        """
+        try:
+            obj = self.session_bus.get_object("org.axonos.Brain", "/org/axonos/Brain")
+            brain = dbus.Interface(obj, "org.axonos.Brain")
+            if not self._voice_conv:
+                self._voice_conv = str(
+                    brain.CreateConversation(self.VOICE_PROMPT, "Voice", timeout=10)
+                )
+        except dbus.exceptions.DBusException as exc:
+            log.debug("Voice agent unavailable: %s", exc)
+            return None
+
+        events: queue.Queue = queue.Queue()
+        receivers = [
+            self.session_bus.add_signal_receiver(
+                lambda tx, tok: events.put(("token", str(tx), str(tok))),
+                signal_name="TokenGenerated",
+                dbus_interface="org.axonos.Brain",
+            ),
+            self.session_bus.add_signal_receiver(
+                lambda tx, ok, err: events.put(("done", str(tx), bool(ok))),
+                signal_name="GenerationCompleted",
+                dbus_interface="org.axonos.Brain",
+            ),
+        ]
+        try:
+            try:
+                tx = str(brain.SendMessageAgent(self._voice_conv, text, "", "", timeout=10))
+            except dbus.exceptions.DBusException as exc:
+                log.debug("SendMessageAgent failed: %s", exc)
+                return None
+            if tx.startswith("{"):  # JSON error instead of a transaction id
+                return None
+            return self._speak_stream(events, tx, brain)
+        finally:
+            for r in receivers:
+                r.remove()
+
+    def _speak_stream(self, events, tx, brain=None):
+        """Speak tokens for transaction *tx* from *events* as sentences complete."""
+        buf = SentenceBuffer()
+        spoken: list[str] = []
+        ok = True
+        self._speech_cancel.clear()
+        self._speaking.set()
+        try:
+            while True:
+                if self._speech_cancel.is_set():
+                    if brain is not None:
+                        try:
+                            brain.CancelStream(tx, timeout=5)
+                        except dbus.exceptions.DBusException:
+                            pass
+                    break
+                try:
+                    kind, etx, value = events.get(timeout=self.AGENT_TIMEOUT)
+                except queue.Empty:
+                    ok = False
+                    break
+                if etx != tx:
+                    continue
+                if kind == "done":
+                    ok = bool(value)
+                    for s in buf.flush():
+                        self._speak_one(s, spoken)
+                    break
+                for s in buf.feed(value):
+                    self._speak_one(s, spoken)
+                    if self._speech_cancel.is_set():
+                        break
+        finally:
+            self._speaking.clear()
+        if not spoken and not ok:
+            return None
+        return " ".join(spoken)
+
+    def _speak_one(self, sentence, spoken):
+        if self._speech_cancel.is_set():
+            return
+        spoken.append(sentence)
+        self._speak(sentence, wait=True)
 
     def _classify(self, text):
         try:
@@ -298,7 +401,8 @@ class VoiceService(ServiceBase):
     # Output helpers
     # ------------------------------------------------------------------
 
-    def _speak(self, text):
+    def _speak(self, text, wait=False):
+        """Say *text*. With ``wait`` the call returns when playback ends."""
         # Prefer configured engine, then fallbacks. AXON_TTS_ENGINE may be set
         # to one of: piper, espeak, pico2wave, spd-say
         engine = self._tts_engine or os.environ.get("AXON_TTS_ENGINE", "")
@@ -315,7 +419,7 @@ class VoiceService(ServiceBase):
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
-                    threading.Thread(target=proc.wait, daemon=True).start()
+                    self._wait_tts(proc, wait)
                     return
                 except Exception as e:
                     log.debug("piper TTS failed: %s", e)
@@ -325,7 +429,7 @@ class VoiceService(ServiceBase):
                     proc = subprocess.Popen(
                         [eng, text[:1000]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                     )
-                    threading.Thread(target=proc.wait, daemon=True).start()
+                    self._wait_tts(proc, wait)
                     return
                 except Exception as e:
                     log.debug("%s TTS failed: %s", eng, e)
@@ -338,9 +442,12 @@ class VoiceService(ServiceBase):
                     proc = subprocess.Popen(
                         ["aplay", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                     )
-                    threading.Thread(
-                        target=self._cleanup_after_tts, args=(proc, tmp), daemon=True
-                    ).start()
+                    if wait:
+                        self._cleanup_after_tts(proc, tmp)
+                    else:
+                        threading.Thread(
+                            target=self._cleanup_after_tts, args=(proc, tmp), daemon=True
+                        ).start()
                     return
                 except Exception as e:
                     log.debug("pico2wave TTS failed: %s", e)
@@ -352,11 +459,11 @@ class VoiceService(ServiceBase):
             if eng == "spd-say" and shutil.which("spd-say"):
                 try:
                     proc = subprocess.Popen(
-                        ["spd-say", "--wait-mode", "no", text[:500]],
+                        ["spd-say", "--wait-mode", "yes" if wait else "no", text[:500]],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
-                    threading.Thread(target=proc.wait, daemon=True).start()
+                    self._wait_tts(proc, wait)
                     return
                 except Exception as e:
                     log.debug("spd-say TTS failed: %s", e)
@@ -365,6 +472,21 @@ class VoiceService(ServiceBase):
         self._notify(
             "Axon Voice", "No text-to-speech engine found. Install piper, espeak, or spd-say."
         )
+
+    def _wait_tts(self, proc, wait):
+        """Reap a TTS process; with *wait*, block until it ends or speech is cancelled."""
+        if not wait:
+            threading.Thread(target=proc.wait, daemon=True).start()
+            return
+        while True:
+            try:
+                proc.wait(timeout=0.2)
+                return
+            except subprocess.TimeoutExpired:
+                if self._speech_cancel.is_set():
+                    proc.terminate()
+                    threading.Thread(target=proc.wait, daemon=True).start()
+                    return
 
     def _notify(self, title, body):
         if shutil.which("notify-send"):

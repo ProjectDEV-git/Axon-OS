@@ -779,9 +779,9 @@ class BrainService(ServiceBase):
             self.store.add_message(conversation_id, "assistant", resp)
             return resp
 
-    @dbus.service.method("org.axonos.Brain", in_signature="sss", out_signature="s")
+    @dbus.service.method("org.axonos.Brain", in_signature="ssss", out_signature="s")
     @rate_limited(rate=60, window_seconds=60)
-    def SendMessageAgent(self, conversation_id, message, model):
+    def SendMessageAgent(self, conversation_id, message, context, model):
         """Like SendMessage, but the model may call tools (search, context,
         calculator, memory, desktop settings) before answering.
 
@@ -792,13 +792,13 @@ class BrainService(ServiceBase):
             return json.dumps({"error": f"invalid model name: {model!r}"})
         self.store.add_message(conversation_id, "user", message)
         if not model:
-            model, _reason = self.router.select_model(str(message), "", needs_tools=True)
+            model, _reason = self.router.select_model(str(message), str(context), needs_tools=True)
         model = self._game_mode_model(self._local_name(str(model)))
         tx_id = str(uuid.uuid4())
         with self._streams_lock:
             self._active_streams[tx_id] = threading.Event()
         threading.Thread(
-            target=self._do_agent, args=(tx_id, conversation_id, "", model), daemon=True
+            target=self._do_agent, args=(tx_id, conversation_id, context, model), daemon=True
         ).start()
         return tx_id
 
@@ -1326,7 +1326,10 @@ class BrainService(ServiceBase):
             system_prompt += (
                 f"\n\nConversation instructions:\n{_sanitize_context(str(conv_prompt))}"
             )
-        if not context:
+        model = str(model or "")
+        # Auto context stays on the machine: cloud models only get context the
+        # caller passed explicitly (the AI panel warns before sending it).
+        if not context and model and not self._is_cloud(model):
             context = self._auto_context()
         if context:
             system_prompt += f"\n\nHere is the user's current desktop context:\n{_sanitize_context(str(context))}"
@@ -1342,7 +1345,6 @@ class BrainService(ServiceBase):
         if extra_system:
             system_prompt += "\n\n" + extra_system
         msgs = [{"role": "system", "content": system_prompt}, *history]
-        model = str(model or "")
         budget = context_limit(model, cloud=self._is_cloud(model) if model else False)
         cfg = getattr(self, "config", None) or {}
         budget = min(budget, int(cfg.get("max_context_tokens", 32768)))
