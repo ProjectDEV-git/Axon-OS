@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-10-27 10:05+0000\n"
+"POT-Creation-Date: 2026-11-01 11:04+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -146,6 +146,14 @@ msgid "Explain Error"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
+msgid "Facts the AI remembers and uses in your chats."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Files used"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
 msgid "Fix Bug"
 msgstr ""
 
@@ -155,7 +163,28 @@ msgid "Fix: {hint}"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
+msgid "Forget"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Forget All"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Forget Everything?"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Forget “{text}”"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
 msgid "Full Diagnostics"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Memories"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py services/status_summary.py
@@ -176,6 +205,10 @@ msgid "New Conversation"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
+msgid "New memory"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
 msgid "No conversations yet"
 msgstr ""
 
@@ -184,10 +217,19 @@ msgstr ""
 msgid "No installed app called “{app}”."
 msgstr ""
 
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Nothing remembered yet."
+msgstr ""
+
 #: apps/axon-ai-panel/ui/panel.py services/suggestions.py
 #: shell/axon-shell/ui-logic.js
 #, python-brace-format
 msgid "Open {app}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "Open {file}"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -201,6 +243,10 @@ msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Regenerate"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "Remember"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -251,6 +297,11 @@ msgid "Summarize"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "The AI will forget all {n} saved facts. This can't be undone."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
 msgid ""
 "This will remove all messages in the current conversation. This cannot be "
 "undone."
@@ -270,6 +321,15 @@ msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Write Code"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+msgid "e.g. I prefer metric units"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel.py
+#, python-brace-format
+msgid "used: {tools}"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py

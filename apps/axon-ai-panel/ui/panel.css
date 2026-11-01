@@ -114,6 +114,14 @@
     font-size: 8.25pt;
 }
 
+/* Files the AI searched or quoted; each opens the file */
+.source-chip {
+    font-size: 8.25pt;
+    padding: 2px 8px;
+    border: 1px solid @axon_border_strong;
+    border-radius: 999px;
+}
+
 /* A system change the AI proposes; it runs only after the confirmation card */
 .action-card {
     background-color: @axon_surface_raised;
