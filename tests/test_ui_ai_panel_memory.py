@@ -3,10 +3,17 @@
 from typing import Any
 
 import pytest
-from gi.repository import GLib
-from ollama_client import tool_sources
 
-from tests.test_ui_ai_panel import FakeClient, FakeContext, panel_mod, pump
+from tests.gtk_helpers import pump, require_gtk
+
+# Skips this whole module when GTK4/libadwaita or D-Bus are missing (as in CI)
+Gtk, Adw, GLib = require_gtk()
+pytest.importorskip("dbus", reason="Requires dbus-python")
+
+from tests.test_ui_ai_panel import FakeClient, FakeContext, panel_mod
+
+# The panel imports this from apps/intent-bar/ollama_client.py
+tool_sources = panel_mod.tool_sources
 
 
 class AgentClient(FakeClient):
