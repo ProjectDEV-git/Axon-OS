@@ -28,8 +28,10 @@ from context_settings import (
     CLIPBOARD,
     OPEN_FILES,
     TERMINAL,
+    clip_context,
     format_context,
     load_settings,
+    redact_secrets,
 )
 from service_utils import rate_limited
 
@@ -168,6 +170,35 @@ class ContextService(ServiceBase):
         if settings.allows(CLIPBOARD):
             snapshot["clipboard_history"] = self._get_clipboard_snapshot()
         return format_context(snapshot, settings) or "No desktop context available."
+
+    @rate_limited(rate=60, window_seconds=60)
+    @dbus.service.method("org.axonos.Context", in_signature="i", out_signature="s")
+    def GetContextForPrompt(self, max_chars):
+        """Context for automatic prompt injection: secrets redacted, size-capped.
+
+        Same items and share_* settings as GetContextString; the clipboard is
+        left out while a password manager marks it as sensitive.
+        """
+        settings = load_settings()
+        if not settings.share_context:
+            return ""
+        snapshot: dict = {}
+        if settings.allows(ACTIVE_APP):
+            snapshot["active_window"] = {
+                "title": self.active_window_title,
+                "app": self.active_window_app,
+            }
+            snapshot["active_space"] = self.active_space
+        if settings.allows(TERMINAL):
+            snapshot["terminal_commands"] = self._get_terminal_commands(5)
+            snapshot["last_stderr"] = self._get_last_stderr()
+        if settings.allows(OPEN_FILES):
+            snapshot["open_files"] = self._get_open_files()
+        if settings.allows(CLIPBOARD) and not self._clipboard_is_secret():
+            snapshot["clipboard_history"] = self._get_clipboard_snapshot()[:2]
+        text = redact_secrets(format_context(snapshot, settings))
+        limit = max(200, min(int(max_chars) or 1500, 8000))
+        return clip_context(text, limit)
 
     @rate_limited(rate=20, window_seconds=60)
     @dbus.service.method("org.axonos.Context", in_signature="s", out_signature="s")

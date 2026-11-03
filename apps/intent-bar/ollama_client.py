@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import queue
+import re
 import threading
 from collections.abc import Iterator
 from typing import Any
@@ -12,6 +13,33 @@ import dbus
 from dbus.mainloop.glib import DBusGMainLoop
 
 _ERROR_NOT_RUNNING: str = "[error] Axon Brain service is not reachable."
+
+MAX_TOOL_SOURCES = 8
+_ASK_PATH_RE = re.compile(r"^\[(/[^\]\n]+)\]$", re.MULTILINE)
+_SEARCH_PATH_RE = re.compile(r"^(/[^:\n]+):", re.MULTILINE)
+
+
+def tool_sources(steps: list[dict[str, Any]]) -> list[str]:
+    """File paths the agent looked at, from search_files/ask_files tool results.
+
+    Deduplicated, in the order they were found, at most ``MAX_TOOL_SOURCES``.
+    """
+    out: list[str] = []
+    for step in steps:
+        result = str(step.get("result", ""))
+        if result.startswith("error:"):
+            continue
+        name = step.get("name")
+        if name == "ask_files":
+            found = _ASK_PATH_RE.findall(result)
+        elif name == "search_files":
+            found = _SEARCH_PATH_RE.findall(result)
+        else:
+            continue
+        for path in found:
+            if path not in out:
+                out.append(path)
+    return out[:MAX_TOOL_SOURCES]
 
 
 class OllamaClient:
@@ -37,6 +65,8 @@ class OllamaClient:
         self._stream_lock: threading.Lock = threading.Lock()
         # Latest model download progress from the Brain, for the status view
         self.pull_progress: dict[str, Any] | None = None
+        # Tool calls the agent made for the current/last message
+        self.tool_steps: list[dict[str, Any]] = []
 
         # Register signal listeners
         self.bus.add_signal_receiver(
@@ -47,6 +77,11 @@ class OllamaClient:
         self.bus.add_signal_receiver(
             self._on_generation_completed,
             signal_name="GenerationCompleted",
+            dbus_interface="org.axonos.Brain",
+        )
+        self.bus.add_signal_receiver(
+            self._on_tool_call,
+            signal_name="ToolCall",
             dbus_interface="org.axonos.Brain",
         )
         self.bus.add_signal_receiver(
@@ -81,6 +116,16 @@ class OllamaClient:
     def _on_token_generated(self, transaction_id: str, token: str) -> None:
         if self.current_tx and transaction_id == self.current_tx:
             self.q.put(token)
+
+    def _on_tool_call(self, transaction_id: str, step_json: str) -> None:
+        if not self.current_tx or transaction_id != self.current_tx:
+            return
+        try:
+            step = json.loads(str(step_json))
+        except ValueError:
+            return
+        if isinstance(step, dict):
+            self.tool_steps.append(step)
 
     def _on_generation_completed(self, transaction_id: str, success: bool, error_msg: str) -> None:
         if self.current_tx and transaction_id == self.current_tx:
@@ -252,18 +297,40 @@ class OllamaClient:
             self.q.put(None)
 
     def send_message_stream(
-        self, conversation_id: str, message: str, model: str = "", ctx: str = ""
+        self,
+        conversation_id: str,
+        message: str,
+        model: str = "",
+        ctx: str = "",
+        agent: bool = True,
     ) -> Iterator[str]:
-        """Send a message to a conversation and yield response tokens via D-Bus."""
+        """Send a message to a conversation and yield response tokens via D-Bus.
+
+        With ``agent`` the Brain may use tools (file search, calculator,
+        memory, desktop settings) before answering; older Brains without
+        SendMessageAgent fall back to plain chat.
+        """
         try:
             brain = self._get_brain()
+            self.tool_steps = []
             with self._stream_lock:
                 # Reset queue
                 while not self.q.empty():
                     self.q.get_nowait()
 
-            # Call SendMessage to start stream and get transaction ID
-            self.current_tx = str(brain.SendMessage(conversation_id, message, ctx, model, True))
+            # Start the stream and get its transaction ID
+            tx = ""
+            if agent:
+                try:
+                    tx = str(brain.SendMessageAgent(conversation_id, message, ctx, model))
+                except Exception:
+                    tx = ""  # Brain without the agent API
+                if tx.startswith("{"):
+                    yield f"\n[error] {json.loads(tx).get('error', tx)}"
+                    return
+            if not tx:
+                tx = str(brain.SendMessage(conversation_id, message, ctx, model, True))
+            self.current_tx = tx
 
             # Consume tokens from queue
             while True:
@@ -275,6 +342,36 @@ class OllamaClient:
             yield f"\n[error] {exc}"
         finally:
             self.current_tx = None
+
+    # ------------------------------------------------------------------
+    # Long-term memory (blocking D-Bus calls: run them off the GTK thread)
+    # ------------------------------------------------------------------
+
+    def list_memories(self) -> list[dict[str, Any]]:
+        """Facts the AI remembers about the user, newest first."""
+        try:
+            data = json.loads(str(self._get_brain().ListMemories()))
+        except Exception:
+            return []
+        return data if isinstance(data, list) else []
+
+    def add_memory(self, text: str) -> bool:
+        try:
+            return int(self._get_brain().AddMemory(text)) >= 0
+        except Exception:
+            return False
+
+    def forget_memory(self, fact_id: int) -> bool:
+        try:
+            return bool(self._get_brain().ForgetMemory(dbus.Int64(fact_id)))
+        except Exception:
+            return False
+
+    def clear_memories(self) -> bool:
+        try:
+            return bool(self._get_brain().ClearMemories())
+        except Exception:
+            return False
 
     def chat(self, messages: list[dict[str, Any]], system: str = "") -> str:
         """Return a complete assistant reply for *messages* (non-streaming)."""
@@ -296,6 +393,14 @@ class OllamaClient:
             self.bus.remove_signal_receiver(
                 self._on_token_generated,
                 signal_name="TokenGenerated",
+                dbus_interface="org.axonos.Brain",
+            )
+        except Exception:
+            pass
+        try:
+            self.bus.remove_signal_receiver(
+                self._on_tool_call,
+                signal_name="ToolCall",
                 dbus_interface="org.axonos.Brain",
             )
         except Exception:

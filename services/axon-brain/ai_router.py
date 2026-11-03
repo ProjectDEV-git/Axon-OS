@@ -84,6 +84,7 @@ class AIRouter:
         prompt: str,
         context: str = "",
         explicit_model: str | None = None,
+        needs_tools: bool = False,
     ) -> tuple[str, str]:
         """Select the best model for a request.
 
@@ -91,6 +92,9 @@ class AIRouter:
             prompt: The user's input text.
             context: Optional desktop context string.
             explicit_model: If provided, use this model directly.
+            needs_tools: The request runs the tool-calling agent. Small speed
+                models and embedding models follow the tool protocol poorly, so
+                the general or deep model is chosen instead.
 
         Returns:
             Tuple of (model_name, reason).
@@ -99,6 +103,11 @@ class AIRouter:
             return explicit_model, "user-selected"
 
         task_type = self.classify_task(prompt, context)
+
+        if needs_tools:
+            if task_type == self.DEEP:
+                return self._deep_model, "agent-complex"
+            return self._general_model, "agent-tools"
 
         if task_type == self.EMBEDDING:
             return self._embed_model, "embedding-task"

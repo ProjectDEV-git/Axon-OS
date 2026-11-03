@@ -32,7 +32,10 @@ ALLOWED_SCHEMA_PREFIXES = (
     "org.gnome.nautilus",
 )
 
-VALID_OP_TYPES = {"gsettings_set", "launch_app", "notify"}
+VALID_OP_TYPES = {"gsettings_set", "gsettings_get", "launch_app", "notify", "open_uri"}
+
+# open_uri only opens web pages; file:// and custom schemes could start programs.
+ALLOWED_URI_SCHEMES = ("https://", "http://")
 
 MAX_OPS = 12
 
@@ -45,13 +48,13 @@ def _check_op(op: dict) -> str | None:
     if op_type not in VALID_OP_TYPES:
         return f"unknown operation type: {op_type!r}"
 
-    if op_type == "gsettings_set":
+    if op_type in ("gsettings_set", "gsettings_get"):
         schema = str(op.get("schema", ""))
         key = str(op.get("key", ""))
-        if "value" not in op:
+        if op_type == "gsettings_set" and "value" not in op:
             return "gsettings_set missing value"
         if not schema or not key:
-            return "gsettings_set missing schema/key"
+            return f"{op_type} missing schema/key"
         if not any(schema == p or schema.startswith(p + ".") for p in ALLOWED_SCHEMA_PREFIXES):
             return f"schema not allowed: {schema}"
         if any(c in schema + key for c in ";|&$`\n"):
@@ -68,6 +71,13 @@ def _check_op(op: dict) -> str | None:
         if not str(op.get("message", "")):
             return "notify missing message"
 
+    elif op_type == "open_uri":
+        uri = str(op.get("uri", ""))
+        if not uri.lower().startswith(ALLOWED_URI_SCHEMES):
+            return "open_uri only allows http(s) links"
+        if len(uri) > 2000 or any(c in uri for c in " \n\r\t`"):
+            return "illegal characters in uri"
+
     return None
 
 
@@ -76,6 +86,17 @@ def validate_plan(raw: str) -> tuple[list[dict], list[str]]:
 
     Returns (allowed_ops, errors). Tolerates the model wrapping the JSON in
     a markdown fence or returning {"operations": [...]}.
+    """
+    ops, errors, _done = parse_round(raw)
+    return ops, errors
+
+
+def parse_round(raw: str) -> tuple[list[dict], list[str], bool]:
+    """Like ``validate_plan`` but also returns the model's ``done`` flag.
+
+    A bare JSON array counts as done (the single-round format). An object
+    ``{"operations": [...], "done": false}`` asks for another round after
+    the operations' results are reported back.
     """
     text = raw.strip()
     if text.startswith("```"):
@@ -93,12 +114,14 @@ def validate_plan(raw: str) -> tuple[list[dict], list[str]]:
     try:
         data = json.loads(text)
     except (json.JSONDecodeError, ValueError) as exc:
-        return [], [f"plan is not valid JSON: {exc}"]
+        return [], [f"plan is not valid JSON: {exc}"], True
 
+    done = True
     if isinstance(data, dict):
+        done = data.get("done", True) is not False
         data = data.get("operations", data.get("ops", []))
     if not isinstance(data, list):
-        return [], ["plan is not a list of operations"]
+        return [], ["plan is not a list of operations"], True
 
     ops: list[dict] = []
     errors: list[str] = []
@@ -110,7 +133,12 @@ def validate_plan(raw: str) -> tuple[list[dict], list[str]]:
             ops.append(op)
     if len(data) > MAX_OPS:
         errors.append(f"plan truncated to {MAX_OPS} operations")
-    return ops, errors
+    return ops, errors, done
+
+
+def is_safe_gvariant_text(text: str) -> bool:
+    """True when a value read back from gsettings is safe to pass to ``gsettings set``."""
+    return bool(text) and len(text) < 4096 and not any(c in text for c in ";|&$`\n")
 
 
 def to_gvariant(value: object) -> str:

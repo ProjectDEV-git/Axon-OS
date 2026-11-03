@@ -32,6 +32,7 @@ _this = str(Path(__file__).resolve().parent)
 if _this not in sys.path:
     sys.path.insert(0, _this)
 import indexer
+import rag
 from service_base import ServiceBase
 
 log = configure_app_logger("axon-search", level=logging.INFO)
@@ -374,19 +375,118 @@ class SearchService(ServiceBase):
     @rate_limited(rate=30, window_seconds=60)
     @dbus.service.method("org.axonos.Search", in_signature="si", out_signature="s")
     def Query(self, query, limit):
-        """Semantic (vector) search with FTS5 keyword fallback.
+        """Hybrid search: vector and FTS5 keyword results fused with RRF.
 
+        Falls back to keyword-only when embeddings are unavailable.
         Returns a JSON array of {path, snippet, score, backend}.
         """
         limit = max(1, min(int(limit) or 8, 25))
         db = open_db()
         try:
-            results = self._vector_query(db, str(query), limit)
-            if results is None:
-                results = self._keyword_query(db, str(query), limit)
-            return json.dumps(results)
+            vector = self._vector_query(db, str(query), limit * 2)
+            keyword = self._keyword_query(db, str(query), limit * 2)
+            if not vector:
+                return json.dumps(keyword[:limit])
+            return json.dumps(self._fuse_files(vector, keyword, limit))
         finally:
             db.close()
+
+    @staticmethod
+    def _fuse_files(vector, keyword, limit):
+        """Merge two per-file result lists with Reciprocal Rank Fusion."""
+        by_path = {}
+        for r in keyword + vector:  # vector snippets win when both exist
+            by_path[r["path"]] = r
+        fused = rag.rrf_merge([[r["path"] for r in vector], [r["path"] for r in keyword]])
+        both = {r["path"] for r in vector} & {r["path"] for r in keyword}
+        out = []
+        for path, score in fused[:limit]:
+            out.append(
+                {
+                    **by_path[path],
+                    "score": round(score, 5),
+                    "backend": "hybrid" if path in both else by_path[path]["backend"],
+                }
+            )
+        return out
+
+    def _retrieve_chunks(self, db, question, limit):
+        """Best chunks for *question*: RRF over vector and keyword chunk ranks."""
+        lists = []
+        vec = self._embed(f"search_query: {question}") if vec_table_ready(db) else None
+        if vec:
+            try:
+                rows = db.execute(
+                    "SELECT v.rowid FROM vec_chunks v WHERE v.embedding MATCH ? AND v.k = ?"
+                    " ORDER BY v.distance",
+                    (json.dumps(vec), limit * 3),
+                ).fetchall()
+                lists.append([r[0] for r in rows])
+            except sqlite3.OperationalError:
+                pass
+        terms = self._fts_terms(question)
+        if terms:
+            try:
+                rows = db.execute(
+                    "SELECT rowid FROM fts_chunks WHERE fts_chunks MATCH ? ORDER BY rank LIMIT ?",
+                    (terms, limit * 3),
+                ).fetchall()
+                lists.append([r[0] for r in rows])
+            except sqlite3.OperationalError:
+                pass
+        ids = [cid for cid, _ in rag.rrf_merge(lists, limit=limit)]
+        if not ids:
+            return []
+        marks = ",".join("?" * len(ids))
+        rows = db.execute(
+            f"SELECT id, path, text FROM chunks WHERE id IN ({marks})",  # nosec B608
+            ids,
+        ).fetchall()
+        found = {r[0]: {"path": r[1], "text": r[2]} for r in rows}
+        return [found[i] for i in ids if i in found]
+
+    @dbus.service.method("org.axonos.Search", in_signature="si", out_signature="s")
+    @rate_limited(rate=60, window_seconds=60)
+    def Retrieve(self, question, limit):
+        """Passages (not files) most relevant to *question*.
+
+        Returns a JSON array of {path, text}.
+        """
+        limit = max(1, min(int(limit) or 6, 12))
+        db = open_db()
+        try:
+            chunks = self._retrieve_chunks(db, str(question)[:1000], limit)
+        finally:
+            db.close()
+        return json.dumps(rag.select_context(chunks))
+
+    @dbus.service.method("org.axonos.Search", in_signature="si", out_signature="s")
+    @rate_limited(rate=20, window_seconds=60)
+    def Ask(self, question, limit):
+        """Answer a question from the user's files, with citations.
+
+        Returns JSON {answer, citations: [{id, path, snippet}]} or {error}.
+        """
+        question = str(question).strip()[:1000]
+        if not question:
+            return json.dumps({"error": "empty question"})
+        chunks = json.loads(self.Retrieve(question, limit))
+        if not chunks:
+            return json.dumps(
+                {"answer": "I couldn't find anything about that in your files.", "citations": []}
+            )
+        brain = self._brain()
+        if brain is None:
+            return json.dumps({"error": "AI is not running", "citations": rag.citations(chunks)})
+        try:
+            answer = str(
+                brain.Generate(
+                    rag.build_answer_prompt(question, chunks), "", "", False, timeout=120
+                )
+            )
+        except dbus.exceptions.DBusException as e:
+            return json.dumps({"error": str(e), "citations": rag.citations(chunks)})
+        return json.dumps({"answer": answer, "citations": rag.citations(chunks)})
 
     def _vector_query(self, db, query, limit):
         if not vec_table_ready(db):
@@ -441,11 +541,15 @@ class SearchService(ServiceBase):
             return ""
         return token
 
-    def _keyword_query(self, db, query, limit):
+    def _fts_terms(self, query):
+        """Safe FTS5 OR-query for *query*; empty when nothing searchable is left."""
         raw_tokens = [t for t in query.replace('"', " ").split() if t]
         safe_tokens = [self._escape_fts5_token(t) for t in raw_tokens]
         safe_tokens = [t for t in safe_tokens if t]
-        terms = " OR ".join(f'"{t}"' for t in safe_tokens)
+        return " OR ".join(f'"{t}"' for t in safe_tokens)
+
+    def _keyword_query(self, db, query, limit):
+        terms = self._fts_terms(query)
         if not terms:
             return []
         try:

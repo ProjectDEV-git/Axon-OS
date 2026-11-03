@@ -40,8 +40,10 @@ _from_services = str(Path(__file__).resolve().parent)
 if _from_services not in sys.path:
     sys.path.insert(0, _from_services)
 
+import agent_actions
 import hardware_profiler
 import oauth
+from agent_loop import run_agent
 from ai_router import AIRouter
 from constants import (
     AXON_DIR,
@@ -49,9 +51,11 @@ from constants import (
     MAX_PROMPT_LEN,
     OLLAMA_BASE_URL,
 )
+from context_window import context_limit, fit_messages, summarize_dropped
 from conversation_store import ConversationStore
 from credentials import CredentialError, CredentialStore
 from game_gate import GameGate
+from memory import MemoryStore, memory_prompt
 from prompts import CHAT_SYSTEM_PROMPT
 from providers import (
     OLLAMA_ID,
@@ -60,6 +64,7 @@ from providers import (
     parse_model_ref,
 )
 from service_utils import rate_limited
+from tools import TOOL_PROTOCOL_NOTE
 from window_routing import (
     DEFAULT_SPACE,
     KNOWN_APP_CONFIDENCE,
@@ -263,6 +268,9 @@ class BrainService(ServiceBase):
         # Game mode: Brain always starts awake. The Gaming service puts it back to
         # sleep when it sees Brain (re)appear during a game.
         self._gate = GameGate()
+        # Long-term memory and agent tools
+        self.memory = MemoryStore(AXON_DIR / "memory.db", embed=self._embed_text)
+        self.tools = agent_actions.build_registry(self)
         threading.Thread(target=self._warm_up_ollama, daemon=True).start()
 
     def _warm_up_ollama(self, wait_seconds: float = 180.0) -> None:
@@ -771,6 +779,58 @@ class BrainService(ServiceBase):
             self.store.add_message(conversation_id, "assistant", resp)
             return resp
 
+    @dbus.service.method("org.axonos.Brain", in_signature="ssss", out_signature="s")
+    @rate_limited(rate=60, window_seconds=60)
+    def SendMessageAgent(self, conversation_id, message, context, model):
+        """Like SendMessage, but the model may call tools (search, context,
+        calculator, memory, desktop settings) before answering.
+
+        Returns a transaction id. Progress arrives as ToolCall signals, the
+        answer as TokenGenerated, and the end as GenerationCompleted.
+        """
+        if model and not self._validate_model_name(str(model)):
+            return json.dumps({"error": f"invalid model name: {model!r}"})
+        self.store.add_message(conversation_id, "user", message)
+        if not model:
+            model, _reason = self.router.select_model(str(message), str(context), needs_tools=True)
+        model = self._game_mode_model(self._local_name(str(model)))
+        tx_id = str(uuid.uuid4())
+        with self._streams_lock:
+            self._active_streams[tx_id] = threading.Event()
+        threading.Thread(
+            target=self._do_agent, args=(tx_id, conversation_id, context, model), daemon=True
+        ).start()
+        return tx_id
+
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="s")
+    def ListTools(self):
+        """Names and descriptions of the agent's tools."""
+        return json.dumps(self.tools.describe())
+
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="s")
+    def ListMemories(self):
+        """Remembered facts, newest first."""
+        return json.dumps(self.memory.entries())
+
+    @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="x")
+    def AddMemory(self, text):
+        """Remember a fact. Returns its id, or -1 if it was rejected."""
+        try:
+            return self.memory.add(_sanitize_context(str(text)))
+        except ValueError:
+            return -1
+
+    @dbus.service.method("org.axonos.Brain", in_signature="x", out_signature="b")
+    def ForgetMemory(self, fact_id):
+        """Delete one remembered fact."""
+        return self.memory.forget(int(fact_id))
+
+    @dbus.service.method("org.axonos.Brain", in_signature="", out_signature="b")
+    def ClearMemories(self):
+        """Delete every remembered fact."""
+        self.memory.clear()
+        return True
+
     @dbus.service.method("org.axonos.Brain", in_signature="ss", out_signature="s")
     def ClassifyWindowDetailed(self, title, wm_class):
         """Classify a window and say how sure the answer is.
@@ -1087,6 +1147,11 @@ class BrainService(ServiceBase):
         """Fires when a stream chunk is generated."""
         pass
 
+    @dbus.service.signal("org.axonos.Brain", signature="ss")
+    def ToolCall(self, transaction_id, step_json):
+        """Fires after the agent runs a tool (name, arguments, result)."""
+        pass
+
     @dbus.service.signal("org.axonos.Brain", signature="sbs")
     def GenerationCompleted(self, transaction_id, success, error_msg):
         """Fires when stream finishes."""
@@ -1245,13 +1310,15 @@ class BrainService(ServiceBase):
             )
         self._run_stream(tx_id, tokens, "Generation")
 
-    def _chat_messages(self, conv_id, context):
+    def _chat_messages(self, conv_id, context, model="", extra_system=""):
         """Build the /api/chat message list, system prompt first.
 
         Ollama's chat endpoint has no top-level "system" field (it is silently
         ignored), so the safety rules and context must be a system message.
         Stored messages with role "system" are dropped: only the service
-        decides what the system prompt says.
+        decides what the system prompt says. Remembered facts relevant to the
+        latest user message are added, and old turns are trimmed to fit the
+        model's context window.
         """
         system_prompt = CHAT_SYSTEM_PROMPT
         conv_prompt = self.store.get_system_prompt(conv_id)
@@ -1259,6 +1326,11 @@ class BrainService(ServiceBase):
             system_prompt += (
                 f"\n\nConversation instructions:\n{_sanitize_context(str(conv_prompt))}"
             )
+        model = str(model or "")
+        # Auto context stays on the machine: cloud models only get context the
+        # caller passed explicitly (the AI panel warns before sending it).
+        if not context and model and not self._is_cloud(model):
+            context = self._auto_context()
         if context:
             system_prompt += f"\n\nHere is the user's current desktop context:\n{_sanitize_context(str(context))}"
         history = [
@@ -1266,10 +1338,115 @@ class BrainService(ServiceBase):
             for m in self.store.get_messages(conv_id)
             if m["role"] in ("user", "assistant")
         ]
-        return [{"role": "system", "content": system_prompt}, *history]
+        last_user = next((m["content"] for m in reversed(history) if m["role"] == "user"), "")
+        facts = self._recall(last_user)
+        if facts:
+            system_prompt += "\n\n" + memory_prompt(facts)
+        if extra_system:
+            system_prompt += "\n\n" + extra_system
+        msgs = [{"role": "system", "content": system_prompt}, *history]
+        budget = context_limit(model, cloud=self._is_cloud(model) if model else False)
+        cfg = getattr(self, "config", None) or {}
+        budget = min(budget, int(cfg.get("max_context_tokens", 32768)))
+        kept, dropped = fit_messages(msgs, budget)
+        note = summarize_dropped(dropped)
+        if note:
+            kept[0] = {"role": "system", "content": kept[0]["content"] + "\n\n" + note}
+        return kept
+
+    def _recall(self, query: str) -> list[str]:
+        cfg = getattr(self, "config", None) or {}
+        memory: MemoryStore | None = getattr(self, "memory", None)
+        if not query or memory is None or not cfg.get("memory_enabled", True):
+            return []
+        try:
+            return memory.recall(query, k=5)
+        except Exception as e:
+            logger.debug("Memory recall failed: %s", e)
+            return []
+
+    def _embed_text(self, text: str) -> list[float] | None:
+        """Embedding vector for *text*, or None when no embedding model is available."""
+        try:
+            data = json.loads(self.GetEmbeddings(text, ""))
+        except Exception:
+            return None
+        if isinstance(data, list) and data and all(isinstance(x, (int, float)) for x in data):
+            return [float(x) for x in data]
+        return None
+
+    def _auto_context(self) -> str:
+        """Desktop context from the Context service, when the user allows it."""
+        cfg = getattr(self, "config", None)
+        if not cfg or not cfg.get("auto_context", True):
+            return ""
+        try:
+            bus = dbus.SessionBus()
+            obj = bus.get_object("org.axonos.Context", "/org/axonos/Context")
+            iface = dbus.Interface(obj, "org.axonos.Context")
+            return str(iface.GetContextForPrompt(dbus.Int32(1500), timeout=2))
+        except Exception as e:
+            logger.debug("Auto context unavailable: %s", e)
+            return ""
+
+    def _complete_messages(self, model: str, msgs: list[dict[str, str]]) -> str:
+        """One non-streamed chat completion for a full message list."""
+        if self._is_cloud(model):
+            return _sanitize_output("".join(self.providers.chat(model, msgs, stream=False)))
+        payload = {"model": self._resolve_local_model(model), "messages": msgs, "stream": False}
+        with self._http_post(
+            f"{OLLAMA_BASE_URL}/api/chat", payload, timeout=_OLLAMA_LOAD_TIMEOUT
+        ) as resp:
+            data = json.loads(resp.read().decode())
+            return _sanitize_output(data.get("message", {}).get("content", ""))
+
+    def _do_agent(self, tx_id, conv_id, context, model):
+        """Run the tool loop, then emit the answer as stream tokens."""
+        extra = self.tools.describe_for_prompt() + "\n" + TOOL_PROTOCOL_NOTE
+        api_msgs = self._chat_messages(conv_id, context, model, extra_system=extra)
+        with self._streams_lock:
+            cancel_flag = self._active_streams.get(tx_id)
+
+        def on_tool(step):
+            GLib.idle_add(self.ToolCall, tx_id, json.dumps(step)[:4000])
+
+        try:
+            result = run_agent(
+                lambda m: self._complete_messages(model, m),
+                api_msgs,
+                self.tools,
+                cancel=cancel_flag,
+                on_tool=on_tool,
+                approve=agent_actions.approve,
+            )
+        except ProviderError as e:
+            self._fail_stream(tx_id, str(e))
+            return
+        except (urllib.error.URLError, OSError) as e:
+            self._fail_stream(tx_id, _ollama_error_message(e, model))
+            return
+        except Exception as e:
+            logger.debug("Agent failed: %s", e)
+            self._fail_stream(tx_id, "Agent failed")
+            return
+        if result.cancelled:
+            self._fail_stream(tx_id, "cancelled")
+            return
+        words = re.findall(r"\S+\s*", result.answer) or [result.answer]
+        self._run_stream(
+            tx_id,
+            iter(words),
+            "Agent",
+            on_done=lambda text: self.store.add_message(conv_id, "assistant", text),
+        )
+
+    def _fail_stream(self, tx_id: str, message: str) -> None:
+        with self._streams_lock:
+            self._active_streams.pop(tx_id, None)
+        GLib.idle_add(self.GenerationCompleted, tx_id, False, message)
 
     def _do_chat_sync(self, conv_id, context, model):
-        api_msgs = self._chat_messages(conv_id, context)
+        api_msgs = self._chat_messages(conv_id, context, model)
         try:
             if self._is_cloud(model):
                 return _sanitize_output("".join(self.providers.chat(model, api_msgs, stream=False)))
@@ -1293,7 +1470,7 @@ class BrainService(ServiceBase):
             return "[Error: AI chat unavailable]"
 
     def _do_chat_stream(self, tx_id, conv_id, context, model):
-        api_msgs = self._chat_messages(conv_id, context)
+        api_msgs = self._chat_messages(conv_id, context, model)
         if self._is_cloud(model):
             tokens = self.providers.chat(model, api_msgs, stream=True)
         else:

@@ -80,6 +80,14 @@ _STATUS_ICONS = {
 _STATUS_WORDS = {OK: "OK", INFO: "Info", WARN: "Warning", FAIL: "Problem"}
 
 try:
+    from ollama_client import tool_sources  # type: ignore[import]
+except ImportError:
+
+    def tool_sources(steps: list[dict[str, Any]]) -> list[str]:  # type: ignore[misc]
+        return []
+
+
+try:
     from ollama_client import OllamaClient  # type: ignore[import]
 except ImportError:
     import urllib.error
@@ -164,6 +172,32 @@ except ImportError:
         def send_message_stream(self, conv_id, message, system=""):
             return iter(["AI service unavailable."])
 
+        def list_memories(self):
+            return []
+
+        def add_memory(self, text):
+            return False
+
+        def forget_memory(self, fact_id):
+            return False
+
+        def clear_memories(self):
+            return False
+
+
+def open_file(widget: Gtk.Widget, path: str) -> None:
+    """Open *path* in the user's default app."""
+    gfile = Gio.File.new_for_path(path)
+    launcher_cls = getattr(Gtk, "FileLauncher", None)
+    root = widget.get_root()
+    try:
+        if launcher_cls is not None:
+            launcher_cls.new(gfile).launch(root if isinstance(root, Gtk.Window) else None, None)
+        else:
+            Gio.AppInfo.launch_default_for_uri(gfile.get_uri(), None)
+    except GLib.Error:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # MessageBubble
@@ -225,6 +259,13 @@ class MessageBubble(Gtk.Box):
         self._sources_label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
         self._sources_label.set_visible(False)
         self._inner.append(self._sources_label)
+        # Files the agent searched or quoted: one button each, opens the file
+        self._found_box = Gtk.FlowBox()
+        self._found_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._found_box.set_max_children_per_line(3)
+        self._found_box.set_visible(False)
+        self._found_box.update_property([Gtk.AccessibleProperty.LABEL], [_("Files used")])
+        self._inner.append(self._found_box)
         self._copy_btn = Gtk.Button.new_from_icon_name("edit-copy-symbolic")
         self._copy_btn.add_css_class("copy-btn")
         self._copy_btn.add_css_class("flat")
@@ -273,6 +314,36 @@ class MessageBubble(Gtk.Box):
             _("Sources: {files}").format(files=", ".join(shown)) if shown else ""
         )
         self._sources_label.set_visible(bool(shown))
+
+    def set_found_files(self, paths: list[str]) -> None:
+        """Show files the AI looked at as buttons that open them."""
+        child = self._found_box.get_first_child()
+        while child is not None:
+            nxt = child.get_next_sibling()
+            self._found_box.remove(child)
+            child = nxt
+        home = GLib.get_home_dir()
+        for path in paths:
+            btn = Gtk.Button(label=Path(path).name or path)
+            btn.add_css_class("flat")
+            btn.add_css_class("source-chip")
+            shown = path.replace(home, "~", 1) if home and path.startswith(home) else path
+            btn.set_tooltip_text(shown)
+            btn.update_property(
+                [Gtk.AccessibleProperty.LABEL], [_("Open {file}").format(file=shown)]
+            )
+            btn.connect("clicked", lambda _b, p=path: open_file(_b, p))
+            self._found_box.append(btn)
+        self._found_box.set_visible(bool(paths))
+
+    def found_files(self) -> list[str]:
+        """Tooltips of the file buttons, for tests."""
+        out = []
+        child = self._found_box.get_first_child()
+        while child is not None:
+            out.append(child.get_child().get_tooltip_text())
+            child = child.get_next_sibling()
+        return out
 
     def set_error(self, text: str) -> None:
         """Show *text* as an error: error colour plus an icon."""
@@ -477,7 +548,18 @@ class AIPanelWindow(Adw.Window):
         self._conv_button.set_popover(self._conv_popover)
         self._build_conversation_popover()
 
+        # What the AI remembers about the user: view, add, forget
+        self._mem_button = Gtk.MenuButton(icon_name="user-bookmarks-symbolic")
+        self._mem_button.add_css_class("flat")
+        self._mem_button.set_tooltip_text(_("Memories"))
+        self._mem_button.update_property([Gtk.AccessibleProperty.LABEL], [_("Memories")])
+        self._mem_popover = Gtk.Popover()
+        self._mem_popover.connect("show", lambda _p: self._refresh_memories())
+        self._mem_button.set_popover(self._mem_popover)
+        self._build_memory_popover()
+
         header.append(self._conv_button)
+        header.append(self._mem_button)
         header.append(title_label)
         header.append(self._model_dropdown)
         header.append(self._clear_btn)
@@ -1006,6 +1088,124 @@ class AIPanelWindow(Adw.Window):
             self._new_conversation()
 
     # ------------------------------------------------------------------
+    # Memories
+    # ------------------------------------------------------------------
+
+    def _build_memory_popover(self) -> None:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        for side in ("top", "bottom", "start", "end"):
+            getattr(box, f"set_margin_{side}")(6)
+        intro = Gtk.Label(
+            label=_("Facts the AI remembers and uses in your chats."), xalign=0.0, wrap=True
+        )
+        intro.add_css_class("dim-label")
+        intro.set_max_width_chars(36)
+        box.append(intro)
+        add_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self._mem_entry = Gtk.Entry(hexpand=True)
+        self._mem_entry.set_placeholder_text(_("e.g. I prefer metric units"))
+        self._mem_entry.update_property([Gtk.AccessibleProperty.LABEL], [_("New memory")])
+        self._mem_entry.connect("activate", lambda _e: self._add_memory())
+        add_btn = Gtk.Button(label=_("Remember"))
+        add_btn.connect("clicked", lambda _b: self._add_memory())
+        add_row.append(self._mem_entry)
+        add_row.append(add_btn)
+        box.append(add_row)
+        self._mem_list = Gtk.ListBox()
+        self._mem_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._mem_list.update_property([Gtk.AccessibleProperty.LABEL], [_("Memories")])
+        self._mem_empty = Gtk.Label(label=_("Nothing remembered yet."), xalign=0.0)
+        self._mem_empty.add_css_class("dim-label")
+        self._mem_list.set_placeholder(self._mem_empty)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_max_content_height(320)
+        scroll.set_propagate_natural_height(True)
+        scroll.set_min_content_width(280)
+        scroll.set_child(self._mem_list)
+        box.append(scroll)
+        self._mem_clear_btn = Gtk.Button(label=_("Forget All"))
+        self._mem_clear_btn.add_css_class("destructive-action")
+        self._mem_clear_btn.set_halign(Gtk.Align.END)
+        self._mem_clear_btn.connect("clicked", lambda _b: self._confirm_clear_memories())
+        box.append(self._mem_clear_btn)
+        self._mem_popover.set_child(box)
+        self._memories: list[dict[str, Any]] = []
+
+    def _refresh_memories(self) -> None:
+        def worker() -> None:
+            facts = self._client.list_memories() if hasattr(self._client, "list_memories") else []
+            GLib.idle_add(self._show_memories, facts)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _show_memories(self, facts: list[dict[str, Any]]) -> bool:
+        self._memories = facts
+        self._mem_list.remove_all()
+        for fact in facts:
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            label = Gtk.Label(label=str(fact.get("text", "")), xalign=0.0, hexpand=True)
+            label.set_wrap(True)
+            label.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+            label.set_max_width_chars(32)
+            label.set_selectable(True)
+            forget = Gtk.Button.new_from_icon_name("edit-delete-symbolic")
+            forget.add_css_class("flat")
+            forget.set_valign(Gtk.Align.CENTER)
+            forget.set_tooltip_text(_("Forget"))
+            forget.update_property(
+                [Gtk.AccessibleProperty.LABEL],
+                [_("Forget “{text}”").format(text=fact.get("text", ""))],
+            )
+            fid = fact.get("id")
+            forget.connect("clicked", lambda _b, fid=fid: self._forget_memory(fid))
+            row.append(label)
+            row.append(forget)
+            self._mem_list.append(row)
+        self._mem_clear_btn.set_sensitive(bool(facts))
+        return False
+
+    def _run_memory_job(self, job: Any) -> None:
+        def worker() -> None:
+            job()
+            facts = self._client.list_memories()
+            GLib.idle_add(self._show_memories, facts)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _add_memory(self) -> None:
+        text = self._mem_entry.get_text().strip()
+        if not text:
+            return
+        self._mem_entry.set_text("")
+        self._run_memory_job(lambda: self._client.add_memory(text))
+
+    def _forget_memory(self, fact_id: Any) -> None:
+        if fact_id is None:
+            return
+        self._run_memory_job(lambda: self._client.forget_memory(int(fact_id)))
+
+    def _confirm_clear_memories(self) -> None:
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading=_("Forget Everything?"),
+            body=_("The AI will forget all {n} saved facts. This can't be undone.").format(
+                n=len(self._memories)
+            ),
+        )
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("forget", _("Forget All"))
+        dialog.set_response_appearance("forget", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+        dialog.connect("response", self._on_clear_memories_response)
+        dialog.present()
+
+    def _on_clear_memories_response(self, _dialog: Any, response: str) -> None:
+        if response == "forget":
+            self._run_memory_job(self._client.clear_memories)
+
+    # ------------------------------------------------------------------
     # Messaging
     # ------------------------------------------------------------------
 
@@ -1271,8 +1471,9 @@ class AIPanelWindow(Adw.Window):
             error_text = f"\n[Error: {exc}]"
             accumulated += error_text
             GLib.idle_add(self._on_chunk, error_text, request_id)
+        steps = list(getattr(self._client, "tool_steps", []) or [])
         if not self._stream_cancelled:
-            GLib.idle_add(self._on_stream_done, accumulated, request_id, sources)
+            GLib.idle_add(self._on_stream_done, accumulated, request_id, sources, steps)
 
     def _on_ai_unavailable(self, request_id: int) -> bool:
         if not self._requests.finish(request_id):
@@ -1453,7 +1654,11 @@ class AIPanelWindow(Adw.Window):
         return False
 
     def _on_stream_done(
-        self, full_text: str, request_id: int, sources: list[str] | None = None
+        self,
+        full_text: str,
+        request_id: int,
+        sources: list[str] | None = None,
+        steps: list[dict[str, Any]] | None = None,
     ) -> bool:
         if not self._requests.finish(request_id):
             return False  # cancelled; the bubble already says so
@@ -1471,14 +1676,17 @@ class AIPanelWindow(Adw.Window):
             if error is None:
                 now = time.monotonic()
                 first = self._first_token_at
-                bubble.set_meta(
-                    answer_meta(
-                        self._client.model,
-                        now - self._stream_started,
-                        None if first is None else first - self._stream_started,
-                    )
+                meta = answer_meta(
+                    self._client.model,
+                    now - self._stream_started,
+                    None if first is None else first - self._stream_started,
                 )
+                used = list(dict.fromkeys(str(s.get("name", "")) for s in steps or []))
+                if used:
+                    meta += " · " + _("used: {tools}").format(tools=", ".join(used))
+                bubble.set_meta(meta)
                 bubble.set_sources(sources or [])
+                bubble.set_found_files(tool_sources(steps or []))
                 self._offer_regenerate(bubble, self._stream_prompt)
                 announce(self, announcement("answer", bubble.get_text()))
             else:
