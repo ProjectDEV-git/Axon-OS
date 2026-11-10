@@ -17,11 +17,11 @@ if _parent not in sys.path:
 import dbus
 import sqlite_vec
 from _log_helper import resolve_logger as configure_app_logger
-from constants import AXON_DIR
+from constants import AXON_DIR, CONTEXT_INDEX_DB
 
 logger = configure_app_logger("axon-file-indexer")
 
-DB_PATH = AXON_DIR / "semantic_search.db"
+DB_PATH = CONTEXT_INDEX_DB
 
 
 class FileIndexer:
@@ -99,6 +99,15 @@ class FileIndexer:
 
             mtime = p.stat().st_mtime
 
+            # Unchanged since it was indexed: skip before asking the Brain for
+            # an embedding, or every scan re-embeds every file.
+            with self._lock:
+                known = self.conn.execute(
+                    "SELECT mtime FROM files WHERE path = ?", (str(p),)
+                ).fetchone()
+            if known and known[0] >= mtime:
+                return
+
             # Read first 1500 chars (reasonable context chunk)
             try:
                 content = p.read_text(encoding="utf-8", errors="ignore").strip()
@@ -129,7 +138,8 @@ class FileIndexer:
                 if row:
                     doc_id = row[0]
                     cursor.execute(
-                        "UPDATE files SET mtime = ?, content = ? WHERE id = ?", (mtime, chunk, doc_id)
+                        "UPDATE files SET mtime = ?, content = ? WHERE id = ?",
+                        (mtime, chunk, doc_id),
                     )
                     cursor.execute(
                         "UPDATE vec_items SET embedding = ? WHERE rowid = ?", (emb_bytes, doc_id)
@@ -141,7 +151,8 @@ class FileIndexer:
                     )
                     doc_id = cursor.lastrowid
                     cursor.execute(
-                        "INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)", (doc_id, emb_bytes)
+                        "INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)",
+                        (doc_id, emb_bytes),
                     )
 
                 self.conn.commit()

@@ -15,7 +15,6 @@ import dbus
 import dbus.mainloop.glib
 import dbus.service
 from _log_helper import resolve_logger as configure_app_logger
-from gi.repository import GLib
 
 _this = str(Path(__file__).resolve().parent)
 if _this not in sys.path:
@@ -163,8 +162,8 @@ class GlobalSearchService(ServiceBase):
                 schemas = subprocess.run(
                     ["gsettings", "list-schemas"], capture_output=True, text=True, timeout=3
                 )
-            except subprocess.TimeoutExpired:
-                return
+            except (OSError, subprocess.SubprocessError):
+                return  # no gsettings (or it hung): no settings results
             try:
                 for schema in schemas.stdout.strip().splitlines():
                     if query.lower() in schema.lower():
@@ -243,9 +242,4 @@ class GlobalSearchService(ServiceBase):
 
 
 if __name__ == "__main__":
-    loop = GLib.MainLoop()
-    service = GlobalSearchService()
-    try:
-        loop.run()
-    except KeyboardInterrupt:
-        loop.quit()
+    GlobalSearchService.main()

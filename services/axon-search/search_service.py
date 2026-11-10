@@ -46,6 +46,15 @@ _ALLOWED_VEC_DIMS = frozenset({128, 256, 384, 512, 768, 1024, 1536})
 
 DB_PATH = SEMANTIC_INDEX_DB
 
+# After this many embedding failures in a row the backend counts as down
+# (Ollama stopped, model not pulled yet, game mode) and is left alone for a
+# while: each failed request costs the Brain seconds of retries, and a scan
+# makes one per chunk.
+_EMBED_FAILURES_BEFORE_PAUSE = 3
+_EMBED_PAUSE_SECONDS = 60.0
+# Least time between two attempts to download the embedding model
+_PULL_RETRY_SECONDS = 3600.0
+
 try:
     import sqlite_vec
 
@@ -143,8 +152,28 @@ class SearchService(ServiceBase):
         except dbus.exceptions.DBusException:
             return None
 
+    def _embeddings_paused(self):
+        """True while the embedding backend is being left alone after failures."""
+        return time.monotonic() < getattr(self, "_embed_retry_at", 0.0)
+
+    def _note_embed_result(self, ok):
+        if ok:
+            self._embed_failures = 0
+            return
+        self._embed_failures = getattr(self, "_embed_failures", 0) + 1
+        if self._embed_failures >= _EMBED_FAILURES_BEFORE_PAUSE:
+            self._embed_failures = 0
+            self._embed_retry_at = time.monotonic() + _EMBED_PAUSE_SECONDS
+
     def _embed(self, text):
         """Return an embedding vector (list[float]) or None."""
+        if self._embeddings_paused():
+            return None
+        vec = self._request_embedding(text)
+        self._note_embed_result(vec is not None)
+        return vec
+
+    def _request_embedding(self, text):
         brain = self._brain()
         if brain is None:
             return None
@@ -153,8 +182,12 @@ class SearchService(ServiceBase):
             vec = json.loads(raw)
             if isinstance(vec, list) and vec and isinstance(vec[0], (int, float)):
                 return vec
-            # Brain returned {"error": ...} — try pulling the model once.
-            if not self._pull_attempted:
+            # Brain returned {"error": ...} — try pulling the model, but not
+            # on every failure. Not just once either: the first scan can run
+            # before Ollama is up, and that pull fails.
+            now = time.monotonic()
+            if now >= getattr(self, "_pull_retry_at", 0.0):
+                self._pull_retry_at = now + _PULL_RETRY_SECONDS
                 self._pull_attempted = True
                 try:
                     brain.PullModel(EMBED_MODEL)
@@ -204,10 +237,7 @@ class SearchService(ServiceBase):
                     for p in paths_to_check:
                         p_path = Path(p)
                         if p_path.suffix.lower() in indexer.INDEX_EXTENSIONS:
-                            if not any(
-                                part in indexer.EXCLUDE_DIRS or part.startswith(".")
-                                for part in p_path.parts[:-1]
-                            ):
+                            if not indexer.in_excluded_dir(p_path):
                                 should_trigger = True
                                 break
 
@@ -315,6 +345,7 @@ class SearchService(ServiceBase):
                 self._reindex_file(db, path, mtime, text)
                 files += 1
                 chunks += 1
+            self._backfill_vectors(db)
             # Drop rows for files that no longer exist.
             for (path,) in db.execute("SELECT DISTINCT path FROM chunks").fetchall():
                 if not Path(path).exists():
@@ -332,6 +363,50 @@ class SearchService(ServiceBase):
             with self._lock:
                 self._stats["indexing"] = False
             db.close()
+
+    def _backfill_vectors(self, db):
+        """Embed chunks that were indexed while embeddings were unavailable.
+
+        A file is only re-read when it changes, so chunks stored keyword-only
+        (first scan before the embedding model was pulled, Ollama stopped,
+        game mode) would otherwise never become searchable by meaning.
+
+        Returns:
+            Number of chunks that gained a vector.
+        """
+        if not HAVE_SQLITE_VEC:
+            return 0
+        try:
+            if vec_table_ready(db):
+                rows = db.execute(
+                    "SELECT id, text FROM chunks"
+                    " WHERE id NOT IN (SELECT rowid FROM vec_chunks) ORDER BY id"
+                ).fetchall()
+            else:
+                rows = db.execute("SELECT id, text FROM chunks ORDER BY id").fetchall()
+        except sqlite3.OperationalError:
+            return 0
+        done = 0
+        for cid, text in rows:
+            if not self._running.is_set() or self._embeddings_paused():
+                break
+            vec = self._embed(f"search_document: {text}")
+            if not vec or not vec_table_ready(db, dim=len(vec)):
+                continue
+            try:
+                db.execute(
+                    "INSERT INTO vec_chunks(rowid, embedding) VALUES (?,?)",
+                    (cid, json.dumps(vec)),
+                )
+            except sqlite3.OperationalError:
+                continue
+            done += 1
+            if done % 50 == 0:
+                db.commit()
+        db.commit()
+        if done:
+            log.info("Added vectors for %d chunks indexed earlier", done)
+        return done
 
     def _delete_file(self, db, path):
         ids = [r[0] for r in db.execute("SELECT id FROM chunks WHERE path=?", (path,)).fetchall()]

@@ -20,6 +20,8 @@ AXON_CACHE_DIR = _XDG_CACHE_HOME / "axon"
 
 CONVERSATIONS_DB = AXON_DIR / "conversations.db"
 SEMANTIC_INDEX_DB = AXON_DIR / "semantic-index.db"
+# Whole-file index kept by axon-context/file_indexer.py (not the Search service's)
+CONTEXT_INDEX_DB = AXON_DIR / "semantic_search.db"
 WHISPER_DIR = AXON_DIR / "models" / "whisper"
 
 # ---------------------------------------------------------------------------

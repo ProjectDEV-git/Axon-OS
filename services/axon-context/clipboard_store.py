@@ -70,6 +70,13 @@ class ClipboardStore:
             except Exception:
                 pass
             self._local.conn = None
+            # Forget it too: a service that opens one connection per worker
+            # thread would otherwise keep every closed connection forever.
+            with self._lock:
+                try:
+                    self._all_connections.remove(conn)
+                except ValueError:
+                    pass
 
     def close_all(self):
         """Close every connection ever created, including those from dead threads."""

@@ -44,6 +44,29 @@ from clipboard_store import ClipboardStore
 _THROTTLE_FACTOR = 5
 
 
+# Open files whose path contains one of these are never reported, so SSH keys,
+# credentials, env files and the like cannot leak into a prompt.
+_SENSITIVE = frozenset(
+    {
+        ".ssh",
+        ".gnupg",
+        ".env",
+        "credentials",
+        "password",
+        ".netrc",
+        ".git-credentials",
+        "secret",
+        "token",
+    }
+)
+
+
+def _is_sensitive_path(path: str) -> bool:
+    """True when *path* looks like it holds secrets (see ``_SENSITIVE``)."""
+    lowered = path.lower()
+    return any(part in lowered for part in _SENSITIVE)
+
+
 class ContextService(ServiceBase):
     BUS_NAME = "org.axonos.Context"
     OBJECT_PATH = "/org/axonos/Context"
@@ -219,9 +242,11 @@ class ContextService(ServiceBase):
             if not emb or not isinstance(emb, list) or not isinstance(emb[0], (int, float)):
                 return "[]"
 
-            from constants import SEMANTIC_INDEX_DB
+            # The whole-file index written by file_indexer.py (files + vec_items);
+            # the Search service's chunk index is a different database.
+            from constants import CONTEXT_INDEX_DB
 
-            db_path = str(SEMANTIC_INDEX_DB)
+            db_path = str(CONTEXT_INDEX_DB)
             if not os.path.exists(db_path):
                 return "[]"
 
@@ -237,9 +262,8 @@ class ContextService(ServiceBase):
                 SELECT f.path, f.content, vec.distance
                 FROM vec_items vec
                 JOIN files f ON f.id = vec.rowid
-                WHERE vec_embedding MATCH ?
+                WHERE vec.embedding MATCH ? AND k = 5
                 ORDER BY distance
-                LIMIT 5
             """,
                 (emb_bytes,),
             )
@@ -284,9 +308,10 @@ class ContextService(ServiceBase):
             # Read clipboard changes in a GLib IO watch
             if self._clipboard_watcher.stdout is not None:
                 self._stdout_ref = self._clipboard_watcher.stdout  # prevent GC
-                self._clipboard_watch_id = GLib.io_add_watch(
+                self._clipboard_watch_id = GLib.unix_fd_add_full(
+                    GLib.PRIORITY_DEFAULT,
                     self._stdout_ref.fileno(),
-                    GLib.IO_IN | GLib.IO_HUP,
+                    GLib.IOCondition.IN | GLib.IOCondition.HUP,
                     self._on_clipboard_data,
                 )
             logger.info("Clipboard watcher started (Wayland/wl-paste)")
@@ -296,7 +321,10 @@ class ContextService(ServiceBase):
         except Exception as e:
             logger.debug("wl-paste failed: %s", e)
 
-        # X11 fallback: poll xclip every 2 seconds
+        self._start_xclip_polling()
+
+    def _start_xclip_polling(self):
+        """X11 fallback: poll xclip every 2 seconds."""
         self._last_xclip_content = ""
         GLib.timeout_add_seconds(2, self._poll_xclip)
         logger.info("Clipboard watcher started (X11/xclip polling)")
@@ -327,23 +355,39 @@ class ContextService(ServiceBase):
 
     def _on_clipboard_data(self, fd, condition):
         """GLib IO callback for wl-paste --watch output."""
-        if condition & GLib.IO_HUP:
-            return False  # watcher died
+        data = b""
+        if condition & GLib.IO_IN:
+            try:
+                data = os.read(fd, 4096)
+            except OSError as e:
+                logger.debug("Clipboard data read error: %s", e)
+        if not data:
+            # Hang-up or end of file: wl-paste exited. On an X11 session it is
+            # installed but cannot reach a compositor and quits at once, so
+            # fall back to xclip instead of silently tracking nothing.
+            self._clipboard_watch_id = None  # returning False removes the source
+            watcher, self._clipboard_watcher = self._clipboard_watcher, None
+            if watcher is not None:
+                try:
+                    watcher.wait(timeout=1)
+                except Exception:
+                    watcher.kill()
+            logger.info("wl-paste watcher exited; using xclip polling")
+            self._start_xclip_polling()
+            return False
         self._load_config()
         if not self.track_clipboard:
             return True
         try:
-            data = os.read(fd, 4096)
-            if data:
-                text = data.decode("utf-8", errors="replace").strip()
-                if text and not self._clipboard_is_secret():
-                    added = self._clipboard_store.add(text)
-                    if added:
-                        with self._clipboard_lock:
-                            self._clipboard_history = self._clipboard_store.to_deque()
-                        self.ContextChanged(self._change_summary())
+            text = data.decode("utf-8", errors="replace").strip()
+            if text and not self._clipboard_is_secret():
+                added = self._clipboard_store.add(text)
+                if added:
+                    with self._clipboard_lock:
+                        self._clipboard_history = self._clipboard_store.to_deque()
+                    self.ContextChanged(self._change_summary())
         except Exception as e:
-            logger.debug("Clipboard data read error: %s", e)
+            logger.debug("Clipboard data error: %s", e)
         return True  # keep watching
 
     @staticmethod
@@ -417,10 +461,6 @@ class ContextService(ServiceBase):
 
         unique_paths = []
         seen = set()
-        # Filter patterns: paths containing these substrings are excluded
-        # to prevent leaking SSH keys, credentials, env files, etc.
-        _SENSITIVE = {'.ssh', '.gnupg', '.env', 'credentials', 'password',
-                      '.netrc', '.git-credentials', 'secret', 'token'}
         for pid in found_pids:
             fd_dir = Path(f"/proc/{pid}/fd")
             try:
@@ -437,9 +477,7 @@ class ContextService(ServiceBase):
                             continue
                     except OSError:
                         continue
-                    if target not in seen and not any(
-                        s in target.lower() for s in _SENSITIVE
-                    ):
+                    if target not in seen and not _is_sensitive_path(target):
                         seen.add(target)
                         unique_paths.append(target)
                     if len(unique_paths) >= 10:

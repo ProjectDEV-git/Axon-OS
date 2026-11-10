@@ -85,12 +85,38 @@ CHUNK_OVERLAP = 200
 DEFAULT_ROOTS = ("Documents", "Desktop", "Projects", "Notes", "src", "scripts")
 
 
-def should_index(path: str | Path) -> bool:
-    """True when *path* is a small enough text-like file we want to embed."""
+def in_excluded_dir(path: str | Path, root: str | Path | None = None) -> bool:
+    """True when a directory between *root* and the file is excluded or hidden.
+
+    Only directories below *root* (default: the home directory) count. Names
+    above it are not ours to judge: a user called ``build`` or ``snap``, or a
+    home under ``/var/.../target``, would otherwise have nothing indexed.
+    A path outside *root* is checked in full.
+    """
+    p = Path(path)
+    parts = p.parts[:-1]
+    for base in (root, Path.home()):
+        if base is None:
+            continue
+        try:
+            parts = p.relative_to(base).parts[:-1]
+            break
+        except ValueError:
+            continue
+    return any(part in EXCLUDE_DIRS or part.startswith(".") for part in parts)
+
+
+def should_index(path: str | Path, root: str | Path | None = None) -> bool:
+    """True when *path* is a small enough text-like file we want to embed.
+
+    Args:
+        path: File to check.
+        root: Directory the scan started from; see ``in_excluded_dir``.
+    """
     p = Path(path)
     if p.suffix.lower() not in INDEX_EXTENSIONS:
         return False
-    if any(part in EXCLUDE_DIRS or part.startswith(".") for part in p.parts[:-1]):
+    if in_excluded_dir(p, root):
         return False
     if p.name.startswith("."):
         return False
@@ -150,7 +176,7 @@ def iter_candidate_files(home: str | Path, roots: tuple[str, ...] = DEFAULT_ROOT
                 full = os.path.join(dirpath, fname)
                 if full in seen:
                     continue
-                if should_index(full):
+                if should_index(full, home):
                     seen.add(full)
                     yield full
 
