@@ -507,8 +507,9 @@ __u32 nt_wait_for_single_object(const __u64 *args)
 	long timeout_jiffies;
 	void *obj;
 
-	if (timeout_ptr && access_ok(timeout_ptr, sizeof(*timeout_ptr)))
-		copy_from_user(&timeout_val, timeout_ptr, sizeof(timeout_val));
+	if (timeout_ptr &&
+	    copy_from_user(&timeout_val, timeout_ptr, sizeof(timeout_val)))
+		return NT_STATUS_ACCESS_VIOLATION;
 
 	if (timeout_val < 0) {
 		if (timeout_val == -1)

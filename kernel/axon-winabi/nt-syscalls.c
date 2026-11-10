@@ -9,8 +9,8 @@
 #include <linux/uaccess.h>
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
-// NOTE: <linux/exit.h> was removed in kernel 6.11.
-// do_group_exit() is declared in <linux/sched/signal.h> (included above).
+// NOTE: do_group_exit() and do_exit() are not exported to modules, so
+// NtTerminateProcess ends the process with a group-directed SIGKILL instead.
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
@@ -24,6 +24,10 @@
 #include "axon-winabi.h"
 
 #define NT_STATUS_INFO_LENGTH_MISMATCH 0xC0000004
+
+/* Upper bounds for caller-supplied I/O lengths */
+#define NT_CONSOLE_WRITE_MAX 1024U
+#define NT_READ_CHUNK_MAX    (1U << 20)
 #define NT_STATUS_OBJECT_NAME_NOT_FOUND 0xC0000034
 #define NT_STATUS_INVALID_HANDLE        0xC0000008
 
@@ -87,12 +91,13 @@ __u32 nt_terminate_process(const __u64 *args)
 	int exit_code = (int)args[1];
 
 	pr_info("NtTerminateProcess: exit_code=%d\n", exit_code);
-	/* Use do_group_exit to kill the entire process (thread group),
-	 * not just the current thread. send_sig(SIGKILL, current, 1) only
-	 * targeted the single thread, leaving other threads running.
+	/* do_group_exit() is not exported to modules (the module failed to
+	 * link with it). A SIGKILL sent to the thread group ends every thread;
+	 * it is delivered when this syscall returns to user space. The NT exit
+	 * code cannot be passed on this way: the process reports SIGKILL.
 	 */
-	do_group_exit(exit_code);
-	return NT_STATUS_SUCCESS; /* unreachable */
+	kill_pid(task_tgid(current), SIGKILL, 1);
+	return NT_STATUS_SUCCESS;
 }
 
 __u32 nt_get_current_process_id(const __u64 *args)
@@ -121,8 +126,8 @@ __u32 nt_query_system_time(const __u64 *args)
 	 * Offset from Unix epoch = 11644473600 seconds = 116444736000000000 * 100ns */
 	__u64 nt_time = ns / 100ULL + 116444736000000000ULL;
 
-	if (out && access_ok(out, sizeof(*out)))
-		copy_to_user(out, &nt_time, sizeof(nt_time));
+	if (out && copy_to_user(out, &nt_time, sizeof(nt_time)))
+		return NT_STATUS_ACCESS_VIOLATION;
 	return NT_STATUS_SUCCESS;
 }
 
@@ -133,8 +138,9 @@ __u32 nt_delay_execution(const __u64 *args)
 	__s64 interval = 0;
 	long timeout;
 
-	if (interval_ptr && access_ok(interval_ptr, sizeof(interval)))
-		copy_from_user(&interval, interval_ptr, sizeof(interval));
+	if (interval_ptr &&
+	    copy_from_user(&interval, interval_ptr, sizeof(interval)))
+		return NT_STATUS_ACCESS_VIOLATION;
 
 	if (interval < 0) {
 		// Negative = relative delay in 100ns units
@@ -286,7 +292,6 @@ __u32 nt_write_file(const __u64 *args)
 	void __user *buf = (void __user *)args[5];
 	__u32 length = (__u32)args[6];
 	char *kbuf;
-	ssize_t written;
 
 	if (length == 0)
 		return NT_STATUS_SUCCESS;
@@ -296,6 +301,11 @@ __u32 nt_write_file(const __u64 *args)
 
 	// Handle stdout (1) and stderr (2) via printk
 	if (handle == 1 || handle == 2) {
+		/* length is caller-controlled: 0xFFFFFFFF + 1 wraps to a
+		 * zero-byte allocation, and one printk line is all that is
+		 * shown anyway.
+		 */
+		length = min_t(__u32, length, NT_CONSOLE_WRITE_MAX);
 		kbuf = kvmalloc(length + 1, GFP_KERNEL);
 		if (!kbuf)
 			return NT_STATUS_NO_MEMORY;
@@ -349,6 +359,10 @@ __u32 nt_read_file(const __u64 *args)
 	if (!f)
 		return NT_STATUS_INVALID_HANDLE;
 
+	/* A short read is valid; do not let one call pin gigabytes of
+	 * kernel memory for a caller-chosen length.
+	 */
+	length = min_t(__u32, length, NT_READ_CHUNK_MAX);
 	kbuf = kvmalloc(length, GFP_KERNEL);
 	if (!kbuf) {
 		fput(f);
@@ -375,10 +389,12 @@ __u32 nt_read_file(const __u64 *args)
 	fput(f);
 
 	/* Write bytes read to IO_STATUS_BLOCK.Information (offset 8) */
-	if (io_status && access_ok(io_status, 16)) {
+	if (io_status) {
 		__u64 info = (__u64)bytes_read;
-		copy_to_user((__u64 __user *)((char __user *)io_status + 8),
-			     &info, sizeof(info));
+
+		if (copy_to_user((__u64 __user *)((char __user *)io_status + 8),
+				 &info, sizeof(info)))
+			return NT_STATUS_ACCESS_VIOLATION;
 	}
 
 	pr_debug("NtReadFile: handle=0x%llx read %zd bytes\n",
@@ -503,9 +519,17 @@ __u32 nt_create_file(const __u64 *args)
 		return NT_STATUS_NO_MEMORY;
 	}
 
-	if (handle_out && access_ok(handle_out, sizeof(__u64))) {
+	if (handle_out) {
 		__u64 h = (__u64)fd;
-		copy_to_user(handle_out, &h, sizeof(h));
+
+		if (copy_to_user(handle_out, &h, sizeof(h))) {
+			/* The caller never learns the handle: do not leak it */
+			spin_lock(&axon_file_idr_lock);
+			idr_remove(&axon_file_idr, fd);
+			spin_unlock(&axon_file_idr_lock);
+			fput(f);
+			return NT_STATUS_ACCESS_VIOLATION;
+		}
 	}
 
 	pr_debug("NtCreateFile: handle=%d\n", fd);
@@ -601,8 +625,8 @@ __u32 nt_query_information_file(const __u64 *args)
 			attrs |= 0x400; /* FILE_ATTRIBUTE_REPARSE_POINT */
 		memcpy(&fbi[0x20], &attrs, sizeof(attrs));
 
-		if (buf && access_ok(buf, sizeof(fbi)))
-			copy_to_user(buf, fbi, sizeof(fbi));
+		if (buf && copy_to_user(buf, fbi, sizeof(fbi)))
+			return NT_STATUS_ACCESS_VIOLATION;
 		return NT_STATUS_SUCCESS;
 	}
 
@@ -658,9 +682,11 @@ __u32 nt_query_information_process(const __u64 *args)
 			return NT_STATUS_INFO_LENGTH_MISMATCH;
 		if (copy_to_user(buf, &pbi, sizeof(pbi)))
 			return NT_STATUS_ACCESS_VIOLATION;
-		if (ret_len && access_ok(ret_len, 4)) {
+		if (ret_len) {
 			u32 sz = sizeof(pbi);
-			copy_to_user(ret_len, &sz, 4);
+
+			if (copy_to_user(ret_len, &sz, 4))
+				return NT_STATUS_ACCESS_VIOLATION;
 		}
 		return NT_STATUS_SUCCESS;
 	}

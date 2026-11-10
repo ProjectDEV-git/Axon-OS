@@ -140,13 +140,22 @@ static __u32 do_create_thread(__u64 __user *handle_out,
 	}
 
 	handle = (__u32)atomic_read(&nt_handle_counter);
+
+	/* Report the handle before the thread starts: once it runs it cannot
+	 * be taken back. A kthread stopped before its first wake-up never
+	 * calls its thread function, so the context is still ours to free.
+	 */
+	if (handle_out && copy_to_user(handle_out, &handle, sizeof(handle))) {
+		kthread_stop(task);
+		mmput(ctx->mm);
+		kfree(ctx);
+		return NT_STATUS_ACCESS_VIOLATION;
+	}
+
 	wake_up_process(task);
 
 	pr_info("NtCreateThread: handle=0x%x start=0x%lx arg=0x%lx\n",
 		handle, start_routine, argument);
-
-	if (handle_out && access_ok(handle_out, sizeof(handle)))
-		copy_to_user(handle_out, &handle, sizeof(handle));
 
 	return NT_STATUS_SUCCESS;
 }

@@ -91,7 +91,7 @@ subagent-controller (orchestrator)
 - Markers: `@pytest.mark.slow`, `@pytest.mark.integration`, `@pytest.mark.unit`; timeout 30s/test
 - Key paths: `services/constants.py`, `services/service_utils.py`, `services/service_base.py`, `docs/architecture.md`
 - SQLite `with conn:` only does commit/rollback — NOT close. Use explicit `conn.close()` or pool
-- Kernel module at `kernel/axon-winabi/` — Phase 1 & 2 complete (~3,900 lines), NOT compiled/tested yet
+- Kernel module at `kernel/axon-winabi/` — Phase 1 & 2 complete (~3,900 lines). Builds against Ubuntu's `linux-headers-6.8.0-*-generic` (checked 2026-11-10, `tests/test_winabi_build.py`); never loaded or run, and not shipped in release images
 - Docker: `docker compose up -d`, Ollama via `host.docker.internal:11434`, each service uses `Dockerfile.service`
 
 ### Frictionless OS (Go) — `Documents/Frictionless/`

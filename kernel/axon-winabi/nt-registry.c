@@ -379,8 +379,8 @@ __u32 nt_query_value_key(const __u64 *args)
 
 	if (info_class == KEY_VALUE_BASIC_INFORMATION) {
 		needed = 8 + ALIGN(name_len + 1, 2);
-		if (result_len && access_ok(result_len, 4))
-			copy_to_user(result_len, &needed, 4);
+		if (result_len && copy_to_user(result_len, &needed, 4))
+			return NT_STATUS_ACCESS_VIOLATION;
 		if (out_len < needed)
 			return NT_STATUS_BUFFER_TOO_SMALL;
 		if (out_buf && access_ok(out_buf, needed)) {
@@ -391,7 +391,9 @@ __u32 nt_query_value_key(const __u64 *args)
 			memcpy(&tmp[off], &name_len, 4); off += 4;
 			memcpy(&tmp[off], &val->type, 4); off += 4;
 			memcpy(&tmp[off], val->name, name_len);
-			copy_to_user(out_buf, tmp, 8 + ALIGN(name_len + 1, 2));
+			if (copy_to_user(out_buf, tmp,
+					 8 + ALIGN(name_len + 1, 2)))
+				return NT_STATUS_ACCESS_VIOLATION;
 		}
 		return NT_STATUS_SUCCESS;
 	}
@@ -401,8 +403,8 @@ __u32 nt_query_value_key(const __u64 *args)
 		u8 *tmp;
 
 		needed = data_off + val->data_len;
-		if (result_len && access_ok(result_len, 4))
-			copy_to_user(result_len, &needed, 4);
+		if (result_len && copy_to_user(result_len, &needed, 4))
+			return NT_STATUS_ACCESS_VIOLATION;
 		if (out_len < needed)
 			return NT_STATUS_BUFFER_TOO_SMALL;
 
@@ -417,8 +419,10 @@ __u32 nt_query_value_key(const __u64 *args)
 		if (val->data_len > 0)
 			memcpy(tmp + data_off, val->data, val->data_len);
 
-		if (out_buf && access_ok(out_buf, needed))
-			copy_to_user(out_buf, tmp, needed);
+		if (out_buf && copy_to_user(out_buf, tmp, needed)) {
+			kfree(tmp);
+			return NT_STATUS_ACCESS_VIOLATION;
+		}
 		kfree(tmp);
 		return NT_STATUS_SUCCESS;
 	}

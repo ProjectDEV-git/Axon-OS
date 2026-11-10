@@ -1,5 +1,6 @@
 #include <dlfcn.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef uint32_t HRESULT;

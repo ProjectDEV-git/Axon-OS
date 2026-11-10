@@ -87,7 +87,9 @@ BOOL SHGetSpecialFolderPathA(HWND hwnd, LPSTR pszPath, int csidl,
 	if (!pszPath)
 		return FALSE;
 
-	strscpy(pszPath, "/tmp", MAX_PATH);
+	/* strscpy() is a kernel function; this file is built for user space */
+	strncpy(pszPath, "/tmp", MAX_PATH - 1);
+	pszPath[MAX_PATH - 1] = '\0';
 	return TRUE;
 }
 

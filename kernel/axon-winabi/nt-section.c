@@ -233,11 +233,13 @@ __u32 nt_map_view_of_section(const __u64 *args)
 	if (!sec)
 		return NT_STATUS_INVALID_PARAMETER;
 
-	if (base_addr_ptr && access_ok(base_addr_ptr, sizeof(unsigned long)))
-		copy_from_user(&base_hint, base_addr_ptr, sizeof(base_hint));
+	if (base_addr_ptr &&
+	    copy_from_user(&base_hint, base_addr_ptr, sizeof(base_hint)))
+		return NT_STATUS_ACCESS_VIOLATION;
 
-	if (view_size_ptr && access_ok(view_size_ptr, sizeof(size_t)))
-		copy_from_user(&view_size, view_size_ptr, sizeof(view_size));
+	if (view_size_ptr &&
+	    copy_from_user(&view_size, view_size_ptr, sizeof(view_size)))
+		return NT_STATUS_ACCESS_VIOLATION;
 
 	if (view_size == 0)
 		view_size = sec->size;
@@ -262,12 +264,18 @@ __u32 nt_map_view_of_section(const __u64 *args)
 	if (IS_ERR_VALUE(addr))
 		return NT_STATUS_NO_MEMORY;
 
-	axon_mapping_track(addr, view_size);
+	/* Report the view before tracking it: if the caller cannot be told
+	 * where it is, unmap it again instead of leaking the mapping.
+	 */
+	if ((base_addr_ptr &&
+	     copy_to_user(base_addr_ptr, &addr, sizeof(addr))) ||
+	    (view_size_ptr &&
+	     copy_to_user(view_size_ptr, &view_size, sizeof(view_size)))) {
+		vm_munmap(addr, view_size);
+		return NT_STATUS_ACCESS_VIOLATION;
+	}
 
-	if (base_addr_ptr && access_ok(base_addr_ptr, sizeof(unsigned long)))
-		copy_to_user(base_addr_ptr, &addr, sizeof(addr));
-	if (view_size_ptr && access_ok(view_size_ptr, sizeof(size_t)))
-		copy_to_user(view_size_ptr, &view_size, sizeof(view_size));
+	axon_mapping_track(addr, view_size);
 
 	pr_debug("NtMapViewOfSection: handle=%u addr=0x%lx size=0x%zx\n",
 		 section_handle, addr, view_size);
@@ -325,11 +333,13 @@ __u32 nt_query_section(const __u64 *args)
 		info.section_attributes = SEC_COMMIT;
 		info.section_size = sec->size;
 
-		if (buf && access_ok(buf, sizeof(info)))
-			copy_to_user(buf, &info, sizeof(info));
-		if (ret_len && access_ok(ret_len, sizeof(u32))) {
+		if (buf && copy_to_user(buf, &info, sizeof(info)))
+			return NT_STATUS_ACCESS_VIOLATION;
+		if (ret_len) {
 			u32 written = sizeof(info);
-			copy_to_user(ret_len, &written, sizeof(written));
+
+			if (copy_to_user(ret_len, &written, sizeof(written)))
+				return NT_STATUS_ACCESS_VIOLATION;
 		}
 		return NT_STATUS_SUCCESS;
 	}
