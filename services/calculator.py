@@ -16,7 +16,7 @@ import re
 _MAX_LENGTH = 80
 _MAX_EXPONENT = 100
 _MAX_RESULT = 1e15
-_ALLOWED = re.compile(r"^[\d.\s+\-*/^()]+$")
+_ALLOWED = re.compile(r"^[\d.\s+\-*/^()]+\Z")
 _NUMBER = re.compile(r"\d+(?:\.\d*)?|\.\d+")
 
 

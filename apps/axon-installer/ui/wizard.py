@@ -45,8 +45,8 @@ except ImportError:
 ENGINE_PATH = Path(__file__).resolve().parents[1] / "install_engine.py"
 ENGINE_WRAPPER = "/usr/local/bin/axon-install-engine"
 
-USERNAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
-HOSTNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$")
+USERNAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}\Z")
+HOSTNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}\Z")
 
 
 def _os_version() -> str:

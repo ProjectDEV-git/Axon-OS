@@ -35,8 +35,8 @@ KINDS = ("ollama", "openai", "anthropic", "gemini")
 OLLAMA_ID = "ollama"
 ANTHROPIC_VERSION = "2023-06-01"
 ANTHROPIC_MAX_TOKENS = 4096
-_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
-_REF_RE = re.compile(r"^@([a-z0-9][a-z0-9-]{0,31})/(.+)$")
+_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}\Z")
+_REF_RE = re.compile(r"^@([a-z0-9][a-z0-9-]{0,31})/(.+)\Z")
 _MODEL_CACHE_TTL = 60.0
 # env_key is preset-only: a custom provider must not be able to read another service's key
 _FIELDS = {"id", "kind", "label", "base_url", "auth_header", "models", "oauth", "enabled"}

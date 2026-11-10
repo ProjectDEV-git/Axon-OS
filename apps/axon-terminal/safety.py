@@ -82,7 +82,21 @@ def is_insertable_suggestion(command: str) -> bool:
     """
     if not command or not command.strip():
         return False
-    return not any(ord(c) < 32 or ord(c) == 127 for c in command)
+    return not any(_is_control(c) for c in command)
+
+
+# Bidirectional overrides and isolates: they make a command display as something else
+_BIDI_CONTROLS = frozenset("\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u200e\u200f")
+
+
+def _is_control(char: str) -> bool:
+    """True for characters that act on the terminal instead of showing as text.
+
+    C0 controls and DEL, the C1 range (U+009B is CSI to a terminal), the
+    Unicode line and paragraph separators, and bidi controls.
+    """
+    code = ord(char)
+    return code < 32 or 127 <= code <= 159 or char in ("\u2028", "\u2029") or char in _BIDI_CONTROLS
 
 
 def assess_command(command: str) -> SafetyDecision:

@@ -21,7 +21,7 @@ from typing import Any
 MAX_RESULT_CHARS = 2000
 
 _CALL_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
-_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
+_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,40}\Z")
 
 
 @dataclass

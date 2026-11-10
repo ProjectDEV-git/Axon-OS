@@ -8,8 +8,36 @@ import dbus
 logger = logging.getLogger(__name__)
 
 # Validation patterns for AI-generated values
-_SAFE_STRING_RE = re.compile(r"^[a-zA-Z0-9_\-\.]+$")
-_SAFE_NUMBER_RE = re.compile(r"^-?\d+\.?\d*$")
+_SAFE_STRING_RE = re.compile(r"^[a-zA-Z0-9_\-\.]+\Z")
+# Settings whose value is on/off
+_BOOL_SETTINGS = frozenset(
+    {"night_light", "power", "discoverable", "natural_scroll", "tap_to_click", "auto_lock", "dnd"}
+)
+_TRUE_WORDS = frozenset({"true", "on", "yes", "enable", "enabled", "1"})
+_FALSE_WORDS = frozenset({"false", "off", "no", "disable", "disabled", "0"})
+
+
+def _coerce_bool(value: object) -> bool | None:
+    """A model's on/off value as a bool, or None when it is neither.
+
+    Models often answer ``"false"`` (a string) where the schema asks for
+    ``false``. Any non-empty string is truthy, so without this "turn off
+    wifi" could turn it on.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        word = value.strip().lower()
+        if word in _TRUE_WORDS:
+            return True
+        if word in _FALSE_WORDS:
+            return False
+    return None
+
+
+_SAFE_NUMBER_RE = re.compile(r"^-?\d+\.?\d*\Z")
 
 
 class SettingsExecutor:
@@ -115,9 +143,19 @@ class SettingsExecutor:
             if response_str.startswith("```"):
                 response_str = response_str.replace("```json", "").replace("```", "").strip()
 
+            if response_str.startswith("[Error:"):
+                # the Brain's own failure report (Ollama stopped, game mode ...)
+                return {"success": False, "message": response_str[7:].rstrip("]").strip()}
+
             data = json.loads(response_str)
+            if not isinstance(data, dict):
+                return {"success": False, "message": "Invalid action format from AI."}
             action = data.get("action")
             value = data.get("value")
+            if action == "set_wifi" or data.get("setting") in _BOOL_SETTINGS:
+                value = _coerce_bool(value)
+                if value is None:
+                    return {"success": False, "message": "Expected on or off for that setting."}
 
             # Validate action is a known safe string
             if action and not self._validate_value(action):

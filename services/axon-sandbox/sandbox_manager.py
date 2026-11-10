@@ -279,12 +279,18 @@ class SandboxManager(ServiceBase):
                 self.logger.info(f"Script {script_path} flagged. Displaying warning prompt...")
 
                 def launch_dialog():
-                    dialog = SandboxPromptDialog(
-                        script_name=p.name,
-                        warnings=warnings,
-                        callback=lambda decision: dbus_ok(decision),
-                    )
-                    dialog.present()
+                    try:
+                        dialog = SandboxPromptDialog(
+                            script_name=p.name,
+                            warnings=warnings,
+                            callback=lambda decision: dbus_ok(decision),
+                        )
+                        dialog.present()
+                    except Exception:
+                        # No display, broken theme ...: answer now instead of
+                        # leaving the shell waiting for its 2 minute timeout.
+                        self.logger.exception("Could not show the sandbox prompt:")
+                        dbus_ok("deny")
 
                 GLib.idle_add(launch_dialog)
             else:

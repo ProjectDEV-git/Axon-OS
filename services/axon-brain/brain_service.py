@@ -490,7 +490,7 @@ class BrainService(ServiceBase):
 
     # Ollama tags: alnum start, then alnum plus . _ : / - (namespaced models
     # like "library/llama3" are allowed; ".." path traversal is not).
-    _MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
+    _MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*\Z")
     _MAX_MODEL_NAME_LEN = MAX_MODEL_NAME_LEN
     _MAX_PROMPT_LEN = MAX_PROMPT_LEN
 

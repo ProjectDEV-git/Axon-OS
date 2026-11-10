@@ -38,7 +38,7 @@ from service_base import ServiceBase
 log = configure_app_logger("axon-gui-agent", level=logging.INFO)
 
 # Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
-_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
 def _validate_app_name(name: str) -> str | None:
@@ -122,8 +122,11 @@ class GuiAgentService(ServiceBase):
             if not plan_mod.is_safe_gvariant_text(old):
                 failed.append(f"{schema} {key}: unsafe stored value")
                 continue
-            proc = self._gsettings("set", schema, key, old)
-            (restored if proc.returncode == 0 else failed).append(f"{schema} {key} = {old}")
+            try:
+                ok = self._gsettings("set", schema, key, old).returncode == 0
+            except (OSError, subprocess.SubprocessError):
+                ok = False
+            (restored if ok else failed).append(f"{schema} {key} = {old}")
         if restored:
             self._notify("Axon GUI Agent", f"Undid {len(restored)} change(s)")
         return json.dumps({"ok": not failed, "restored": restored, "failed": failed})
@@ -145,11 +148,18 @@ class GuiAgentService(ServiceBase):
         rounds = 0
         for rounds in range(1, self.MAX_ROUNDS + 1):
             raw = self._ask_brain(self._round_prompt(instruction, observations))
+            # The Brain reports its own failures (Ollama stopped, game mode)
+            # as an "[Error: ...]" reply, not as a D-Bus error.
+            brain_error = None
             if raw is None:
+                brain_error = "AI brain unavailable"
+            elif raw.lstrip().startswith("[Error:"):
+                brain_error = raw.strip()[len("[Error:") :].rstrip("]").strip()
+            if brain_error is not None:
                 if rounds == 1:
                     return {
                         "ok": False,
-                        "error": "AI brain unavailable",
+                        "error": brain_error or "AI brain unavailable",
                         "executed": [],
                         "skipped": [],
                     }

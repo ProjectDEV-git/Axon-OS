@@ -111,7 +111,7 @@ _HISTORY_FILE = AXON_DIR / "intent_history.json"
 _RESPONSE_MAX_HEIGHT = 320  # px; longer answers scroll
 
 # Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
-_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
 def _wrapping_row(spacing: int) -> Gtk.FlowBox:

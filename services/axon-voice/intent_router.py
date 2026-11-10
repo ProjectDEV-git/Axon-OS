@@ -46,4 +46,7 @@ def parse_intent_response(raw: str) -> tuple[str, Any]:
                 return ("open_app", str(data["app"]))
             if action == "run_command" and data.get("command"):
                 return ("run_command", str(data["command"]))
+            if action == "error":
+                # the Brain's own failure report: say the message, not the JSON
+                return ("say", str(data.get("message") or "The AI is not available right now."))
     return ("say", raw)

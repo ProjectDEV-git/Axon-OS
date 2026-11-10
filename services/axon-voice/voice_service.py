@@ -48,7 +48,7 @@ log = configure_app_logger("axon-voice", level=logging.INFO)
 WHISPER_MODEL = os.environ.get("AXON_WHISPER_MODEL", "base.en")
 
 # Allowlist of safe characters for AI-generated app names (no paths, no metacharacters)
-_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_SAFE_APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
 def _validate_app_name(name: str) -> str | None:
@@ -179,19 +179,20 @@ class VoiceService(ServiceBase):
                 os.unlink(wav_path)
             except OSError:
                 pass
-            self._notify(
-                "Axon Voice",
-                "No microphone recorder found (install pulseaudio-utils or alsa-utils).",
+            self._recording_failed(
+                "No microphone recorder found (install pulseaudio-utils or alsa-utils)."
             )
-            self.StateChanged("error")
             return False
         try:
             self._recorder = subprocess.Popen(
                 cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
         except OSError as exc:
-            self._notify("Axon Voice", f"Could not record: {exc}")
-            self.StateChanged("error")
+            try:
+                os.unlink(wav_path)
+            except OSError:
+                pass
+            self._recording_failed(f"Could not record: {exc}")
             return False
         self._wav_path = wav_path
         self._show_overlay("Listening... press Super+V again to stop")
@@ -201,6 +202,17 @@ class VoiceService(ServiceBase):
             MAX_RECORD_SECONDS, self._stop_and_process
         )
         return False
+
+    def _recording_failed(self, message):
+        """Report a recording that never started and release the busy claim.
+
+        Toggle sets ``_busy`` before recording starts; leaving it set would
+        make every later Toggle a no-op until the service is restarted.
+        """
+        with self._lock:
+            self._busy = False
+        self._notify("Axon Voice", message)
+        self.StateChanged("error")
 
     def _stop_and_process(self):
         with self._lock:
@@ -216,6 +228,7 @@ class VoiceService(ServiceBase):
             rec.wait(timeout=3)
         except subprocess.TimeoutExpired:
             rec.kill()
+            rec.wait()
         with self._lock:
             self._busy = True
         self._set_overlay_status("Transcribing on-device...")
@@ -265,7 +278,15 @@ class VoiceService(ServiceBase):
 
         GLib.idle_add(self.TranscriptReady, text)
         GLib.idle_add(self._set_overlay_status, f'"{text}"')
+        try:
+            self._route(text)
+        except Exception as exc:
+            # _finish must always run: it is what clears the busy state
+            log.warning("Voice routing failed: %s", exc)
+            GLib.idle_add(self._finish, "", "Something went wrong handling that request.")
 
+    def _route(self, text):
+        """Act on a transcript: open an app, run a confirmed command, or answer."""
         reply = self._classify(text)
         kind, payload = parse_intent_response(reply)
         if kind == "open_app":

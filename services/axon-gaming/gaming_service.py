@@ -187,6 +187,9 @@ class GamingService(ServiceBase):
     def _on_grace_timer(self):
         self._grace_source = 0
         self._manager.tick()
+        # A game that came and went meanwhile restarted the grace period:
+        # wait for the new one too instead of leaving it to the slow poll.
+        self._arm_grace_timer()
         return False
 
     def _on_name_owner_changed(self, name, _old_owner, new_owner):

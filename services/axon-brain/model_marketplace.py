@@ -33,7 +33,7 @@ import urllib.request
 
 CATALOG_FILE = AXON_DIR / "model_catalog.json"
 
-_MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
+_MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*\Z")
 _MAX_MODEL_NAME_LEN = 256
 
 

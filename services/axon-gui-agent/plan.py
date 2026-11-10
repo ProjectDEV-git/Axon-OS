@@ -45,7 +45,8 @@ def _check_op(op: dict) -> str | None:
     if not isinstance(op, dict):
         return "operation is not an object"
     op_type = op.get("type", "")
-    if op_type not in VALID_OP_TYPES:
+    # a list or object here is unhashable and would raise on the set lookup
+    if not isinstance(op_type, str) or op_type not in VALID_OP_TYPES:
         return f"unknown operation type: {op_type!r}"
 
     if op_type in ("gsettings_set", "gsettings_get"):

@@ -43,8 +43,8 @@ ESP_MIB = 512
 BIOS_GRUB_MIB = 2
 ESP_PARTTYPE_GUID = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
 
-USERNAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
-HOSTNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$")
+USERNAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}\Z")
+HOSTNAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}\Z")
 
 # Live-session components that must never survive onto the installed system:
 # the polkit policy grants passwordless root to the engine wrapper below.

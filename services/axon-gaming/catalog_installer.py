@@ -64,11 +64,12 @@ def run_command(argv: list[str], on_line: Callable[[str], None]) -> int:
         on_line(f"{argv[0]}: {exc}")
         return 127
     assert proc.stdout is not None
-    # Both tools redraw progress with carriage returns
-    for chunk in proc.stdout:
-        for line in re.split(r"[\r\n]+", chunk):
-            if line.strip():
-                on_line(line.strip())
+    with proc:  # closes the pipe; it was left for the garbage collector
+        # Both tools redraw progress with carriage returns
+        for chunk in proc.stdout:
+            for line in re.split(r"[\r\n]+", chunk):
+                if line.strip():
+                    on_line(line.strip())
     return proc.wait()
 
 

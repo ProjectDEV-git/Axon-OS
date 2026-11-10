@@ -24,7 +24,7 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 
-_SAFE_BUS_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9._-]*$")
+_SAFE_BUS_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9._-]*\Z")
 
 
 def _validate_bus_name(bus_name: str) -> bool:

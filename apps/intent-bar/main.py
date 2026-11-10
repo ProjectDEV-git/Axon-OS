@@ -11,6 +11,23 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gio
 
+if not __package__:
+    # Started as a script (``python3 .../intent-bar/main.py``, as the .desktop
+    # launcher does). The directory name has a hyphen, so it cannot be imported
+    # as a package: register it as ``intent_bar`` so the relative imports work.
+    import importlib.util
+    from pathlib import Path
+
+    _here = Path(__file__).resolve().parent
+    _spec = importlib.util.spec_from_file_location(
+        "intent_bar", _here / "__init__.py", submodule_search_locations=[str(_here)]
+    )
+    assert _spec is not None and _spec.loader is not None
+    _pkg = importlib.util.module_from_spec(_spec)
+    sys.modules["intent_bar"] = _pkg
+    _spec.loader.exec_module(_pkg)
+    __package__ = "intent_bar"
+
 from .ollama_client import OllamaClient
 from .spaces_manager import SpacesManager
 from .ui.window import IntentBarWindow

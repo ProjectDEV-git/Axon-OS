@@ -158,7 +158,7 @@ class UserSetupPage(Gtk.Box):
         v = self.get_values()
         if not v["username"]:
             return "Username cannot be empty."
-        if not re.match(r"^[a-z][a-z0-9-]{0,31}$", v["username"]):
+        if not re.match(r"^[a-z][a-z0-9-]{0,31}\Z", v["username"]):
             return "Username must be lowercase, start with a letter, and contain only a-z, 0-9, or hyphens (max 32 chars)."
         if not v["password"]:
             return "Password cannot be empty."
@@ -168,13 +168,13 @@ class UserSetupPage(Gtk.Box):
             return "Passwords do not match."
         if not v["hostname"]:
             return "Hostname cannot be empty."
-        if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,61}[a-zA-Z0-9])?$", v["hostname"]):
+        if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9.-]{0,61}[a-zA-Z0-9])?\Z", v["hostname"]):
             return "Hostname must be a valid RFC 1123 name (letters, digits, hyphens, dots)."
         if v["timezone"] and (
-            ".." in v["timezone"] or not re.match(r"^[A-Za-z0-9_/.-]+$", v["timezone"])
+            ".." in v["timezone"] or not re.match(r"^[A-Za-z0-9_/.-]+\Z", v["timezone"])
         ):
             return "Invalid timezone format."
-        if v["keymap"] and not re.match(r"^[A-Za-z0-9_-]+$", v["keymap"]):
+        if v["keymap"] and not re.match(r"^[A-Za-z0-9_-]+\Z", v["keymap"]):
             return "Keymap must contain only letters, digits, underscores, and hyphens."
         return None
 
