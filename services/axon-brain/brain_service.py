@@ -111,12 +111,21 @@ def _sanitize_context(context: str) -> str:
     _MAX_CONTEXT_LEN chars, and wraps in untrusted tags so the model
     treats the content as inert data.
     """
-    safe = context.replace("\x00", "")
+    return f"<untrusted_context>{_clean_untrusted(context)}</untrusted_context>"
+
+
+def _clean_untrusted(text: str) -> str:
+    """The cleaning half of ``_sanitize_context``, without the wrapper tags.
+
+    For text that is stored and wrapped later (remembered facts): wrapping it
+    here would save the tags as part of the fact and show them in the UI.
+    """
+    safe = text.replace("\x00", "")
     safe = unicodedata.normalize("NFKD", safe)
     safe = _INJECTION_PATTERNS.sub("", safe)
-    if len(safe) > _MAX_CONTEXT_LEN:
-        safe = safe[:_MAX_CONTEXT_LEN]
-    return f"<untrusted_context>{safe}</untrusted_context>"
+    # a fact must not be able to close the tag it is later wrapped in
+    safe = re.sub(r"</?untrusted_context>", "", safe, flags=re.IGNORECASE)
+    return safe[:_MAX_CONTEXT_LEN]
 
 
 class TokenBuffer:
@@ -495,11 +504,15 @@ class BrainService(ServiceBase):
             return False
         if len(name) > BrainService._MAX_MODEL_NAME_LEN or ".." in name:
             return False
+        # The reference is stored and sent as given, so check all of it:
+        # parse_model_ref() trims, which would let "model\n" through.
+        if any(c.isspace() or not c.isprintable() for c in name):
+            return False
         try:
             _provider, model = parse_model_ref(name)
         except ValueError:
             return False
-        return bool(BrainService._MODEL_NAME_RE.match(model))
+        return bool(BrainService._MODEL_NAME_RE.fullmatch(model))
 
     @staticmethod
     def _is_cloud(model: str) -> bool:
@@ -668,7 +681,7 @@ class BrainService(ServiceBase):
         if model and not self._validate_model_name(str(model)):
             return json.dumps({"error": f"invalid model name: {model!r}"})
         if not model:
-            model, _reason = self.router.select_model(str(prompt), str(context))
+            model = self._route_model(str(prompt), str(context))
         model = self._local_name(str(model))
         model = self._game_mode_model(model)
 
@@ -692,6 +705,18 @@ class BrainService(ServiceBase):
             return tx_id
         else:
             return self._do_generate_sync(prompt, system_prompt, model)
+
+    def _route_model(self, prompt: str, context: str, needs_tools: bool = False) -> str:
+        """The model that answers *prompt* when the caller named none.
+
+        The router also knows an embedding tier ("find similar notes"), but an
+        embedding model cannot generate text: Ollama rejects the request. A
+        chat or generate call that lands there gets the general model.
+        """
+        model, reason = self.router.select_model(prompt, context, needs_tools=needs_tools)
+        if reason == "embedding-task":
+            model = self.router.get_model_for_chat(len(prompt))
+        return str(model)
 
     @dbus.service.method("org.axonos.Brain", in_signature="s", out_signature="b")
     def CancelStream(self, transaction_id: str) -> bool:
@@ -758,7 +783,7 @@ class BrainService(ServiceBase):
         self.store.add_message(conversation_id, "user", message)
 
         if not model:
-            model, _reason = self.router.select_model(str(message), str(context))
+            model = self._route_model(str(message), str(context))
         model = self._local_name(str(model))
         model = self._game_mode_model(model)
 
@@ -776,7 +801,11 @@ class BrainService(ServiceBase):
             return tx_id
         else:
             resp = self._do_chat_sync(conversation_id, context, model)
-            self.store.add_message(conversation_id, "assistant", resp)
+            # A failure is reported to the caller but is not part of the
+            # conversation: stored, it would be replayed to the model as
+            # something the assistant said.
+            if not resp.startswith("[Error:"):
+                self.store.add_message(conversation_id, "assistant", resp)
             return resp
 
     @dbus.service.method("org.axonos.Brain", in_signature="ssss", out_signature="s")
@@ -792,7 +821,7 @@ class BrainService(ServiceBase):
             return json.dumps({"error": f"invalid model name: {model!r}"})
         self.store.add_message(conversation_id, "user", message)
         if not model:
-            model, _reason = self.router.select_model(str(message), str(context), needs_tools=True)
+            model = self._route_model(str(message), str(context), needs_tools=True)
         model = self._game_mode_model(self._local_name(str(model)))
         tx_id = str(uuid.uuid4())
         with self._streams_lock:
@@ -816,7 +845,7 @@ class BrainService(ServiceBase):
     def AddMemory(self, text):
         """Remember a fact. Returns its id, or -1 if it was rejected."""
         try:
-            return self.memory.add(_sanitize_context(str(text)))
+            return self.memory.add(_clean_untrusted(str(text)))
         except ValueError:
             return -1
 
@@ -853,6 +882,7 @@ class BrainService(ServiceBase):
                 f"App: {_sanitize_context(wm_class)}\nWindow Title: {_sanitize_context(title)}",
                 temperature=0.1,
                 timeout=5.0,
+                max_retries=1,
             )
         except Exception as e:
             logger.debug("Window classification failed: %s", e)
@@ -879,7 +909,9 @@ class BrainService(ServiceBase):
             "Respond with ONLY the exact space name (one word, capitalised, e.g., 'Code' or 'Web'). No other text or markdown."
         )
         try:
-            raw = self._complete(model, system_prompt, prompt, temperature=0.1, timeout=5.0)
+            raw = self._complete(
+                model, system_prompt, prompt, temperature=0.1, timeout=5.0, max_retries=1
+            )
             result = raw.strip().replace('"', "").replace("'", "")
             valid_spaces = [
                 "Code",
@@ -912,7 +944,9 @@ class BrainService(ServiceBase):
             "Respond ONLY with valid JSON if action, otherwise plain text. Keep it brief."
         )
         try:
-            result = self._complete(model, system_prompt, text, temperature=0.1, timeout=10.0)
+            result = self._complete(
+                model, system_prompt, text, temperature=0.1, timeout=10.0, max_retries=1
+            )
         except Exception as e:
             logger.debug("ClassifyIntent failed: %s", e)
             return '{"action": "error", "message": "AI classification unavailable"}'
@@ -1180,6 +1214,10 @@ class BrainService(ServiceBase):
                     if not line:
                         continue
                     data = json.loads(line)
+                    if data.get("error"):
+                        # e.g. a model name that does not exist: Ollama answers
+                        # 200 with an error line and ends the stream
+                        raise ProviderError(str(data["error"]))
                     status = data.get("status", "")
                     completed = data.get("completed", 0)
                     total = data.get("total", 0)
@@ -1195,8 +1233,14 @@ class BrainService(ServiceBase):
         prompt: str,
         temperature: float | None = None,
         timeout: float = 60.0,
+        max_retries: int = 2,
     ) -> str:
-        """Return one non-streamed completion from any model. Raises on failure."""
+        """Return one non-streamed completion from any model. Raises on failure.
+
+        Runs on the D-Bus main loop, so a stopped Ollama must fail fast: the
+        default backoff of ``_http_post`` (15 s of sleeping) would freeze every
+        other Brain call, and outlast the *timeout* the caller asked for.
+        """
         model = self._local_name(model)
         if self._is_cloud(model):
             msgs = [{"role": "system", "content": system}] if system else []
@@ -1211,7 +1255,9 @@ class BrainService(ServiceBase):
             payload["system"] = system
         if temperature is not None:
             payload["options"] = {"temperature": temperature}
-        with self._http_post(f"{OLLAMA_BASE_URL}/api/generate", payload, timeout=timeout) as resp:
+        with self._http_post(
+            f"{OLLAMA_BASE_URL}/api/generate", payload, timeout=timeout, max_retries=max_retries
+        ) as resp:
             data = json.loads(resp.read().decode())
             return _sanitize_output(data.get("response", ""))
 
@@ -1296,7 +1342,29 @@ class BrainService(ServiceBase):
             logger.debug("Generate failed: %s", e)
             return "[Error: AI generation unavailable]"
 
+    def _stream_worker(self, tx_id: str, label: str, work: Callable[[], None]) -> None:
+        """Run a stream worker so its client always hears how it ended.
+
+        Building the request can fail before any token flows (database error,
+        a provider that was just removed). Without this the thread would die
+        silently: the transaction stays registered and the client waits for a
+        GenerationCompleted that never comes. Each worker thread also opens
+        its own conversation-store connection, released here.
+        """
+        try:
+            work()
+        except Exception as e:
+            logger.warning("%s stream %s could not start: %s", label, tx_id, e)
+            self._fail_stream(tx_id, f"{label} failed")
+        finally:
+            self.store.close()
+
     def _do_generate_stream(self, tx_id, prompt, system, model):
+        self._stream_worker(
+            tx_id, "Generation", lambda: self._generate_stream(tx_id, prompt, system, model)
+        )
+
+    def _generate_stream(self, tx_id, prompt, system, model):
         if self._is_cloud(model):
             msgs = [{"role": "system", "content": system}] if system else []
             msgs.append({"role": "user", "content": prompt})
@@ -1401,6 +1469,9 @@ class BrainService(ServiceBase):
             return _sanitize_output(data.get("message", {}).get("content", ""))
 
     def _do_agent(self, tx_id, conv_id, context, model):
+        self._stream_worker(tx_id, "Agent", lambda: self._agent(tx_id, conv_id, context, model))
+
+    def _agent(self, tx_id, conv_id, context, model):
         """Run the tool loop, then emit the answer as stream tokens."""
         extra = self.tools.describe_for_prompt() + "\n" + TOOL_PROTOCOL_NOTE
         api_msgs = self._chat_messages(conv_id, context, model, extra_system=extra)
@@ -1457,7 +1528,7 @@ class BrainService(ServiceBase):
                 "stream": False,
             }
             with self._http_post(
-                f"{OLLAMA_BASE_URL}/api/chat", payload, timeout=_OLLAMA_LOAD_TIMEOUT
+                f"{OLLAMA_BASE_URL}/api/chat", payload, timeout=_OLLAMA_LOAD_TIMEOUT, max_retries=2
             ) as resp:
                 data = json.loads(resp.read().decode())
                 return _sanitize_output(data.get("message", {}).get("content", ""))
@@ -1470,6 +1541,11 @@ class BrainService(ServiceBase):
             return "[Error: AI chat unavailable]"
 
     def _do_chat_stream(self, tx_id, conv_id, context, model):
+        self._stream_worker(
+            tx_id, "Chat", lambda: self._chat_stream(tx_id, conv_id, context, model)
+        )
+
+    def _chat_stream(self, tx_id, conv_id, context, model):
         api_msgs = self._chat_messages(conv_id, context, model)
         if self._is_cloud(model):
             tokens = self.providers.chat(model, api_msgs, stream=True)

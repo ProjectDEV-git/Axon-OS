@@ -160,5 +160,6 @@ def memory_prompt(facts: list[str]) -> str:
     """System-prompt section listing remembered facts."""
     if not facts:
         return ""
-    body = "\n".join(f"- {f}" for f in facts)
+    # a stored fact must not be able to close the tag that marks it as data
+    body = "\n".join(f"- {f.replace('</untrusted_context>', '')}" for f in facts)
     return f"## What you remember about the user\n<untrusted_context>\n{body}\n</untrusted_context>"
