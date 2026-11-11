@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: axon-os\n"
 "Report-Msgid-Bugs-To: https://github.com/ProjectDEV-git/Axon-OS/issues\n"
-"POT-Creation-Date: 2026-11-01 11:04+0000\n"
+"POT-Creation-Date: 2026-11-11 13:37+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,52 +18,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 
 #: apps/axon-ai-panel/ui/panel.py
-msgid "(Cancelled)"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Active Chat"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Archived"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Ask again for a new answer"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
 msgid "Ask anything…"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
-msgid "Axon Brain service is offline or Ollama is not running."
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
 msgid "Axon status: checking…"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "Axon status: {headline}"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py services/ui_logic.py
-#: shell/axon-shell/ui-logic.js
-msgid "Axon suggested an action it can't perform here."
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py apps/axon-confirm/main.py
-#: apps/axon-game-center/ui.py apps/axon-settings/ai_models.py
-#: apps/axon-terminal/terminal_widget.py
-msgid "Cancel"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py apps/intent-bar/ui/window.py
-#: shell/axon-shell/intentbar.js
-msgid "Cancelled"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -75,70 +34,15 @@ msgid "Choose what context Axon may send"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
-msgid "Clear"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Clear Conversation"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
 msgid "Clear conversation"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Context:"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Context: checking…"
 msgstr ""
 
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Context: none"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Context: off"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
+#: apps/axon-ai-panel/ui/panel.py apps/axon-ai-panel/ui/panel_conversations.py
 msgid "Conversations"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Copy message"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Copy to clipboard"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Delete"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Delete Conversation?"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py apps/axon-settings/diagnostics_window.py
-#: shell/axon-shell/intentbar.js
-msgid "Diagnostics"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py apps/axon-terminal/terminal_widget.py
-msgid "Dismiss"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "Don't send {item}"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "Don't send {item} with this message"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -146,44 +50,14 @@ msgid "Explain Error"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
-msgid "Facts the AI remembers and uses in your chats."
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Files used"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
 msgid "Fix Bug"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "Fix: {hint}"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Forget"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Forget All"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Forget Everything?"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "Forget “{text}”"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Full Diagnostics"
 msgstr ""
 
-#: apps/axon-ai-panel/ui/panel.py
+#: apps/axon-ai-panel/ui/panel.py apps/axon-ai-panel/ui/panel_memory.py
 msgid "Memories"
 msgstr ""
 
@@ -196,92 +70,13 @@ msgstr ""
 msgid "Model: checking…"
 msgstr ""
 
-#: apps/axon-ai-panel/ui/panel.py
-msgid "New Chat"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "New Conversation"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "New memory"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "No conversations yet"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py shell/axon-shell/intentbar.js
-#, python-brace-format
-msgid "No installed app called “{app}”."
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Nothing remembered yet."
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py services/suggestions.py
-#: shell/axon-shell/ui-logic.js
-#, python-brace-format
-msgid "Open {app}"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "Open {file}"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "Opened {app}."
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Opens the confirmation card first"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Regenerate"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Remember"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Review and Run…"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py apps/intent-bar/ui/window.py
-#: shell/axon-shell/intentbar.js
-msgid "Run anyway"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
+#: apps/axon-ai-panel/ui/panel.py apps/axon-ai-panel/ui/panel_context.py
 msgid "Send"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Send Without It"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Send desktop context to the cloud?"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py services/suggestions.py
 #: shell/axon-shell/ui-logic.js
 msgid "Settings"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Show archived conversations"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "Sources: {files}"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
@@ -297,44 +92,251 @@ msgid "Summarize"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "The AI will forget all {n} saved facts. This can't be undone."
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid ""
-"This will remove all messages in the current conversation. This cannot be "
-"undone."
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
 msgid "Translate"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py apps/axon-settings/ai_models.py
-msgid "Try again"
-msgstr ""
-
-#: apps/axon-ai-panel/ui/panel.py
-msgid "Untitled"
 msgstr ""
 
 #: apps/axon-ai-panel/ui/panel.py
 msgid "Write Code"
 msgstr ""
 
-#: apps/axon-ai-panel/ui/panel.py
+#: apps/axon-ai-panel/ui/panel_actions.py services/ui_logic.py
+#: shell/axon-shell/ui-logic.js
+msgid "Axon suggested an action it can't perform here."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py
+#: apps/axon-settings/diagnostics_window.py shell/axon-shell/intentbar.js
+msgid "Diagnostics"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py apps/axon-terminal/terminal_widget.py
+msgid "Dismiss"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py shell/axon-shell/intentbar.js
+#, python-brace-format
+msgid "No installed app called “{app}”."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py services/suggestions.py
+#: shell/axon-shell/ui-logic.js
+#, python-brace-format
+msgid "Open {app}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py
+#, python-brace-format
+msgid "Opened {app}."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py
+msgid "Opens the confirmation card first"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py
+msgid "Review and Run…"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py apps/intent-bar/ui/window.py
+#: shell/axon-shell/intentbar.js
+msgid "Run anyway"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_actions.py apps/axon-settings/ai_models.py
+msgid "Try again"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_bubble.py
+msgid "Copy message"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_bubble.py
+msgid "Copy to clipboard"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_bubble.py
+msgid "Files used"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_bubble.py
+#, python-brace-format
+msgid "Open {file}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_bubble.py
+#, python-brace-format
+msgid "Sources: {files}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+#, python-brace-format
+msgid "Axon status: {headline}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+#: apps/axon-ai-panel/ui/panel_conversations.py
+#: apps/axon-ai-panel/ui/panel_memory.py apps/axon-confirm/main.py
+#: apps/axon-game-center/ui.py apps/axon-settings/ai_models.py
+#: apps/axon-terminal/terminal_widget.py
+msgid "Cancel"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+msgid "Context:"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+msgid "Context: none"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+msgid "Context: off"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+#, python-brace-format
+msgid "Don't send {item}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+#, python-brace-format
+msgid "Don't send {item} with this message"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+#, python-brace-format
+msgid "Fix: {hint}"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+msgid "Send Without It"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_context.py
+msgid "Send desktop context to the cloud?"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "Active Chat"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "Archived"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "Clear"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "Clear Conversation"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "Delete"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "Delete Conversation?"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "New Chat"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "New Conversation"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "No conversations yet"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "Show archived conversations"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid ""
+"This will remove all messages in the current conversation. This cannot be "
+"undone."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+msgid "Untitled"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_conversations.py
+#, python-brace-format
+msgid "“{title}” will be removed. This can't be undone."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+msgid "Facts the AI remembers and uses in your chats."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+msgid "Forget"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+msgid "Forget All"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+msgid "Forget Everything?"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+#, python-brace-format
+msgid "Forget “{text}”"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+msgid "New memory"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+msgid "Nothing remembered yet."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+msgid "Remember"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
+#, python-brace-format
+msgid "The AI will forget all {n} saved facts. This can't be undone."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_memory.py
 msgid "e.g. I prefer metric units"
 msgstr ""
 
-#: apps/axon-ai-panel/ui/panel.py
-#, python-brace-format
-msgid "used: {tools}"
+#: apps/axon-ai-panel/ui/panel_stream.py
+msgid "(Cancelled)"
 msgstr ""
 
-#: apps/axon-ai-panel/ui/panel.py
+#: apps/axon-ai-panel/ui/panel_stream.py
+msgid "Ask again for a new answer"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_stream.py
+msgid "Axon Brain service is offline or Ollama is not running."
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_stream.py apps/intent-bar/ui/window.py
+#: shell/axon-shell/intentbar.js
+msgid "Cancelled"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_stream.py
+msgid "Regenerate"
+msgstr ""
+
+#: apps/axon-ai-panel/ui/panel_stream.py
 #, python-brace-format
-msgid "“{title}” will be removed. This can't be undone."
+msgid "used: {tools}"
 msgstr ""
 
 #: apps/axon-confirm/main.py
