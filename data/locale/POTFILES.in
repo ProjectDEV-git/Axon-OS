@@ -14,6 +14,12 @@ apps/axon-terminal/terminal.py
 apps/axon-files/ui.py
 apps/axon-settings/settings.py
 apps/axon-ai-panel/ui/panel.py
+apps/axon-ai-panel/ui/panel_actions.py
+apps/axon-ai-panel/ui/panel_bubble.py
+apps/axon-ai-panel/ui/panel_context.py
+apps/axon-ai-panel/ui/panel_conversations.py
+apps/axon-ai-panel/ui/panel_memory.py
+apps/axon-ai-panel/ui/panel_stream.py
 apps/axon-installer/install_engine.py
 apps/axon-welcome/welcome.py
 apps/intent-bar/intent_bar.py

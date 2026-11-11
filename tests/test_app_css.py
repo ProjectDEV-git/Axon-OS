@@ -11,6 +11,13 @@ ROOT = Path(__file__).resolve().parent.parent
 MOVED = [
     "apps/intent-bar/ui/window.py",
     "apps/axon-ai-panel/ui/panel.py",
+    "apps/axon-ai-panel/ui/panel_actions.py",
+    "apps/axon-ai-panel/ui/panel_bubble.py",
+    "apps/axon-ai-panel/ui/panel_compat.py",
+    "apps/axon-ai-panel/ui/panel_context.py",
+    "apps/axon-ai-panel/ui/panel_conversations.py",
+    "apps/axon-ai-panel/ui/panel_memory.py",
+    "apps/axon-ai-panel/ui/panel_stream.py",
     "apps/axon-welcome/ui/welcome.py",
     "apps/axon-installer/ui/wizard.py",
 ]

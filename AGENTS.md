@@ -94,6 +94,20 @@ subagent-controller (orchestrator)
 - Kernel module at `kernel/axon-winabi/` — Phase 1 & 2 complete (~3,900 lines), NOT compiled/tested yet
 - Docker: `docker compose up -d`, Ollama via `host.docker.internal:11434`, each service uses `Dockerfile.service`
 
+#### Axon-OS code map (split modules)
+
+Big modules are split into cohesive files; the original module still re-exports every public name, so existing imports and `tests/` patch points keep working.
+
+- **AI panel** — `apps/axon-ai-panel/ui/`. `panel.py` keeps `AIPanelWindow` (init, model dropdown, key/entry handlers, `_load_status_worker`, `_run_card_command`) and re-exports `MessageBubble`, `_apply_markup`, `open_file`, `OllamaClient`, `tool_sources`, `run_diagnostics`, `confirm_and_exec`. Siblings are imported by bare name (`panel.py` is loaded both as `ui.panel` and by file path in tests, so no relative imports).
+  - `panel_compat.py` — `sys.path` bootstrap (intent-bar, `services/`, `apps/shared`); must be imported before `i18n`/`ui_logic`/`axon_gtk_utils`. `OllamaClient` + `tool_sources` with fallback stubs.
+  - `panel_bubble.py` — `MessageBubble`, `_apply_markup`, `open_file`
+  - `panel_conversations.py` — `ConversationsMixin`: clear/new/switch/rename/archive/delete conversations
+  - `panel_memory.py` — `MemoryMixin`: memories popover
+  - `panel_context.py` — `ContextMixin`: Axon status section, desktop-context row, cloud-send warning
+  - `panel_stream.py` — `StreamMixin`: send, stream worker, chunk/done handling, retry/regenerate
+  - `panel_actions.py` — `ActionsMixin`: error bubbles, action cards (open app / diagnostics / settings)
+  - Tests patch `panel.run_diagnostics` and `panel.confirm_and_exec`, so the two methods that call them (`_load_status_worker`, `_run_card_command`) stay in `panel.py`. New files with `_()` strings go in `data/locale/POTFILES.in`, then `sh scripts/update-pot.sh` (CI checks `--check`).
+
 ### Frictionless OS (Go) — `Documents/Frictionless/`
 - Under 100MB cloud server OS, Go static binaries (CGO_ENABLED=0)
 - Alpine containers: busybox ash, no bash, no brace expansion
