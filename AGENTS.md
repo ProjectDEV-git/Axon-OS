@@ -107,6 +107,15 @@ Big modules are split into cohesive files; the original module still re-exports 
   - `panel_stream.py` — `StreamMixin`: send, stream worker, chunk/done handling, retry/regenerate
   - `panel_actions.py` — `ActionsMixin`: error bubbles, action cards (open app / diagnostics / settings)
   - Tests patch `panel.run_diagnostics` and `panel.confirm_and_exec`, so the two methods that call them (`_load_status_worker`, `_run_card_command`) stay in `panel.py`. New files with `_()` strings go in `data/locale/POTFILES.in`, then `sh scripts/update-pot.sh` (CI checks `--check`).
+- **Brain service** — `services/axon-brain/`. `brain_service.py` keeps `BrainService` (lifecycle `_setup`/`_cleanup`, config load/save, model resolution, `SetModel`, and the methods that emit via `GLib` or read module config) and re-exports the helpers and `CHAT_SYSTEM_PROMPT`. D-Bus methods/signals live in mixins; **a mixin with `@dbus.service.method/signal` must subclass `dbus.service.Object`** (dbus-python only registers them via that metaclass), plain-helper mixins need not. Interface is unchanged: 52 methods+signals.
+  - `brain_sanitize.py` — `_sanitize_output/_sanitize_context/_require_http_url`; `brain_tokens.py` — `TokenBuffer`; `brain_ollama.py` — Ollama timeouts, `_is_retryable`, `_ollama_error_message`, `_same_model`; `brain_config.py` — `MODEL_TIERS`
+  - `brain_http.py` — `OllamaHttpMixin` (plain): `_http_post/_http_get/_installed_models`, model-ref helpers
+  - `brain_gamemode.py` — `GameModeMixin`: Suspend/Resume/AllowCpuOnly, `SuspendedChanged`, request gating
+  - `brain_providers.py` — `ProvidersMixin`: status/models/pull, cloud providers, API keys, OAuth sign-in
+  - `brain_conversations.py` — `ConversationsMixin`: conversations, memories, `ListTools`
+  - `brain_classify.py` — `ClassifyMixin`: `ClassifyWindow*`, `ClassifyIntent`, `GetEmbeddings`
+  - `brain_generation.py` — `GenerationMixin`: `Generate`/`SendMessage*`/`CancelStream`, prompt building, completions
+  - Tests patch `brain_service.GLib`, `.AIRouter`, `._LOCAL_OPENER`, `.CONFIG_FILE`, `.INSTALLER_CONFIG_FILE`, `._read_installer_model`, so any method reading those stays in `brain_service.py` (`_run_stream`, `_do_agent`, `_fail_stream`, `_do_pull_model`, `_do_sign_in`, `_open_with_retry`, ...). After splitting, diff `BrainService._dbus_class_table` before/after.
 
 ### Frictionless OS (Go) — `Documents/Frictionless/`
 - Under 100MB cloud server OS, Go static binaries (CGO_ENABLED=0)
