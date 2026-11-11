@@ -14,7 +14,7 @@ published to the Axon apt repo next to `axon-os`, so `axon-update` keeps them cu
 | `axon-game-mode` | The `axon-game-mode` command and `/etc/gamemode.ini`, which makes GameMode run it when a game starts and ends. |
 | `axon-gaming-tweaks` | `vm.max_map_count`, `kernel.split_lock_mitigate`, a 1048576 open-file hard limit for system and user services, zram swap (`min(RAM/2, 8 GiB)`, zstd), and `/dev/ntsync` access. |
 
-Not shipped, on purpose (see the ISO policy in `AGENTS.md`): other launchers, Proton-GE,
+Not shipped, on purpose (see the ISO policy in `docs/iso-policy.md`): other launchers, Proton-GE,
 emulators, chat/recording tools, optional media codecs, Node/Go/Docker, LibreOffice,
 Mission Center. They arrive through Game Center in a later phase.
 
@@ -110,7 +110,7 @@ axon-game-mode reset      # force game mode off
 ## Game Center and the catalog
 
 Everything optional installs after the system is installed, never from the ISO (see the ISO
-policy in `AGENTS.md`). `data/gaming/catalog.json` lists it, validated by
+policy in `docs/iso-policy.md`). `data/gaming/catalog.json` lists it, validated by
 `data/gaming/catalog.schema.json` in CI. The `axon-gaming-catalog` package puts both in
 `/usr/share/axon/gaming/`, so **a new list reaches installed systems through the normal update,
 without a new ISO**. Game Center, the welcome app and the Intent Bar all read that file.

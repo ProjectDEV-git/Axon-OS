@@ -13,7 +13,7 @@ You are improving the user interface of Axon OS, an AI-native Linux desktop
 
 How to work:
 
-1. Read `AGENTS.md` (Axon-OS section), `docs/architecture.md`, `DEVELOPING.md` and the
+1. Read `AGENTS.md` (Axon-OS section; ISO policy is in `docs/iso-policy.md`), `docs/architecture.md`, `DEVELOPING.md` and the
    whole plan before changing anything. Then do Phase 0 (baseline QA run).
 2. Work through the phases **in order** (1 → 5). Inside a phase, work top to bottom
    unless an item depends on a later one.

@@ -108,7 +108,7 @@ scripts/check-iso-size.sh --edition standard \
 ```
 
 A pull request that adds more than 50 MB to either ISO must say why in its description and which
-rule (A, B or C) of the ISO policy in `AGENTS.md` allows it.
+rule (A, B or C) of the ISO policy in `docs/iso-policy.md` allows it.
 
 ### Keep Chroot (Interactive Development)
 

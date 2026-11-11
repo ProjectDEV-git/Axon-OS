@@ -6,7 +6,7 @@ add a short note under any item you skip or change.
 
 ## Ground rules
 
-- Read `AGENTS.md` (Axon-OS section), `docs/architecture.md` and `DEVELOPING.md` first.
+- Read `AGENTS.md` (Axon-OS section; ISO policy is in `docs/iso-policy.md`), `docs/architecture.md` and `DEVELOPING.md` first.
 - Before every push run: `ruff check apps/ services/ tests/ installer/`,
   `ruff format --check apps/ services/ tests/ installer/`,
   `mypy apps/ services/ --ignore-missing-imports`, and

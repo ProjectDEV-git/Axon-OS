@@ -102,7 +102,7 @@ pythonpath = ["."]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--verbose --strict-markers --timeout=30"
+addopts = "--strict-markers --timeout=30"
 markers = [
     "slow: marks tests as slow",
     "integration: marks tests as integration tests",
