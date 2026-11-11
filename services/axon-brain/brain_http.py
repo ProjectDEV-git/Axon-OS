@@ -26,8 +26,11 @@ class OllamaHttpMixin:
     """Plain-HTTP access to local Ollama: POST/GET with retry, installed-model cache."""
 
     if TYPE_CHECKING:
-        # Provided by sibling mixins / BrainService; declared here for the type checker only.
-        def _game_mode_payload(self, url: Any, payload: Any) -> Any: ...
+        # Defined on BrainService; declared here for the type checker only.
+        _config_lock: Any
+        config: Any
+
+        def _resolve_local_model(self, model: str) -> str: ...
 
         @staticmethod
         def _open_with_retry(req: Any, timeout: Any, max_retries: Any) -> Any: ...
@@ -39,6 +42,19 @@ class OllamaHttpMixin:
         data = json.dumps(payload).encode()
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         return self._open_with_retry(req, timeout, max_retries)
+
+    def _game_mode_payload(self, url, payload):
+        """Apply game mode to a request for Ollama (raises if it must not run)."""
+        gate = getattr(self, "_gate", None)
+        if gate is None or not gate.suspended or not url.startswith(OLLAMA_BASE_URL):
+            return payload
+        cpu_model = ""
+        if gate.cpu_allowed:
+            with self._config_lock:
+                speed = str(self.config.get("speed_model", ""))
+            if speed and not self._is_cloud(speed):
+                cpu_model = self._resolve_local_model(self._local_name(speed))
+        return gate.apply(url[len(OLLAMA_BASE_URL) :], payload, cpu_model)
 
     def _http_get(self, url, timeout=5.0, max_retries=5):
         """GET from Ollama, retrying only while it refuses connections."""

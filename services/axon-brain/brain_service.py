@@ -48,7 +48,7 @@ from brain_conversations import ConversationsMixin
 from brain_gamemode import GameModeMixin
 from brain_generation import GenerationMixin
 from brain_http import OllamaHttpMixin
-from brain_ollama import (  # noqa: F401  (re-exported: tests and callers import these from here)
+from brain_ollama import (
     _INSTALLED_MODELS_TTL,
     _OLLAMA_LOAD_TIMEOUT,
     _STREAM_READ_TIMEOUT,
@@ -57,7 +57,7 @@ from brain_ollama import (  # noqa: F401  (re-exported: tests and callers import
     _same_model,
 )
 from brain_providers import ProvidersMixin
-from brain_sanitize import (  # noqa: F401  (re-exported)
+from brain_sanitize import (
     _ANSI_RE,
     _INJECTION_PATTERNS,
     _MAX_CONTEXT_LEN,
@@ -76,13 +76,31 @@ from conversation_store import ConversationStore
 from credentials import CredentialStore
 from game_gate import GameGate
 from memory import MemoryStore
-from prompts import CHAT_SYSTEM_PROMPT  # noqa: F401  (re-exported)
+from prompts import CHAT_SYSTEM_PROMPT
 from providers import (
     ProviderError,
     ProviderRegistry,
     parse_model_ref,
 )
 from tools import TOOL_PROTOCOL_NOTE
+
+__all__ = [
+    "CHAT_SYSTEM_PROMPT",
+    "_ANSI_RE",
+    "_INJECTION_PATTERNS",
+    "_INSTALLED_MODELS_TTL",
+    "_MAX_CONTEXT_LEN",
+    "_OLLAMA_LOAD_TIMEOUT",
+    "_STREAM_READ_TIMEOUT",
+    "BrainService",
+    "TokenBuffer",
+    "_is_retryable",
+    "_ollama_error_message",
+    "_require_http_url",
+    "_same_model",
+    "_sanitize_context",
+    "_sanitize_output",
+]
 
 CONFIG_FILE = AXON_DIR / "config.toml"
 # Written by the graphical installer; holds the model the user picked there.

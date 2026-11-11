@@ -14,6 +14,11 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+__all__ = [
+    "OllamaClient",
+    "tool_sources",
+]
+
 # ---------------------------------------------------------------------------
 # Import OllamaClient from the intent-bar app, falling back to a built-in
 # stub if the module is not yet populated.

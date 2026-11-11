@@ -30,14 +30,14 @@ from gi.repository import Adw, Gdk, GLib, Gtk, Pango
 # ``ui.panel`` (main.py) and by path (tests), so relative imports won't do.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # OllamaClient / tool_sources are re-exported: callers import them from here.
-from panel_compat import OllamaClient, tool_sources  # noqa: F401  (sets up sys.path first)
+from panel_compat import OllamaClient, tool_sources
 
 # isort: split
 from axon_gtk_utils import fit_default_size, load_app_css
 from diagnostics import run_diagnostics
 from i18n import N_, _
 from panel_actions import ActionsMixin
-from panel_bubble import MessageBubble, _apply_markup, open_file  # noqa: F401  (re-exported)
+from panel_bubble import MessageBubble, _apply_markup, open_file
 from panel_context import ContextMixin
 from panel_conversations import ConversationsMixin
 from panel_memory import MemoryMixin
@@ -52,6 +52,15 @@ from ui_logic import (
     origin_tooltip,
     routing_origin,
 )
+
+__all__ = [
+    "AIPanelWindow",
+    "MessageBubble",
+    "OllamaClient",
+    "_apply_markup",
+    "open_file",
+    "tool_sources",
+]
 
 
 def _label_factory(ellipsize: bool) -> Gtk.SignalListItemFactory:
